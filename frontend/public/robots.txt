@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Disallow private and transactional pages
+Disallow: /account
+Disallow: /cart
+Disallow: /payment
+Disallow: /confirmation
+Disallow: /signin
+Disallow: /signup
+Disallow: /admin
+
+# Sitemap location
+Sitemap: https://www.bodilicious.in/sitemap.xml

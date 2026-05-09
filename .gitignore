@@ -1,0 +1,24 @@
+# env
+.env
+backend/.env
+frontend/.env
+.env.production
+backend/.env.production
+*.env.*
+
+# dependencies
+node_modules/
+
+# build
+dist/
+build/
+
+# logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# testing
+backend/scripts/test-*.js
