@@ -27,7 +27,7 @@ app.use(cors({
     "http://localhost:5173",
     "https://bodilicious.in",
     "https://www.bodilicious.in",
-    "https://bodilicious-cxow.onrender.com"
+    "https://bodilicious.netlify.app/"
   ],
   credentials: true
 }));
