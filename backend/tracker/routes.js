@@ -38,6 +38,13 @@ router.post("/", protect, validate(createOrderSchema), createOrder);
 router.get("/", protect, getMyOrders);
 
 // =============================
+// SHIPROCKET WEBHOOK
+// POST /api/orders/webhook/shipping
+// ⚠ Must be ABOVE /:orderId route
+// =============================
+router.post("/webhook/shipping", shiprocketWebhook);
+
+// =============================
 // TRACK ORDER (Shiprocket)
 // GET /api/orders/shiprocket/:awb
 // ⚠ Must be ABOVE :orderId route
@@ -86,11 +93,7 @@ router.post("/:orderId/return", protect, requestReturn);
 // =============================
 router.post("/:orderId/comment", protect, addOrderComment);
 
-// =============================
-// SHIPROCKET WEBHOOK
-// POST /api/orders/webhook/shipping
-// =============================
-router.post("/webhook/shipping", shiprocketWebhook);
+// (Shiprocket webhook moved above /:orderId routes to prevent route conflict)
 
 
 export default router;
