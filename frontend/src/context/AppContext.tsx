@@ -258,7 +258,7 @@ const fetchUserProfileAndSync = useCallback(async () => {
         if (existing) {
           // If product exists in both, we sum quantities
           // (Can also choose to take max or localItem's quantity)
-          existing.quantity = (existing.quantity || 0) + (localItem.quantity || 1);
+          existing.quantity = Number(existing.quantity || 0) + Number(localItem.quantity || 1);
           hasChanges = true;
         } else {
           // New item from guest session
@@ -637,7 +637,7 @@ const resendVerificationEmail = async () => {
       const newItems = prev.map(i => {
         if (i.product && i.product.pid === product.pid) {
           isMutated = true;
-          return { ...i, quantity: (i.quantity ?? 0) + quantity };
+          return { ...i, quantity: Number(i.quantity ?? 0) + Number(quantity) };
         }
         return i;
       });
@@ -689,7 +689,7 @@ const resendVerificationEmail = async () => {
     let nextCart: CartItem[] = [];
     setCartItems(prev => {
       nextCart = prev.map(i =>
-        i.product && i.product.pid === pid ? { ...i, quantity: qty } : i
+        i.product && i.product.pid === pid ? { ...i, quantity: Number(qty) } : i
       );
       return nextCart;
     });
@@ -976,7 +976,7 @@ const resendVerificationEmail = async () => {
      Derived values
   ============================== */
   const cartCount = cartItems.reduce(
-    (sum, i) => sum + (i.product ? (i.quantity ?? 0) : 0),
+    (sum, i) => sum + (i.product ? Number(i.quantity ?? 0) : 0),
     0
   );
 

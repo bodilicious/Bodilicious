@@ -31,7 +31,7 @@ export default function StoreSettings() {
   const fetchSettings = async () => {
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`${API_URL}/api/v1/settings/admin`, { headers });
+      const res = await fetch(`${API_URL}/api/v1/settings`, { headers });
       const data = await res.json();
       if (data.success && data.data) {
         setForm(data.data);
@@ -49,8 +49,8 @@ export default function StoreSettings() {
     setSaving(true);
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`${API_URL}/api/v1/settings/admin`, {
-        method: 'POST',
+      const res = await fetch(`${API_URL}/api/v1/settings`, {
+        method: 'PUT',
         headers,
         body: JSON.stringify(form)
       });
@@ -80,7 +80,7 @@ export default function StoreSettings() {
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex items-center gap-3 mb-8">
         <Settings className="text-dark-red" size={28} />
-        <h2 className="text-2xl font-serif font-bold text-dark-red">Store Settings</h2>
+        <h2 className="text-2xl font-serif font-bold text-dark-red">Settings</h2>
       </div>
 
       <form onSubmit={handleSave} className="space-y-8">

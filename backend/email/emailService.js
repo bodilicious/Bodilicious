@@ -409,12 +409,158 @@ export const sendReturnRejectedEmail = async (order, userEmail, userName, reject
 };
 
 /*
-  TICKET RESOLVED EMAIL
+  TICKET ACKNOWLEDGEMENT EMAIL — fires when a new ticket is created
 */
-export const sendTicketResolvedEmail = async (ticket, userEmail, userName) => {
+export const sendTicketAcknowledgementEmail = async (ticket, userEmail, userName) => {
   try {
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
+    const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
+    const ticketsUrl = `${frontendUrl}/account/tickets`;
+
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        We've Received Your Query 🙏
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        Thank you for reaching out! We've received your support request and our team will get back to you within <strong>a few hours</strong>.
+      </p>
+
+      <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
+        <p style="margin:0 0 8px;"><strong>Ticket ID:</strong> ${ticketId}</p>
+        <p style="margin:0 0 8px;"><strong>Issue Type:</strong> ${typeLabel}</p>
+        <p style="margin:0;"><strong>Your Message:</strong><br/><span style="color:#555555;">${ticket?.description || ""}</span></p>
+      </div>
+
+      <p style="margin:0 0 14px;">
+        You can track the status of your ticket at any time by clicking the button below. We will also email you as soon as we respond.
+      </p>
+
+      <div style="text-align:center; margin:28px 0;">
+        <a
+          href="${ticketsUrl}"
+          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block;"
+        >
+          View My Tickets
+        </a>
+      </div>
+
+      <p style="margin:18px 0 0; font-size:13px; color:#666666;">
+        Need urgent help? You can also reach us on WhatsApp at
+        <a href="https://wa.me/919894451947" style="color:#8B0000;">+91 98944 51947</a>
+        or email us at
+        <a href="mailto:bodiliciousnaturalproducts@gmail.com" style="color:#8B0000;">bodiliciousnaturalproducts@gmail.com</a>.
+      </p>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: `We got your query! Ticket #${ticketId} | Bodilicious`,
+      html: buildEmailLayout(content, { customerName: userName }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Ticket acknowledgement email sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Ticket acknowledgement email failed:", error);
+    throw error;
+  }
+};
+
+/*
+  TICKET REPLY EMAIL — fires when admin replies to a ticket
+*/
+export const sendTicketReplyEmail = async (ticket, replyText, userEmail, userName) => {
+  try {
+    const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
+    const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
+    const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
+    const ticketsUrl = `${frontendUrl}/account/tickets`;
+    const contactUrl = `${frontendUrl}/contact`;
+
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        Support Has Replied to Your Query 💬
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        Our team has responded to your support ticket <strong>#${ticketId}</strong>. Here's what we said:
+      </p>
+
+      <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
+        <p style="margin:0 0 8px; font-size:12px; color:#999999; text-transform:uppercase; letter-spacing:0.05em; font-weight:bold;">Bodilicious Support</p>
+        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${replyText}</p>
+      </div>
+
+      <div style="background:#fafafa; padding:14px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
+        <p style="margin:0 0 6px;"><strong>Ticket ID:</strong> ${ticketId}</p>
+        <p style="margin:0;"><strong>Issue Type:</strong> ${typeLabel}</p>
+      </div>
+
+      <p style="margin:0 0 22px;">
+        Log into your account to see the full conversation and check your ticket status.
+      </p>
+
+      <div style="text-align:center; margin:28px 0;">
+        <a
+          href="${ticketsUrl}"
+          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block;"
+        >
+          View My Ticket
+        </a>
+      </div>
+
+      <p style="margin:22px 0 0; font-size:13px; color:#666666; text-align:center;">
+        Still have questions?
+        <a href="${contactUrl}" style="color:#8B0000; font-weight:bold;">Raise a new query</a>
+        or reply to this email and we'll help you out.
+      </p>
+
+      <hr style="border:none; border-top:1px solid #eeeeee; margin:28px 0;" />
+
+      <p style="font-size:12px; color:#aaaaaa; text-align:center; margin:0;">
+        You're receiving this email because you raised a support ticket at Bodilicious.<br/>
+        <a href="https://wa.me/919894451947" style="color:#8B0000;">WhatsApp Us</a> &nbsp;|&nbsp;
+        <a href="https://www.bodilicious.in" style="color:#8B0000;">Visit Our Store</a>
+      </p>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      replyTo: process.env.EMAIL_USER,
+      subject: `Re: Your Query [#${ticketId}] | Bodilicious Support`,
+      html: buildEmailLayout(content, { customerName: userName }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Ticket reply email sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Ticket reply email failed:", error);
+    throw error;
+  }
+};
+
+/*
+  TICKET RESOLVED EMAIL
+*/
+export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resolutionMessage = null) => {
+  try {
+    const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
+    const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
+
+    let messageHtml = '';
+    if (resolutionMessage) {
+      messageHtml = `
+      <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
+        <p style="margin:0 0 8px; font-size:12px; color:#999999; text-transform:uppercase; letter-spacing:0.05em; font-weight:bold;">Final Resolution Note</p>
+        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${resolutionMessage}</p>
+      </div>`;
+    }
 
     const content = `
       <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
@@ -424,6 +570,8 @@ export const sendTicketResolvedEmail = async (ticket, userEmail, userName) => {
       <p style="margin:0 0 14px;">
         We wanted to let you know that your support ticket <strong>#${ticketId}</strong> regarding <strong>${typeLabel}</strong> has been marked as resolved.
       </p>
+
+      ${messageHtml}
 
       <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
         <p style="margin:0 0 8px;"><strong>Ticket ID:</strong> ${ticketId}</p>
@@ -457,6 +605,70 @@ export const sendTicketResolvedEmail = async (ticket, userEmail, userName) => {
     return info;
   } catch (error) {
     console.error("Ticket resolved email failed:", error);
+    throw error;
+  }
+};
+
+/*
+  TICKET CANCELLED EMAIL
+*/
+export const sendTicketCancelledEmail = async (ticket, userEmail, userName, cancelReason = null) => {
+  try {
+    const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
+    const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
+
+    let reasonHtml = '';
+    if (cancelReason) {
+      reasonHtml = `
+      <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
+        <p style="margin:0 0 8px; font-size:12px; color:#999999; text-transform:uppercase; letter-spacing:0.05em; font-weight:bold;">Reason for Cancellation</p>
+        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${cancelReason}</p>
+      </div>`;
+    }
+
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        Ticket Cancelled ❌
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        This is an update regarding your support ticket <strong>#${ticketId}</strong> for <strong>${typeLabel}</strong>. This ticket has been cancelled.
+      </p>
+
+      ${reasonHtml}
+
+      <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
+        <p style="margin:0 0 8px;"><strong>Ticket ID:</strong> ${ticketId}</p>
+        <p style="margin:0 0 8px;"><strong>Issue Type:</strong> ${typeLabel}</p>
+        <p style="margin:0;"><strong>Status:</strong> Cancelled</p>
+      </div>
+
+      <p style="margin:0 0 14px;">
+        If you feel this was done in error or if you still need assistance, please reach out to us by replying to this email or raising a new query.
+      </p>
+
+      <div style="text-align:center; margin:28px 0 0;">
+        <a
+          href="https://www.bodilicious.in/contact"
+          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block;"
+        >
+          Contact Support
+        </a>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: `Ticket Cancelled: #${ticketId} | Bodilicious Support`,
+      html: buildEmailLayout(content, { customerName: userName }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Ticket cancelled email sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Ticket cancelled email failed:", error);
     throw error;
   }
 };

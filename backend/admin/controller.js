@@ -298,7 +298,7 @@ const autoSyncOrdersWithShiprocket = async (orders) => {
   const activeOrders = orders.filter(
     (o) =>
       o.shiprocketOrderId &&
-      ["processing", "shipped", "return_requested"].includes(o.orderStatus)
+      ["pending", "processing", "shipped", "return_requested"].includes(o.orderStatus)
   );
 
   if (activeOrders.length === 0) return;

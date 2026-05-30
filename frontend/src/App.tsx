@@ -19,7 +19,7 @@ const TrackingPage = lazy(() => import('./pages/TrackingPage'));
 const OrderDetailsPage = lazy(() => import('./pages/OrderDetailsPage'));
 const PaymentPage = lazy(() => import('./pages/PaymentPage'));
 const ShippingPage = lazy(() => import('./pages/ShippingPage'));
-const ChatPage = lazy(() => import('./pages/ChatPage'));
+
 const ConfirmationPage = lazy(() => import('./pages/ConfirmationPage'));
 const GenericStaticPage = lazy(() => import('./pages/GenericStaticPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
@@ -49,6 +49,7 @@ const Insights = lazy(() => import('./admin/Insights'));
 const AbandonedCheckouts = lazy(() => import('./admin/AbandonedCheckouts'));
 const DraftOrders = lazy(() => import('./admin/DraftOrders'));
 const StoreSettings = lazy(() => import('./admin/StoreSettings'));
+const TicketManagement = lazy(() => import('./admin/TicketManagement'));
 
 // Simple loading fallback
 const PageLoader = () => (
@@ -92,7 +93,7 @@ function AppRoutes() {
             <Route path="/cart" element={<PageTransition><CartPage /></PageTransition>} />
             <Route path="/wishlist" element={<PageTransition><WishlistPage /></PageTransition>} />
             <Route path="/payment" element={<PageTransition><PaymentPage /></PageTransition>} />
-            <Route path="/chat" element={<PageTransition><ChatPage /></PageTransition>} />
+
             <Route path="/signin" element={<PageTransition><SignInPage /></PageTransition>} />
             <Route path="/account" element={<PageTransition><AccountPage /></PageTransition>} />
             <Route path="/tracking" element={<PageTransition><TrackingPage /></PageTransition>} />
@@ -134,6 +135,7 @@ function AppRoutes() {
                 <Route path="coupons" element={<CouponManagement />} />
                 <Route path="insights" element={<Insights />} />
                 <Route path="users" element={<UserManagement />} />
+                <Route path="tickets" element={<TicketManagement />} />
                 <Route path="settings" element={<StoreSettings />} />
                 <Route path="logs" element={<AuditLogs />} />
               </Route>

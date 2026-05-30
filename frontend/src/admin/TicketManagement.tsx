@@ -264,22 +264,22 @@ const TicketManagement: React.FC = () => {
     }
   };
 
-  const handleResolve = async (ticketId: string) => {
+  const handleStatusChange = async (ticketId: string, status: 'resolved' | 'cancelled') => {
     setResolvingId(ticketId);
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/api/v1/support/tickets/${ticketId}`, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ status: 'resolved' }),
+        body: JSON.stringify({ status, message: draft.trim() || undefined }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success('Ticket resolved — customer notified by email');
+        toast.success(`Ticket ${status} — customer notified by email`);
         await fetchTickets();
         closeDrawer();
       } else {
-        toast.error(data.message || 'Failed to resolve ticket');
+        toast.error(data.message || `Failed to mark as ${status}`);
       }
     } catch {
       toast.error('An error occurred');
@@ -345,6 +345,7 @@ const TicketManagement: React.FC = () => {
             <option value="">All Statuses</option>
             <option value="open">Open</option>
             <option value="resolved">Resolved</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           <select
             className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
@@ -421,6 +422,8 @@ const TicketManagement: React.FC = () => {
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                       t.status === 'resolved'
                         ? 'bg-teal-50 text-teal-700 border-teal-200'
+                        : t.status === 'cancelled'
+                        ? 'bg-gray-100 text-gray-700 border-gray-300'
                         : 'bg-amber-50 text-amber-700 border-amber-200'
                     }`}>
                       {t.status}
@@ -473,6 +476,8 @@ const TicketManagement: React.FC = () => {
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                     selectedTicket.status === 'resolved'
                       ? 'bg-teal-50 text-teal-700 border-teal-200'
+                      : selectedTicket.status === 'cancelled'
+                      ? 'bg-gray-100 text-gray-700 border-gray-300'
                       : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}>
                     {selectedTicket.status}
@@ -612,24 +617,45 @@ const TicketManagement: React.FC = () => {
                     <Send size={18} />
                   </button>
                 </div>
-                <button
-                  onClick={() => handleResolve(selectedTicket._id)}
-                  disabled={resolvingId === selectedTicket._id}
-                  className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
-                >
-                  {resolvingId === selectedTicket._id ? (
-                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <CheckCircle size={17} />
-                  )}
-                  Mark as Resolved &amp; Notify Customer
-                </button>
+                <div className="flex gap-2 items-center text-xs text-grey-beige/70 italic px-1">
+                  Optional: Type a final message above, then click Resolve or Cancel to include it in the email.
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleStatusChange(selectedTicket._id, 'resolved')}
+                    disabled={resolvingId === selectedTicket._id}
+                    className="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
+                  >
+                    {resolvingId === selectedTicket._id ? (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <CheckCircle size={17} />
+                    )}
+                    Resolve
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(selectedTicket._id, 'cancelled')}
+                    disabled={resolvingId === selectedTicket._id}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
+                  >
+                    {resolvingId === selectedTicket._id ? (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <X size={17} />
+                    )}
+                    Cancel Ticket
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="p-4 border-t border-silk-light space-y-3">
-                <div className="flex items-center justify-center gap-2 py-3 text-teal-600 text-sm font-semibold bg-teal-50 rounded-xl">
-                  <CheckCircle size={16} />
-                  Ticket resolved — thread is closed
+                <div className={`flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl ${
+                  selectedTicket.status === 'resolved' 
+                    ? 'bg-teal-50 text-teal-600' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {selectedTicket.status === 'resolved' ? <CheckCircle size={16} /> : <X size={16} />}
+                  Ticket {selectedTicket.status} — thread is closed
                 </div>
               </div>
             )}

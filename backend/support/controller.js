@@ -1,5 +1,9 @@
 import { Ticket, FAQ } from "./models.js";
-import { sendTicketResolvedEmail } from "../email/emailService.js";
+import {
+  sendTicketResolvedEmail,
+  sendTicketAcknowledgementEmail,
+  sendTicketReplyEmail,
+} from "../email/emailService.js";
 import { v2 as cloudinary } from "cloudinary";
 
 // POST /api/v1/support/tickets
@@ -28,6 +32,20 @@ export const createTicket = async (req, res) => {
         },
       ],
     });
+
+    await ticket.save();
+
+    // Populate user for email
+    await ticket.populate("userId", "name email");
+
+    // Send acknowledgement email (non-blocking)
+    if (ticket.userId?.email) {
+      sendTicketAcknowledgementEmail(
+        ticket,
+        ticket.userId.email,
+        ticket.userId.name || "Customer"
+      ).catch((err) => console.error("Ticket ack email failed:", err.message));
+    }
 
     return res.status(201).json({ success: true, ticket });
   } catch (error) {
@@ -128,6 +146,16 @@ export const addMessage = async (req, res) => {
     // Re-populate so the response has full userId data
     await ticket.populate("userId", "name email photoURL");
 
+    // If admin replied, notify the customer by email (non-blocking)
+    if (authorRole === "admin" && ticket.userId?.email) {
+      sendTicketReplyEmail(
+        ticket,
+        text.trim(),
+        ticket.userId.email,
+        ticket.userId.name || "Customer"
+      ).catch((err) => console.error("Ticket reply email failed:", err.message));
+    }
+
     return res.status(201).json({ success: true, ticket });
   } catch (error) {
     console.error("Error adding message:", error);
@@ -139,9 +167,9 @@ export const addMessage = async (req, res) => {
 export const updateTicketStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, message } = req.body;
 
-    if (!status || !["open", "resolved"].includes(status)) {
+    if (!status || !["open", "resolved", "cancelled"].includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status" });
     }
 
@@ -171,8 +199,17 @@ export const updateTicketStatus = async (req, res) => {
 
     // Fire resolution email only on first resolve
     if (status === "resolved" && wasOpen && ticket.userId?.email) {
-      sendTicketResolvedEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer").catch((err) => {
+      sendTicketResolvedEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
         console.error("Failed to send ticket resolved email:", id, err.message);
+      });
+    }
+
+    // Fire cancelled email
+    if (status === "cancelled" && wasOpen && ticket.userId?.email) {
+      import("../email/emailService.js").then((mod) => {
+        mod.sendTicketCancelledEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
+          console.error("Failed to send ticket cancelled email:", id, err.message);
+        });
       });
     }
 

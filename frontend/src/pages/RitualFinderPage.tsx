@@ -572,17 +572,7 @@ export default function RitualFinderPage() {
                 )}
             </div>
 
-            {(step === 0 || step === 7) && (
-                <div onClick={() => navigateTo('chat')} className="fixed bottom-6 right-6 z-40 bg-white text-dark-red p-4 rounded-2xl shadow-lg border border-silk flex items-center gap-4 hover:shadow-xl transition-all transform hover:-translate-y-1 group cursor-pointer">
-                <div className="w-12 h-12 bg-[#EFE7DF] rounded-full flex items-center justify-center shrink-0">
-                    <MessageCircle className="text-[#8B5E3C]" size={24} />
-                </div>
-                <div>
-                    <p className="text-sm font-serif leading-tight">Need expert advice?</p>
-                    <p className="text-xs font-sans text-grey-beige mt-1">Talk to our assistant <span className="group-hover:translate-x-1 inline-block transition-transform">→</span></p>
-                </div>
-            </div>
-        )}
+
     </div>
     );
 }

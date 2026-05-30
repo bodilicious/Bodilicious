@@ -79,7 +79,7 @@ const AdminLayout: React.FC = () => {
     {
       title: 'Settings',
       items: [
-        { name: 'Store Settings', path: '/admin/settings', icon: Settings },
+        { name: 'Settings', path: '/admin/settings', icon: Settings },
         { name: 'Audit Logs', path: '/admin/logs', icon: History },
       ]
     }

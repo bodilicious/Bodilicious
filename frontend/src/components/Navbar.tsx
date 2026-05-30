@@ -57,6 +57,7 @@ const NAV_LINKS = [
   { label: 'Body', page: 'shop' as const, isMegaMenu: true, query: 'category=body,lip,makeup' },
   { label: 'Ritual Finder', page: 'ritual-finder' as const },
   { label: 'About', page: 'about' as const },
+  { label: 'Contact Us', page: 'contact' as const },
 ];
 
 export default function Navbar() {
@@ -291,15 +292,7 @@ export default function Navbar() {
               <Search size={18} className={searchOpen ? 'scale-110 transition-transform' : 'transition-transform'} />
             </button>
 
-            <Link
-              to="/chat"
-              className={`transition-colors relative ${
-                isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-ruby-red'
-              } ${currentPage === 'chat' && !isTransparent ? 'text-dark-red' : ''}`}
-              title="Chat with Beauty Advisor"
-            >
-              <MessageCircle size={18} />
-            </Link>
+
 
             <Link to="/wishlist" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-ruby-red'}`}>
               <Heart size={18} />
