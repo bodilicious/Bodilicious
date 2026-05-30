@@ -266,7 +266,7 @@ const ProductForm: React.FC = () => {
         >
           ← Back
         </button>
-        <h1 className="text-xl font-bold text-gray-800">
+        <h1 className="text-base sm:text-xl font-bold text-gray-800 flex-1 text-center truncate mx-2">
           {isEditMode ? `Edit: ${formData.name}` : 'Add New Product'}
         </h1>
         <button 

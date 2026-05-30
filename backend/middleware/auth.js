@@ -4,7 +4,10 @@ import { logAction } from "../admin/controller.js";
 
 export const protect = async (req, res, next) => {
   try {
-    const header = req.headers.authorization;
+    let header = req.headers.authorization;
+    if (!header && req.query.token) {
+      header = `Bearer ${req.query.token}`;
+    }
 
     if (!header || !header.startsWith("Bearer ")) {
       return res.status(401).json({
@@ -20,6 +23,12 @@ export const protect = async (req, res, next) => {
       decoded = await admin.auth().verifyIdToken(token);
     } catch (firebaseErr) {
       console.error("Firebase token verification failed:", firebaseErr.message);
+      
+      // 🚀 Audit Login Failed
+      logAction(req, "login_failed", "user", "anonymous", {
+        reason: firebaseErr.message
+      }, { severity: "WARNING", source: "frontend" }).catch(err => console.error("Login Failed Audit Failed:", err));
+
       return res.status(401).json({
         success: false,
         message: "Invalid or expired token",
@@ -56,9 +65,19 @@ export const protect = async (req, res, next) => {
         }).catch(err => console.error("New Customer Audit Failed:", err));
       }
 
-      await UserProfile.findByIdAndUpdate(user._id, {
-        $set: { lastLoginAt: new Date() }
-      });
+      // Debounce lastLoginAt updates to max once per hour to prevent DB spam and log flooding
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (!user.lastLoginAt || user.lastLoginAt < oneHourAgo) {
+        await UserProfile.findByIdAndUpdate(user._id, {
+          $set: { lastLoginAt: new Date() }
+        });
+        
+        // 🚀 Audit Login Success (Debounced)
+        logAction(req, "login_success", "user", user._id.toString(), {
+          email: user.email,
+          name: user.name
+        }, { source: "frontend" }).catch(err => console.error("Login Success Audit Failed:", err));
+      }
 
       req.user = user;
       req.userVerified = user.emailVerified;
@@ -86,7 +105,10 @@ export const protect = async (req, res, next) => {
  */
 export const tryProtect = async (req, res, next) => {
   try {
-    const header = req.headers.authorization;
+    let header = req.headers.authorization;
+    if (!header && req.query.token) {
+      header = `Bearer ${req.query.token}`;
+    }
 
     if (!header || !header.startsWith("Bearer ")) {
       return next();

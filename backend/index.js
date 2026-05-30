@@ -8,6 +8,9 @@ import adminRoutes from "./admin/routes.js";
 import returnsRoutes from "./returns/routes.js";
 import couponRoutes from "./coupons/routes.js";
 import procurementRoutes from "./procurement/routes.js";
+import supportRoutes from "./support/routes.js";
+import analyticsRoutes from "./analytics/routes.js";
+import settingsRoutes from "./settings/routes.js";
 
 const router = Router();
 
@@ -16,10 +19,13 @@ router.use("/user", profileRoutes);
 router.use("/chat", chatRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payment", paymentRoutes);
-router.use("/admin", adminRoutes);
+router.use("/admin/analytics", analyticsRoutes);
 router.use("/admin/returns", returnsRoutes);
 router.use("/admin/coupons", couponRoutes);
 router.use("/admin", procurementRoutes);
+router.use("/admin", adminRoutes); // Moved to the bottom to avoid intercepting other /admin/* routes
+router.use("/settings", settingsRoutes);
+router.use("/support", supportRoutes);
 
 export default router;
 

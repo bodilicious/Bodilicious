@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Heart,
   ShoppingBag,
@@ -49,6 +49,7 @@ import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { getIngredientData } from '../data/ingredientMeta';
 import { useSEO } from '../hooks/useSEO';
+import { usePostHog } from 'posthog-js/react';
 
 const AccordionItem = ({
   title,
@@ -95,6 +96,7 @@ export default function ProductPage() {
   const { pid } = useParams<{ pid: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const posthog = usePostHog();
 
   const {
     selectedProductPid: contextPid,
@@ -218,6 +220,36 @@ export default function ProductPage() {
     fetchProduct();
   }, [fetchProduct, productId]);
 
+  useEffect(() => {
+    if (product && product.pid) {
+      if (posthog) {
+        posthog.capture('Product Viewed', {
+          product_id: product.pid,
+          product_name: product.name,
+          category: product.category,
+        });
+      }
+      
+      const trackInternal = async () => {
+        try {
+          const headers = await getAuthHeaders();
+          await fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/analytics/track`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              event: 'product_viewed',
+              productId: product.pid,
+              productName: product.name
+            })
+          });
+        } catch (e) {
+          // ignore
+        }
+      };
+      trackInternal();
+    }
+  }, [product, posthog, getAuthHeaders]);
+
   const submitReview = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -285,6 +317,38 @@ export default function ProductPage() {
 
     fetchRelated();
   }, [product?.category, product?.pid]);
+
+  // ── Product View Tracking ──
+  // Fire once per product per session (deduped via sessionStorage)
+  const viewTracked = useRef(false);
+  useEffect(() => {
+    if (!product?.pid || viewTracked.current) return;
+    const sessionKey = `pv_${product.pid}`;
+    if (sessionStorage.getItem(sessionKey)) return;
+    viewTracked.current = true;
+    sessionStorage.setItem(sessionKey, '1');
+
+    // Fire and forget — silent failure is intentional
+    fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/analytics/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'product_viewed',
+        productId: product.pid,
+        productName: product.name,
+      }),
+    }).catch(() => { /* silent */ });
+
+    // 🚀 PostHog Client-Side Tracking
+    if (posthog) {
+      posthog.capture('Product Viewed', {
+        productId: product.pid,
+        name: product.name,
+        category: product.category,
+        price: product.price
+      });
+    }
+  }, [product?.pid, product?.name, product?.category, product?.price, posthog]);
 
   const prevImage = useCallback(() => {
     setActiveImage((i) => (i === 0 ? (product?.images.length || 1) - 1 : i - 1));

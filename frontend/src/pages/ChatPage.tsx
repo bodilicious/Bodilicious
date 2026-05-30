@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { MessageCircle, Send, Sparkles, Droplets, ShieldCheck, User, Trash2 } from "lucide-react";

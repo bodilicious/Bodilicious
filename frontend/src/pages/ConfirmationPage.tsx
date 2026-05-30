@@ -11,6 +11,7 @@ type ConfirmationState = { orderId: string; status: 'success' | 'failed' | 'canc
 export default function ConfirmationPage() {
     const location = useLocation();
     const navigate = useNavigate();
+    const { storeSettings } = useApp();
     const { orders, refreshProfile } = useApp();
 
     // ── Recover state from router OR sessionStorage (survives page refresh) ──
@@ -31,7 +32,7 @@ export default function ConfirmationPage() {
     });
 
     // ── Order found in context? ──────────────────────────────────────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const order = resolvedState ? orders.find(o => (o as any)._id === resolvedState.orderId) : undefined;
     const orderLoaded = !!order;
 
@@ -255,11 +256,11 @@ export default function ConfirmationPage() {
                             <div className="border-t border-silk pt-4 space-y-2">
                                 <div className="flex justify-between font-sans text-sm text-gray-600">
                                     <span>Subtotal</span>
-                                    <span>₹{(order.totalAmount - (order.totalAmount < 999 ? 99 : 0)).toLocaleString('en-IN')}</span>
+                                    <span>₹{(order.totalAmount - (order.totalAmount < storeSettings.shippingThreshold ? storeSettings.shippingCost : 0)).toLocaleString('en-IN')}</span>
                                 </div>
-                                <div className="flex justify-between font-sans text-sm text-gray-600">
-                                    <span>Shipping</span>
-                                    <span>{order.totalAmount < 999 ? '₹99' : 'Free'}</span>
+                                <div className="flex justify-between items-center py-2">
+                                    <span className="text-gray-500 text-sm font-sans">Shipping</span>
+                                    <span className="text-sm font-sans text-gray-600">{order.totalAmount < storeSettings.shippingThreshold ? `₹${storeSettings.shippingCost}` : 'Free'}</span>
                                 </div>
                                 <div className="flex justify-between font-serif text-xl text-dark-red mt-4 pt-4 border-t border-silk">
                                     <span>Total Amount</span>

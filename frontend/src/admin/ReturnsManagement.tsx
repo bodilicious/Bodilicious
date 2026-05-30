@@ -78,7 +78,7 @@ const ReturnsManagement: React.FC = () => {
       if (d.success) { setOrders(d.data); setTotal(d.total); }
     } catch { toast.error('Failed to load returns'); }
     finally { setLoading(false); }
-  }, [page, statusFilter, reasonFilter]);
+  }, [page, statusFilter, reasonFilter, getAuthHeaders]);
 
   useEffect(() => { fetchQueue(); }, [fetchQueue]);
 

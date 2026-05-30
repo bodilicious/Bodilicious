@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle2, Clock, XCircle, ChevronRight, ShoppingBag } from 'lucide-react';
 import { Order } from '../../types';

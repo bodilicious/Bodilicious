@@ -1,9 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import {
   createContext,
   useContext,
   useEffect,
   useState,
+  useRef,
   ReactNode,
   useCallback,
 } from 'react';
@@ -20,7 +21,16 @@ import {
   GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth } from '../firebase';
-import { CartItem, Product, Page, User, AuthStatus, Order, Address } from '../types';
+import {
+  User,
+  Product,
+  CartItem,
+  Order,
+  Page,
+  AuthStatus,
+  Address
+} from '../types';
+import { usePostHog } from 'posthog-js/react';
 
 /* ================================
    Types
@@ -58,6 +68,14 @@ interface AppContextType {
   authLoading: boolean;
   isAuthenticated: boolean;
   isPrimaryAdmin: boolean;
+
+  storeSettings: {
+    storeName: string;
+    supportEmail: string;
+    shippingThreshold: number;
+    shippingCost: number;
+    announcementBar: { text: string; isActive: boolean; link: string };
+  };
 
   isChatOpen: boolean;
   setIsChatOpen: (isOpen: boolean) => void;
@@ -140,12 +158,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [authLoading, setAuthLoading] = useState(true);
+  const posthog = usePostHog();
+
+  const [storeSettings, setStoreSettings] = useState({
+    storeName: 'Bodilicious',
+    supportEmail: 'support@bodilicious.in',
+    shippingThreshold: 999,
+    shippingCost: 99,
+    announcementBar: { text: '', isActive: false, link: '' },
+  });
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const toggleChat = useCallback(() => setIsChatOpen(prev => !prev), []);
 
   // true while the initial cart sync from the backend is in progress
   const [cartLoading, setCartLoading] = useState(true);
+
+  // Ref to hold syncCartToBackend to avoid circular dependency in fetchUserProfileAndSync
+  const syncCartToBackendRef = useRef<((cart: CartItem[]) => Promise<void>) | null>(null);
 
   // Load cart from localStorage on mount (for guest users)
   useEffect(() => {
@@ -241,7 +271,7 @@ const fetchUserProfileAndSync = useCallback(async () => {
       
       // If we added guest items to a logged-in user, sync back to backend immediately
       if (hasChanges && auth.currentUser) {
-        setTimeout(() => syncCartToBackend(nextCart), 0);
+        setTimeout(() => syncCartToBackendRef.current?.(nextCart), 0);
       }
 
       return nextCart;
@@ -494,10 +524,23 @@ const resendVerificationEmail = async () => {
     }
   }, [filters]);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/settings/public`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setStoreSettings(json.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch store settings', err);
+    }
+  }, []);
+
   // Sync products with URL query and fetch filters once
   useEffect(() => {
     fetchFilters();
-  }, [fetchFilters]);
+    fetchSettings();
+  }, [fetchFilters, fetchSettings]);
 
   // Route-aware product fetch: only runs on pages that actually render products.
   // Explicit equality checks prevent '/' matching every route via startsWith.
@@ -560,7 +603,7 @@ const resendVerificationEmail = async () => {
   /* =============================
      Cart helpers
   ============================== */
-  const syncCartToBackend = async (newCart: CartItem[]) => {
+  const syncCartToBackend = useCallback(async (newCart: CartItem[]) => {
     if (authStatus !== 'authenticated') return;
 
     const headers = await getAuthHeaders();
@@ -573,12 +616,17 @@ const resendVerificationEmail = async () => {
           .filter(i => i.product)
           .map(i => {
             const productId = resolveProductId(i.product);
-            return productId ? { productId, quantity: i.quantity } : null;
+            return productId ? { productId, pid: i.product.pid, quantity: i.quantity } : null;
           })
           .filter(Boolean),
       }),
     });
-  };
+  }, [authStatus, getAuthHeaders, resolveProductId]);
+
+  // Keep the ref always pointing to the latest syncCartToBackend
+  useEffect(() => {
+    syncCartToBackendRef.current = syncCartToBackend;
+  }, [syncCartToBackend]);
 
   const addToCart = (product: Product, quantity: number = 1) => {
     if (!product) return;
@@ -600,6 +648,29 @@ const resendVerificationEmail = async () => {
 
       nextCart = newItems;
       return newItems;
+    });
+
+    // 🚀 PostHog Client-Side Tracking
+    if (posthog) {
+      posthog.capture('Added to Cart', {
+        productId: product.pid,
+        name: product.name,
+        price: product.price,
+        quantity: quantity
+      });
+    }
+
+    // 🚀 Internal Analytics Tracking
+    getAuthHeaders().then(headers => {
+      fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/analytics/track`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          event: 'cart_item_added',
+          productId: product.pid,
+          productName: product.name
+        })
+      }).catch(() => {});
     });
 
     setTimeout(() => syncCartToBackend(nextCart), 0);
@@ -644,16 +715,19 @@ const resendVerificationEmail = async () => {
       .filter(i => i.product)
       .map(i => {
         const productId = resolveProductId(i.product);
-        return productId ? { productId, quantity: i.quantity } : null;
+        return productId ? { productId, pid: i.product.pid, quantity: i.quantity } : null;
       })
       .filter(Boolean) as { productId: string; quantity: number }[];
 
     if (items.length === 0) throw new Error('Cart items are missing product IDs. Refresh and add again.');
 
+    const utmStorage = localStorage.getItem('bodilicious_utm');
+    const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
+
     const response = await fetch(`${API_BASE}/orders`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ items, shippingDetails, paymentMethod: 'cod' }),
+      body: JSON.stringify({ items, shippingDetails, paymentMethod: 'cod', marketing }),
     });
 
     if (!response.ok) {
@@ -667,6 +741,9 @@ const resendVerificationEmail = async () => {
     // Cart was cleared server-side; clear locally
     setCartItems([]);
     setOrders(prev => [order, ...prev]);
+
+    // Clear UTM tracking after successful checkout
+    localStorage.removeItem('bodilicious_utm');
 
     return { order };
   };
@@ -707,6 +784,9 @@ const resendVerificationEmail = async () => {
     shippingDetails: ShippingDetails
   ): Promise<Order> => {
     const headers = await getAuthHeaders();
+    const utmStorage = localStorage.getItem('bodilicious_utm');
+    const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
+
     const res = await fetch(`${API_BASE}/payment/verify`, {
       method: 'POST',
       headers,
@@ -716,6 +796,7 @@ const resendVerificationEmail = async () => {
         razorpay_signature,
         items,
         shippingDetails,
+        marketing,
       }),
     });
 
@@ -729,6 +810,9 @@ const resendVerificationEmail = async () => {
     // Cart was cleared server-side; clear locally
     setCartItems([]);
     setOrders(prev => [order, ...prev]);
+
+    // Clear UTM tracking after successful checkout
+    localStorage.removeItem('bodilicious_utm');
 
     return order;
   };
@@ -958,6 +1042,7 @@ const resendVerificationEmail = async () => {
         toggleChat,
         cartLoading,
         refreshProfile: fetchUserProfileAndSync,
+        storeSettings,
       }}
     >
       {children}

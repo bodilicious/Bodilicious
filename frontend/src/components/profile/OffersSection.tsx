@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { motion } from 'framer-motion';
 import { Gift, ChevronRight, Sparkles, Truck, Tag } from 'lucide-react';
 import { User } from '../../types';

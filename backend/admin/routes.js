@@ -6,6 +6,7 @@ import { adminLimiter, enforcePagination } from "../middleware/admin.js";
 import * as adminCtrl from "./controller.js";
 import * as analyticsCtrl from "./analyticsController.js";
 import * as segmentCtrl from "./segmentController.js";
+import { generatePaymentLink } from "../payment/controller.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -64,6 +65,7 @@ router.get("/dashboard/recent-orders", enforcePagination, adminCtrl.getRecentOrd
 router.post("/upload", upload.single("image"), verifyFileType, adminCtrl.uploadImage);
 
 // Logs & Exports
+router.get("/logs/export", adminCtrl.exportLogsCSV);
 router.get("/logs", enforcePagination, adminCtrl.getLogsAdmin);
 router.get("/orders/export", adminCtrl.exportOrdersCSV);
 
@@ -86,7 +88,10 @@ router.post("/products", adminCtrl.createProductAdmin);
 router.put("/products/:id", adminCtrl.updateProductAdmin);
 router.patch("/products/:id/status", adminCtrl.toggleProductStatus);
 
-// Orders — bulk route MUST come before /:id routes
+// Orders — bulk routes and custom endpoints MUST come before /:id routes
+router.get("/orders/abandoned-checkouts", enforcePagination, adminCtrl.getAbandonedCheckouts);
+router.post("/orders/draft", adminCtrl.createDraftOrder);
+router.post("/orders/:id/payment-link", generatePaymentLink);
 router.patch("/orders/bulk-status", adminCtrl.bulkUpdateOrderStatus);
 router.get("/orders", enforcePagination, adminCtrl.getAllOrdersAdmin);
 router.get("/orders/:id", adminCtrl.getOrderByIdAdmin);

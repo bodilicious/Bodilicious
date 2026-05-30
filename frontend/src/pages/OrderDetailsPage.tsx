@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from 'react';
+ 
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Order } from '../types';
@@ -66,7 +66,7 @@ export default function OrderDetailsPage() {
     const [newComment, setNewComment] = useState('');
     const [commentLoading, setCommentLoading] = useState(false);
 
-    const fetchTracking = async (currentOrder: Order) => {
+    const fetchTracking = useCallback(async (currentOrder: Order) => {
         setIsTrackingLoading(true);
         setTrackingError('');
         setTrackingData(null);
@@ -130,7 +130,7 @@ export default function OrderDetailsPage() {
         } finally {
             setIsTrackingLoading(false);
         }
-    };
+    }, [getAuthHeaders]);
 
     useEffect(() => {
         if (authLoading) return;
@@ -167,7 +167,7 @@ export default function OrderDetailsPage() {
             // If orders are loaded but not found, redirect to tracking list
             navigateTo('tracking');
         }
-    }, [authLoading, isAuthenticated, urlOrderId, selectedOrderId, orders, navigateTo, location.pathname, navigate]);
+    }, [authLoading, isAuthenticated, urlOrderId, selectedOrderId, orders, navigateTo, location.pathname, navigate, fetchTracking]);
 
     const handleSaveAddress = async () => {
         if (!order) return;

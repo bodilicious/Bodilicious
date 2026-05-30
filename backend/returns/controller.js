@@ -1,7 +1,7 @@
 import Order from "../tracker/models.js";
 import UserProfile from "../profile/models.js";
 import Product from "../products/models.js";
-import AuditLog from "../admin/models.js";
+import { logAuditEvent } from "../audit/logger.js";
 import { logAction } from "../admin/controller.js";
 import { sendReturnApprovedEmail, sendReturnRejectedEmail } from "../email/emailService.js";
 
@@ -169,15 +169,21 @@ export const markReceived = async (req, res) => {
           await Product.findByIdAndUpdate(item.product._id, { stock: newStock });
           restockLog.push({ pid: item.product.pid, addedQty: item.quantity, newStock });
 
-          await AuditLog.create({
-            admin: req.user._id,
-            action: "stock_restock_on_return",
-            targetType: "product",
-            targetId: item.product._id.toString(),
-            before: { stock: item.product.stock },
-            after: { stock: newStock },
-            meta: { reason: "return_received", source: "admin" },
-            ip: req.ip,
+          await logAuditEvent({
+            event_type: "STOCK_RESTOCK_ON_RETURN",
+            user_id: req.user._id,
+            severity: "INFO",
+            source_system: "backend-api",
+            correlation_id: item.product._id.toString(),
+            network: { ip_address: req.ip },
+            metadata: {
+              targetType: "product",
+              targetId: item.product._id.toString(),
+              before: { stock: item.product.stock },
+              after: { stock: newStock },
+              reason: "return_received",
+              source: "admin"
+            }
           });
         }
       }

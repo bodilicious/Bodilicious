@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useState, useEffect } from 'react';
 import { User } from '../../types';
 import toast from 'react-hot-toast';

@@ -148,23 +148,24 @@ const AnalyticsDashboard: React.FC = () => {
   return (
     <div className="space-y-8 pb-20">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-dark-red tracking-tight">Analytics Dashboard</h1>
-          <div className="flex items-center gap-2 mt-2">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-6 border-b border-gray-100">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 xl:gap-6">
+          <h1 className="text-3xl font-serif font-bold text-dark-red tracking-tight m-0">Analytics Dashboard</h1>
+          <div className="hidden sm:block h-8 w-px bg-gray-200"></div>
+          <div className="flex items-center gap-2 bg-[#F5F2EC] px-3 py-1.5 rounded-full">
              <span className={`w-2 h-2 rounded-full ${isRefreshing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400 animate-pulse'}`} />
-             <p className="text-xs text-grey-beige font-medium whitespace-nowrap">
-               Live Data {lastSync ? `• Synced ${sinceSec < 60 ? `${sinceSec}s` : `${Math.round(sinceSec / 60)}m`} ago` : ''}
+             <p className="text-xs text-dark-red font-medium whitespace-nowrap">
+               Live Sync {lastSync ? `• ${sinceSec < 60 ? `${sinceSec}s` : `${Math.round(sinceSec / 60)}m`} ago` : ''}
              </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <DateRangePicker onRangeChange={setDateRange} currentRange={dateRange} />
           <button
             onClick={() => fetchData(true)}
             disabled={isRefreshing}
-            className="p-2.5 bg-silk-light text-grey-beige hover:text-dark-red hover:bg-silk rounded-xl transition-all disabled:opacity-50"
+            className="p-2.5 bg-[#F5F2EC] text-dark-red hover:bg-ruby-red hover:text-white rounded-xl transition-all disabled:opacity-50 font-medium"
             title="Refresh Data"
           >
             <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
@@ -173,7 +174,7 @@ const AnalyticsDashboard: React.FC = () => {
       </div>
 
       {refreshError && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center justify-between border border-red-100 animate-in fade-in slide-in-from-top-2">
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center justify-between border border-red-100 animate-in fade-in slide-in-from-top-2">
           <p className="text-sm font-medium">Partial data sync failed. Retrying in the background...</p>
           <button onClick={() => fetchData()} className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-white rounded-lg shadow-sm">Retry</button>
         </div>
@@ -182,37 +183,37 @@ const AnalyticsDashboard: React.FC = () => {
       {/* Primary KPIs */}
       <KPICardsRow data={kpiData as any} loading={isRefreshing} />
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-1 bg-silk-light/50 border border-silk-light p-1 rounded-2xl w-fit">
+      {/* Control Panel Navigation (No Scrollbars) */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
         <button 
           onClick={() => setActiveTab('sales')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'sales' ? 'bg-white text-dark-red shadow-sm border border-silk-light' : 'text-grey-beige hover:text-dark-red'}`}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all flex-grow sm:flex-grow-0 justify-center whitespace-nowrap ${activeTab === 'sales' ? 'bg-dark-red text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:text-dark-red hover:bg-[#F5F2EC]'}`}
         >
-          <BarChart2 size={18} /> Sales
+          <BarChart2 size={16} /> Sales
         </button>
         <button 
           onClick={() => setActiveTab('products')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'products' ? 'bg-white text-dark-red shadow-sm border border-silk-light' : 'text-grey-beige hover:text-dark-red'}`}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all flex-grow sm:flex-grow-0 justify-center whitespace-nowrap ${activeTab === 'products' ? 'bg-dark-red text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:text-dark-red hover:bg-[#F5F2EC]'}`}
         >
-          <PackageIcon size={18} /> Products
+          <PackageIcon size={16} /> Products
         </button>
         <button 
           onClick={() => setActiveTab('customers')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'customers' ? 'bg-white text-dark-red shadow-sm border border-silk-light' : 'text-grey-beige hover:text-dark-red'}`}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all flex-grow sm:flex-grow-0 justify-center whitespace-nowrap ${activeTab === 'customers' ? 'bg-dark-red text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:text-dark-red hover:bg-[#F5F2EC]'}`}
         >
-          <Users size={18} /> Customers
+          <Users size={16} /> Customers
         </button>
         <button 
           onClick={() => setActiveTab('operations')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'operations' ? 'bg-white text-dark-red shadow-sm border border-silk-light' : 'text-grey-beige hover:text-dark-red'}`}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all flex-grow sm:flex-grow-0 justify-center whitespace-nowrap ${activeTab === 'operations' ? 'bg-dark-red text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:text-dark-red hover:bg-[#F5F2EC]'}`}
         >
-          <Truck size={18} /> Operations
+          <Truck size={16} /> Operations
         </button>
         <button 
           onClick={() => setActiveTab('ritual')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'ritual' ? 'bg-white text-dark-red shadow-sm border border-silk-light' : 'text-grey-beige hover:text-dark-red'}`}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium transition-all flex-grow sm:flex-grow-0 justify-center whitespace-nowrap ${activeTab === 'ritual' ? 'bg-dark-red text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:text-dark-red hover:bg-[#F5F2EC]'}`}
         >
-          <Sparkles size={18} /> Rituals
+          <Sparkles size={16} /> Rituals
         </button>
       </div>
 
@@ -255,11 +256,11 @@ const AnalyticsDashboard: React.FC = () => {
 
       {/* Operational Alerts (Quick View always at bottom) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
-          <div className="bg-dark-red p-8 rounded-3xl text-white shadow-xl shadow-dark-red/20 relative overflow-hidden">
+          <div className="bg-dark-red p-8 rounded-xl text-white shadow-xl shadow-dark-red/20 relative overflow-hidden">
             <h3 className="text-xl font-serif font-bold mb-6">Inventory Health Alerts</h3>
             <div className="space-y-4">
               {inventoryData?.stockoutImpact?.slice(0, 3).map((item: any) => (
-                <div key={item.pid} className="flex items-center justify-between bg-white/10 p-4 rounded-2xl backdrop-blur-sm border border-white/5">
+                <div key={item.pid} className="flex items-center justify-between bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/5">
                   <div>
                     <p className="text-xs text-red-100 italic">{item.name}</p>
                     <p className="font-bold text-sm">₹{item.estimatedDailyLoss.toLocaleString()} daily loss</p>
@@ -273,19 +274,19 @@ const AnalyticsDashboard: React.FC = () => {
                 <p className="text-sm text-red-100 opacity-60">All items are currently in stock.</p>
               )}
             </div>
-            <Link to="/admin/products" className="block w-full mt-6 py-3 bg-white text-dark-red text-center font-bold rounded-2xl hover:bg-silk-light transition-colors">
+            <Link to="/admin/products" className="block w-full mt-6 py-3 bg-white text-dark-red text-center font-bold rounded-xl hover:bg-silk-light transition-colors">
                Manage Inventory
             </Link>
           </div>
 
-          <div className="bg-white p-8 rounded-3xl border border-silk shadow-sm shadow-silk-dark/10">
+          <div className="bg-white p-8 rounded-xl border border-silk shadow-sm shadow-silk-dark/10">
              <h3 className="text-xl font-serif font-bold text-dark-red mb-6 flex items-center gap-2">
                 <Tag size={20} className="text-ruby-red" />
                 Expiring Coupons
              </h3>
              <div className="space-y-4">
                 {expiringCoupons.length > 0 ? expiringCoupons.slice(0, 5).map(c => (
-                  <div key={c._id} className="flex items-center justify-between p-4 bg-silk-light/50 rounded-2xl border border-silk-light">
+                  <div key={c._id} className="flex items-center justify-between p-4 bg-silk-light/50 rounded-xl border border-silk-light">
                     <div>
                       <span className="font-mono text-xs font-bold bg-white px-2 py-1 rounded border border-silk-light text-dark-red">{c.code}</span>
                       <p className="text-[10px] text-grey-beige mt-1 uppercase font-medium">Expires: {new Date(c.expiresAt).toLocaleDateString()}</p>

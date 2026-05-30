@@ -5,8 +5,10 @@ import UserProfile from "../profile/models.js";
 import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, createShiprocketReturn } from "./shiprocketservice.js";
 import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice } from "../email/emailService.js";
 import { logAction } from "../admin/controller.js";
+import { trackServerEvent } from "../utils/posthog.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import StoreSettings from "../settings/models.js";
 
 
 
@@ -19,7 +21,7 @@ export const createOrder = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { items, shippingDetails, paymentMethod } = req.body;
+    const { items, shippingDetails, paymentMethod, marketing } = req.body;
     const userId = req.user._id;
 
     // Razorpay orders must use /api/payment/razorpay/init + /api/payment/verify flow
@@ -41,7 +43,14 @@ export const createOrder = async (req, res) => {
 
     // 🔹 Validate stock + calculate total
     for (const item of items) {
-      const product = await Product.findById(item.productId).session(session);
+      let product;
+      if (mongoose.Types.ObjectId.isValid(item.productId)) {
+        product = await Product.findById(item.productId).session(session);
+      }
+      if (!product) {
+        const searchPid = item.pid || item.productId;
+        product = await Product.findOne({ pid: searchPid }).session(session);
+      }
 
       if (!product) throw new Error("Product not found");
 
@@ -64,7 +73,8 @@ export const createOrder = async (req, res) => {
       await product.save({ session });
     }
 
-    const shippingCost = totalAmount >= 999 ? 0 : 99;
+    const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
+    const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
     let originalAmount = totalAmount + shippingCost;
     let finalAmount = originalAmount;
     let isWelcomeOfferApplied = false;
@@ -127,6 +137,7 @@ export const createOrder = async (req, res) => {
           paymentStatus: "pending",
           orderStatus: "pending",
           shippingDetails,
+          marketing: marketing || undefined,
           ...eddData,
         }],
       { session }
@@ -181,6 +192,20 @@ export const createOrder = async (req, res) => {
       itemCount: order.items.length,
       paymentMethod: order.paymentMethod
     }).catch(err => console.error("Order Placed Audit Failed:", err));
+
+    // 🚀 PostHog Server-Side Tracking
+    trackServerEvent(userId, 'Order Completed', {
+      orderId: order._id.toString(),
+      revenue: order.totalAmount,
+      shipping: shippingCost,
+      tax: 0,
+      paymentMethod: order.paymentMethod,
+      products: orderItems.map(item => ({
+        productId: item.product.toString(),
+        price: item.priceAtPurchase,
+        quantity: item.quantity
+      }))
+    });
 
     return res.status(201).json({
       success: true,
@@ -447,6 +472,15 @@ export const shiprocketWebhook = async (req, res) => {
           }
 
           console.log(`[Shiprocket Webhook] Order ${order._id} updated to ${internalStatus}`);
+          
+          // 🚀 Audit Fulfillment Events
+          if (internalStatus === "shipped") {
+             logAction(req, "shipment_created", "order", order._id.toString(), { awb, status: shiprocketStatus }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+          } else if (internalStatus === "delivered") {
+             logAction(req, "order_delivered", "order", order._id.toString(), { awb }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+          } else if (internalStatus === "returned" || shiprocketStatus.includes("rto") || shiprocketStatus.includes("failed")) {
+             logAction(req, "delivery_failed", "order", order._id.toString(), { awb, reason: shiprocketStatus }, { source: "shiprocket-webhook", severity: "WARNING" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+          }
         }
       }
 

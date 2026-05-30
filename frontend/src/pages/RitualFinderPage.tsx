@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Sun, Moon, RefreshCcw, MessageCircle, Sparkles } from 'lucide-react';

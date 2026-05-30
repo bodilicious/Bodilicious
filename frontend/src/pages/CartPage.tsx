@@ -1,10 +1,10 @@
-import { Trash2, Minus, Plus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Footer from '../components/Footer';
 
 export default function CartPage() {
-  const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user } = useApp();
+  const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings } = useApp();
   const navigate = useNavigate();
 
   const validCartItems = cartItems.filter(item => item && item.product);
@@ -30,7 +30,7 @@ export default function CartPage() {
     );
   }
 
-  const shipping = cartTotal >= 999 ? 0 : 99;
+  const shipping = cartTotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
   const total = cartTotal + shipping;
 
   return (
@@ -79,15 +79,15 @@ export default function CartPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center border border-silk">
                       <button
-  onClick={() => {
-    if (item.quantity > 1) {
-      updateQuantity(item.product.pid, item.quantity - 1);
-    }
-  }}
-  className="w-8 h-8 flex items-center justify-center text-dark-red hover:bg-silk-light"
->
-  <Minus size={12} />
-</button>
+                        onClick={() => {
+                          if (item.quantity > 1) {
+                            updateQuantity(item.product.pid, item.quantity - 1);
+                          }
+                        }}
+                        className="w-8 h-8 flex items-center justify-center text-dark-red hover:bg-silk-light"
+                      >
+                        <Minus size={12} />
+                      </button>
                       <span className="w-8 text-center font-sans text-dark-red text-sm">
                         {item.quantity}
                       </span>
@@ -125,8 +125,9 @@ export default function CartPage() {
                   </span>
                 </div>
                 {shipping > 0 && (
-                  <p className="text-[10px] font-sans text-grey-beige">
-                    Free shipping on orders above ₹999
+                  <p className="text-xs font-sans mt-2 text-dark-red/80 flex items-center gap-1.5 justify-center">
+                    <Truck size={14} /> 
+                    Free shipping on orders above ₹{storeSettings.shippingThreshold}
                   </p>
                 )}
 

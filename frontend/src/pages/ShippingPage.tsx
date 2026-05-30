@@ -37,7 +37,7 @@ function isIndiaCountry(c: string) {
 
 // ─── Component ───────────────────────────────────────────────────────────────────────────────────────────
 export default function ShippingPage() {
-    const { cartItems, cartTotal, user, authLoading, cartLoading } = useApp();
+    const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings } = useApp();
     const navigate = useNavigate();
 
     // ── Form state ────────────────────────────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ export default function ShippingPage() {
 
     // ── Street autocomplete state ─────────────────────────────────────────────────────────────────────────
     const [addressQuery, setAddressQuery] = useState(user?.address || '');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
@@ -100,7 +100,7 @@ export default function ShippingPage() {
     // ── Cart calculations ─────────────────────────────────────────────────────────────────────────────────
     const validCartItems = cartItems.filter(i => i && i.product);
 
-    const shippingCost = cartTotal >= 999 ? 0 : 99;
+    const shippingCost = cartTotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
     const total = cartTotal + shippingCost;
 
     // ── Validation ────────────────────────────────────────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ export default function ShippingPage() {
 
                 // Deduplicate by osm_id
                 const seen = new Set<string>();
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                 
                 const unique = (data.features || []).filter((f: any) => {
                     const id = String(f.properties?.osm_id ?? Math.random());
                     if (seen.has(id)) return false;
@@ -258,7 +258,7 @@ export default function ShippingPage() {
     }, []);
 
     // ── Suggestion selection ──────────────────────────────────────────────────────────────────────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const handleSuggestionClick = (suggestion: any) => {
         const p = suggestion.properties || {};
         const street = [p.housenumber, p.street || p.name].filter(Boolean).join(' ');
@@ -724,7 +724,7 @@ export default function ShippingPage() {
                                 </div>
 
                                 <div className="mt-6 flex items-center justify-center gap-2 text-dark-red bg-red-50 p-3 rounded-sm border border-red-100 text-xs font-medium tracking-wide">
-                                    <Truck size={16} /> Free shipping on orders over ₹999
+                                    <Truck size={16} /> Free shipping on orders over ₹{storeSettings.shippingThreshold}
                                 </div>
                             </div>
                         </div>

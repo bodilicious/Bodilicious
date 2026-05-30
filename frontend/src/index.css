@@ -8,6 +8,29 @@
   * {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(61, 10, 5, 0.2) transparent;
+  }
+
+  /* Premium Floating Scrollbar */
+  ::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(61, 10, 5, 0.15); /* Soft Bodilicious burgundy */
+    border-radius: 20px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(61, 10, 5, 0.3);
   }
 
   html {

@@ -76,7 +76,7 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     price_inr: { type: Number, min: 0 },
     stock: { type: Number, default: 0, min: 0 },
-
+    expectedLifespanDays: { type: Number, default: 45 },
     product_weight_ml: { type: Number, min: 0 },
     product_weight_g: { type: Number, min: 0 },
     availability: {

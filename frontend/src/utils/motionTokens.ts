@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { Variants, Transition } from "framer-motion";
 
 // --- Durations ---

@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import { razorpayWebhook } from "./payment/controller.js";
+import { trackActiveSession } from "./analytics/live.js";
 import routes from "./index.js";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(helmet({
 }));
 
 app.set("trust proxy", 1);
+app.use(trackActiveSession);
 
 app.use(cors({
   origin: [
@@ -80,5 +82,10 @@ app.use((req, res, next) => {
 app.use("/api/v1", globalLimiter, routes);
 app.use("/api/v1/payment", sensitiveLimiter);
 app.use("/api/v1/profile", sensitiveLimiter);
+
+// Health check endpoint for UptimeRobot
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK", timestamp: new Date() });
+});
 
 export default app;

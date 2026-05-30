@@ -7,6 +7,8 @@ import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket } f
 import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice } from "../email/emailService.js";
 import Razorpay from "razorpay";
 import { logAction } from "../admin/controller.js";
+import { trackServerEvent } from "../utils/posthog.js";
+import StoreSettings from "../settings/models.js";
 
 /* =========================================================
    INIT RAZORPAY ORDER
@@ -29,8 +31,19 @@ export const initRazorpayOrder = async (req, res) => {
         // Calculate price from DB — never trust the frontend
         let totalAmount = 0;
         for (const item of items) {
-            const product = await Product.findById(item.productId);
-            if (!product) return res.status(400).json({ success: false, message: "Product not found" });
+            console.log("Processing item during checkout:", item);
+            let product;
+            if (mongoose.Types.ObjectId.isValid(item.productId)) {
+                product = await Product.findById(item.productId);
+            }
+            if (!product) {
+                const searchPid = item.pid || item.productId;
+                product = await Product.findOne({ pid: searchPid });
+            }
+            if (!product) {
+                console.error("Product not found for item:", item);
+                return res.status(400).json({ success: false, message: "Product not found" });
+            }
             if (product.stock < item.quantity) {
                 return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
             }
@@ -46,7 +59,9 @@ export const initRazorpayOrder = async (req, res) => {
         if (existingOrdersCount === 0) {
             discountAmount = Math.round(totalAmount * 0.10);
         }
-        const shippingCost = totalAmount >= 999 ? 0 : 99;
+
+        const settings = await StoreSettings.findOne() || { shippingThreshold: 999, shippingCost: 99 };
+        const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
         const finalAmount = Math.max(0, totalAmount + shippingCost - discountAmount);
 
         // Create Razorpay order only
@@ -64,6 +79,12 @@ export const initRazorpayOrder = async (req, res) => {
                 itemCount: items.length,
             },
         });
+
+        // 🚀 Audit Payment Initiated
+        logAction(req, "payment_initiated", "order", razorpayOrder.id, {
+            amount: finalAmount,
+            itemCount: items.length
+        }).catch(err => console.error("Payment Initiated Audit Failed:", err));
 
         return res.status(201).json({
             success: true,
@@ -87,7 +108,7 @@ export const initRazorpayOrder = async (req, res) => {
 ========================================================= */
 export const verifyPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, items, shippingDetails } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, items, shippingDetails, marketing } = req.body;
         const userId = req.user._id;
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -118,6 +139,10 @@ export const verifyPayment = async (req, res) => {
             .digest("hex");
 
         if (expectedSignature !== razorpay_signature) {
+            // 🚀 Audit Verification Failed
+            logAction(req, "payment_verification_failed", "order", razorpay_order_id, {
+                paymentId: razorpay_payment_id
+            }, { severity: "CRITICAL" }).catch(err => console.error("Payment Verification Failed Audit Failed:", err));
             return res.status(400).json({ success: false, message: "Invalid payment signature" });
         }
 
@@ -133,7 +158,14 @@ export const verifyPayment = async (req, res) => {
 
             // Re-calculate from DB (never trust frontend prices)
             for (const item of items) {
-                const product = await Product.findById(item.productId).session(session);
+                let product;
+                if (mongoose.Types.ObjectId.isValid(item.productId)) {
+                    product = await Product.findById(item.productId).session(session);
+                }
+                if (!product) {
+                    const searchPid = item.pid || item.productId;
+                    product = await Product.findOne({ pid: searchPid }).session(session);
+                }
                 if (!product) throw new Error("Product not found");
                 if (product.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
 
@@ -151,7 +183,8 @@ export const verifyPayment = async (req, res) => {
                 await product.save({ session });
             }
 
-            const shippingCost = totalAmount >= 999 ? 0 : 99;
+            const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
+            const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
             const originalAmount = totalAmount + shippingCost;
 
             // Welcome offer
@@ -199,6 +232,7 @@ export const verifyPayment = async (req, res) => {
                 razorpayPaymentId: razorpay_payment_id,
                 razorpaySignature: razorpay_signature,
                 shippingDetails,
+                marketing: marketing || undefined,
                 ...eddData,
             }], { session });
 
@@ -214,6 +248,20 @@ export const verifyPayment = async (req, res) => {
                 paymentMethod: "razorpay"
             }).catch(err => console.error("Order Placed Audit Failed (Razorpay):", err));
 
+            // 🚀 PostHog Server-Side Tracking
+            trackServerEvent(userId, 'Order Completed', {
+              orderId: newOrder._id.toString(),
+              revenue: finalAmount,
+              shipping: shippingCost,
+              tax: 0,
+              paymentMethod: "razorpay",
+              products: orderItems.map(item => ({
+                productId: item.product.toString(),
+                price: item.priceAtPurchase,
+                quantity: item.quantity
+              }))
+            });
+
             await session.commitTransaction();
             session.endSession();
 
@@ -222,6 +270,12 @@ export const verifyPayment = async (req, res) => {
         } catch (txErr) {
             if (session.inTransaction()) await session.abortTransaction();
             session.endSession();
+            
+            // 🚀 Audit Order Creation Failed
+            logAction(req, "order_creation_failed", "order", razorpay_order_id, {
+                error: txErr.message
+            }, { severity: "ERROR" }).catch(err => console.error("Order Creation Failed Audit Failed:", err));
+
             throw txErr;
         }
 
@@ -293,6 +347,13 @@ export const razorpayWebhook = async (req, res) => {
                 existing.paymentStatus = "paid";
                 existing.razorpayPaymentId = payment.id;
                 await existing.save();
+                
+                // 🚀 Audit Payment Captured
+                logAction(req, "payment_captured", "order", existing._id.toString(), {
+                    paymentId: payment.id,
+                    amount: payment.amount / 100
+                }, { source: "razorpay-webhook" }).catch(err => console.error("Payment Captured Audit Failed:", err));
+
                 const populated = await Order.findById(existing._id).populate("items.product");
                 await pushOrderToShiprocket(populated);
                 
@@ -315,6 +376,12 @@ export const razorpayWebhook = async (req, res) => {
                     const freshPopulated = await Order.findById(populated._id).populate("items.product");
                     sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
                 }
+            } else if (!existing) {
+                // 🚀 Audit Payment Success No Order
+                logAction(req, "payment_success_no_order", "order", payment.order_id, {
+                    paymentId: payment.id,
+                    amount: payment.amount / 100
+                }, { source: "razorpay-webhook", severity: "CRITICAL" }).catch(err => console.error("Payment Success No Order Audit Failed:", err));
             }
         } else if (event === "payment.failed") {
             const payment = payload.payment.entity;
@@ -323,6 +390,12 @@ export const razorpayWebhook = async (req, res) => {
                 { razorpayOrderId: payment.order_id, paymentStatus: "pending" },
                 { paymentStatus: "failed" }
             );
+
+            // 🚀 Audit Payment Failed
+            logAction(req, "payment_failed", "order", payment.order_id, {
+                paymentId: payment.id,
+                reason: payment.error_description
+            }, { source: "razorpay-webhook", severity: "WARNING" }).catch(err => console.error("Payment Failed Audit Failed:", err));
         } else if (event === "refund.processed") {
             const refund = payload.refund.entity;
             const paymentId = refund.payment_id;
@@ -349,4 +422,65 @@ export const razorpayWebhook = async (req, res) => {
     }
 };
 
+/* =========================================================
+   GENERATE PAYMENT LINK (Admin Draft Orders)
+   POST /api/v1/admin/orders/:id/payment-link
+========================================================= */
+export const generatePaymentLink = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id).populate("user", "name email phone");
+        if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
+        if (order.paymentStatus === "paid") {
+            return res.status(400).json({ success: false, message: "Order is already paid" });
+        }
+
+        if (order.paymentLink) {
+            return res.status(200).json({ success: true, data: { paymentLink: order.paymentLink } });
+        }
+
+        const razorpayInstance = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+
+        // Expiry time: 24 hours from now
+        const expireBy = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+
+        const paymentLinkReq = {
+            amount: Math.round(order.totalAmount * 100),
+            currency: "INR",
+            accept_partial: false,
+            description: `Payment for Bodilicious Order ${order._id}`,
+            customer: {
+                name: order.user?.name || order.shippingDetails?.name || "Customer",
+                email: order.user?.email || order.shippingDetails?.email,
+                contact: order.user?.phone || order.shippingDetails?.phone
+            },
+            notify: {
+                sms: true,
+                email: true
+            },
+            reminder_enable: true,
+            notes: {
+                orderId: order._id.toString()
+            },
+            expire_by: expireBy
+        };
+
+        const paymentLinkRes = await razorpayInstance.paymentLink.create(paymentLinkReq);
+
+        order.paymentLinkId = paymentLinkRes.id;
+        order.paymentLink = paymentLinkRes.short_url;
+        await order.save();
+
+        logAction(req, "PAYMENT_LINK_GENERATED", "order", order._id.toString(), {
+            paymentLink: paymentLinkRes.short_url
+        });
+
+        return res.status(200).json({ success: true, data: { paymentLink: paymentLinkRes.short_url } });
+    } catch (err) {
+        console.error("Generate Payment Link Error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};

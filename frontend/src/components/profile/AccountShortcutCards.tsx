@@ -1,12 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { motion } from 'framer-motion';
 import { 
     Package, 
     Heart, 
     HelpCircle, 
     ChevronRight, 
-    Gift
+    Gift,
+    Ticket
 } from 'lucide-react';
+
 
 interface Props {
     navigateTo: (page: any) => void;
@@ -14,11 +16,12 @@ interface Props {
 
 export default function AccountShortcutCards({ navigateTo }: Props) {
     const shortcuts = [
-        { id: 'orders',    label: 'Order History',    icon: Package,    page: 'tracking', color: 'text-amber-600 bg-amber-50' },
-        { id: 'wishlist',  label: 'Saved Items',      icon: Heart,      page: 'wishlist', color: 'text-rose-600 bg-rose-50' },
-        { id: 'offers',    label: 'Exclusive Offers', icon: Gift,       page: 'offers',   color: 'text-ruby-red bg-ruby-red/10' },
-        { id: 'help',      label: 'Help & Support',   icon: HelpCircle, page: 'contact',  color: 'text-blue-600 bg-blue-50' },
+        { id: 'orders',    label: 'Order History',    icon: Package,    page: 'tracking',          color: 'text-amber-600 bg-amber-50' },
+        { id: 'wishlist',  label: 'Saved Items',      icon: Heart,      page: 'wishlist',           color: 'text-rose-600 bg-rose-50' },
+        { id: 'tickets',   label: 'My Tickets',       icon: Ticket,     page: 'account/tickets',    color: 'text-violet-600 bg-violet-50' },
+        { id: 'help',      label: 'Help & Support',   icon: HelpCircle, page: 'contact',            color: 'text-blue-600 bg-blue-50' },
     ];
+
 
     return (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">

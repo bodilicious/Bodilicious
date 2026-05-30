@@ -82,7 +82,7 @@ const CouponManagement: React.FC = () => {
       if (d.success) { setCoupons(d.data); setTotal(d.total); }
     } catch { toast.error('Failed to load coupons'); }
     finally { setLoading(false); }
-  }, [page, activeFilter]);
+  }, [page, activeFilter, getAuthHeaders]);
 
   useEffect(() => { fetchCoupons(); }, [fetchCoupons]);
 

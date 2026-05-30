@@ -163,7 +163,7 @@ export default function HeroCarousel() {
       }
     }, AUTOPLAY_MS);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []); // intentionally empty — the interval is created once and reads refs
 
   // ── Touch / swipe handlers ──────────────────────────────────────────────────

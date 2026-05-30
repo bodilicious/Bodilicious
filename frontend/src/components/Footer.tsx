@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 
 export default function Footer() {
   const { user, authStatus } = useApp();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const welcomeOffer = (user as any)?.welcomeOffer;
   const showBanner = authStatus !== 'authenticated' || welcomeOffer?.eligible === true;
 

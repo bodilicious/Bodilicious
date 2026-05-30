@@ -407,3 +407,56 @@ export const sendReturnRejectedEmail = async (order, userEmail, userName, reject
     throw error;
   }
 };
+
+/*
+  TICKET RESOLVED EMAIL
+*/
+export const sendTicketResolvedEmail = async (ticket, userEmail, userName) => {
+  try {
+    const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
+    const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
+
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        Your Support Ticket is Resolved ✓
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        We wanted to let you know that your support ticket <strong>#${ticketId}</strong> regarding <strong>${typeLabel}</strong> has been marked as resolved.
+      </p>
+
+      <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
+        <p style="margin:0 0 8px;"><strong>Ticket ID:</strong> ${ticketId}</p>
+        <p style="margin:0 0 8px;"><strong>Issue Type:</strong> ${typeLabel}</p>
+        <p style="margin:0;"><strong>Status:</strong> Resolved</p>
+      </div>
+
+      <p style="margin:0 0 14px;">
+        We hope we were able to fully address your concern. If you still need help or have further questions, feel free to reply to this email or raise a new query on our website.
+      </p>
+
+      <div style="text-align:center; margin:28px 0 0;">
+        <a
+          href="https://www.bodilicious.in/contact"
+          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block;"
+        >
+          Contact Support
+        </a>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: `Ticket Resolved: #${ticketId} | Bodilicious Support`,
+      html: buildEmailLayout(content, { customerName: userName }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Ticket resolved email sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Ticket resolved email failed:", error);
+    throw error;
+  }
+};

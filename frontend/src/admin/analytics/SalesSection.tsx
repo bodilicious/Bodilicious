@@ -17,7 +17,7 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Graph 1: Revenue Trend (Gross vs Net) */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="lg:col-span-2 bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-bold text-gray-800">Revenue Performance</h3>
@@ -72,16 +72,19 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2">
-                <TrendingUp size={48} className="opacity-20" />
-                <p className="text-sm">No sales data found for this period</p>
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                <div className="p-4 bg-gray-50 rounded-full">
+                  <TrendingUp size={32} className="text-gray-400" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">No sales data found for this period</p>
+                <button className="text-xs font-bold bg-white border border-gray-200 px-4 py-2 rounded-lg text-dark-red hover:bg-gray-50 transition-colors shadow-sm">View Last Month</button>
               </div>
             )}
           </div>
         </div>
 
         {/* Graph 2: Payment Method Mix */}
-        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
           <div className="mb-8">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <CreditCard size={20} className="text-gray-400" />
@@ -112,7 +115,13 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">No payment data</div>
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                <div className="p-4 bg-gray-50 rounded-full">
+                  <CreditCard size={32} className="text-gray-400" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">No payment data yet</p>
+                <button className="text-xs font-bold bg-white border border-gray-200 px-4 py-2 rounded-lg text-dark-red hover:bg-gray-50 transition-colors shadow-sm">Configure Payments</button>
+              </div>
             )}
           </div>
         </div>
@@ -120,7 +129,7 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
       </div>
 
       {/* Graph 3: AOV & Order Count Trend */}
-      <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
           <div className="mb-8">
             <h3 className="text-lg font-bold text-gray-800">AOV & Volume Efficiency</h3>
             <p className="text-sm text-gray-400">Average net order value vs total order volume</p>
@@ -168,7 +177,13 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">Insufficient trend data</div>
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                <div className="p-4 bg-gray-50 rounded-full">
+                  <TrendingUp size={32} className="text-gray-400" />
+                </div>
+                <p className="text-sm font-medium text-gray-600">Insufficient trend data</p>
+                <button className="text-xs font-bold bg-white border border-gray-200 px-4 py-2 rounded-lg text-dark-red hover:bg-gray-50 transition-colors shadow-sm">Expand Date Range</button>
+              </div>
             )}
           </div>
       </div>

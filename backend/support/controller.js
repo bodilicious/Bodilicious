@@ -1,0 +1,285 @@
+import { Ticket, FAQ } from "./models.js";
+import { sendTicketResolvedEmail } from "../email/emailService.js";
+import { v2 as cloudinary } from "cloudinary";
+
+// POST /api/v1/support/tickets
+export const createTicket = async (req, res) => {
+  try {
+    const { type, description, attachments } = req.body;
+
+    if (!type || !description) {
+      return res.status(400).json({ success: false, message: "Type and description are required" });
+    }
+
+    const priority = type === "payment" ? "high" : "normal";
+
+    // Seed the conversation thread with the customer's initial description
+    const ticket = await Ticket.create({
+      userId: req.user._id,
+      type,
+      description,
+      priority,
+      messages: [
+        {
+          text: description,
+          authorId: req.user._id,
+          authorRole: "customer",
+          attachments: attachments || [],
+        },
+      ],
+    });
+
+    return res.status(201).json({ success: true, ticket });
+  } catch (error) {
+    console.error("Error creating ticket:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// GET /api/v1/support/tickets/:userId  (customer or admin fetching by userId)
+export const getUserTickets = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const isOwner = req.user._id.toString() === userId || req.user.firebaseUID === userId;
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    let queryUserId = userId;
+    if (userId === req.user.firebaseUID) {
+      queryUserId = req.user._id;
+    }
+
+    const tickets = await Ticket.find({ userId: queryUserId }).sort({ createdAt: -1 });
+
+    return res.status(200).json({ success: true, tickets });
+  } catch (error) {
+    console.error("Error fetching user tickets:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// GET /api/v1/support/tickets  (admin — all tickets)
+export const getAllTickets = async (req, res) => {
+  try {
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const { status, type } = req.query;
+    const query = {};
+    if (status) query.status = status;
+    if (type) query.type = type;
+
+    // "open" < "resolved" and "high" < "normal" alphabetically — correct sort order
+    const tickets = await Ticket.find(query)
+      .populate("userId", "name email photoURL")
+      .sort({ status: 1, priority: 1, createdAt: -1 });
+
+    return res.status(200).json({ success: true, tickets });
+  } catch (error) {
+    console.error("Error fetching all tickets:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// POST /api/v1/support/tickets/:id/messages
+export const addMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text, attachments } = req.body;
+
+    if (!text?.trim()) {
+      return res.status(400).json({ success: false, message: "Message text is required" });
+    }
+
+    const ticket = await Ticket.findById(id).populate("userId", "name email");
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: "Ticket not found" });
+    }
+
+    const isOwner = req.user._id.toString() === ticket.userId._id.toString();
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    // Block messages on closed threads
+    if (ticket.status === "resolved") {
+      return res.status(403).json({ success: false, message: "Cannot add messages to a resolved ticket" });
+    }
+
+    const authorRole = isAdmin ? "admin" : "customer";
+
+    ticket.messages.push({
+      text: text.trim(),
+      authorId: req.user._id,
+      authorRole,
+      attachments: attachments || [],
+    });
+
+    await ticket.save();
+
+    // Re-populate so the response has full userId data
+    await ticket.populate("userId", "name email photoURL");
+
+    return res.status(201).json({ success: true, ticket });
+  } catch (error) {
+    console.error("Error adding message:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// PATCH /api/v1/support/tickets/:id  (update status)
+export const updateTicketStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !["open", "resolved"].includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status" });
+    }
+
+    const ticket = await Ticket.findById(id).populate("userId", "name email");
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: "Ticket not found" });
+    }
+
+    const isOwner = req.user._id.toString() === ticket.userId._id.toString();
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const wasOpen = ticket.status === "open";
+
+    ticket.status = status;
+
+    if (status === "resolved") {
+      ticket.resolvedAt = new Date();
+    } else {
+      ticket.resolvedAt = null;
+    }
+
+    await ticket.save();
+
+    // Fire resolution email only on first resolve
+    if (status === "resolved" && wasOpen && ticket.userId?.email) {
+      sendTicketResolvedEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer").catch((err) => {
+        console.error("Failed to send ticket resolved email:", id, err.message);
+      });
+    }
+
+    return res.status(200).json({ success: true, ticket });
+  } catch (error) {
+    console.error("Error updating ticket:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// GET /api/v1/support/faqs
+export const getFaqs = async (req, res) => {
+  try {
+    const faqs = await FAQ.find().sort({ order: 1, createdAt: -1 });
+    return res.status(200).json({ success: true, faqs });
+  } catch (error) {
+    console.error("Error fetching FAQs:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// POST /api/v1/support/upload
+export const uploadSupportAttachment = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ success: false, message: "Cloudinary keys missing from .env" });
+    }
+
+    // Configure Cloudinary inline
+    cloudinary.config({ 
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+      api_key: process.env.CLOUDINARY_API_KEY, 
+      api_secret: process.env.CLOUDINARY_API_SECRET 
+    });
+
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const safeOriginalName = req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const filename = `BD-SUP-${uniqueSuffix}-${safeOriginalName}`;
+
+    // Wrap upload_stream in a Promise
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { 
+          folder: "bodilicious_support",
+          public_id: filename
+        },
+        (error, result) => {
+          if (error) {
+            console.error("Cloudinary upload error:", error);
+            reject(new Error("Failed to upload to Cloudinary"));
+          } else {
+            resolve(result);
+          }
+        }
+      );
+      stream.end(req.file.buffer);
+    });
+
+    return res.status(200).json({
+      success: true,
+      publicId: uploadResult.public_id,
+      url: uploadResult.secure_url
+    });
+
+  } catch (err) {
+    console.error("Support UploadAttachment Error:", err.message || err);
+    return res.status(500).json({ success: false, message: err.message || "Failed to upload image" });
+  }
+};
+
+// DELETE /api/v1/support/upload
+export const deleteSupportAttachment = async (req, res) => {
+  try {
+    const { publicId } = req.body;
+    if (!publicId) {
+      return res.status(400).json({ success: false, message: "Public ID is required" });
+    }
+
+    // Security check: Only allow deleting files in the bodilicious_support folder
+    if (!publicId.startsWith("bodilicious_support/")) {
+      return res.status(400).json({ success: false, message: "Access denied: Invalid folder" });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ success: false, message: "Cloudinary keys missing from .env" });
+    }
+
+    // Configure Cloudinary inline
+    cloudinary.config({ 
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+      api_key: process.env.CLOUDINARY_API_KEY, 
+      api_secret: process.env.CLOUDINARY_API_SECRET 
+    });
+
+    const destroyResult = await cloudinary.uploader.destroy(publicId);
+
+    if (destroyResult.result !== "ok" && destroyResult.result !== "not found") {
+      return res.status(500).json({ success: false, message: "Failed to delete from Cloudinary" });
+    }
+
+    return res.status(200).json({ success: true, message: "Attachment deleted" });
+  } catch (error) {
+    console.error("Support DeleteAttachment Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};

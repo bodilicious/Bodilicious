@@ -1,10 +1,10 @@
+import "dotenv/config";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import app from "./app.js";
 import Product, { initProductCollection } from "./products/models.js";
-
-dotenv.config();
-
+import { initAnalyticsCron } from "./analytics/etl.js";
+import { initSupportCleanupCron } from "./support/cleanup.js";
+import { shutdownPosthog } from "./utils/posthog.js";
 const gracefulShutdown = async (signal) => {
   console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
   try {
@@ -28,6 +28,7 @@ const gracefulShutdown = async (signal) => {
     }
 
     console.log(`✅ Successfully updated ${updatedCount} products.`);
+    await shutdownPosthog();
     await mongoose.connection.close();
     console.log("MongoDB connection closed.");
     process.exit(0);
@@ -48,6 +49,8 @@ mongoose
     console.log("MongoDB connected");
 
     await initProductCollection();
+    initAnalyticsCron(); // Start background aggregations
+    initSupportCleanupCron(); // Start orphaned Cloudinary upload cleanup
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -20,7 +20,7 @@ const loadRazorpayScript = () => {
 };
 
 export default function PaymentPage() {
-    const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products } = useApp();
+    const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings } = useApp();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -54,7 +54,7 @@ export default function PaymentPage() {
     if (!shippingDetails) return null;
 
     const validCartItems = cartItems.filter((item: CartItem) => item && item.product);
-    const shippingCost = cartTotal >= 999 ? 0 : 99;
+    const shippingCost = cartTotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
     const total = cartTotal + shippingCost;
 
     // Build items array for backend (productId + quantity)
@@ -67,7 +67,7 @@ export default function PaymentPage() {
                     const match = products.find((x: any) => x.pid === item.product.pid) as any;
                     if (match?._id) productId = String(match._id);
                 }
-                return productId ? { productId, quantity: item.quantity } : null;
+                return productId ? { productId, pid: item.product.pid, quantity: item.quantity } : null;
             })
             .filter(Boolean) as { productId: string; quantity: number }[];
     };

@@ -15,7 +15,7 @@ export default function AccountHeaderCard({ user, authStatus,  onSave }: Account
     const [localAvatar, setLocalAvatar] = useState<string | null>(null);
 
     const memberSince = user
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         ? new Date(parseInt((user as any).createdAt || Date.now())).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
         : "January 2026";
 

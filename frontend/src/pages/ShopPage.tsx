@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useEffect, useMemo, useState } from 'react';
 import { X, SlidersHorizontal, ChevronDown, Search } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
@@ -13,7 +13,8 @@ type Option = { value: string; label: string };
 
 const titleCase = (s: string) =>
   s
-    .replace(/[_-]+/g, ' ')
+    .replace(/[_\-/]+/g, ' ')
+    .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
 const parseCSV = (v: string | null) => (v ? v.split(',').map(x => x.trim()).filter(Boolean) : []);
@@ -152,7 +153,7 @@ export default function ShopPage() {
 
   const selectedCategories = parseCSV(searchParams.get('category'));
   const selectedSubCategories = parseCSV(searchParams.get('sub_category'));
-  const selectedTypes = parseCSV(searchParams.get('product_type'));
+  const selectedTypes = parseCSV(searchParams.get('type')); // ← backend param is 'type'
   const selectedConcerns = parseCSV(searchParams.get('concern'));
   const selectedIngredients = parseCSV(searchParams.get('ingredient'));
   const sort = searchParams.get('sort') || 'best_selling';
@@ -182,13 +183,27 @@ export default function ShopPage() {
 
   const CATEGORY_OPTIONS: Option[] = useMemo(() => {
     if (!filters?.categories) return [];
-    return filters.categories
-      .map((v: string) => ({ value: v, label: titleCase(v) }));
+    return filters.categories.map((v: string) => ({ value: v, label: titleCase(v) }));
   }, [filters]);
 
-  const SUBCATEGORY_OPTIONS: Option[] = useMemo(() =>
-    (filters?.subCategories || []).map((v: string) => ({ value: v, label: titleCase(v) })),
-    [filters]);
+  // When a category is selected, narrow sub-categories by checking which products
+  // have both the selected category AND the sub-category. Falls back to all if no category selected.
+  const SUBCATEGORY_OPTIONS: Option[] = useMemo(() => {
+    const all: string[] = filters?.subCategories || [];
+    if (selectedCategories.length === 0) {
+      return all.map((v: string) => ({ value: v, label: titleCase(v) }));
+    }
+    // Filter sub-categories that exist on products matching selected categories
+    const relevant = all.filter(sub =>
+      products.some(p =>
+        selectedCategories.includes((p as any).category?.toLowerCase?.() || '') &&
+        (p as any).sub_category?.toLowerCase?.() === sub.toLowerCase()
+      )
+    );
+    // If no matches yet (loading), show all
+    const list = relevant.length > 0 ? relevant : all;
+    return list.map((v: string) => ({ value: v, label: titleCase(v) }));
+  }, [filters, selectedCategories, products]);
 
   const TYPE_OPTIONS: Option[] = useMemo(() =>
     (filters?.productTypes || []).map((v: string) => ({ value: v, label: titleCase(v) })),
@@ -198,7 +213,7 @@ export default function ShopPage() {
     (filters?.concerns || []).map((v: string) => ({ value: v, label: titleCase(v) })),
     [filters]);
 
-  const INGREDIENT_OPTIONS: Option[] = useMemo(() => 
+  const INGREDIENT_OPTIONS: Option[] = useMemo(() =>
     (filters?.ingredients || []).map((v: string) => ({ value: v, label: v })),
     [filters]);
 
@@ -240,6 +255,9 @@ export default function ShopPage() {
     (inStock !== '' ? 1 : 0) +
     (priceMax && priceMax !== String(computedMaxPrice) ? 1 : 0);
 
+  // Correct URL param name for product_type filter pill removal
+  const handleTypePillRemove = (value: string) => handleToggle('type', value);
+
   // ─── Shared filter panel content ──────────────────────────────────────────
   const FilterPanelContent = () => (
     <div className="space-y-0">
@@ -268,9 +286,9 @@ export default function ShopPage() {
       </div>
 
       <FilterAccordion title="Category" items={CATEGORY_OPTIONS} paramKey="category" selected={selectedCategories} handleToggle={handleToggle} defaultOpen limit={8} />
-      <FilterAccordion title="Sub Category" items={SUBCATEGORY_OPTIONS} paramKey="sub_category" selected={selectedSubCategories} handleToggle={handleToggle} limit={6} />
-      <FilterAccordion title="Product Type" items={TYPE_OPTIONS} paramKey="product_type" selected={selectedTypes} handleToggle={handleToggle} limit={6} />
-      <FilterAccordion title="Skin Concern" items={CONCERN_OPTIONS} paramKey="concern" selected={selectedConcerns} handleToggle={handleToggle} limit={6} />
+      <FilterAccordion title="Sub-category" items={SUBCATEGORY_OPTIONS} paramKey="sub_category" selected={selectedSubCategories} handleToggle={handleToggle} limit={8} />
+      <FilterAccordion title="Product Type" items={TYPE_OPTIONS} paramKey="type" selected={selectedTypes} handleToggle={handleToggle} limit={6} />
+      <FilterAccordion title="Skin Concern" items={CONCERN_OPTIONS} paramKey="concern" selected={selectedConcerns} handleToggle={handleToggle} limit={8} />
       <FilterAccordion title="Ingredients" items={INGREDIENT_OPTIONS} paramKey="ingredient" selected={selectedIngredients} handleToggle={handleToggle} searchable limit={6} />
 
       {/* Price Range */}
@@ -353,7 +371,7 @@ export default function ShopPage() {
             {[
               ...selectedCategories.map(v => ({ key: 'category', value: v, label: `Category: ${titleCase(v)}` })),
               ...selectedSubCategories.map(v => ({ key: 'sub_category', value: v, label: titleCase(v) })),
-              ...selectedTypes.map(v => ({ key: 'product_type', value: v, label: titleCase(v) })),
+              ...selectedTypes.map(v => ({ key: 'type', value: v, label: titleCase(v) })),
               ...selectedConcerns.map(v => ({ key: 'concern', value: v, label: titleCase(v) })),
               ...selectedIngredients.map(v => ({ key: 'ingredient', value: v, label: v })),
             ].map(filter => (

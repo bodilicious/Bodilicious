@@ -57,6 +57,12 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
+    marketing: {
+      source: { type: String, default: null },
+      medium: { type: String, default: null },
+      campaign: { type: String, default: null },
+    },
+
     paymentMethod: {
       type: String,
       enum: ["cod", "razorpay"],

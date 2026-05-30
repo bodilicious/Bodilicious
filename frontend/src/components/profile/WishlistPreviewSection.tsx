@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, ChevronRight, X, AlertCircle } from 'lucide-react';
 import { Product } from '../../types';

@@ -25,6 +25,7 @@ const UserManagement: React.FC = () => {
   const [pages, setPages] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [computing, setComputing] = useState(false);
   const [filters, setFilters] = useState({ role: '', isBlocked: '', segment: '' });
 
   const SEGMENT_CONFIG = [
@@ -104,6 +105,32 @@ const UserManagement: React.FC = () => {
     } catch { toast.error('Export failed'); }
   };
 
+  const handleCompute = async () => {
+    setComputing(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/api/v1/admin/segments/compute`, {
+        method: 'POST',
+        headers
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message);
+        // Refresh stats
+        const r = await fetch(`${API_URL}/api/v1/admin/segments/stats`, { headers });
+        const d = await r.json();
+        if (d.success) setSegmentStats(d.data);
+        fetchUsers();
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Computation failed');
+    } finally {
+      setComputing(false);
+    }
+  };
+
   const handleToggleBlock = async (id: string, currentlyBlocked: boolean) => {
     if (id === currentUser?.uid) {
       toast.error("You cannot block yourself");
@@ -163,6 +190,17 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-serif font-bold text-dark-red">Users & Segments</h2>
+        <button
+          onClick={handleCompute}
+          disabled={computing}
+          className="bg-white border border-silk-light px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-sm text-dark-red hover:bg-silk-light transition-all text-sm disabled:opacity-50"
+        >
+          {computing ? 'Computing...' : 'Recompute Segments'}
+        </button>
+      </div>
+
       {/* Segment Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {SEGMENT_CONFIG.map(seg => {
@@ -232,6 +270,7 @@ const UserManagement: React.FC = () => {
           <thead>
             <tr className="border-b border-silk-light">
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">User</th>
+              <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Segments</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Role</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Status</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Last Login</th>
@@ -242,7 +281,7 @@ const UserManagement: React.FC = () => {
             {loading ? (
               [...Array(5)].map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  <td colSpan={5} className="px-6 py-8 h-16 bg-gray-50/50 rounded-lg"></td>
+                  <td colSpan={6} className="px-6 py-8 h-16 bg-gray-50/50 rounded-lg"></td>
                 </tr>
               ))
             ) : users.map((u) => (
@@ -258,6 +297,18 @@ const UserManagement: React.FC = () => {
                         <Mail size={12} /> {u.email}
                       </p>
                     </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex gap-1 flex-wrap">
+                    {((u as any).segment || []).map((seg: string) => (
+                      <span key={seg} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-bold uppercase tracking-wider">
+                        {seg.replace('_', ' ')}
+                      </span>
+                    ))}
+                    {((u as any).segment || []).length === 0 && (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4">

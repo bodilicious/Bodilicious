@@ -1,7 +1,7 @@
 import { AppProvider } from './context/AppContext';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { LazyMotion, domAnimation, AnimatePresence } from 'framer-motion';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import PageTransition from './components/PageTransition';
 import ScrollToTop from './components/ScrollToTop';
@@ -37,6 +37,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = lazy(() => import('./admin/AdminLayout'));
 const AdminRoute = lazy(() => import('./components/AdminRoute'));
 const AnalyticsDashboard = lazy(() => import('./admin/AnalyticsDashboard'));
+const AnalyticsPage = lazy(() => import('./admin/AnalyticsPage'));
 const ProductManagement = lazy(() => import('./admin/ProductManagement'));
 const ProductForm = lazy(() => import('./admin/ProductForm'));
 const OrderManagement = lazy(() => import('./admin/OrderManagement'));
@@ -45,6 +46,9 @@ const AuditLogs = lazy(() => import('./admin/AuditLogs'));
 const ReturnsManagement = lazy(() => import('./admin/ReturnsManagement'));
 const CouponManagement = lazy(() => import('./admin/CouponManagement'));
 const Insights = lazy(() => import('./admin/Insights'));
+const AbandonedCheckouts = lazy(() => import('./admin/AbandonedCheckouts'));
+const DraftOrders = lazy(() => import('./admin/DraftOrders'));
+const StoreSettings = lazy(() => import('./admin/StoreSettings'));
 
 // Simple loading fallback
 const PageLoader = () => (
@@ -55,6 +59,23 @@ const PageLoader = () => (
 
 function AppRoutes() {
   const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const source = params.get('utm_source');
+    const medium = params.get('utm_medium');
+    const campaign = params.get('utm_campaign');
+
+    if (source || medium || campaign) {
+      const utm = {
+        source: source || 'direct',
+        medium: medium || 'none',
+        campaign: campaign || 'none',
+        timestamp: Date.now()
+      };
+      localStorage.setItem('bodilicious_utm', JSON.stringify(utm));
+    }
+  }, [location.search]);
 
   return (
     <>
@@ -102,14 +123,18 @@ function AppRoutes() {
               <Route element={<AdminRoute />}>
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AnalyticsDashboard />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="products" element={<ProductManagement />} />
                 <Route path="products/new" element={<ProductForm />} />
                 <Route path="products/:pid" element={<ProductForm />} />
                 <Route path="orders" element={<OrderManagement />} />
+                <Route path="abandoned-checkouts" element={<AbandonedCheckouts />} />
+                <Route path="draft-orders" element={<DraftOrders />} />
                 <Route path="returns" element={<ReturnsManagement />} />
                 <Route path="coupons" element={<CouponManagement />} />
                 <Route path="insights" element={<Insights />} />
                 <Route path="users" element={<UserManagement />} />
+                <Route path="settings" element={<StoreSettings />} />
                 <Route path="logs" element={<AuditLogs />} />
               </Route>
             </Route>

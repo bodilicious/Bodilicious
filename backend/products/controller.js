@@ -1,6 +1,7 @@
 import Product from "./models.js";
 import Order from "../tracker/models.js";
 import escapeStringRegexp from "escape-string-regexp";
+import { logAuditEvent } from "../audit/logger.js";
 
 /**
  * CREATE PRODUCT
@@ -121,10 +122,10 @@ export const getAllProducts = async (req, res) => {
     }
 
     const sortMap = {
-      best_selling: { ratingCount: -1, rating: -1 },
-      price_asc: { price: 1 },
-      price_desc: { price: -1 },
-      newest: { createdAt: -1 },
+      best_selling: { sub_category: 1, ratingCount: -1, rating: -1 },
+      price_asc: { sub_category: 1, price: 1 },
+      price_desc: { sub_category: 1, price: -1 },
+      newest: { sub_category: 1, createdAt: -1 },
     };
 
     const sortObj = sortMap[sort] || sortMap.best_selling;
@@ -176,6 +177,23 @@ export const getAllProducts = async (req, res) => {
       }
       return product;
     });
+
+    if (search) {
+      logAuditEvent({
+        event_type: "SEARCH",
+        user_id: req.user?._id || null,
+        severity: "INFO",
+        source_system: "frontend",
+        metadata: {
+          query: search,
+          resultsCount: total
+        },
+        network: {
+          ip_address: req.ip || req.headers["x-forwarded-for"] || null,
+          user_agent: req.headers["user-agent"] || null
+        }
+      }).catch(err => console.error("[Analytics] Search log failed:", err));
+    }
 
     res.json({
       success: true,

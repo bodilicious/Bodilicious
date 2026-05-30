@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useApp } from '../context/AppContext';
 import { Sparkles, ShoppingBag, Gift, CheckCircle, XCircle, Clock, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';

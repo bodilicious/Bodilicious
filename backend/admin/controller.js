@@ -1,9 +1,11 @@
 import Order from "../tracker/models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
+import StoreSettings from "../settings/models.js";
 import admin from "../config/firebaseAdmin.js";
 import { v2 as cloudinary } from "cloudinary";
-import AuditLog from "./models.js";
+import AuditLogV2 from "../audit/models.js";
+import { logAuditEvent } from "../audit/logger.js";
 import mongoose from "mongoose";
 import { pushOrderToShiprocket as srPush, getShiprocketToken } from "../tracker/shiprocketservice.js";
 
@@ -19,26 +21,25 @@ export const logAction = async (req, action, entity, entityId, details, options 
     const detailsMeta = details?.meta || {};
     const resolvedSource = options.source || detailsMeta.source || (adminId ? "admin" : (userId ? "customer" : "system"));
 
-    await AuditLog.create({
-      admin: adminId,
-      user: userId,
-      action,
-      targetType: entity,
-      targetId: entityId,
-      // Compatibility fields
-      entity,
-      entityId,
-      details,
-      // Structured fields
-      before: details?.before || null,
-      after: details?.after || null,
-      meta: {
-        ...detailsMeta,
-        ...options.meta,
-        source: resolvedSource,
-        reason: options.reason || detailsMeta.reason || null
+    await logAuditEvent({
+      event_type: action.toUpperCase(),
+      user_id: adminId || userId,
+      session_id: req?.sessionID || null,
+      severity: options.severity || "INFO",
+      source_system: resolvedSource === "admin" ? "backend-api" : "frontend",
+      correlation_id: entityId !== "multiple" && entityId !== "all" ? entityId : null,
+      request_id: req?.headers?.['x-request-id'] || null,
+      network: {
+        ip_address: req?.ip || req?.headers?.["x-forwarded-for"] || req?.connection?.remoteAddress,
+        user_agent: req?.headers?.["user-agent"]
       },
-      ip: req?.ip || req?.headers?.["x-forwarded-for"] || req?.connection?.remoteAddress
+      metadata: {
+        targetType: entity,
+        targetId: entityId,
+        before: details?.before || null,
+        after: details?.after || null,
+        reason: options.reason || detailsMeta.reason || null
+      }
     });
   } catch (err) {
     console.error("Audit Logging Failed:", err.message);
@@ -82,9 +83,9 @@ export const getDashboardSummary = async (req, res) => {
         isActive: true
       }),
       // Recent Administrative Activity
-      AuditLog.find()
-        .populate("admin", "name")
-        .sort({ createdAt: -1 })
+      AuditLogV2.find({ "metadata.targetType": { $exists: true } })
+        .populate("user_id", "name")
+        .sort({ timestamp_utc: -1 })
         .limit(5),
       // Category Distribution
       Product.aggregate([
@@ -637,13 +638,26 @@ export const updateUserRole = async (req, res) => {
 export const getLogsAdmin = async (req, res) => {
   try {
     const { limit, skip } = req.pagination;
-    const logs = await AuditLog.find()
-      .populate("admin", "name email")
-      .sort({ createdAt: -1 })
+    const { event_type, severity, is_anomaly, search } = req.query;
+
+    const query = {};
+    if (event_type) query.event_type = event_type;
+    if (severity) query.severity = severity;
+    if (is_anomaly !== undefined) query['flags.is_anomaly'] = is_anomaly === 'true';
+    if (search) {
+      query.$or = [
+        { correlation_id: new RegExp(search, "i") },
+        { session_id: new RegExp(search, "i") }
+      ];
+    }
+
+    const logs = await AuditLogV2.find(query)
+      .populate("user_id", "name email")
+      .sort({ timestamp_utc: -1 })
       .skip(skip)
       .limit(limit);
     
-    const total = await AuditLog.countDocuments();
+    const total = await AuditLogV2.countDocuments(query);
 
     res.json({ 
       success: true, 
@@ -655,6 +669,36 @@ export const getLogsAdmin = async (req, res) => {
   } catch (err) {
     console.error("Admin GetLogs Error:", err);
     res.status(500).json({ success: false, message: "Error fetching audit logs" });
+  }
+};
+
+/**
+ * GET /api/v1/admin/logs/export
+ */
+export const exportLogsCSV = async (req, res) => {
+  try {
+    const { range = "30d" } = req.query;
+    const days = parseInt(range) || 30;
+    const dateLimit = new Date();
+    dateLimit.setDate(dateLimit.getDate() - days);
+
+    const logs = await AuditLogV2.find({ timestamp_utc: { $gte: dateLimit } })
+      .populate("user_id", "name email")
+      .sort({ timestamp_utc: -1 });
+
+    let csv = "Timestamp (UTC),Event Type,User/System,Severity,IP Address,Correlation ID\n";
+    logs.forEach(l => {
+      const user = l.user_id ? l.user_id.email : l.source_system || "System";
+      const ip = l.network?.ip_address || "N/A";
+      csv += `${l.timestamp_utc.toISOString()},${l.event_type},"${user}",${l.severity},${ip},${l.correlation_id || ""}\n`;
+    });
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("audit_logs_export.csv");
+    return res.send(csv);
+  } catch (err) {
+    console.error("Admin ExportLogs Error:", err);
+    res.status(500).json({ success: false, message: "Error exporting audit logs" });
   }
 };
 
@@ -844,25 +888,25 @@ export const getProductStockHistory = async (req, res) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const logs = await AuditLog.find({
+    const logs = await AuditLogV2.find({
       $or: [
-        { targetType: "product", targetId: id },
-        { targetType: "product", targetId: product._id.toString() }
+        { "metadata.targetType": "product", "metadata.targetId": id },
+        { "metadata.targetType": "product", "metadata.targetId": product._id.toString() }
       ],
-      action: { $regex: /^stock/i },
-      createdAt: { $gte: thirtyDaysAgo }
+      event_type: { $regex: /^STOCK/i },
+      timestamp_utc: { $gte: thirtyDaysAgo }
     })
-      .populate("admin", "name")
-      .sort({ createdAt: 1 })
+      .populate("user_id", "name")
+      .sort({ timestamp_utc: 1 })
       .lean();
 
     // Build normalized edits list
     const edits = logs.map(log => ({
-      timestamp: log.createdAt,
-      actorName: log.admin?.name || "System",
-      from: log.before?.stock ?? null,
-      to: log.after?.stock ?? null,
-      reason: log.meta?.reason || log.action
+      timestamp: log.timestamp_utc,
+      actorName: log.user_id?.name || "System",
+      from: log.metadata?.before?.stock ?? null,
+      to: log.metadata?.after?.stock ?? null,
+      reason: log.metadata?.reason || log.event_type
     }));
 
     // Build time series by carrying forward the last known stock value
@@ -870,13 +914,13 @@ export const getProductStockHistory = async (req, res) => {
     let rollingStock = product.stock; // start from current
 
     // Walk backwards to reconstruct historical values
-    const sortedLogs = [...logs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const sortedLogs = [...logs].sort((a, b) => new Date(a.timestamp_utc) - new Date(b.timestamp_utc));
     if (sortedLogs.length > 0) {
       // Use the 'before' from the first log as our starting point
-      rollingStock = sortedLogs[0].before?.stock ?? product.stock;
+      rollingStock = sortedLogs[0].metadata?.before?.stock ?? product.stock;
       for (const log of sortedLogs) {
-        const dateKey = new Date(log.createdAt).toISOString().split("T")[0];
-        rollingStock = log.after?.stock ?? rollingStock;
+        const dateKey = new Date(log.timestamp_utc).toISOString().split("T")[0];
+        rollingStock = log.metadata?.after?.stock ?? rollingStock;
         seriesMap[dateKey] = rollingStock;
       }
     }
@@ -961,15 +1005,20 @@ export const bulkStockImport = async (req, res) => {
         const prevStock = product.stock;
         await Product.findByIdAndUpdate(product._id, { stock: newStock });
 
-        await AuditLog.create({
-          admin: req.user._id,
-          action: "stock_bulk_import",
-          targetType: "product",
-          targetId: product._id.toString(),
-          before: { stock: prevStock },
-          after: { stock: newStock },
-          meta: { reason: "bulk_import", source: "admin" },
-          ip: req.ip
+        await logAuditEvent({
+          event_type: "STOCK_BULK_IMPORT",
+          user_id: req.user._id,
+          severity: "INFO",
+          source_system: "backend-api",
+          correlation_id: product._id.toString(),
+          network: { ip_address: req.ip },
+          metadata: {
+            targetType: "product",
+            targetId: product._id.toString(),
+            before: { stock: prevStock },
+            after: { stock: newStock },
+            reason: "bulk_import"
+          }
         });
 
         results.updated++;
@@ -1199,6 +1248,160 @@ export const adminSyncShiprocket = async (req, res) => {
   } catch (err) {
     console.error("Admin SyncShiprocket Error:", err);
     return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/abandoned-checkouts
+ */
+export const getAbandonedCheckouts = async (req, res) => {
+  try {
+    const { limit, skip } = req.pagination;
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+    const query = {
+      paymentStatus: { $in: ["pending", "failed"] },
+      orderStatus: "pending",
+      createdAt: { $lt: thirtyMinsAgo }
+    };
+
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .populate("user", "name email phone")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Order.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      data: orders,
+      total,
+      page: req.pagination.page,
+      pages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    console.error("Admin AbandonedCheckouts Error:", err);
+    res.status(500).json({ success: false, message: "Error fetching abandoned checkouts" });
+  }
+};
+
+/**
+ * POST /api/v1/admin/draft-orders
+ * Create a draft order manually (B2B, phone orders). Locks inventory.
+ */
+export const createDraftOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    let { userId, items, shippingDetails, manualDiscount = 0, notes } = req.body;
+
+    if (!items || items.length === 0 || !shippingDetails?.address) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    // 🚀 Support Guest Orders
+    if (!userId) {
+      if (!shippingDetails.name || !shippingDetails.email) {
+        return res.status(400).json({ success: false, message: "Name and Email are required for Guest Orders" });
+      }
+      
+      // Check if this email already exists
+      let existingUser = await UserProfile.findOne({ email: shippingDetails.email }).session(session);
+      
+      if (existingUser) {
+        userId = existingUser._id;
+      } else {
+        // Create a guest user profile
+        const [newUser] = await UserProfile.create([{
+          firebaseUID: `guest_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          name: shippingDetails.name,
+          email: shippingDetails.email,
+          phone: shippingDetails.phone || "",
+          addresses: [{
+            name: shippingDetails.name,
+            phone: shippingDetails.phone || "",
+            addressLine: shippingDetails.address,
+            city: shippingDetails.city,
+            state: shippingDetails.state,
+            pincode: shippingDetails.pincode,
+            country: shippingDetails.country || "India"
+          }]
+        }], { session });
+        userId = newUser._id;
+      }
+    }
+
+    let totalAmount = 0;
+    const orderItems = [];
+
+    // Calculate prices and lock inventory
+    for (const item of items) {
+      let product;
+      if (mongoose.Types.ObjectId.isValid(item.productId)) {
+        product = await Product.findById(item.productId).session(session);
+      }
+      if (!product) {
+        const searchPid = item.pid || item.productId;
+        product = await Product.findOne({ pid: searchPid }).session(session);
+      }
+      if (!product) throw new Error(`Product ${item.productId} not found`);
+      if (product.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
+
+      totalAmount += product.price * item.quantity;
+      
+      orderItems.push({
+        product: product._id,
+        quantity: item.quantity,
+        priceAtPurchase: product.price
+      });
+
+      product.stock -= item.quantity;
+      await product.save({ session });
+    }
+
+    const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
+    const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
+    const originalAmount = totalAmount + shippingCost;
+    const finalAmount = Math.max(0, originalAmount - manualDiscount);
+
+    const [newOrder] = await Order.create([{
+      user: userId,
+      items: orderItems,
+      totalAmount: finalAmount,
+      originalAmount,
+      discountAmount: manualDiscount,
+      paymentMethod: "razorpay", // Default to razorpay, but pending
+      paymentStatus: "pending",
+      orderStatus: "pending",
+      shippingDetails,
+      source: "admin_draft",
+      notes
+    }], { session });
+
+    await UserProfile.findByIdAndUpdate(userId, { $push: { orders: newOrder._id } }, { session });
+
+    // Audit Log
+    await logAction(req, "DRAFT_ORDER_CREATED", "order", newOrder._id.toString(), {
+      totalAmount: finalAmount,
+      notes
+    }, { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    const populatedOrder = await Order.findById(newOrder._id)
+      .populate("user", "name email")
+      .populate("items.product", "name pid price images");
+
+    res.status(201).json({ success: true, data: populatedOrder });
+  } catch (err) {
+    if (session.inTransaction()) await session.abortTransaction();
+    session.endSession();
+    console.error("Admin CreateDraftOrder Error:", err);
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 

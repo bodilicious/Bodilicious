@@ -57,7 +57,6 @@ const NAV_LINKS = [
   { label: 'Body', page: 'shop' as const, isMegaMenu: true, query: 'category=body,lip,makeup' },
   { label: 'Ritual Finder', page: 'ritual-finder' as const },
   { label: 'About', page: 'about' as const },
-  { label: 'Contact', page: 'contact' as const },
 ];
 
 export default function Navbar() {
@@ -154,6 +153,22 @@ export default function Navbar() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const resultsCount = products.filter((p: any) => 
+        p.name.toLowerCase().includes(q) || 
+        (p.description && p.description.toLowerCase().includes(q))
+      ).length;
+
+      // Log to analytics backend
+      fetch(`${import.meta.env.VITE_API_BASE}/admin/analytics/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'search',
+          metadata: { query: searchQuery.trim(), resultsCount }
+        })
+      }).catch(err => console.error("Search tracking failed:", err));
+
       setShopFilter('all');
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
       setSearchOpen(false);

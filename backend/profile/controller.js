@@ -2,7 +2,8 @@ import UserProfile from "./models.js";
 import Product from "../products/models.js";
 import Order from "../tracker/models.js";
 import admin from "../config/firebaseAdmin.js";
-import { sendVerificationEmail } from "../email/emailService.js"
+import { sendVerificationEmail } from "../email/emailService.js";
+import { logAction } from "../admin/controller.js";
 /*
   GET PROFILE
   GET /api/v1/user
@@ -148,12 +149,39 @@ export const syncCart = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const oldCartMap = new Map(user.cart.map(i => [i.product ? i.product.toString() : "unknown", i.quantity]));
+    const newCartMap = new Map(cartItems.map(i => [i.productId ? i.productId.toString() : "unknown", i.quantity]));
+
     user.cart = cartItems.map(item => ({
       product: item.productId,
       quantity: item.quantity,
     }));
 
     await user.save();
+
+    // 🚀 Audit Cart Changes
+    for (const [pid, newQty] of newCartMap.entries()) {
+      const oldQty = oldCartMap.get(pid) || 0;
+      if (newQty > oldQty) {
+        logAction(req, "cart_item_added", "product", pid, {
+          quantity_added: newQty - oldQty,
+          total_quantity: newQty
+        }).catch(err => console.error("Cart Item Added Audit Failed:", err));
+      } else if (newQty < oldQty) {
+        logAction(req, "cart_item_removed", "product", pid, {
+          quantity_removed: oldQty - newQty,
+          total_quantity: newQty
+        }).catch(err => console.error("Cart Item Removed Audit Failed:", err));
+      }
+    }
+    for (const pid of oldCartMap.keys()) {
+      if (!newCartMap.has(pid)) {
+        logAction(req, "cart_item_removed", "product", pid, {
+          quantity_removed: oldCartMap.get(pid),
+          total_quantity: 0
+        }).catch(err => console.error("Cart Item Removed Audit Failed:", err));
+      }
+    }
 
     const userWithPopulatedCart = await UserProfile.findById(user._id)
       .populate("cart.product")
