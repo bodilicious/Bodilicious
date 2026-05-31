@@ -20,7 +20,7 @@ import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import OrderTimelineModal from './OrderTimelineModal';
 import ShippingLabel from './ShippingLabel';
-import CustomerDrawer from './CustomerDrawer';
+import CustomerAnalysisModal from './CustomerAnalysisModal';
 
 const OrderManagement: React.FC = () => {
   const { getAuthHeaders } = useApp();
@@ -434,7 +434,7 @@ const OrderManagement: React.FC = () => {
       {/* Modals & Drawers */}
       {timelineOrder && <OrderTimelineModal order={timelineOrder} onClose={() => setTimelineOrder(null)} />}
       {labelOrder && <ShippingLabel order={labelOrder} onClose={() => setLabelOrder(null)} />}
-      {customerUserId && <CustomerDrawer userId={customerUserId} onClose={() => setCustomerUserId(null)} />}
+      {customerUserId && <CustomerAnalysisModal userId={customerUserId} onClose={() => setCustomerUserId(null)} />}
     </div>
   );
 };
