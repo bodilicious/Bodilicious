@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { ShoppingBag, Heart, User, Menu, X, Search, MessageCircle, ChevronDown, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Heart, User, Menu, X, Search, MessageCircle, ChevronDown, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, m } from 'framer-motion';
 import Logo from './Logo';
 import { useApp } from '../context/AppContext';
 
@@ -61,7 +62,7 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
-  const { cartCount, wishlist, currentPage, authStatus, user, setShopFilter, products, navigateTo } = useApp();
+  const { cartCount, wishlist, currentPage, authStatus, user, setShopFilter, products, navigateTo, storeSettings } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -73,6 +74,8 @@ export default function Navbar() {
     (location.pathname === '/' || location.pathname === '/home') &&
     !sessionStorage.getItem('splashShown')
   );
+  
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
 
   useEffect(() => {
     const handleSplashDismiss = () => setSplashVisible(false);
@@ -194,6 +197,48 @@ export default function Navbar() {
             : 'bg-white/95 backdrop-blur-sm'
       }`}
     >
+      <AnimatePresence>
+        {storeSettings?.announcementBar?.isActive && storeSettings.announcementBar.text && !announcementDismissed && (
+          <m.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-gradient-to-r from-dark-red via-ruby-red to-dark-red text-white text-[10px] sm:text-xs tracking-widest font-sans uppercase z-50 shadow-md relative overflow-hidden"
+          >
+            <div className="py-2 sm:py-2.5 flex items-center relative pr-10">
+              {/* Marquee Container */}
+              <div className="overflow-hidden w-full relative flex items-center h-4 sm:h-5">
+                <m.div 
+                  initial={{ x: "100vw" }}
+                  animate={{ x: "-100%" }}
+                  transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
+                  className="whitespace-nowrap absolute left-0 flex items-center"
+                >
+                  {storeSettings.announcementBar.link ? (
+                    <a href={storeSettings.announcementBar.link} className="hover:text-silk-light transition-colors flex items-center gap-2 group/link cursor-pointer px-4">
+                      <span className="border-b border-transparent group-hover/link:border-silk-light pb-0.5 transition-colors">
+                        {storeSettings.announcementBar.text}
+                      </span>
+                      <ArrowRight size={14} className="group-hover/link:translate-x-1 transition-transform" />
+                    </a>
+                  ) : (
+                    <span className="font-bold opacity-90 px-4">{storeSettings.announcementBar.text}</span>
+                  )}
+                </m.div>
+              </div>
+              
+              <button 
+                onClick={() => setAnnouncementDismissed(true)}
+                className="absolute right-2 sm:right-4 p-1 rounded-full bg-dark-red/50 hover:bg-white/20 transition-colors z-10 backdrop-blur-sm"
+                aria-label="Dismiss announcement"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo — drop-shadow when transparent so it pops over any slide image */}

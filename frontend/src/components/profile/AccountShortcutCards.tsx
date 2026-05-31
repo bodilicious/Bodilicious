@@ -5,22 +5,33 @@ import {
     Heart, 
     HelpCircle, 
     ChevronRight, 
-    Gift,
-    Ticket
+    Ticket,
+    ShieldCheck
 } from 'lucide-react';
-
+import { User } from '../../types';
 
 interface Props {
+    user?: User | null;
     navigateTo: (page: any) => void;
 }
 
-export default function AccountShortcutCards({ navigateTo }: Props) {
+export default function AccountShortcutCards({ user, navigateTo }: Props) {
     const shortcuts = [
         { id: 'orders',    label: 'Order History',    icon: Package,    page: 'tracking',          color: 'text-amber-600 bg-amber-50' },
         { id: 'wishlist',  label: 'Saved Items',      icon: Heart,      page: 'wishlist',           color: 'text-rose-600 bg-rose-50' },
         { id: 'tickets',   label: 'My Tickets',       icon: Ticket,     page: 'account/tickets',    color: 'text-violet-600 bg-violet-50' },
         { id: 'help',      label: 'Help & Support',   icon: HelpCircle, page: 'contact',            color: 'text-blue-600 bg-blue-50' },
     ];
+
+    if (user?.role === 'admin' || user?.role === 'primary_admin') {
+        shortcuts.push({
+            id: 'admin',
+            label: 'Admin Panel',
+            icon: ShieldCheck,
+            page: 'admin',
+            color: 'text-ruby-red bg-ruby-red/10'
+        });
+    }
 
 
     return (

@@ -2,7 +2,7 @@ import UserProfile from "./models.js";
 import Product from "../products/models.js";
 import Order from "../tracker/models.js";
 import admin from "../config/firebaseAdmin.js";
-import { sendVerificationEmail } from "../email/emailService.js";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../email/emailService.js";
 import { logAction } from "../admin/controller.js";
 /*
   GET PROFILE
@@ -345,7 +345,7 @@ export const triggerEmailVerification = async (req, res) => {
       });
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || "https://bodilicious.onrender.com";
+    const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
     console.log("Using FRONTEND_URL for link:", frontendUrl);
     
     const actionCodeSettings = {
@@ -401,6 +401,72 @@ export const triggerEmailVerification = async (req, res) => {
       message: "Verification failed",
       error: error.message,
       stack: error.stack
+    });
+  }
+};
+
+/*
+  TRIGGER PASSWORD RESET
+  POST /api/v1/user/forgot-password
+*/
+export const triggerPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
+    const actionCodeSettings = {
+      url: `${frontendUrl}/auth/action`,
+      handleCodeInApp: false,
+    };
+
+    // 1. Generate the standard Firebase password reset link
+    let firebaseLink;
+    try {
+      firebaseLink = await admin
+        .auth()
+        .generatePasswordResetLink(email, actionCodeSettings);
+    } catch (firebaseErr) {
+      // Don't expose whether the email exists or not for security reasons
+      if (firebaseErr.code === 'auth/user-not-found') {
+        return res.json({ success: true, message: "If an account exists, a reset link was sent." });
+      }
+      throw firebaseErr;
+    }
+
+    // 2. Extract the oobCode from the Firebase link
+    const url = new URL(firebaseLink);
+    const oobCode = url.searchParams.get("oobCode");
+
+    if (!oobCode) {
+      throw new Error("Could not extract oobCode from Firebase reset link");
+    }
+
+    // 3. Construct our BRANDED link
+    const brandedLink = `${frontendUrl}/auth/action?mode=resetPassword&oobCode=${oobCode}`;
+
+    try {
+      await sendPasswordResetEmail(email, brandedLink);
+    } catch (emailErr) {
+      console.error("Email Service Error:", emailErr.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send reset email.",
+        error: emailErr.message
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "If an account exists, a reset link was sent.",
+    });
+  } catch (error) {
+    console.error("Password reset error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Password reset failed",
     });
   }
 };

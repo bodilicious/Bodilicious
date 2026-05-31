@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { applyActionCode, getAuth } from "firebase/auth";
+import { applyActionCode, confirmPasswordReset, getAuth } from "firebase/auth";
 
 type StatusType = "loading" | "success" | "error";
 
@@ -10,8 +10,36 @@ export default function EmailActionPage() {
   const navigate = useNavigate();
 
   const [status, setStatus] = useState<StatusType>("loading");
-  const [message, setMessage] = useState("Verifying your email...");
+  const [message, setMessage] = useState("Processing your request...");
+  const [mode, setMode] = useState<string | null>(null);
+  const [oobCode, setOobCode] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const actionProcessed = useRef(false);
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setStatus("error");
+      setMessage("Password must be at least 6 characters long.");
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      const auth = getAuth();
+      await confirmPasswordReset(auth, oobCode!, newPassword);
+      setStatus("success");
+      setMode("resetSuccess");
+      setMessage("Your password has been reset successfully. You can now sign in.");
+    } catch (err: any) {
+      console.error("Password reset failed:", err);
+      setStatus("error");
+      setMessage(err.message || "Failed to reset password. The link might be expired.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const handleEmailAction = async () => {
@@ -19,21 +47,32 @@ export default function EmailActionPage() {
       actionProcessed.current = true;
 
       const params = new URLSearchParams(location.search);
-      const mode = params.get("mode");
-      const oobCode = params.get("oobCode");
+      const urlMode = params.get("mode");
+      const urlOobCode = params.get("oobCode");
 
-      if (!mode || !oobCode) {
+      if (!urlMode || !urlOobCode) {
         setStatus("error");
-        setMessage("Invalid email action link.");
+        setMessage("Invalid action link.");
         return;
       }
+
+      setMode(urlMode);
+      setOobCode(urlOobCode);
+
+      // If it's a reset password link, stop loading and wait for user input
+      if (urlMode === "resetPassword") {
+        setStatus("success"); // we use success state to show the form
+        return;
+      }
+
+
 
       try {
         const auth = getAuth();
 
-        switch (mode) {
+        switch (urlMode) {
           case "verifyEmail":
-            await applyActionCode(auth, oobCode);
+            await applyActionCode(auth, urlOobCode);
             setStatus("success");
             setMessage("Your email has been verified successfully.");
 
@@ -75,15 +114,61 @@ export default function EmailActionPage() {
           </>
         )}
 
-        {status === "success" && (
+        {status === "success" && mode === "resetPassword" && (
+          <form onSubmit={handlePasswordReset} className="text-left mt-6">
+            <h1 className="text-3xl font-serif text-dark-red mb-4 text-center">
+              New Password
+            </h1>
+            <p className="text-sm font-sans text-grey-beige leading-relaxed text-center mb-6">
+              Please enter your new password below.
+            </p>
+            <div className="mb-6">
+              <label className="block text-[10px] uppercase tracking-widest text-grey-beige mb-2">
+                New Password
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isSubmitting}
+                className="w-full bg-silk-light/50 border border-silk/50 px-4 py-3 text-sm font-sans focus:outline-none focus:border-dark-red/50 transition-colors disabled:opacity-50"
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-12 bg-dark-red text-silk font-sans text-xs tracking-widest uppercase hover:bg-ruby-red transition-all duration-300 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                "Save Password"
+              )}
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
+            </button>
+          </form>
+        )}
+
+        {status === "success" && mode !== "resetPassword" && (
           <>
             <CheckCircle2 className="w-12 h-12 text-dark-red mx-auto mb-6" />
             <h1 className="text-3xl font-serif text-dark-red mb-4">
-              Email Verified
+              {mode === "resetSuccess" ? "Password Reset" : "Email Verified"}
             </h1>
-            <p className="text-sm font-sans text-grey-beige leading-relaxed">
+            <p className="text-sm font-sans text-grey-beige leading-relaxed mb-8">
               {message}
             </p>
+            {mode === "resetSuccess" && (
+              <button
+                onClick={() => navigate("/signin", { replace: true })}
+                className="w-full h-12 bg-dark-red text-silk font-sans text-xs tracking-widest uppercase hover:bg-ruby-red transition-all"
+              >
+                Go to Sign In
+              </button>
+            )}
           </>
         )}
 

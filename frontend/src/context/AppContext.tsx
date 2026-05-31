@@ -75,6 +75,15 @@ interface AppContextType {
     shippingThreshold: number;
     shippingCost: number;
     announcementBar: { text: string; isActive: boolean; link: string };
+    maintenanceMode: boolean;
+    maintenanceMessage: string;
+    bestSellerPids: string[];
+    reviewSkinTypeTaggingEnabled: boolean;
+    reviewBeforeAfterPhotosEnabled: boolean;
+    reviewVerifiedBadgeEnabled: boolean;
+    reviewIncentiveEnabled: boolean;
+    reviewIncentiveDiscountPercent: number;
+    reviewModerationEnabled: boolean;
   };
 
   isChatOpen: boolean;
@@ -87,6 +96,7 @@ interface AppContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
+  triggerPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuthState: () => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
@@ -124,11 +134,13 @@ interface AppContextType {
   refreshProfile: () => Promise<void>;
 }
 
-const AppContext = createContext<AppContextType | null>(null);
+export const AppContext = createContext<AppContextType | null>(null);
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/v1`;
 const USER_BASE = `${API_BASE}/user`;
 const CART_STORAGE_KEY = 'bodilicious_guest_cart';
+
+const ENFORCEMENT_DATE = new Date("2026-05-31T00:00:00Z").getTime();
 
 /* ================================
    Provider
@@ -162,10 +174,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [storeSettings, setStoreSettings] = useState({
     storeName: 'Bodilicious',
-    supportEmail: 'support@bodilicious.in',
+    supportEmail: 'bodiliciousnaturalproducts@gmail.com',
     shippingThreshold: 999,
     shippingCost: 99,
     announcementBar: { text: '', isActive: false, link: '' },
+    maintenanceMode: false,
+    maintenanceMessage: 'We are currently down for maintenance. Please check back later.',
+    bestSellerPids: [] as string[],
+    reviewSkinTypeTaggingEnabled: true,
+    reviewBeforeAfterPhotosEnabled: true,
+    reviewVerifiedBadgeEnabled: true,
+    reviewIncentiveEnabled: false,
+    reviewIncentiveDiscountPercent: 10,
+    reviewModerationEnabled: true,
   });
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -347,9 +368,15 @@ const syncUserState = useCallback(async (firebaseUser: any) => {
 
     await getIdToken(refreshedUser, true);
 
-    // Bypass verification check for now
-    setAuthStatus('authenticated');
-    await fetchUserProfileAndSync();
+    const isNewUser = new Date(refreshedUser.metadata.creationTime || 0).getTime() >= ENFORCEMENT_DATE;
+
+    if (!refreshedUser.emailVerified && isNewUser) {
+      setAuthStatus('awaiting-verification');
+      setCartLoading(false);
+    } else {
+      setAuthStatus('authenticated');
+      await fetchUserProfileAndSync();
+    }
   } catch (err) {
     console.error('Auth state sync failed:', err);
     setUser(null);
@@ -394,9 +421,14 @@ const refreshAuthState = async () => {
     photoURL: refreshedUser.photoURL,
   });
 
-  // Bypass verification check for now
-  setAuthStatus('authenticated');
-  await fetchUserProfileAndSync();
+  const isNewUser = new Date(refreshedUser.metadata.creationTime || 0).getTime() >= ENFORCEMENT_DATE;
+
+  if (!refreshedUser.emailVerified && isNewUser) {
+    setAuthStatus('awaiting-verification');
+  } else {
+    setAuthStatus('authenticated');
+    await fetchUserProfileAndSync();
+  }
 };
 
   /* =============================
@@ -420,14 +452,11 @@ const signUpWithEmail = async (email: string, password: string, name: string) =>
     if (cred.user) {
       await updateProfile(cred.user, { displayName: name });
 
-      // Verification email sending disabled for now
-      /* 
       const headers = await getAuthHeaders();
       await fetch(`${USER_BASE}/send-verification`, {
         method: "POST",
         headers,
       });
-      */
     }
 
     await refreshAuthState();
@@ -455,6 +484,24 @@ const resendVerificationEmail = async () => {
     console.log("Verification email sent");
   } catch (err) {
     console.error("Resend verification failed:", err);
+    throw err;
+  }
+};
+
+const triggerPasswordReset = async (email: string) => {
+  try {
+    const res = await fetch(`${USER_BASE}/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.message || "Failed to trigger password reset");
+    }
+  } catch (err) {
+    console.error("Forgot password failed:", err);
     throw err;
   }
 };
@@ -526,7 +573,9 @@ const resendVerificationEmail = async () => {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/settings/public`);
+      const bypassToken = localStorage.getItem('maintenance_bypass');
+      const query = bypassToken ? `?bypass=${bypassToken}` : '';
+      const res = await fetch(`${API_BASE}/settings/public${query}`);
       const json = await res.json();
       if (json.success && json.data) {
         setStoreSettings(json.data);
@@ -1012,6 +1061,7 @@ const resendVerificationEmail = async () => {
         signInWithEmail,
         signUpWithEmail,
         resendVerificationEmail,
+        triggerPasswordReset,
         logout,
         refreshAuthState,
         updateUserProfile,

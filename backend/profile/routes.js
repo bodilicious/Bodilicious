@@ -1,6 +1,18 @@
 import express from "express";
 import { protect } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
+import rateLimit from "express-rate-limit";
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 forgot password requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many password reset requests from this IP, please try again after 15 minutes."
+  }
+});
 
 import {
   getProfile,
@@ -15,6 +27,7 @@ import {
   deleteAddress,
   setDefaultAddress,
   triggerEmailVerification,
+  triggerPasswordReset,
 } from "./controller.js";
 
 import UserProfile from "./models.js";
@@ -61,5 +74,8 @@ router.put("/address/:addressId", protect, updateAddress);
 router.delete("/address/:addressId", protect, deleteAddress);
 router.patch("/address/:addressId/default", protect, setDefaultAddress);
 router.post("/send-verification", protect, triggerEmailVerification);
+
+// PUBLIC ROUTES
+router.post("/forgot-password", forgotPasswordLimiter, triggerPasswordReset);
 
 export default router;

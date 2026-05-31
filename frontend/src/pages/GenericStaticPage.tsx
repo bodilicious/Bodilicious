@@ -7,8 +7,8 @@ const PAGE_CONTENT: Record<string, { title: string; content: string[] }> = {
         title: 'Contact Us',
         content: [
             'We would love to hear from you! Please reach out to us for any inquiries, concerns, or feedback.',
-            'Email: support@bodilicious.in',
-            'Phone: +91 98765 43210',
+            'Email: bodiliciousnaturalproducts@gmail.com',
+            'Phone: +91 9894451947',
             'Hours: Monday to Friday, 9:00 AM - 6:00 PM IST',
         ],
     },

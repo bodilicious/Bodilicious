@@ -167,6 +167,7 @@ export default function AccountPage() {
 
         {/* 7. Shortcut Cards (Navigation) */}
         <AccountShortcutCards 
+          user={user}
           navigateTo={navigateTo} 
         />
 

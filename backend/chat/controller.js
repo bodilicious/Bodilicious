@@ -96,9 +96,9 @@ const FAQ_ANSWERS = {
   cancellation:
     "Orders can be cancelled before dispatch from our warehouse.",
   contact:
-    "You can reach support at support@bodilicious.in or via WhatsApp at +91-XXXXXXXXXX",
+    "You can reach support at bodiliciousnaturalproducts@gmail.com or via WhatsApp at +91 9894451947",
   support:
-    "You can reach support at support@bodilicious.in or via WhatsApp at +91-XXXXXXXXXX"
+    "You can reach support at bodiliciousnaturalproducts@gmail.com or via WhatsApp at +91 9894451947"
 };
 
 /* ===================================================

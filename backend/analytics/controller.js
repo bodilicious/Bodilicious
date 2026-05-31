@@ -118,7 +118,7 @@ export const getProductFunnel = async (req, res) => {
           totalRevenue: { $sum: "$revenue_generated" },
         }
       },
-      { $match: { $or: [{ totalViews: { $gt: 0 } }, { totalPurchases: { $gt: 0 } }] } },
+      { $match: { $or: [{ totalViews: { $gt: 0 } }, { totalCarts: { $gt: 0 } }, { totalPurchases: { $gt: 0 } }] } },
       { $sort: { totalViews: -1 } },
       { $limit: 20 },
       {
@@ -129,7 +129,7 @@ export const getProductFunnel = async (req, res) => {
           as: "productDetails"
         }
       },
-      { $unwind: { path: "$productDetails", preserveNullAndEmpty: true } },
+      { $unwind: { path: "$productDetails", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 1,
@@ -142,21 +142,21 @@ export const getProductFunnel = async (req, res) => {
           viewToCartRate: {
             $cond: [
               { $gt: ["$totalViews", 0] },
-              { $round: [{ $multiply: [{ $divide: ["$totalCarts", "$totalViews"] }, 100] }, 1] },
+              { $round: [{ $multiply: [{ $divide: ["$totalCarts", { $cond: [{ $eq: ["$totalViews", 0] }, 1, "$totalViews"] }] }, 100] }, 1] },
               0
             ]
           },
           cartToPurchaseRate: {
             $cond: [
               { $gt: ["$totalCarts", 0] },
-              { $round: [{ $multiply: [{ $divide: ["$totalPurchases", "$totalCarts"] }, 100] }, 1] },
+              { $round: [{ $multiply: [{ $divide: ["$totalPurchases", { $cond: [{ $eq: ["$totalCarts", 0] }, 1, "$totalCarts"] }] }, 100] }, 1] },
               0
             ]
           },
           viewToPurchaseRate: {
             $cond: [
               { $gt: ["$totalViews", 0] },
-              { $round: [{ $multiply: [{ $divide: ["$totalPurchases", "$totalViews"] }, 100] }, 1] },
+              { $round: [{ $multiply: [{ $divide: ["$totalPurchases", { $cond: [{ $eq: ["$totalViews", 0] }, 1, "$totalViews"] }] }, 100] }, 1] },
               0
             ]
           },

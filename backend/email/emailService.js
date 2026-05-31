@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import UserProfile from "../profile/models.js";
+import StoreSettings from "../settings/models.js";
 
 let transporter = null;
 
@@ -21,6 +23,17 @@ const getTransporter = () => {
   }
 
   return transporter;
+};
+
+// Helper to get primary admin email
+const getPrimaryAdminEmail = async () => {
+  try {
+    const adminUser = await UserProfile.findOne({ role: "primary_admin" });
+    if (adminUser && adminUser.email) return adminUser.email;
+    return process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+  } catch (err) {
+    return process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+  }
 };
 
 /*
@@ -213,6 +226,12 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
 
   setImmediate(async () => {
     try {
+      const settings = await StoreSettings.findOne();
+      if (settings && settings.sendOrderConfirmationToCustomer === false) {
+        console.log(`[EmailService] Skipping order confirmation email due to store settings`);
+        return;
+      }
+
       console.log(`📧 Preparing order confirmation email for: ${recipientEmail}`, {
         orderId: order?._id?.toString(),
         invoiceNo: order?.invoiceNumber,
@@ -235,7 +254,10 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
 */
 export const sendAdminNewOrderAlert = async (order) => {
   try {
-    const adminEmail = process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+    const settings = await StoreSettings.findOne();
+    if (settings && settings.notifyAdminOnOrder === false) return; // Feature toggle
+
+    const adminEmail = await getPrimaryAdminEmail();
     if (!adminEmail) return;
 
     const fullOrderId = order?._id ? order._id.toString() : "";
@@ -305,7 +327,7 @@ export const sendAdminNewOrderAlert = async (order) => {
 */
 export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, amount) => {
   try {
-    const adminEmail = process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+    const adminEmail = await getPrimaryAdminEmail();
     if (!adminEmail) return;
 
     const content = `
@@ -393,9 +415,62 @@ export const sendVerificationEmail = async (userEmail, verificationLink, userNam
     const info = await getTransporter().sendMail(mailOptions);
 
     console.log("Verification email sent:", info.messageId);
-    return info;
   } catch (error) {
     console.error("Verification email failed:", error);
+    throw error;
+  }
+};
+
+/*
+  PASSWORD RESET EMAIL
+*/
+export const sendPasswordResetEmail = async (userEmail, resetLink, userName = "") => {
+  try {
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        Reset Your Password
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        Hello${userName ? ` ${userName}` : ""},
+      </p>
+
+      <p style="margin:0 0 18px;">
+        We received a request to reset the password for your Bodilicious account. 
+        Click the button below to choose a new password.
+      </p>
+
+      <div style="text-align:center; margin:32px 0;">
+        <a
+          href="${resetLink}"
+          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block; text-transform:uppercase;"
+        >
+          Reset Password
+        </a>
+      </div>
+
+      <p style="font-size:13px; color:#777777; margin:0 0 12px;">
+        If you didn’t request this password reset, you can safely ignore this email. Your password won't change until you create a new one.
+      </p>
+
+      <p style="font-size:12px; color:#999999; word-break:break-all; margin:0;">
+        Or copy and paste this link into your browser:<br>
+        ${resetLink}
+      </p>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: "Reset Your Password - Bodilicious",
+      html: buildEmailLayout(content, { customerName: userName }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Password reset email sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Password reset email failed:", error);
     throw error;
   }
 };

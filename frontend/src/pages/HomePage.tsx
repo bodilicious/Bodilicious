@@ -95,7 +95,7 @@ const AMAZON_REVIEWS = [
 ];
 
 export default function HomePage() {
-  const { setShopFilter, products, isLoading, error } = useApp();
+  const { setShopFilter, products, isLoading, error, storeSettings } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const shouldReduceMotion = useReducedMotion();
@@ -179,10 +179,19 @@ export default function HomePage() {
     }
   }, [navigate, setShopFilter]);
 
-  // Best sellers: curated picks based on requested product names
+  // Best sellers: admin-curated via settings, or keyword fallback
   const bestSellers = useMemo(() => {
     if (!products || products.length === 0) return [];
 
+    // If admin has curated a best sellers list, use it (preserving order)
+    if (storeSettings.bestSellerPids && storeSettings.bestSellerPids.length > 0) {
+      const pinned = storeSettings.bestSellerPids
+        .map(pid => products.find(p => p.pid === pid))
+        .filter((p): p is NonNullable<typeof p> => !!p);
+      if (pinned.length > 0) return pinned;
+    }
+
+    // Keyword-based fallback (original logic)
     const targets = [
       'coenzyme q10',
       'glow boost',
@@ -202,14 +211,9 @@ export default function HomePage() {
     }).filter((p): p is NonNullable<typeof p> => !!p);
 
     const uniqueSelected = Array.from(new Set(selected));
-
-    // Fallback back to indices if nothing matches
-    if (uniqueSelected.length === 0) {
-      return products.filter((_, i) => [0, 1, 2, 4].includes(i));
-    }
-
+    if (uniqueSelected.length === 0) return products.filter((_, i) => [0, 1, 2, 4].includes(i));
     return uniqueSelected;
-  }, [products]);
+  }, [products, storeSettings.bestSellerPids]);
 
   // New arrivals: sorted by createdAt desc, guarded against missing/invalid dates, max 6
   const newArrivals = useMemo(() =>

@@ -106,6 +106,7 @@ export default function ProductPage() {
     navigateTo,
     authStatus,
     getAuthHeaders,
+    storeSettings,
   } = useApp();
 
   const productId = pid || searchParams.get('id') || contextPid;
@@ -272,7 +273,10 @@ export default function ProductPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to submit review');
 
-      setReviewFeedback({ type: 'success', msg: 'Review submitted successfully!' });
+      const successMsg = storeSettings.reviewModerationEnabled 
+        ? 'Review submitted and is pending approval.' 
+        : 'Review submitted successfully!';
+      setReviewFeedback({ type: 'success', msg: successMsg });
       setReviewComment('');
       setReviewRating(5);
 
@@ -1109,7 +1113,7 @@ export default function ProductPage() {
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-sans font-semibold text-dark-red">{review.user}</p>
-                        {review.isVerified && (
+                        {storeSettings.reviewVerifiedBadgeEnabled && review.isVerified && (
                           <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded-full text-[8px] font-bold uppercase tracking-tighter">
                             <CheckCircle2 size={10} strokeWidth={3} />
                             Verified
@@ -1156,18 +1160,29 @@ export default function ProductPage() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="w-full bg-white border border-silk/60 p-6 sm:p-8 md:p-12 relative overflow-hidden mt-8 shadow-sm"
+                  className="w-full max-w-2xl mx-auto mt-8 bg-white/80 backdrop-blur-md p-8 sm:p-12 border border-ruby-red/20 shadow-lg relative overflow-hidden"
                 >
-                  <div className="flex justify-between items-center gap-4 mb-8 relative z-10">
-                    <h3 className="font-serif text-dark-red text-2xl">Write a Review</h3>
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-ruby-red/5 rounded-bl-full pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-dark-red/5 rounded-tr-full pointer-events-none" />
 
-                    <button
-                      onClick={() => setShowReviewForm(false)}
-                      className="text-grey-beige hover:text-dark-red transition-colors text-xs uppercase tracking-widest font-sans"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  <h3 className="font-serif text-dark-red text-2xl mb-2">Write a Review</h3>
+                  {storeSettings.reviewIncentiveEnabled && (
+                    <div className="mb-6 bg-ruby-red/10 border border-ruby-red/20 rounded-xl p-3 flex items-start gap-2">
+                      <span className="text-ruby-red mt-0.5">⭐</span>
+                      <p className="text-xs font-sans text-dark-red">
+                        <strong>Review & Save!</strong> Leave a review and get a {storeSettings.reviewIncentiveDiscountPercent}% off coupon on your next order.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowReviewForm(false)}
+                    className="text-grey-beige hover:text-dark-red transition-colors text-xs uppercase tracking-widest font-sans"
+                  >
+                    Cancel
+                  </button>
 
                   {authStatus === 'authenticated' ? (
                     <form onSubmit={submitReview} className="flex flex-col gap-6 relative z-10">
@@ -1196,6 +1211,28 @@ export default function ProductPage() {
                           ))}
                         </div>
                       </div>
+
+                      {storeSettings.reviewSkinTypeTaggingEnabled && (
+                        <div>
+                          <label className="block text-[10px] font-sans tracking-[0.2em] uppercase text-ruby-red mb-3 opacity-50">
+                            Your Skin Type
+                          </label>
+                          <div className="w-full bg-[#FDFBF7]/50 border border-silk/60 p-4 font-sans text-sm text-dark-red/50 cursor-not-allowed select-none shadow-inner italic" title="Skin type tagging coming soon">
+                            Skin type selection (Coming Soon)
+                          </div>
+                        </div>
+                      )}
+
+                      {storeSettings.reviewBeforeAfterPhotosEnabled && (
+                        <div>
+                          <label className="block text-[10px] font-sans tracking-[0.2em] uppercase text-ruby-red mb-3 opacity-50">
+                            Before & After Photos
+                          </label>
+                          <div className="border border-dashed border-silk/60 rounded-none p-6 text-center bg-[#FDFBF7]/30 cursor-not-allowed">
+                            <p className="text-xs font-sans text-dark-red/50 italic">Photo uploads coming soon</p>
+                          </div>
+                        </div>
+                      )}
 
                       <div>
                         <label className="block text-[10px] font-sans tracking-[0.2em] uppercase text-ruby-red mb-3">

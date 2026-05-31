@@ -1296,7 +1296,7 @@ export const createDraftOrder = async (req, res) => {
   session.startTransaction();
 
   try {
-    let { userId, items, shippingDetails, manualDiscount = 0, notes } = req.body;
+    let { userId, items, shippingDetails, manualDiscount = 0, notes, paymentMethod = "razorpay", paymentStatus = "pending" } = req.body;
 
     if (!items || items.length === 0 || !shippingDetails?.address) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -1373,9 +1373,9 @@ export const createDraftOrder = async (req, res) => {
       totalAmount: finalAmount,
       originalAmount,
       discountAmount: manualDiscount,
-      paymentMethod: "razorpay", // Default to razorpay, but pending
-      paymentStatus: "pending",
-      orderStatus: "pending",
+      paymentMethod,
+      paymentStatus,
+      orderStatus: paymentStatus === "paid" ? "processing" : "pending",
       shippingDetails,
       source: "admin_draft",
       notes

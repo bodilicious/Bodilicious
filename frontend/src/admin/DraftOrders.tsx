@@ -23,6 +23,8 @@ const DraftOrders: React.FC = () => {
   const [cartItems, setCartItems] = useState<{ product: any, quantity: number }[]>([]);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [notes, setNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
+  const [alreadyPaid, setAlreadyPaid] = useState(false);
   const [shippingDetails, setShippingDetails] = useState({
     name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '', country: 'India'
   });
@@ -142,7 +144,9 @@ const DraftOrders: React.FC = () => {
         items: cartItems.map(i => ({ productId: i.product._id, pid: i.product.pid, quantity: i.quantity })),
         shippingDetails,
         manualDiscount,
-        notes
+        notes,
+        paymentMethod,
+        paymentStatus: alreadyPaid ? 'paid' : 'pending'
       };
 
       // 1. Create Draft Order
@@ -158,17 +162,21 @@ const DraftOrders: React.FC = () => {
       setGeneratedOrder(order);
 
       // 2. Generate Payment Link
-      const linkRes = await fetch(`${API_URL}/api/v1/admin/orders/${order._id}/payment-link`, {
-        method: 'POST',
-        headers
-      });
-      const linkData = await linkRes.json();
-      
-      if (linkRes.ok && linkData.success) {
-        setPaymentLink(linkData.data.paymentLink);
-        toast.success("Draft order and payment link generated!");
+      if (paymentMethod === 'razorpay' && !alreadyPaid) {
+        const linkRes = await fetch(`${API_URL}/api/v1/admin/orders/${order._id}/payment-link`, {
+          method: 'POST',
+          headers
+        });
+        const linkData = await linkRes.json();
+        
+        if (linkRes.ok && linkData.success) {
+          setPaymentLink(linkData.data.paymentLink);
+          toast.success("Draft order and payment link generated!");
+        } else {
+          toast.error("Order created, but payment link failed to generate.");
+        }
       } else {
-        toast.error("Order created, but payment link failed to generate.");
+        toast.success(`Order created successfully! (${alreadyPaid ? 'Paid' : 'Pending'})`);
       }
       
       setStep(4);
@@ -193,6 +201,8 @@ const DraftOrders: React.FC = () => {
     setCartItems([]);
     setManualDiscount(0);
     setNotes('');
+    setPaymentMethod('razorpay');
+    setAlreadyPaid(false);
     setShippingDetails({ name: '', email: '', phone: '', address: '', city: '', state: '', pincode: '', country: 'India' });
     setUserSearch('');
     setGeneratedOrder(null);
@@ -396,6 +406,24 @@ const DraftOrders: React.FC = () => {
                   <h4 className="font-bold text-sm text-grey-beige uppercase tracking-wider mb-2">Admin Notes (Internal)</h4>
                   <textarea className="w-full p-3 bg-gray-50 border border-silk-light rounded-lg text-sm outline-none" rows={2} value={notes} onChange={e => setNotes(e.target.value)}></textarea>
                 </div>
+                
+                <div className="pt-2">
+                  <h4 className="font-bold text-sm text-grey-beige uppercase tracking-wider mb-2">Payment Details</h4>
+                  <div className={`grid grid-cols-1 ${alreadyPaid ? '' : 'sm:grid-cols-2'} gap-4`}>
+                    {!alreadyPaid && (
+                      <select className="w-full p-2.5 bg-gray-50 border border-silk-light rounded-lg text-sm outline-none" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                        <option value="razorpay">Razorpay (Send Link)</option>
+                        <option value="cash_on_delivery">Cash on Delivery (COD)</option>
+                        <option value="bank_transfer">Bank Transfer / UPI</option>
+                        <option value="store_credit">Store Credit</option>
+                      </select>
+                    )}
+                    <label className="flex items-center gap-2 text-sm cursor-pointer p-2.5 bg-gray-50 border border-silk-light rounded-lg">
+                      <input type="checkbox" checked={alreadyPaid} onChange={e => setAlreadyPaid(e.target.checked)} className="rounded border-gray-300 text-dark-red focus:ring-dark-red" />
+                      Mark as Already Paid
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-gray-50 p-6 rounded-2xl border border-silk-light h-fit">
@@ -446,23 +474,31 @@ const DraftOrders: React.FC = () => {
             <div>
               <h3 className="text-2xl font-serif font-bold text-dark-red">Draft Order Created!</h3>
               <p className="text-gray-600 mt-2">Order ID: <span className="font-mono font-bold text-dark-red">{generatedOrder._id}</span></p>
-              <p className="text-sm text-grey-beige mt-1">Inventory has been reserved. Waiting for payment.</p>
+              <p className="text-sm text-grey-beige mt-1">
+                {alreadyPaid ? 'Order has been marked as paid and inventory is reserved.' : 'Inventory has been reserved. Waiting for payment.'}
+              </p>
             </div>
 
-            {paymentLink ? (
-              <div className="max-w-md mx-auto bg-gray-50 border border-silk-light p-6 rounded-2xl mt-8">
-                <p className="text-sm font-bold text-grey-beige mb-3 uppercase tracking-wider">Razorpay Payment Link</p>
-                <div className="flex items-center gap-2">
-                  <input type="text" readOnly value={paymentLink} className="flex-1 p-3 bg-white border border-gray-200 rounded-xl outline-none text-sm font-medium" />
-                  <button onClick={copyToClipboard} className="p-3 bg-dark-red text-white rounded-xl hover:bg-ruby-red transition-colors" title="Copy Link">
-                    {copied ? <CheckCircle2 size={20} /> : <Copy size={20} />}
-                  </button>
+            {paymentMethod === 'razorpay' && !alreadyPaid ? (
+              paymentLink ? (
+                <div className="max-w-md mx-auto bg-gray-50 border border-silk-light p-6 rounded-2xl mt-8">
+                  <p className="text-sm font-bold text-grey-beige mb-3 uppercase tracking-wider">Razorpay Payment Link</p>
+                  <div className="flex items-center gap-2">
+                    <input type="text" readOnly value={paymentLink} className="flex-1 p-3 bg-white border border-gray-200 rounded-xl outline-none text-sm font-medium" />
+                    <button onClick={copyToClipboard} className="p-3 bg-dark-red text-white rounded-xl hover:bg-ruby-red transition-colors" title="Copy Link">
+                      {copied ? <CheckCircle2 size={20} /> : <Copy size={20} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">This link will expire in 24 hours. A notification may have been sent by Razorpay depending on their settings.</p>
                 </div>
-                <p className="text-xs text-gray-400 mt-3">This link will expire in 24 hours. A notification may have been sent by Razorpay depending on their settings.</p>
-              </div>
+              ) : (
+                <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium mt-6">
+                  Order created, but payment link generation failed. You may need to create it manually in the Razorpay Dashboard.
+                </div>
+              )
             ) : (
-              <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium mt-6">
-                Order created, but payment link generation failed. You may need to create it manually in the Razorpay Dashboard.
+              <div className="p-4 bg-green-50 text-green-700 rounded-xl text-sm font-medium mt-6 border border-green-200">
+                Success! The order has been saved successfully without a Razorpay link.
               </div>
             )}
 
