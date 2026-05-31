@@ -230,6 +230,119 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
     }
   });
 };
+/*
+  ADMIN ALERT: NEW ORDER
+*/
+export const sendAdminNewOrderAlert = async (order) => {
+  try {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+    if (!adminEmail) return;
+
+    const fullOrderId = order?._id ? order._id.toString() : "";
+    const displayOrderId = fullOrderId ? fullOrderId.slice(-8).toUpperCase() : "ORDER";
+    const paymentMethod = order?.paymentMethod ? order.paymentMethod.toUpperCase() : "COD";
+    const totalAmount = order?.totalAmount || 0;
+    const shippingName = order?.shippingDetails?.name || "Customer";
+
+    const itemsHtml = (order?.items || [])
+      .map(
+        (item) => `
+          <tr>
+            <td style="padding:10px 0; border-bottom:1px solid #eeeeee;">
+              <strong>${item?.product?.name || item?.name || "Product"}</strong><br>
+              <span style="color:#777777; font-size:12px;">Qty: ${item?.quantity || 0} | ₹${((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0)).toLocaleString("en-IN")}</span>
+            </td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        🚨 New Order Received!
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        A new order has been placed on the website by <strong>${shippingName}</strong>.
+      </p>
+
+      <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
+        <p style="margin:0 0 8px;"><strong>Order ID:</strong> #${displayOrderId}</p>
+        <p style="margin:0 0 8px;"><strong>Amount:</strong> ₹${totalAmount.toLocaleString("en-IN")}</p>
+        <p style="margin:0 0 8px;"><strong>Payment Method:</strong> ${paymentMethod}</p>
+        <p style="margin:0;"><strong>Items:</strong> ${(order?.items || []).length}</p>
+      </div>
+      
+      <h3 style="margin:0 0 12px; color:#222222; font-size:16px;">Items Ordered</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+
+      <p style="margin:18px 0 0;">
+        Log in to the admin dashboard to review and process the order.
+      </p>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious Alerts" <${process.env.EMAIL_USER}>`,
+      to: adminEmail,
+      subject: `New Order Alert! [#${displayOrderId}] - ₹${totalAmount.toLocaleString("en-IN")}`,
+      html: buildEmailLayout(content, { customerName: "Admin" }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Admin new order alert sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Admin new order alert failed:", error.message);
+  }
+};
+
+/*
+  ADMIN ALERT: PAYMENT SUCCESS NO ORDER
+*/
+export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, amount) => {
+  try {
+    const adminEmail = process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+    if (!adminEmail) return;
+
+    const content = `
+      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+        ⚠️ CRITICAL: Payment Received but Order Failed
+      </h2>
+
+      <p style="margin:0 0 14px;">
+        Razorpay reported a successful payment, but the backend <strong>failed to create an order</strong>. The customer was charged.
+      </p>
+
+      <div style="background:#fff5f5; padding:16px 18px; border:1px solid #fecaca; border-radius:8px; margin:22px 0;">
+        <p style="margin:0 0 8px;"><strong>Razorpay Order ID:</strong> ${orderId}</p>
+        <p style="margin:0 0 8px;"><strong>Razorpay Payment ID:</strong> ${paymentId}</p>
+        <p style="margin:0;"><strong>Amount Paid:</strong> ₹${amount.toLocaleString("en-IN")}</p>
+      </div>
+
+      <p style="margin:18px 0 0;">
+        Please log into the Razorpay dashboard immediately to investigate. You may need to manually create the order or issue a refund.
+      </p>
+    `;
+
+    const mailOptions = {
+      from: `"Bodilicious Alerts" <${process.env.EMAIL_USER}>`,
+      to: adminEmail,
+      subject: `CRITICAL: Orphaned Payment Captured - ₹${amount.toLocaleString("en-IN")}`,
+      html: buildEmailLayout(content, { customerName: "Admin" }),
+    };
+
+    const info = await getTransporter().sendMail(mailOptions);
+    console.log("Admin orphaned payment alert sent:", info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Admin orphaned payment alert failed:", error.message);
+  }
+};
+
 
 /*
   EMAIL VERIFICATION EMAIL

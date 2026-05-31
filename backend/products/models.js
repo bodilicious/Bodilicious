@@ -111,6 +111,9 @@ productSchema.index({ concerns_targeted: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ stock: 1 });
 productSchema.index({ isActive: 1 });
+// Sparse index on embedded review author — enables fast lookup of all reviews left by a user
+// without scanning every product document's reviews array. Sparse = excluded from index if field absent.
+productSchema.index({ "reviews.user": 1 }, { sparse: true });
 
 productSchema.set("autoCreate", true);
 

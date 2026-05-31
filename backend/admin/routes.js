@@ -110,8 +110,16 @@ router.post("/segments/compute", segmentCtrl.triggerSegmentCompute);
 router.get("/segments/stats", segmentCtrl.getSegmentStats);
 router.get("/segments/customers", enforcePagination, segmentCtrl.getSegmentCustomers);
 router.get("/segments/:segment/export", segmentCtrl.exportSegmentCSV);
-router.get("/customers/:id/profile", segmentCtrl.getCustomerProfile);
-router.patch("/customers/:id/notes", segmentCtrl.updateAdminNotes);
+
+// Customer analysis — specific sub-routes MUST come before /:id/profile and /:id/notes
+router.get("/customers/:id/summary",  segmentCtrl.getCustomerSummary);
+router.get("/customers/:id/orders",   segmentCtrl.getCustomerOrders);
+router.get("/customers/:id/reviews",  segmentCtrl.getCustomerReviews);
+router.get("/customers/:id/tickets",  segmentCtrl.getCustomerTickets);
+router.get("/customers/:id/cart",     segmentCtrl.getCustomerCart);
+router.get("/customers/:id/profile",  segmentCtrl.getCustomerProfile);
+router.patch("/customers/:id/notes",  segmentCtrl.updateAdminNotes);
 
 export default router;
+
 

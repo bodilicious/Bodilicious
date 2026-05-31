@@ -292,3 +292,310 @@ export const exportSegmentCSV = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOMER ANALYSIS ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+import Product from "../products/models.js";
+import { Ticket } from "../support/models.js";
+
+/**
+ * GET /api/v1/admin/customers/:id/summary
+ * Fast endpoint: identity, segment tags, KPI metrics, and 12-month LTV trend.
+ * All aggregations run in parallel — target <200ms for typical catalogs.
+ */
+export const getCustomerSummary = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await UserProfile.findById(
+      id,
+      "name email phone avatar segment lifetimeSpend adminNotes createdAt lastLoginAt isBlocked role skinType skinConcerns preferredRoutine gender dateOfBirth"
+    ).lean();
+    if (!user) return res.status(404).json({ success: false, message: "Customer not found" });
+
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    const [kpiAgg, statusBreakdown, ltvTrend] = await Promise.all([
+      // KPI aggregation: total spend, order count, AOV, cancel count, return count
+      Order.aggregate([
+        { $match: { user: user._id } },
+        {
+          $group: {
+            _id: null,
+            totalSpend: {
+              $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, "$totalAmount", 0] },
+            },
+            orderCount: { $sum: 1 },
+            paidOrders: { $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0] } },
+            cancelledOrders: { $sum: { $cond: [{ $eq: ["$orderStatus", "cancelled"] }, 1, 0] } },
+            returnedOrders: {
+              $sum: {
+                $cond: [
+                  { $in: ["$orderStatus", ["returned", "return_requested"]] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            firstOrderAt: { $min: "$createdAt" },
+            lastOrderAt: { $max: "$createdAt" },
+          },
+        },
+      ]),
+      // Order status breakdown for the donut chart
+      Order.aggregate([
+        { $match: { user: user._id } },
+        { $group: { _id: "$orderStatus", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      // LTV trend: paid spend per month for the last 12 months
+      Order.aggregate([
+        {
+          $match: {
+            user: user._id,
+            paymentStatus: "paid",
+            orderStatus: { $ne: "cancelled" },
+            createdAt: { $gte: twelveMonthsAgo },
+          },
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+            spend: { $sum: "$totalAmount" },
+            orders: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    const kpi = kpiAgg[0] || {
+      totalSpend: 0,
+      orderCount: 0,
+      paidOrders: 0,
+      cancelledOrders: 0,
+      returnedOrders: 0,
+      firstOrderAt: null,
+      lastOrderAt: null,
+    };
+
+    const aov = kpi.paidOrders > 0 ? kpi.totalSpend / kpi.paidOrders : 0;
+    const cancelRate =
+      kpi.orderCount > 0
+        ? parseFloat(((kpi.cancelledOrders / kpi.orderCount) * 100).toFixed(1))
+        : 0;
+    const returnRate =
+      kpi.orderCount > 0
+        ? parseFloat(((kpi.returnedOrders / kpi.orderCount) * 100).toFixed(1))
+        : 0;
+
+    res.json({
+      success: true,
+      data: {
+        user,
+        kpi: {
+          totalSpend: kpi.totalSpend,
+          orderCount: kpi.orderCount,
+          paidOrders: kpi.paidOrders,
+          cancelledOrders: kpi.cancelledOrders,
+          returnedOrders: kpi.returnedOrders,
+          aov: parseFloat(aov.toFixed(2)),
+          cancelRate,
+          returnRate,
+          firstOrderAt: kpi.firstOrderAt,
+          lastOrderAt: kpi.lastOrderAt,
+        },
+        statusBreakdown,
+        ltvTrend,
+      },
+    });
+  } catch (err) {
+    console.error("CustomerSummary Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/orders?page=1&limit=10
+ * Server-paginated order list with populated product items.
+ */
+export const getCustomerOrders = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const user = await UserProfile.findById(id, "_id").lean();
+    if (!user) return res.status(404).json({ success: false, message: "Customer not found" });
+
+    const [orders, total] = await Promise.all([
+      Order.find({ user: user._id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("items.product", "name pid images price")
+        .lean(),
+      Order.countDocuments({ user: user._id }),
+    ]);
+
+    res.json({
+      success: true,
+      data: orders,
+      pagination: { page, pages: Math.ceil(total / limit), total },
+    });
+  } catch (err) {
+    console.error("CustomerOrders Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/reviews
+ * All reviews this user has left across all products.
+ * Uses the sparse index { "reviews.user": 1 } on the Product collection.
+ */
+export const getCustomerReviews = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const mongoose = (await import("mongoose")).default;
+    const objectId = mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id) : null;
+    if (!objectId) return res.status(400).json({ success: false, message: "Invalid user ID" });
+
+    // Fetch products that contain at least one review from this user
+    const products = await Product.find(
+      { "reviews.user": objectId },
+      "name pid images reviews"
+    ).lean();
+
+    // Extract and flatten only the reviews belonging to this user
+    const reviews = [];
+    for (const product of products) {
+      const userReviews = (product.reviews || []).filter(
+        (r) => r.user?.toString() === id
+      );
+      for (const r of userReviews) {
+        reviews.push({
+          _id: r._id,
+          productId: product._id,
+          productName: product.name,
+          productPid: product.pid,
+          productImage: product.images?.[0] || null,
+          rating: r.rating,
+          comment: r.comment,
+          isVerified: r.isVerified,
+          createdAt: r.createdAt,
+        });
+      }
+    }
+
+    // Sort by newest first
+    reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({ success: true, data: reviews, total: reviews.length });
+  } catch (err) {
+    console.error("CustomerReviews Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/tickets
+ * All support tickets raised by this customer.
+ */
+export const getCustomerTickets = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await UserProfile.findById(id, "_id").lean();
+    if (!user) return res.status(404).json({ success: false, message: "Customer not found" });
+
+    const tickets = await Ticket.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const stats = {
+      total: tickets.length,
+      open: tickets.filter((t) => t.status === "open").length,
+      resolved: tickets.filter((t) => t.status === "resolved").length,
+      cancelled: tickets.filter((t) => t.status === "cancelled").length,
+      avgResolutionDays: (() => {
+        const resolved = tickets.filter((t) => t.resolvedAt);
+        if (resolved.length === 0) return null;
+        const totalDays = resolved.reduce(
+          (sum, t) =>
+            sum + (new Date(t.resolvedAt) - new Date(t.createdAt)) / 86400000,
+          0
+        );
+        return parseFloat((totalDays / resolved.length).toFixed(1));
+      })(),
+    };
+
+    // Scrub message bodies — return only metadata (count, last message date)
+    const safeTickets = tickets.map((t) => ({
+      _id: t._id,
+      ticketId: t.ticketId,
+      type: t.type,
+      status: t.status,
+      priority: t.priority,
+      description: t.description,
+      messageCount: (t.messages || []).length,
+      lastMessageAt: t.messages?.length
+        ? t.messages[t.messages.length - 1].createdAt
+        : null,
+      resolvedAt: t.resolvedAt,
+      createdAt: t.createdAt,
+    }));
+
+    res.json({ success: true, data: safeTickets, stats });
+  } catch (err) {
+    console.error("CustomerTickets Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/cart
+ * Current cart contents, wishlist, and detailed skin profile.
+ */
+export const getCustomerCart = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await UserProfile.findById(id)
+      .populate("cart.product", "name pid images price stock isActive")
+      .populate("wishlist", "name pid images price stock isActive")
+      .lean();
+
+    if (!user) return res.status(404).json({ success: false, message: "Customer not found" });
+
+    const cartValue = (user.cart || []).reduce((sum, item) => {
+      const price = item.product?.price || 0;
+      return sum + price * (item.quantity || 1);
+    }, 0);
+
+    res.json({
+      success: true,
+      data: {
+        cart: user.cart || [],
+        cartItemCount: (user.cart || []).length,
+        cartValue: parseFloat(cartValue.toFixed(2)),
+        wishlist: user.wishlist || [],
+        skinProfile: {
+          skinType: user.skinType || null,
+          skinConcerns: user.skinConcerns || [],
+          preferredRoutine: user.preferredRoutine || null,
+          gender: user.gender || null,
+          dateOfBirth: user.dateOfBirth || null,
+        },
+        addresses: user.addresses || [],
+      },
+    });
+  } catch (err) {
+    console.error("CustomerCart Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

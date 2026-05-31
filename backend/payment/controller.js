@@ -4,7 +4,7 @@ import Order from "../tracker/models.js";
 import UserProfile from "../profile/models.js";
 import Product from "../products/models.js";
 import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket } from "../tracker/shiprocketservice.js";
-import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice } from "../email/emailService.js";
+import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendAdminNewOrderAlert, sendAdminPaymentSuccessNoOrderAlert } from "../email/emailService.js";
 import Razorpay from "razorpay";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
@@ -302,6 +302,8 @@ export const verifyPayment = async (req, res) => {
             const user = await UserProfile.findById(userId);
             const populatedOrder = await Order.findById(order._id).populate("items.product");
             sendOrderConfirmationAfterInvoice(populatedOrder, user?.email);
+            // Send alert to admin
+            sendAdminNewOrderAlert(populatedOrder);
         } else {
             console.warn("⚠️ Invoice generation failed or missing, skipping email trigger after payment.");
         }
@@ -375,6 +377,8 @@ export const razorpayWebhook = async (req, res) => {
                     const user = await UserProfile.findById(existing.user);
                     const freshPopulated = await Order.findById(populated._id).populate("items.product");
                     sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
+                    // Send alert to admin
+                    sendAdminNewOrderAlert(freshPopulated);
                 }
             } else if (!existing) {
                 // 🚀 Audit Payment Success No Order
@@ -382,6 +386,9 @@ export const razorpayWebhook = async (req, res) => {
                     paymentId: payment.id,
                     amount: payment.amount / 100
                 }, { source: "razorpay-webhook", severity: "CRITICAL" }).catch(err => console.error("Payment Success No Order Audit Failed:", err));
+                
+                // Send critical alert to admins about the orphaned payment
+                sendAdminPaymentSuccessNoOrderAlert(payment.id, payment.order_id, payment.amount / 100);
             }
         } else if (event === "payment.failed") {
             const payment = payload.payment.entity;

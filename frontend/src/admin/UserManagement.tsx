@@ -16,6 +16,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
 import toast from 'react-hot-toast';
+import CustomerAnalysisModal from './CustomerAnalysisModal';
 
 const UserManagement: React.FC = () => {
   const { getAuthHeaders, user: currentUser, isPrimaryAdmin } = useApp();
@@ -27,6 +28,7 @@ const UserManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [computing, setComputing] = useState(false);
   const [filters, setFilters] = useState({ role: '', isBlocked: '', segment: '' });
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const SEGMENT_CONFIG = [
     { key: 'high_value', label: 'High Value', color: 'bg-amber-50 border-amber-200 text-amber-700', dot: 'bg-amber-400' },
@@ -280,12 +282,17 @@ const UserManagement: React.FC = () => {
           <tbody className="divide-y divide-silk-light/50">
             {loading ? (
               [...Array(5)].map((_, i) => (
-                <tr key={i} className="animate-pulse">
+                <tr key={i} className="animate-pulse" aria-hidden="true">
                   <td colSpan={6} className="px-6 py-8 h-16 bg-gray-50/50 rounded-lg"></td>
                 </tr>
               ))
             ) : users.map((u) => (
-              <tr key={(u as any)._id || u.uid} className="group hover:bg-silk-light/30 transition-colors">
+              <tr
+                key={(u as any)._id || u.uid}
+                className="group hover:bg-silk-light/30 transition-colors cursor-pointer"
+                onClick={() => setSelectedUserId((u as any)._id || u.uid)}
+                title="Click to view full customer profile"
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-silk-light overflow-hidden flex items-center justify-center text-dark-red font-bold border border-silk-light">
@@ -340,7 +347,7 @@ const UserManagement: React.FC = () => {
                     {/* Role-change button: only visible to Primary Admin, hidden for primary_admin targets */}
                     {isPrimaryAdmin && u.role !== 'primary_admin' && (
                       <button 
-                        onClick={() => handleChangeRole((u as any)._id, u.role || 'user')}
+                        onClick={(e) => { e.stopPropagation(); handleChangeRole((u as any)._id, u.role || 'user'); }}
                         className="p-2 hover:bg-amber-50 rounded-lg border border-transparent hover:border-amber-200 text-grey-beige hover:text-amber-700 transition-all"
                         title={u.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
                       >
@@ -348,7 +355,7 @@ const UserManagement: React.FC = () => {
                       </button>
                     )}
                     <button 
-                      onClick={() => handleToggleBlock((u as any)._id, u.isBlocked || false)}
+                      onClick={(e) => { e.stopPropagation(); handleToggleBlock((u as any)._id, u.isBlocked || false); }}
                       className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-silk-light text-grey-beige hover:text-ruby-red transition-all"
                       title={u.isBlocked ? 'Unblock Account' : 'Block Account'}
                     >
@@ -386,6 +393,11 @@ const UserManagement: React.FC = () => {
           </button>
         </div>
       </div>
+      {/* Customer Analysis Modal */}
+      <CustomerAnalysisModal
+        userId={selectedUserId}
+        onClose={() => setSelectedUserId(null)}
+      />
     </div>
   );
 };
