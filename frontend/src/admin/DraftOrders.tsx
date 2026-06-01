@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
+import Select from '../components/Select';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -411,12 +412,16 @@ const DraftOrders: React.FC = () => {
                   <h4 className="font-bold text-sm text-grey-beige uppercase tracking-wider mb-2">Payment Details</h4>
                   <div className={`grid grid-cols-1 ${alreadyPaid ? '' : 'sm:grid-cols-2'} gap-4`}>
                     {!alreadyPaid && (
-                      <select className="w-full p-2.5 bg-gray-50 border border-silk-light rounded-lg text-sm outline-none" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-                        <option value="razorpay">Razorpay (Send Link)</option>
-                        <option value="cash_on_delivery">Cash on Delivery (COD)</option>
-                        <option value="bank_transfer">Bank Transfer / UPI</option>
-                        <option value="store_credit">Store Credit</option>
-                      </select>
+                      <Select
+                        value={paymentMethod}
+                        onChange={val => setPaymentMethod(val as string)}
+                        options={[
+                          { value: 'razorpay', label: 'Razorpay (Send Link)' },
+                          { value: 'cash_on_delivery', label: 'Cash on Delivery (COD)' },
+                          { value: 'bank_transfer', label: 'Bank Transfer / UPI' },
+                          { value: 'store_credit', label: 'Store Credit' }
+                        ]}
+                      />
                     )}
                     <label className="flex items-center gap-2 text-sm cursor-pointer p-2.5 bg-gray-50 border border-silk-light rounded-lg">
                       <input type="checkbox" checked={alreadyPaid} onChange={e => setAlreadyPaid(e.target.checked)} className="rounded border-gray-300 text-dark-red focus:ring-dark-red" />

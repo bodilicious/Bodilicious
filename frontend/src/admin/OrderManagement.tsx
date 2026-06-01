@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import OrderTimelineModal from './OrderTimelineModal';
 import ShippingLabel from './ShippingLabel';
 import CustomerAnalysisModal from './CustomerAnalysisModal';
+import Select from '../components/Select';
 
 const OrderManagement: React.FC = () => {
   const { getAuthHeaders } = useApp();
@@ -212,19 +213,20 @@ const OrderManagement: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-          <select
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
+          <Select
+            className="w-48"
             value={filters.orderStatus}
-            onChange={(e) => setFilters(prev => ({ ...prev, orderStatus: e.target.value }))}
-          >
-            <option value="">Status: All</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="return_requested">Return Requested</option>
-            <option value="returned">Returned</option>
-          </select>
+            onChange={(val) => setFilters(prev => ({ ...prev, orderStatus: val as string }))}
+            options={[
+              { value: '', label: 'Status: All' },
+              { value: 'processing', label: 'Processing' },
+              { value: 'shipped', label: 'Shipped' },
+              { value: 'delivered', label: 'Delivered' },
+              { value: 'cancelled', label: 'Cancelled' },
+              { value: 'return_requested', label: 'Return Requested' },
+              { value: 'returned', label: 'Returned' }
+            ]}
+          />
           <button
             onClick={fetchOrders}
             disabled={loading}
@@ -248,16 +250,17 @@ const OrderManagement: React.FC = () => {
         <div className="flex items-center gap-3 bg-dark-red/5 border border-dark-red/20 rounded-2xl px-5 py-3 flex-wrap">
           <span className="text-sm font-bold text-dark-red">{selectedIds.length} selected</span>
           <div className="flex items-center gap-2 ml-auto flex-wrap">
-            <select
-              className="bg-white border border-silk-light rounded-xl px-3 py-2 text-sm outline-none text-dark-red"
+            <Select
+              className="w-40"
               value={bulkStatus}
-              onChange={e => setBulkStatus(e.target.value)}
-            >
-              <option value="processing">→ Processing</option>
-              <option value="shipped">→ Shipped</option>
-              <option value="delivered">→ Delivered</option>
-              <option value="cancelled">→ Cancelled</option>
-            </select>
+              onChange={val => setBulkStatus(val as string)}
+              options={[
+                { value: 'processing', label: '→ Processing' },
+                { value: 'shipped', label: '→ Shipped' },
+                { value: 'delivered', label: '→ Delivered' },
+                { value: 'cancelled', label: '→ Cancelled' }
+              ]}
+            />
             <button
               onClick={handleBulkStatus}
               disabled={bulkLoading}

@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import StockHistoryDrawer from './StockHistoryDrawer';
+import Select from '../components/Select';
 
 const ProductManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -155,23 +156,27 @@ const ProductManagement: React.FC = () => {
           />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-          <select
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
-            value={filters.category} onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-          >
-            <option value="">All Categories</option>
-            <option value="skin">Skin</option>
-            <option value="hair">Hair</option>
-            <option value="body">Body</option>
-          </select>
-          <select
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
-            value={filters.isActive} onChange={(e) => setFilters(prev => ({ ...prev, isActive: e.target.value }))}
-          >
-            <option value="">Status: All</option>
-            <option value="true">Visible Only</option>
-            <option value="false">Hidden Only</option>
-          </select>
+          <Select
+            className="w-48"
+            value={filters.category}
+            onChange={(val) => setFilters(prev => ({ ...prev, category: val as string }))}
+            options={[
+              { value: '', label: 'All Categories' },
+              { value: 'skin', label: 'Skin' },
+              { value: 'hair', label: 'Hair' },
+              { value: 'body', label: 'Body' }
+            ]}
+          />
+          <Select
+            className="w-48"
+            value={filters.isActive}
+            onChange={(val) => setFilters(prev => ({ ...prev, isActive: val as string }))}
+            options={[
+              { value: '', label: 'Status: All' },
+              { value: 'true', label: 'Visible Only' },
+              { value: 'false', label: 'Hidden Only' }
+            ]}
+          />
           <button
             onClick={() => setShowCsvPanel(s => !s)}
             className="bg-silk-light text-dark-red px-4 py-3 rounded-2xl font-bold flex items-center gap-2 text-sm hover:bg-silk transition-all"

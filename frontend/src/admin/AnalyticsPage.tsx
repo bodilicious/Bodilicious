@@ -9,6 +9,7 @@ import Papa from 'papaparse';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
+import Select from '../components/Select';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Area, AreaChart,
@@ -180,16 +181,17 @@ const AnalyticsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <select
+          <Select
+            className="flex-1 md:flex-none w-40"
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-red-400 font-medium shadow-sm flex-1 md:flex-none"
-          >
-            <option value="7">Last 7 Days</option>
-            <option value="30">Last 30 Days</option>
-            <option value="90">Last 90 Days</option>
-            <option value="365">Last 365 Days</option>
-          </select>
+            onChange={(val) => setTimeRange(val as string)}
+            options={[
+              { value: '7', label: 'Last 7 Days' },
+              { value: '30', label: 'Last 30 Days' },
+              { value: '90', label: 'Last 90 Days' },
+              { value: '365', label: 'Last 365 Days' }
+            ]}
+          />
           <button
             onClick={fetchData}
             className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-dark-red hover:bg-red-50 transition-colors shadow-sm"

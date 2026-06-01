@@ -217,17 +217,25 @@ export const getAllProducts = async (req, res) => {
  */
 export const getProductFilters = async (req, res) => {
   try {
-    // Add Vercel-CDN-Cache-Control for edge caching (filters rarely change)
-    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    // Add Vercel-CDN-Cache-Control for edge caching
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+
+    const baseQuery = { isActive: true };
+    const filterQuery = { isActive: true };
+
+    if (req.query.category && req.query.category !== 'all') {
+      const cats = req.query.category.split(',').map(c => c.trim().toLowerCase());
+      filterQuery.category = { $in: cats };
+    }
 
     const [categories, subCategories, productTypes, concerns, keyActives, botanicalExtracts, others] = await Promise.all([
-      Product.distinct("category", { isActive: true }),
-      Product.distinct("sub_category", { isActive: true }),
-      Product.distinct("product_type", { isActive: true }),
-      Product.distinct("concerns_targeted", { isActive: true }),
-      Product.distinct("ingredients.key_actives", { isActive: true }),
-      Product.distinct("ingredients.botanical_extracts", { isActive: true }),
-      Product.distinct("ingredients.others", { isActive: true }),
+      Product.distinct("category", baseQuery), // Always return all categories
+      Product.distinct("sub_category", filterQuery),
+      Product.distinct("product_type", filterQuery),
+      Product.distinct("concerns_targeted", filterQuery),
+      Product.distinct("ingredients.key_actives", filterQuery),
+      Product.distinct("ingredients.botanical_extracts", filterQuery),
+      Product.distinct("ingredients.others", filterQuery),
     ]);
 
     const normalize = (arr) => {

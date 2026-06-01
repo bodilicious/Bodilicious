@@ -1,7 +1,7 @@
- 
 import { useState, useEffect } from 'react';
 import { User } from '../../types';
 import toast from 'react-hot-toast';
+import Select from '../Select';
 
 interface Props {
     user: User | null;
@@ -106,17 +106,17 @@ export default function PersonalInfoForm({ user, onSave }: Props) {
 
                     <div className="space-y-2">
                         <label className="block font-sans text-sm text-[#3E2C23]/80">Gender</label>
-                        <select
+                        <Select
                             disabled={!isEditing}
                             value={formData.gender}
-                            onChange={e => setFormData({ ...formData, gender: e.target.value })}
-                            className="w-full p-3 border border-[#D8C7B8] bg-[#F8F4EF] rounded-md font-sans text-sm outline-none focus:border-[#8B5E3C] focus:ring-1 focus:ring-[#8B5E3C]/20 disabled:opacity-70 transition-all text-[#3E2C23]"
-                        >
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Non-binary">Non-binary</option>
-                            <option value="Prefer not to say">Prefer not to say</option>
-                        </select>
+                            onChange={(val) => setFormData({ ...formData, gender: val as string })}
+                            options={[
+                                { value: 'Male', label: 'Male' },
+                                { value: 'Female', label: 'Female' },
+                                { value: 'Non-binary', label: 'Non-binary' },
+                                { value: 'Prefer not to say', label: 'Prefer not to say' }
+                            ]}
+                        />
                     </div>
 
                     <div className="space-y-2">

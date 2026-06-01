@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
+import Select from '../components/Select';
 
 function ArrayField({ label, value, onChange }: {
   label: string;
@@ -298,19 +299,19 @@ const ProductForm: React.FC = () => {
             <InputField label="Brand" field="brand" />
             <div className="mb-4">
               <label className="block text-sm font-bold text-gray-700 mb-2">Category *</label>
-              <select 
-                className="w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20"
+              <Select
                 value={formData.category}
-                onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
-              >
-                <option value="">Select Category</option>
-                <option value="skin">Skin</option>
-                <option value="hair">Hair</option>
-                <option value="body">Body</option>
-                <option value="makeup">Makeup</option>
-                <option value="lip">Lip</option>
-                <option value="other">Other</option>
-              </select>
+                onChange={val => setFormData(prev => ({ ...prev, category: val as string }))}
+                options={[
+                  { value: '', label: 'Select Category' },
+                  { value: 'skin', label: 'Skin' },
+                  { value: 'hair', label: 'Hair' },
+                  { value: 'body', label: 'Body' },
+                  { value: 'makeup', label: 'Makeup' },
+                  { value: 'lip', label: 'Lip' },
+                  { value: 'other', label: 'Other' }
+                ]}
+              />
             </div>
             <InputField label="Sub Category" field="sub_category" />
             <InputField label="Product Type" field="product_type" />
@@ -426,16 +427,16 @@ const ProductForm: React.FC = () => {
             <InputField label="Low Stock Threshold" field="lowStockThreshold" type="number" min="0" />
             <div className="mb-4">
               <label className="block text-sm font-bold text-gray-700 mb-2">Availability</label>
-              <select 
-                className="w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20"
+              <Select
                 value={formData.availability}
-                onChange={e => setFormData(prev => ({ ...prev, availability: e.target.value }))}
-              >
-                <option value="In Stock">In Stock</option>
-                <option value="Out of Stock">Out of Stock</option>
-                <option value="Preorder">Preorder</option>
-                <option value="Discontinued">Discontinued</option>
-              </select>
+                onChange={val => setFormData(prev => ({ ...prev, availability: val as string }))}
+                options={[
+                  { value: 'In Stock', label: 'In Stock' },
+                  { value: 'Out of Stock', label: 'Out of Stock' },
+                  { value: 'Preorder', label: 'Preorder' },
+                  { value: 'Discontinued', label: 'Discontinued' }
+                ]}
+              />
             </div>
           </div>
         </section>

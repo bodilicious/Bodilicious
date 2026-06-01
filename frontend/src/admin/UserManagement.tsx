@@ -17,6 +17,7 @@ import { useApp } from '../context/AppContext';
 import { User } from '../types';
 import toast from 'react-hot-toast';
 import CustomerAnalysisModal from './CustomerAnalysisModal';
+import Select from '../components/Select';
 
 const UserManagement: React.FC = () => {
   const { getAuthHeaders, user: currentUser, isPrimaryAdmin } = useApp();
@@ -242,27 +243,29 @@ const UserManagement: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <select 
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
+          <Select
+            className="w-48"
             value={filters.role}
-            onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}
-          >
-            <option value="">All Roles</option>
-            <option value="primary_admin">Primary Admin</option>
-            <option value="admin">Admin</option>
-            <option value="user">Users</option>
-          </select>
-          <select
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
+            onChange={(val) => setFilters(prev => ({ ...prev, role: val as string }))}
+            options={[
+              { value: '', label: 'All Roles' },
+              { value: 'primary_admin', label: 'Primary Admin' },
+              { value: 'admin', label: 'Admin' },
+              { value: 'user', label: 'Users' }
+            ]}
+          />
+          <Select
+            className="w-48"
             value={filters.segment}
-            onChange={(e) => setFilters(prev => ({ ...prev, segment: e.target.value }))}
-          >
-            <option value="">All Segments</option>
-            <option value="high_value">High Value</option>
-            <option value="loyal">Loyal</option>
-            <option value="at_risk">At Risk</option>
-            <option value="new">New</option>
-          </select>
+            onChange={(val) => setFilters(prev => ({ ...prev, segment: val as string }))}
+            options={[
+              { value: '', label: 'All Segments' },
+              { value: 'high_value', label: 'High Value' },
+              { value: 'loyal', label: 'Loyal' },
+              { value: 'at_risk', label: 'At Risk' },
+              { value: 'new', label: 'New' }
+            ]}
+          />
         </div>
       </div>
 

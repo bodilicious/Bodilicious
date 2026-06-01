@@ -78,7 +78,7 @@ export default memo(function ProductCard({
           alt={product.name}
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover scale-100 group-hover:scale-105 transition-transform duration-700 ease-out"
+          className="w-full h-full object-cover scale-100 group-hover:scale-105 transition-transform duration-700 ease-out mix-blend-multiply"
         />
 
         {/* Hover tint */}
@@ -149,7 +149,7 @@ export default memo(function ProductCard({
       {/* ── Info area ──────────────────────────────────────── */}
       <div className="pt-3 pb-2 px-1 space-y-1.5">
         <Link to={`/product/${product.pid}`} className="block">
-          <p className="text-[10px] font-sans tracking-widest uppercase text-grey-beige">
+          <p className="text-xs font-sans tracking-wide uppercase text-gray-500 font-medium">
             {categoryLabel}
           </p>
           <h3 className="font-serif text-dark-red text-sm leading-snug mt-0.5 group-hover:text-ruby-red transition-colors line-clamp-2">

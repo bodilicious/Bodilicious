@@ -8,8 +8,10 @@ import Footer from '../components/Footer';
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { fadeUpVariant, getAccessibleVariant, staggerContainerVariant } from '../utils/motionTokens';
 import { useSEO } from '../hooks/useSEO';
+import Slider from 'rc-slider';
+import 'rc-slider/assets/index.css';
 
-type Option = { value: string; label: string };
+type Option = { value: string; label: string; isDisabled?: boolean };
 
 const titleCase = (s: string) =>
   s
@@ -29,6 +31,7 @@ const FilterAccordion = ({
   defaultOpen = false,
   searchable = false,
   limit = 6,
+  renderAs = 'pill',
 }: {
   title: string;
   items: Option[];
@@ -38,8 +41,10 @@ const FilterAccordion = ({
   defaultOpen?: boolean;
   searchable?: boolean;
   limit?: number;
+  renderAs?: 'list' | 'pill';
 }) => {
-  const [open, setOpen] = useState(defaultOpen || selected.length > 0);
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+  const [open, setOpen] = useState(isDesktop || defaultOpen || selected.length > 0);
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
 
@@ -79,9 +84,9 @@ const FilterAccordion = ({
             transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <div className="pb-4 space-y-1">
+            <div className="pb-4 space-y-3">
               {searchable && (
-                <div className="relative mb-3">
+                <div className="relative">
                   <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
@@ -94,39 +99,64 @@ const FilterAccordion = ({
               )}
 
               {visible.length === 0 ? (
-                <p className="text-xs font-sans text-gray-400 italic py-2">No results</p>
+                <p className="text-xs font-sans text-gray-400 italic">No results</p>
               ) : (
-                visible.map(item => {
-                  const isSelected = selected.includes(item.value);
-                  return (
-                    <button
-                      key={item.value}
-                      onClick={() => handleToggle(paramKey, item.value)}
-                      className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left transition-all duration-150 ${
-                        isSelected
-                          ? 'bg-ruby-red/8 text-dark-red'
-                          : 'hover:bg-gray-50 text-gray-600 hover:text-dark-red'
-                      }`}
-                    >
-                      <span className={`flex-shrink-0 w-4 h-4 rounded border-[1.5px] flex items-center justify-center transition-all ${
-                        isSelected ? 'bg-dark-red border-dark-red' : 'border-gray-300'
-                      }`}>
-                        {isSelected && (
-                          <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                            <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </span>
-                      <span className="font-sans text-sm leading-tight">{item.label}</span>
-                    </button>
-                  );
-                })
+                <div className={renderAs === 'pill' ? "flex flex-wrap gap-2" : "space-y-1"}>
+                  {visible.map(item => {
+                    const isSelected = selected.includes(item.value);
+
+                    if (renderAs === 'pill') {
+                      return (
+                        <button
+                          key={item.value}
+                          onClick={() => !item.isDisabled && handleToggle(paramKey, item.value)}
+                          disabled={item.isDisabled}
+                          className={`px-3 py-1.5 rounded-full font-sans text-xs transition-all border ${
+                            item.isDisabled
+                              ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
+                              : isSelected
+                                ? 'bg-white border-ruby-red text-ruby-red font-medium shadow-sm'
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-ruby-red hover:text-ruby-red'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={item.value}
+                        onClick={() => !item.isDisabled && handleToggle(paramKey, item.value)}
+                        disabled={item.isDisabled}
+                        className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-left transition-all duration-150 ${
+                          item.isDisabled
+                            ? 'opacity-40 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-ruby-red/8 text-dark-red'
+                              : 'hover:bg-gray-50 text-gray-600 hover:text-dark-red'
+                        }`}
+                      >
+                        <span className={`flex-shrink-0 w-4 h-4 rounded border-[1.5px] flex items-center justify-center transition-all ${
+                          isSelected ? 'bg-dark-red border-dark-red' : 'border-gray-300'
+                        }`}>
+                          {isSelected && (
+                            <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                              <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="font-sans text-sm leading-tight">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
 
               {hasMore && (
                 <button
                   onClick={() => setShowAll(s => !s)}
-                  className="mt-1 ml-2 text-[11px] font-sans text-grey-beige hover:text-dark-red transition-colors underline"
+                  className="mt-2 text-[11px] font-sans text-grey-beige hover:text-dark-red transition-colors underline uppercase tracking-widest block"
                 >
                   {showAll ? 'Show less' : `+${filtered.length - limit} more`}
                 </button>
@@ -160,22 +190,52 @@ export default function ShopPage() {
   const inStock = searchParams.get('inStock') || '';
   const searchQuery = searchParams.get('search') || '';
 
-  // Use a stable max price since we are now filtering server-side
   const computedMaxPrice = 5000;
 
   const priceMax = searchParams.get('priceMax') || String(computedMaxPrice);
+  const priceMin = searchParams.get('priceMin') || '0';
   const [localPriceMax, setLocalPriceMax] = useState(priceMax);
+  const [localPriceMin, setLocalPriceMin] = useState(priceMin);
+
+  const [dynamicFilters, setDynamicFilters] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchDynamicFilters = async () => {
+      try {
+        const catQuery = selectedCategories.length > 0 ? `?category=${selectedCategories.join(',')}` : '';
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/products/filters${catQuery}`);
+        const json = await res.json();
+        if (active && json.success) {
+          setDynamicFilters(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dynamic filters", err);
+      }
+    };
+    fetchDynamicFilters();
+    return () => { active = false; };
+  }, [selectedCategories.join(',')]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
+      let changed = false;
+      const newParams = new URLSearchParams(searchParams);
       if (localPriceMax !== priceMax) {
-        const newParams = new URLSearchParams(searchParams);
         newParams.set('priceMax', localPriceMax);
+        changed = true;
+      }
+      if (localPriceMin !== priceMin) {
+        newParams.set('priceMin', localPriceMin);
+        changed = true;
+      }
+      if (changed) {
+        newParams.delete('page');
         setSearchParams(newParams);
       }
     }, 400); // Slightly higher debounce for server-side
     return () => clearTimeout(timeout);
-  }, [localPriceMax, priceMax, searchParams, setSearchParams]);
+  }, [localPriceMax, priceMax, localPriceMin, priceMin, searchParams, setSearchParams]);
 
   const shouldReduceMotion = useReducedMotion();
   const fadeUp = getAccessibleVariant(fadeUpVariant, !!shouldReduceMotion);
@@ -186,36 +246,40 @@ export default function ShopPage() {
     return filters.categories.map((v: string) => ({ value: v, label: titleCase(v) }));
   }, [filters]);
 
-  // When a category is selected, narrow sub-categories by checking which products
-  // have both the selected category AND the sub-category. Falls back to all if no category selected.
+  // Sub-categories, Types, Concerns, and Ingredients are derived from dynamicFilters (which are scoped by Category).
+  // If dynamicFilters hasn't loaded yet, we fall back to the global filters.
+  
   const SUBCATEGORY_OPTIONS: Option[] = useMemo(() => {
     const all: string[] = filters?.subCategories || [];
-    if (selectedCategories.length === 0) {
-      return all.map((v: string) => ({ value: v, label: titleCase(v) }));
-    }
-    // Filter sub-categories that exist on products matching selected categories
-    const relevant = all.filter(sub =>
-      products.some(p =>
-        selectedCategories.includes((p as any).category?.toLowerCase?.() || '') &&
-        (p as any).sub_category?.toLowerCase?.() === sub.toLowerCase()
-      )
-    );
-    // If no matches yet (loading), show all
-    const list = relevant.length > 0 ? relevant : all;
-    return list.map((v: string) => ({ value: v, label: titleCase(v) }));
-  }, [filters, selectedCategories, products]);
+    const valid = new Set(dynamicFilters?.subCategories?.map((s: string) => s.toLowerCase()));
+    return all
+      .filter(v => dynamicFilters ? valid.has(v.toLowerCase()) : true)
+      .map((v: string) => ({ value: v, label: titleCase(v) }));
+  }, [filters, dynamicFilters]);
 
-  const TYPE_OPTIONS: Option[] = useMemo(() =>
-    (filters?.productTypes || []).map((v: string) => ({ value: v, label: titleCase(v) })),
-    [filters]);
+  const TYPE_OPTIONS: Option[] = useMemo(() => {
+    const all: string[] = filters?.productTypes || [];
+    const valid = new Set(dynamicFilters?.productTypes?.map((s: string) => s.toLowerCase()));
+    return all
+      .filter(v => dynamicFilters ? valid.has(v.toLowerCase()) : true)
+      .map((v: string) => ({ value: v, label: titleCase(v) }));
+  }, [filters, dynamicFilters]);
 
-  const CONCERN_OPTIONS: Option[] = useMemo(() =>
-    (filters?.concerns || []).map((v: string) => ({ value: v, label: titleCase(v) })),
-    [filters]);
+  const CONCERN_OPTIONS: Option[] = useMemo(() => {
+    const all: string[] = filters?.concerns || [];
+    const valid = new Set(dynamicFilters?.concerns?.map((s: string) => s.toLowerCase()));
+    return all
+      .filter(v => dynamicFilters ? valid.has(v.toLowerCase()) : true)
+      .map((v: string) => ({ value: v, label: titleCase(v) }));
+  }, [filters, dynamicFilters]);
 
-  const INGREDIENT_OPTIONS: Option[] = useMemo(() =>
-    (filters?.ingredients || []).map((v: string) => ({ value: v, label: v })),
-    [filters]);
+  const INGREDIENT_OPTIONS: Option[] = useMemo(() => {
+    const all: string[] = filters?.ingredients || [];
+    const valid = new Set(dynamicFilters?.ingredients?.map((s: string) => s.toLowerCase()));
+    return all
+      .filter(v => dynamicFilters ? valid.has(v.toLowerCase()) : true)
+      .map((v: string) => ({ value: v, label: v }));
+  }, [filters, dynamicFilters]);
 
   const handleToggle = (key: string, value: string) => {
     const current = parseCSV(searchParams.get(key));
@@ -242,6 +306,7 @@ export default function ShopPage() {
   const handleClear = () => {
     setSearchParams(new URLSearchParams());
     setLocalPriceMax(String(computedMaxPrice));
+    setLocalPriceMin('0');
   };
 
   // Products are already filtered by the API via AppContext listening to location.search
@@ -253,88 +318,261 @@ export default function ShopPage() {
     selectedCategories.length + selectedSubCategories.length + selectedTypes.length +
     selectedConcerns.length + selectedIngredients.length +
     (inStock !== '' ? 1 : 0) +
-    (priceMax && priceMax !== String(computedMaxPrice) ? 1 : 0);
+    (priceMax !== String(computedMaxPrice) || priceMin !== '0' ? 1 : 0);
 
   // Correct URL param name for product_type filter pill removal
   const handleTypePillRemove = (value: string) => handleToggle('type', value);
 
   // ─── Shared filter panel content ──────────────────────────────────────────
-  const FilterPanelContent = () => (
-    <div className="space-y-0">
-      {/* Sort */}
-      <div className="border-b border-gray-100 pb-4 mb-0">
-        <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-gray-400 mb-3">Sort By</p>
-        <div className="grid grid-cols-1 gap-1">
-          {[
-            { value: 'best_selling', label: 'Best Selling' },
-            { value: 'price_asc', label: 'Price: Low → High' },
-            { value: 'price_desc', label: 'Price: High → Low' },
-          ].map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setSingleParam('sort', opt.value)}
-              className={`w-full text-left px-2 py-1.5 rounded-md text-sm font-sans transition-all ${
-                sort === opt.value
-                  ? 'bg-ruby-red/8 text-dark-red font-medium'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-dark-red'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
+  const FilterPanelContent = () => {
+    const [ingredientQuery, setIngredientQuery] = useState('');
+    const [showAllIngredients, setShowAllIngredients] = useState(false);
+    
+    const filteredIngredients = INGREDIENT_OPTIONS.filter(i => i.label.toLowerCase().includes(ingredientQuery.toLowerCase()));
+    const visibleIngredients = showAllIngredients ? filteredIngredients : filteredIngredients.slice(0, 6);
+    const hasMoreIngredients = filteredIngredients.length > 6;
 
-      <FilterAccordion title="Category" items={CATEGORY_OPTIONS} paramKey="category" selected={selectedCategories} handleToggle={handleToggle} defaultOpen limit={8} />
-      <FilterAccordion title="Sub-category" items={SUBCATEGORY_OPTIONS} paramKey="sub_category" selected={selectedSubCategories} handleToggle={handleToggle} limit={8} />
-      <FilterAccordion title="Product Type" items={TYPE_OPTIONS} paramKey="type" selected={selectedTypes} handleToggle={handleToggle} limit={6} />
-      <FilterAccordion title="Skin Concern" items={CONCERN_OPTIONS} paramKey="concern" selected={selectedConcerns} handleToggle={handleToggle} limit={8} />
-      <FilterAccordion title="Ingredients" items={INGREDIENT_OPTIONS} paramKey="ingredient" selected={selectedIngredients} handleToggle={handleToggle} searchable limit={6} />
+    return (
+      <div className="flex flex-col h-full relative">
+        <div className="space-y-0 pb-24">
+          
+          {/* Active Filters Box */}
+          {totalActiveFilters > 0 && (
+            <div className="bg-white border border-gray-200 p-4 rounded-xl shadow-sm mb-6">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-sans font-medium text-gray-900">Active Filters</span>
+                <button onClick={handleClear} className="text-xs font-sans text-gray-500 hover:text-ruby-red underline transition-colors">
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ...selectedCategories.map(v => ({ key: 'category', value: v, label: `Category: ${titleCase(v)}` })),
+                  ...selectedSubCategories.map(v => ({ key: 'sub_category', value: v, label: titleCase(v) })),
+                  ...selectedTypes.map(v => ({ key: 'type', value: v, label: titleCase(v) })),
+                  ...selectedConcerns.map(v => ({ key: 'concern', value: v, label: titleCase(v) })),
+                  ...selectedIngredients.map(v => ({ key: 'ingredient', value: v, label: v })),
+                ].map(filter => (
+                  <span
+                    key={`${filter.key}-${filter.value}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ruby-red/10 border border-ruby-red/20 rounded-full text-[11px] font-sans text-dark-red"
+                  >
+                    {filter.label}
+                    <button
+                      onClick={() => handleToggle(filter.key, filter.value)}
+                      className="hover:bg-ruby-red/20 rounded-full p-0.5 transition-colors"
+                    >
+                      <X size={10} className="text-dark-red" />
+                    </button>
+                  </span>
+                ))}
+                {inStock !== '' && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ruby-red/10 border border-ruby-red/20 rounded-full text-[11px] font-sans text-dark-red">
+                    {inStock === 'true' ? 'In Stock' : 'Out of Stock'}
+                    <button onClick={() => setSingleParam('inStock', '')} className="hover:bg-ruby-red/20 rounded-full p-0.5 transition-colors">
+                      <X size={10} className="text-dark-red" />
+                    </button>
+                  </span>
+                )}
+                {(priceMax !== String(computedMaxPrice) || priceMin !== '0') && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ruby-red/10 border border-ruby-red/20 rounded-full text-[11px] font-sans text-dark-red">
+                    ₹{priceMin} - ₹{priceMax}
+                    <button onClick={() => { 
+                      setLocalPriceMax(String(computedMaxPrice)); 
+                      setLocalPriceMin('0'); 
+                      const newParams = new URLSearchParams(searchParams);
+                      newParams.delete('priceMax');
+                      newParams.delete('priceMin');
+                      setSearchParams(newParams);
+                    }} className="hover:bg-ruby-red/20 rounded-full p-0.5 transition-colors">
+                      <X size={10} className="text-dark-red" />
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
-      {/* Price Range */}
-      <div className="border-b border-gray-100 py-4">
-        <p className="font-sans text-sm font-medium text-gray-700 mb-3">Price Range</p>
-        <div className="px-1">
-          <input
-            type="range"
-            min="0"
-            max={String(computedMaxPrice)}
-            value={localPriceMax}
-            onChange={(e) => setLocalPriceMax(e.target.value)}
-            className="w-full accent-dark-red mb-3"
-          />
-          <div className="flex items-center justify-between text-xs font-sans text-gray-500">
-            <span>₹0</span>
-            <span className="font-medium text-dark-red">Up to ₹{Number(localPriceMax).toLocaleString('en-IN')}</span>
+          {/* Sort */}
+          <div className="border-b border-gray-100 pb-5 mb-5">
+            <p className="text-sm font-sans font-medium text-gray-900 mb-3">Sort By</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'best_selling', label: 'Best Selling' },
+                { value: 'price_asc', label: 'Price: Low → High' },
+                { value: 'price_desc', label: 'Price: High → Low' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSingleParam('sort', opt.value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-sans transition-all border ${
+                    sort === opt.value
+                      ? 'bg-white border-ruby-red text-ruby-red font-medium shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-ruby-red hover:text-ruby-red'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <FilterAccordion title="Category" items={CATEGORY_OPTIONS} paramKey="category" selected={selectedCategories} handleToggle={handleToggle} defaultOpen limit={8} />
+          <FilterAccordion title="Product Type" items={TYPE_OPTIONS} paramKey="type" selected={selectedTypes} handleToggle={handleToggle} defaultOpen limit={8} />
+          <FilterAccordion title="Skin Concern" items={CONCERN_OPTIONS} paramKey="concern" selected={selectedConcerns} handleToggle={handleToggle} limit={5} />
+
+          {/* Ingredients */}
+          <div className="border-b border-gray-100 py-4">
+            <p className="text-sm font-sans font-medium text-gray-700 mb-3">Ingredients</p>
+            <div className="space-y-3">
+              {selectedIngredients.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {selectedIngredients.map(ing => (
+                    <span key={ing} className="inline-flex items-center gap-1.5 px-2 py-1 bg-ruby-red/10 border border-ruby-red/30 rounded-md text-[10px] font-sans text-dark-red">
+                      {ing}
+                      <button onClick={() => handleToggle('ingredient', ing)} className="hover:text-ruby-red">
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search ingredients..."
+                  value={ingredientQuery}
+                  onChange={e => setIngredientQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2.5 text-xs font-sans border border-gray-200 rounded-lg focus:outline-none focus:border-dark-red bg-white shadow-sm"
+                />
+              </div>
+
+              {visibleIngredients.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">No results</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {visibleIngredients.map(item => {
+                    const isSelected = selectedIngredients.includes(item.value);
+                    return (
+                      <button
+                        key={item.value}
+                        onClick={() => !item.isDisabled && handleToggle('ingredient', item.value)}
+                        disabled={item.isDisabled}
+                        className={`px-3 py-1.5 rounded-full font-sans text-xs transition-all border ${
+                          item.isDisabled
+                            ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-white border-ruby-red text-ruby-red font-medium shadow-sm'
+                              : 'bg-white border-gray-200 text-gray-600 hover:border-ruby-red hover:text-ruby-red'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {hasMoreIngredients && (
+                <button
+                  onClick={() => setShowAllIngredients(!showAllIngredients)}
+                  className="mt-2 text-[11px] font-sans text-grey-beige hover:text-dark-red transition-colors underline uppercase tracking-widest block"
+                >
+                  {showAllIngredients ? 'Show less' : `+${filteredIngredients.length - 6} more`}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Price Range */}
+          <div className="border-b border-gray-100 py-4">
+            <p className="font-sans text-sm font-medium text-gray-700 mb-3">Price Range</p>
+            <div className="px-2 mb-6 mt-6">
+              <Slider
+                range
+                min={0}
+                max={computedMaxPrice}
+                value={[Number(localPriceMin), Number(localPriceMax)]}
+                onChange={(val) => {
+                  if (Array.isArray(val)) {
+                    setLocalPriceMin(String(val[0]));
+                    setLocalPriceMax(String(val[1]));
+                  }
+                }}
+                trackStyle={[{ backgroundColor: '#8B5E3C' }]}
+                handleStyle={[
+                  { borderColor: '#8B5E3C', backgroundColor: '#fff', opacity: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
+                  { borderColor: '#8B5E3C', backgroundColor: '#fff', opacity: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }
+                ]}
+                railStyle={{ backgroundColor: '#e5e7eb' }}
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-sans text-sm">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={computedMaxPrice}
+                  value={localPriceMin}
+                  onChange={(e) => setLocalPriceMin(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 bg-white text-[#3E2C23] rounded-md text-sm font-sans outline-none focus:ring-1 focus:ring-ruby-red border border-gray-200"
+                />
+              </div>
+              <span className="text-gray-400 font-sans text-sm">to</span>
+              <div className="flex-1 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-sans text-sm">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={computedMaxPrice}
+                  value={localPriceMax}
+                  onChange={(e) => setLocalPriceMax(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 bg-white text-[#3E2C23] rounded-md text-sm font-sans outline-none focus:ring-1 focus:ring-ruby-red border border-gray-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Availability */}
+          <div className="pb-4">
+            <p className="font-sans text-sm font-medium text-gray-700 mb-3">Availability</p>
+            <div className="flex gap-2">
+              {[
+                { v: 'true', label: 'In Stock' },
+                { v: 'false', label: 'Out of Stock' },
+                { v: '', label: 'All' },
+              ].map(opt => (
+                <button
+                  key={opt.v}
+                  onClick={() => setSingleParam('inStock', opt.v)}
+                  className={`flex-1 py-2 text-[11px] uppercase tracking-wider font-sans rounded-full border transition-all ${
+                    inStock === opt.v
+                      ? 'bg-white text-ruby-red border-ruby-red font-medium shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-ruby-red hover:text-ruby-red'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Availability */}
-      <div className="border-b border-gray-100 py-4">
-        <p className="font-sans text-sm font-medium text-gray-700 mb-3">Availability</p>
-        <div className="flex gap-2">
-          {[
-            { v: 'true', label: 'In Stock' },
-            { v: 'false', label: 'Out of Stock' },
-            { v: '', label: 'All' },
-          ].map(opt => (
-            <button
-              key={opt.v}
-              onClick={() => setSingleParam('inStock', opt.v)}
-              className={`flex-1 py-1.5 text-xs font-sans rounded-full border transition-all ${
-                inStock === opt.v
-                  ? 'bg-dark-red text-white border-dark-red'
-                  : 'border-gray-200 text-gray-600 hover:border-dark-red hover:text-dark-red'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* Sticky Apply Filters Button */}
+        <div className="sticky bottom-0 left-0 right-0 bg-neutral-50 pt-4 pb-2 mt-auto border-t border-gray-200 z-10">
+          <button
+            onClick={() => setIsMobileFiltersOpen(false)}
+            className="w-full py-3.5 bg-white border border-gray-200 text-[#3E2C23] font-sans text-sm uppercase tracking-widest hover:bg-gray-50 hover:border-gray-300 transition-all rounded-md shadow-sm font-medium"
+          >
+            Apply filters
+          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="bg-neutral-50 min-h-screen pt-28">
@@ -365,9 +603,9 @@ export default function ShopPage() {
           </button>
         </div>
 
-        {/* Active Filter Pills */}
+        {/* Active Filter Pills (Mobile Only) */}
         {totalActiveFilters > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-8 md:mb-10">
+          <div className="md:hidden flex flex-wrap items-center gap-2 mb-8">
             {[
               ...selectedCategories.map(v => ({ key: 'category', value: v, label: `Category: ${titleCase(v)}` })),
               ...selectedSubCategories.map(v => ({ key: 'sub_category', value: v, label: titleCase(v) })),
@@ -397,10 +635,17 @@ export default function ShopPage() {
                 </button>
               </span>
             )}
-            {priceMax && priceMax !== String(computedMaxPrice) && (
+            {(priceMax !== String(computedMaxPrice) || priceMin !== '0') && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-silk-dark/50 rounded-full text-[11px] font-sans tracking-widest uppercase text-dark-red shadow-sm">
-                Under ₹{priceMax}
-                <button onClick={() => { setLocalPriceMax(String(computedMaxPrice)); setSingleParam('priceMax', ''); }} className="hover:bg-indian-red/10 rounded-full p-0.5 transition-colors">
+                ₹{priceMin} - ₹{priceMax}
+                <button onClick={() => { 
+                  setLocalPriceMax(String(computedMaxPrice)); 
+                  setLocalPriceMin('0'); 
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete('priceMax');
+                  newParams.delete('priceMin');
+                  setSearchParams(newParams);
+                }} className="hover:bg-indian-red/10 rounded-full p-0.5 transition-colors">
                   <X size={10} className="text-dark-red/60 hover:text-indian-red transition-colors" />
                 </button>
               </span>

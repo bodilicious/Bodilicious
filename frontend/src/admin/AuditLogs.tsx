@@ -7,6 +7,7 @@ import {
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import Select from '../components/Select';
 
 const AuditLogs: React.FC = () => {
   const { getAuthHeaders } = useApp();
@@ -151,40 +152,43 @@ const AuditLogs: React.FC = () => {
       {/* Filters & Actions */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <select
+          <Select
+            className="w-48"
             value={eventTypeFilter}
-            onChange={(e) => setEventTypeFilter(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-red-400 font-medium"
-          >
-            <option value="">All Events</option>
-            <option value="ORDER_PLACED">Order Placed</option>
-            <option value="ORDER_CANCELLED">Order Cancelled</option>
-            <option value="ORDER_CREATION_FAILED">Order Creation Failed</option>
-            <option value="PAYMENT_CAPTURED">Payment Captured</option>
-            <option value="PAYMENT_FAILED">Payment Failed</option>
-            <option value="LOGIN_SUCCESS">Login Success</option>
-            <option value="LOGIN_FAILED">Login Failed</option>
-          </select>
-          <select
+            onChange={(val) => setEventTypeFilter(val as string)}
+            options={[
+              { value: '', label: 'All Events' },
+              { value: 'ORDER_PLACED', label: 'Order Placed' },
+              { value: 'ORDER_CANCELLED', label: 'Order Cancelled' },
+              { value: 'ORDER_CREATION_FAILED', label: 'Order Creation Failed' },
+              { value: 'PAYMENT_CAPTURED', label: 'Payment Captured' },
+              { value: 'PAYMENT_FAILED', label: 'Payment Failed' },
+              { value: 'LOGIN_SUCCESS', label: 'Login Success' },
+              { value: 'LOGIN_FAILED', label: 'Login Failed' }
+            ]}
+          />
+          <Select
+            className="w-40"
             value={severityFilter}
-            onChange={(e) => setSeverityFilter(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-red-400 font-medium"
-          >
-            <option value="">All Severities</option>
-            <option value="INFO">INFO</option>
-            <option value="WARNING">WARNING</option>
-            <option value="ERROR">ERROR</option>
-            <option value="CRITICAL">CRITICAL</option>
-          </select>
-          <select
+            onChange={(val) => setSeverityFilter(val as string)}
+            options={[
+              { value: '', label: 'All Severities' },
+              { value: 'INFO', label: 'INFO' },
+              { value: 'WARNING', label: 'WARNING' },
+              { value: 'ERROR', label: 'ERROR' },
+              { value: 'CRITICAL', label: 'CRITICAL' }
+            ]}
+          />
+          <Select
+            className="w-40"
             value={isAnomalyFilter}
-            onChange={(e) => setIsAnomalyFilter(e.target.value)}
-            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-red-400 font-medium"
-          >
-            <option value="">All Statuses</option>
-            <option value="true">Anomalies Only</option>
-            <option value="false">Normal Events</option>
-          </select>
+            onChange={(val) => setIsAnomalyFilter(val as string)}
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'true', label: 'Anomalies Only' },
+              { value: 'false', label: 'Normal Events' }
+            ]}
+          />
         </div>
         
         <button

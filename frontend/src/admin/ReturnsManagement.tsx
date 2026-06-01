@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { RotateCcw, CheckCircle, XCircle, Package, ChevronDown, ChevronUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useApp } from '../context/AppContext';
+import Select from '../components/Select';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -156,11 +157,15 @@ const ReturnsManagement: React.FC = () => {
             {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All Statuses'}
           </button>
         ))}
-        <select value={reasonFilter} onChange={e => { setReasonFilter(e.target.value); setPage(1); }}
-          className="px-3 py-1.5 rounded-lg text-sm border border-transparent bg-silk-light/50 text-dark-red focus:outline-none focus:ring-2 focus:ring-dark-red/20">
-          <option value="">All Reasons</option>
-          {Object.entries(REASON_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <Select
+          className="w-48"
+          value={reasonFilter}
+          onChange={(val) => { setReasonFilter(val as string); setPage(1); }}
+          options={[
+            { value: '', label: 'All Reasons' },
+            ...Object.entries(REASON_LABELS).map(([k, v]) => ({ value: k, label: v }))
+          ]}
+        />
       </div>
 
       {/* Queue Table */}

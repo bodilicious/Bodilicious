@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Settings, Save, AlertCircle, AlertTriangle, Info, X, Plus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
+import Select from '../components/Select';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -103,7 +104,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputCls = "w-full p-3 bg-gray-50 border border-silk-light rounded-xl outline-none focus:border-dark-red/40 transition-colors";
-const selectCls = "w-full p-3 bg-gray-50 border border-silk-light rounded-xl outline-none focus:border-dark-red/40 transition-colors";
 
 // ─── Default Form State ───────────────────────────────────────────────────────
 const defaultForm = {
@@ -316,12 +316,16 @@ export default function StoreSettings() {
                     <Field label="Store Name"><input type="text" className={inputCls} value={form.storeName} onChange={e => set('storeName', e.target.value)} required /></Field>
                     <Field label="Support Email"><input type="email" className={inputCls} value={form.supportEmail} onChange={e => set('supportEmail', e.target.value)} required /></Field>
                     <Field label="Support Phone"><input type="text" className={inputCls} value={form.supportPhone} onChange={e => set('supportPhone', e.target.value)} /></Field>
-                    <Field label="Currency">
-                      <select className={selectCls} value={form.currency} onChange={e => set('currency', e.target.value)}>
-                        <option value="INR">INR (₹)</option>
-                        <option value="USD">USD ($)</option>
-                      </select>
-                    </Field>
+                      <Field label="Currency">
+                        <Select
+                          value={form.currency}
+                          onChange={val => set('currency', val as string)}
+                          options={[
+                            { value: 'INR', label: 'INR (₹)' },
+                            { value: 'USD', label: 'USD ($)' }
+                          ]}
+                        />
+                      </Field>
                     <Field label="Timezone"><input type="text" className={inputCls} value={form.timezone} onChange={e => set('timezone', e.target.value)} placeholder="e.g. Asia/Kolkata" /></Field>
                     <div className="md:col-span-2">
                       <Field label="Store Address (for invoices)"><textarea className={`${inputCls} h-24`} value={form.storeAddress} onChange={e => set('storeAddress', e.target.value)} /></Field>
@@ -368,11 +372,15 @@ export default function StoreSettings() {
                     <Field label="GST Number"><input type="text" className={inputCls} value={form.gstNumber} onChange={e => set('gstNumber', e.target.value)} /></Field>
                     <Field label="PAN Number"><input type="text" className={inputCls} value={form.panNumber} onChange={e => set('panNumber', e.target.value)} /></Field>
                     <Field label="Business Type">
-                      <select className={selectCls} value={form.businessType} onChange={e => set('businessType', e.target.value)}>
-                        <option>Sole Proprietor</option>
-                        <option>LLP</option>
-                        <option>Pvt Ltd</option>
-                      </select>
+                      <Select
+                        value={form.businessType}
+                        onChange={val => set('businessType', val as string)}
+                        options={[
+                          { value: 'Sole Proprietor', label: 'Sole Proprietor' },
+                          { value: 'LLP', label: 'LLP' },
+                          { value: 'Pvt Ltd', label: 'Pvt Ltd' }
+                        ]}
+                      />
                     </Field>
                     <Field label="Low Stock Alert Threshold">
                       <input type="number" min="0" className={inputCls} value={form.lowStockThreshold} onChange={e => set('lowStockThreshold', Number(e.target.value))} />
@@ -428,11 +436,15 @@ export default function StoreSettings() {
                     {form.pincodeCheckEnabled && (
                       <div className="space-y-3">
                         <Field label="Serviceability Data Source">
-                          <select className={selectCls} value={form.pincodeServiceabilitySource} onChange={e => set('pincodeServiceabilitySource', e.target.value)}>
-                            <option value="manual">Manual (upload pincode list)</option>
-                            <option value="shiprocket">Shiprocket API</option>
-                            <option value="delhivery">Delhivery API</option>
-                          </select>
+                          <Select
+                            value={form.pincodeServiceabilitySource}
+                            onChange={val => set('pincodeServiceabilitySource', val as string)}
+                            options={[
+                              { value: 'manual', label: 'Manual (upload pincode list)' },
+                              { value: 'shiprocket', label: 'Shiprocket API' },
+                              { value: 'delhivery', label: 'Delhivery API' }
+                            ]}
+                          />
                         </Field>
                         <Callout type="info">Pincode checking requires API credentials or a pincode list to be configured separately. Enabling this toggle without a data source will block all checkouts.</Callout>
                       </div>
@@ -452,11 +464,15 @@ export default function StoreSettings() {
                         <input type="number" min="0" className={inputCls} value={form.returnWindowDays} onChange={e => set('returnWindowDays', Number(e.target.value))} />
                       </Field>
                       <Field label="Refund Method">
-                        <select className={selectCls} value={form.refundMethod} onChange={e => set('refundMethod', e.target.value as any)}>
-                          <option value="original">Refund to Original Payment Source</option>
-                          <option value="store_credit">Store Credit Only</option>
-                          <option value="both">Customer's Choice (Original or Store Credit)</option>
-                        </select>
+                        <Select
+                          value={form.refundMethod}
+                          onChange={val => set('refundMethod', val as any)}
+                          options={[
+                            { value: 'original', label: 'Refund to Original Payment Source' },
+                            { value: 'store_credit', label: 'Store Credit Only' },
+                            { value: 'both', label: "Customer's Choice (Original or Store Credit)" }
+                          ]}
+                        />
                       </Field>
                     </div>
                     <ToggleRow label="Allow Returns on Unopened Products" description="Standard return policy — product must be in original sealed condition." checked={form.allowReturnUnopened} onChange={v => set('allowReturnUnopened', v)} />

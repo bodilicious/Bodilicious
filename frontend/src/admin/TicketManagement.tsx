@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
+import Select from '../components/Select';
 
 interface Message {
   _id: string;
@@ -337,26 +338,28 @@ const TicketManagement: React.FC = () => {
           />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <select
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
+          <Select
+            className="w-48"
             value={filters.status}
-            onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))}
-          >
-            <option value="">All Statuses</option>
-            <option value="open">Open</option>
-            <option value="resolved">Resolved</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select
-            className="bg-silk-light/50 border-none rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 ring-dark-red/20 text-dark-red"
+            onChange={(val) => setFilters((p) => ({ ...p, status: val as string }))}
+            options={[
+              { value: '', label: 'All Statuses' },
+              { value: 'open', label: 'Open' },
+              { value: 'resolved', label: 'Resolved' },
+              { value: 'cancelled', label: 'Cancelled' }
+            ]}
+          />
+          <Select
+            className="w-48"
             value={filters.type}
-            onChange={(e) => setFilters((p) => ({ ...p, type: e.target.value }))}
-          >
-            <option value="">All Types</option>
-            <option value="shipping">Shipping</option>
-            <option value="payment">Payment</option>
-            <option value="other">Other</option>
-          </select>
+            onChange={(val) => setFilters((p) => ({ ...p, type: val as string }))}
+            options={[
+              { value: '', label: 'All Types' },
+              { value: 'shipping', label: 'Shipping' },
+              { value: 'payment', label: 'Payment' },
+              { value: 'other', label: 'Other' }
+            ]}
+          />
         </div>
       </div>
 
