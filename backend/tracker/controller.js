@@ -9,6 +9,8 @@ import { trackServerEvent } from "../utils/posthog.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import StoreSettings from "../settings/models.js";
+import { enqueueWhatsApp } from "../whatsapp/queue.js";
+import { getSettings } from "../settings/cache.js";
 
 
 
@@ -133,7 +135,7 @@ export const createOrder = async (req, res) => {
           discountAmount,
           isWelcomeOfferApplied,
           originalAmount,
-          paymentMethod: "cod",
+          paymentMethod: finalPaymentMethod,
           paymentStatus: "pending",
           orderStatus: "pending",
           shippingDetails,
@@ -473,6 +475,16 @@ export const shiprocketWebhook = async (req, res) => {
 
           console.log(`[Shiprocket Webhook] Order ${order._id} updated to ${internalStatus}`);
           
+          // Trigger WhatsApp alert for Out for Delivery
+          if (shiprocketStatus === "out for delivery") {
+            const settings = await getSettings();
+            if (settings.waAllEnabled && settings.waOutForDeliveryEnabled) {
+              enqueueWhatsApp("out_for_delivery", {
+                orderId: order._id.toString()
+              }).catch(err => console.error("Failed to enqueue WhatsApp out_for_delivery:", err));
+            }
+          }
+
           // 🚀 Audit Fulfillment Events
           if (internalStatus === "shipped") {
              logAction(req, "shipment_created", "order", order._id.toString(), { awb, status: shiprocketStatus }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
@@ -605,11 +617,15 @@ export const updateShippingAddress = async (req, res) => {
 ========================================================= */
 export const cancelOrder = async (req, res) => {
   try {
-    const order = await Order.findOne({
-      _id: req.params.orderId,
-      user: req.user._id,
-      orderStatus: { $in: ["processing", "pending"] },
-    });
+    const order = await Order.findOneAndUpdate(
+      {
+        _id: req.params.orderId,
+        user: req.user._id,
+        orderStatus: { $in: ["processing", "pending"] },
+      },
+      { $set: { orderStatus: "cancelled" } },
+      { new: true }
+    );
 
     if (!order) {
       return res.status(400).json({
@@ -681,8 +697,23 @@ export const cancelOrder = async (req, res) => {
       }
     }
 
-    order.orderStatus = "cancelled";
     await order.save();
+
+    // Restore stock for all cancelled items
+    if (order.items && order.items.length > 0) {
+      try {
+        const bulkOps = order.items.map(item => ({
+          updateOne: {
+            filter: { _id: item.product },
+            update: { $inc: { stock: item.quantity } },
+          },
+        }));
+        await Product.bulkWrite(bulkOps);
+      } catch (stockErr) {
+        // Non-fatal: log but don't block the cancellation response
+        console.error("Failed to restore stock after cancellation:", stockErr.message);
+      }
+    }
 
     // 🚀 Audit Order Cancellation
     logAction(req, "order_cancelled", "order", order._id.toString(), {
@@ -785,35 +816,6 @@ export const requestReturn = async (req, res) => {
       });
     }
 
-    /* =========================================================
-       Razorpay Refund — only if paid online
-    ========================================================= */
-    let refundResult = null;
-    if (order.paymentStatus === "paid" && order.razorpayPaymentId) {
-      try {
-        const razorpayInstance = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID,
-          key_secret: process.env.RAZORPAY_KEY_SECRET,
-        });
-
-        const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
-          amount: Math.round(order.totalAmount * 100), // paise
-          speed: "normal",
-          notes: { reason: reason.trim() },
-        });
-
-        order.refundId = refund.id;
-        order.refundStatus = "pending";
-        order.refundAmount = order.totalAmount;
-        order.paymentStatus = "refunded";
-        refundResult = refund;
-      } catch (refundErr) {
-        console.error("Razorpay refund failed (return):", refundErr.message);
-        order.refundStatus = "failed";
-        order.refundAmount = order.totalAmount;
-      }
-    }
-
     order.returnStatus = "requested";
     order.returnReason = reason.trim();
     order.returnRequestedAt = new Date();
@@ -830,9 +832,6 @@ export const requestReturn = async (req, res) => {
       success: true,
       message: "Return request submitted successfully.",
       data: order,
-      refund: refundResult
-        ? { id: refundResult.id, status: refundResult.status, amount: order.totalAmount }
-        : null,
     });
   } catch (err) {
     return res.status(500).json({

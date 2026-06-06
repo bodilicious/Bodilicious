@@ -63,7 +63,14 @@ export default function CartPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-[10px] font-sans tracking-widest uppercase text-grey-beige mb-1">
-                        {item.product.category === 'skin' ? 'Skin Care' : item.product.category === 'hair' ? 'Hair Care' : 'Body Care'}
+                        {{
+                          skin: 'Skin Care',
+                          hair: 'Hair Care',
+                          body: 'Body Care',
+                          makeup: 'Makeup',
+                          lip: 'Lip Care',
+                          other: 'Other'
+                        }[item.product.category] || 'Body Care'}
                       </p>
                       <h3 className="font-serif text-dark-red text-base">{item.product.name}</h3>
                     </div>

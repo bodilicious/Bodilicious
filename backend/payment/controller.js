@@ -9,6 +9,8 @@ import Razorpay from "razorpay";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
 import StoreSettings from "../settings/models.js";
+import { enqueueWhatsApp } from "../whatsapp/queue.js";
+import { getSettings } from "../settings/cache.js";
 
 /* =========================================================
    INIT RAZORPAY ORDER
@@ -31,7 +33,7 @@ export const initRazorpayOrder = async (req, res) => {
         // Calculate price from DB — never trust the frontend
         let totalAmount = 0;
         for (const item of items) {
-            console.log("Processing item during checkout:", item);
+
             let product;
             if (mongoose.Types.ObjectId.isValid(item.productId)) {
                 product = await Product.findById(item.productId);
@@ -55,14 +57,17 @@ export const initRazorpayOrder = async (req, res) => {
             user: userId,
             orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
         });
-        let discountAmount = 0;
-        if (existingOrdersCount === 0) {
-            discountAmount = Math.round(totalAmount * 0.10);
-        }
-
         const settings = await StoreSettings.findOne() || { shippingThreshold: 999, shippingCost: 99 };
         const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
-        const finalAmount = Math.max(0, totalAmount + shippingCost - discountAmount);
+        const originalAmount = totalAmount + shippingCost;
+
+        // Apply discount to originalAmount (products + shipping) — must match the
+        // same base used in verifyPayment to avoid a Razorpay charge ≠ DB total discrepancy.
+        let discountAmount = 0;
+        if (existingOrdersCount === 0) {
+            discountAmount = Math.round(originalAmount * 0.10);
+        }
+        const finalAmount = Math.max(0, originalAmount - discountAmount);
 
         // Create Razorpay order only
         const razorpayInstance = new Razorpay({
@@ -300,10 +305,18 @@ export const verifyPayment = async (req, res) => {
         // ── Trigger Order Confirmation Email (Asynchronous/Non-blocking) ──
         if (invoiceNumber) {
             const user = await UserProfile.findById(userId);
-            const populatedOrder = await Order.findById(order._id).populate("items.product");
-            sendOrderConfirmationAfterInvoice(populatedOrder, user?.email);
+            const freshPopulated = await Order.findById(order._id).populate("items.product");
+            sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
             // Send alert to admin
-            sendAdminNewOrderAlert(populatedOrder);
+            sendAdminNewOrderAlert(freshPopulated);
+            // 5. Fire non-blocking WhatsApp order placed notification
+            const settings = await getSettings();
+            if (settings.waAllEnabled && settings.waOrderPlacedEnabled) {
+              enqueueWhatsApp("order_placed", { 
+                userId: userId.toString(), 
+                orderId: order._id.toString() 
+              }).catch(err => console.error("Failed to enqueue WhatsApp order_placed:", err));
+            }
         } else {
             console.warn("⚠️ Invoice generation failed or missing, skipping email trigger after payment.");
         }
@@ -403,6 +416,15 @@ export const razorpayWebhook = async (req, res) => {
                 paymentId: payment.id,
                 reason: payment.error_description
             }, { source: "razorpay-webhook", severity: "WARNING" }).catch(err => console.error("Payment Failed Audit Failed:", err));
+
+            // Fire WhatsApp payment failure alert after a slight delay
+            const settings = await getSettings();
+            if (settings.waAllEnabled && settings.waPaymentFailureEnabled) {
+              enqueueWhatsApp("payment_failure", {
+                razorpayOrderId: payment.order_id,
+                amount: payment.amount / 100
+              }, { delay: 3000 }).catch(err => console.error("Failed to enqueue WhatsApp payment_failure:", err));
+            }
         } else if (event === "refund.processed") {
             const refund = payload.refund.entity;
             const paymentId = refund.payment_id;

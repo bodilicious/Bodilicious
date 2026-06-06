@@ -1,5 +1,6 @@
 import StoreSettings from "./models.js";
 import { logAction } from "../admin/controller.js";
+import { clearSettingsCache } from "./cache.js";
 
 /**
  * GET /api/v1/settings
@@ -78,6 +79,11 @@ export const updateSettings = async (req, res) => {
       "shippingThreshold", "shippingCost", "taxRatePercent",
       // Notifications
       "notifyAdminOnOrder", "adminNotificationEmail", "sendOrderConfirmationToCustomer",
+      "waAllEnabled", "emailAllEnabled", "waOrderPlacedEnabled", "waStaleCartEnabled",
+      "waOutForDeliveryEnabled", "waTicketRaisedEnabled", "waTicketResolvedEnabled",
+      "waTrendingProductsEnabled", "waReEngagementEnabled", "waPaymentFailureEnabled",
+      "emailReturnApproved", "emailReturnRejected", "emailTicketRaised",
+      "emailTicketReply", "emailTicketResolved", "emailTicketCancelled",
       // Payments
       "codEnabled", "codExtraCharge", "minOrderValueForCOD",
       // Store Preferences
@@ -143,6 +149,8 @@ export const updateSettings = async (req, res) => {
       before,
       after: settings.toObject()
     });
+
+    clearSettingsCache();
 
     res.json({
       success: true,

@@ -7,7 +7,7 @@ import Product from "./products/models.js";
 const envFile = existsSync(".env.production") ? ".env.production" : ".env";
 dotenv.config({ path: envFile });
 
-await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
 
 const userId = "69d1fd4cfc966af533a694bc";
 

@@ -33,7 +33,7 @@ function toPngToWebp(url) {
 async function run() {
   const DB_NAME = process.env.DB_NAME || 'myappdb';
   console.log(`🔌 Connecting to MongoDB (DB: ${DB_NAME})...`);
-  await mongoose.connect(MONGO_URI, { dbName: DB_NAME });
+  await mongoose.connect(MONGO_URI, { maxPoolSize: 3,  dbName: DB_NAME });
   console.log('✅ Connected\n');
 
   const products = await Product.find({});

@@ -106,7 +106,7 @@ const orderSchema = new mongoose.Schema(
     orderStatus: {
       type: String,
       enum: ["pending", "processing", "shipped", "delivered", "cancelled", "return_requested", "returned"],
-      default: "processing",
+      default: "pending",
     },
 
     /* =========================================
@@ -124,6 +124,16 @@ const orderSchema = new mongoose.Schema(
     },
 
     razorpaySignature: {
+      type: String,
+      default: null,
+    },
+
+    paymentLinkId: {
+      type: String,
+      default: null,
+    },
+
+    paymentLink: {
       type: String,
       default: null,
     },

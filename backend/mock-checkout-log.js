@@ -7,7 +7,7 @@ dotenv.config();
 
 const run = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME || 'test' });
+        await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME || 'test' });
         let user = await UserProfile.findOne();
         if (!user) {
             user = { _id: new mongoose.Types.ObjectId() };

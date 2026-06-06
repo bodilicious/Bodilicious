@@ -11,6 +11,7 @@ import procurementRoutes from "./procurement/routes.js";
 import supportRoutes from "./support/routes.js";
 import analyticsRoutes from "./analytics/routes.js";
 import settingsRoutes from "./settings/routes.js";
+import whatsappRoutes from "./whatsapp/routes.js";
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use("/admin", procurementRoutes);
 router.use("/admin", adminRoutes); // Moved to the bottom to avoid intercepting other /admin/* routes
 router.use("/settings", settingsRoutes);
 router.use("/support", supportRoutes);
+router.use("/whatsapp", whatsappRoutes);
 
 export default router;
 

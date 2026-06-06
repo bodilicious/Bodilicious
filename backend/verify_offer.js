@@ -6,7 +6,7 @@ dotenv.config();
 
 const verify = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+        await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
         const user = await UserProfile.findOne({});
         if (!user) {
             console.log('No user found');

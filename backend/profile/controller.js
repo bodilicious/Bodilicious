@@ -38,7 +38,7 @@ export const getProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: err.message,
-      stack: err.stack,
+      ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
     });
   }
 };
@@ -156,6 +156,8 @@ export const syncCart = async (req, res) => {
       product: item.productId,
       quantity: item.quantity,
     }));
+
+    user.cartUpdatedAt = new Date();
 
     await user.save();
 

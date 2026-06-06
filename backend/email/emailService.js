@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import UserProfile from "../profile/models.js";
 import StoreSettings from "../settings/models.js";
+import { getSettings } from "../settings/cache.js";
 
 let transporter = null;
 
@@ -82,6 +83,9 @@ const buildEmailLayout = (content, data = {}) => {
 */
 export const sendOrderConfirmationEmail = async (order, userEmail, userName) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.sendOrderConfirmationToCustomer) return;
+
     const itemsHtml = (order?.items || [])
       .map(
         (item) => `
@@ -226,8 +230,8 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
 
   setImmediate(async () => {
     try {
-      const settings = await StoreSettings.findOne();
-      if (settings && settings.sendOrderConfirmationToCustomer === false) {
+      const settings = await getSettings();
+      if (!settings.emailAllEnabled || !settings.sendOrderConfirmationToCustomer) {
         console.log(`[EmailService] Skipping order confirmation email due to store settings`);
         return;
       }
@@ -254,8 +258,8 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
 */
 export const sendAdminNewOrderAlert = async (order) => {
   try {
-    const settings = await StoreSettings.findOne();
-    if (settings && settings.notifyAdminOnOrder === false) return; // Feature toggle
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.notifyAdminOnOrder) return; // Feature toggle
 
     const adminEmail = await getPrimaryAdminEmail();
     if (!adminEmail) return;
@@ -480,6 +484,9 @@ export const sendPasswordResetEmail = async (userEmail, resetLink, userName = ""
 */
 export const sendReturnApprovedEmail = async (order, userEmail, userName) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.emailReturnApproved) return;
+
     const orderId = order?._id?.toString()?.slice(-8).toUpperCase() || "ORDER";
     const refundMethodLabel = {
       original_payment: "Original Payment Method",
@@ -545,6 +552,9 @@ export const sendReturnApprovedEmail = async (order, userEmail, userName) => {
 */
 export const sendReturnRejectedEmail = async (order, userEmail, userName, rejectionReason) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.emailReturnRejected) return;
+
     const orderId = order?._id?.toString()?.slice(-8).toUpperCase() || "ORDER";
 
     const content = `
@@ -601,6 +611,9 @@ export const sendReturnRejectedEmail = async (order, userEmail, userName, reject
 */
 export const sendTicketAcknowledgementEmail = async (ticket, userEmail, userName) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.emailTicketRaised) return;
+
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
     const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
@@ -663,6 +676,9 @@ export const sendTicketAcknowledgementEmail = async (ticket, userEmail, userName
 */
 export const sendTicketReplyEmail = async (ticket, replyText, userEmail, userName) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.emailTicketReply) return;
+
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
     const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
@@ -738,6 +754,9 @@ export const sendTicketReplyEmail = async (ticket, replyText, userEmail, userNam
 */
 export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resolutionMessage = null) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.emailTicketResolved) return;
+
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
 
@@ -802,6 +821,9 @@ export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resol
 */
 export const sendTicketCancelledEmail = async (ticket, userEmail, userName, cancelReason = null) => {
   try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.emailTicketCancelled) return;
+
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
 

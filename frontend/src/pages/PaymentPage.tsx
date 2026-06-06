@@ -37,7 +37,9 @@ export default function PaymentPage() {
         if (!shippingDetails) {
             navigate('/cart');
         }
-        loadRazorpayScript();
+        if (!document.querySelector('script[src*="checkout.razorpay.com"]')) {
+            loadRazorpayScript();
+        }
     }, [shippingDetails, navigate]);
 
     useEffect(() => {

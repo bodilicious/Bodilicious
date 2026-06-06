@@ -45,10 +45,15 @@ export default memo(function ProductCard({
   const lift     = shouldReduceMotion ? {} : hoverLift;
   const subtleLift = shouldReduceMotion ? {} : hoverLiftSubtle;
 
-  const categoryLabel =
-    product.category === 'skin' ? 'Skin Care'
-    : product.category === 'hair' ? 'Hair Care'
-    : 'Body Care';
+  const CATEGORY_LABELS: Record<string, string> = {
+    skin:   'Skin Care',
+    hair:   'Hair Care',
+    body:   'Body Care',
+    lip:    'Lip Care',
+    makeup: 'Makeup',
+    other:  'Wellness',
+  };
+  const categoryLabel = CATEGORY_LABELS[product.category] ?? 'Beauty';
 
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();

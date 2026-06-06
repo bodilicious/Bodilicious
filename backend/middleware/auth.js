@@ -154,9 +154,13 @@ export const tryProtect = async (req, res, next) => {
         }).catch(err => console.error("New Customer Audit Failed (tryProtect):", err));
       }
 
-      await UserProfile.findByIdAndUpdate(user._id, {
-        $set: { lastLoginAt: new Date() }
-      });
+      // Debounce lastLoginAt to max once per hour — same policy as protect middleware
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (!user.lastLoginAt || user.lastLoginAt < oneHourAgo) {
+        await UserProfile.findByIdAndUpdate(user._id, {
+          $set: { lastLoginAt: new Date() }
+        });
+      }
 
       req.user = user;
       next();

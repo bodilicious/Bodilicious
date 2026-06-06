@@ -9,7 +9,7 @@ import Product from "./products/models.js"; // must be imported to register sche
 const envFile = existsSync(".env.production") ? ".env.production" : ".env";
 dotenv.config({ path: envFile });
 
-await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
 
 const recovered = await Order.find({
   adminNote: { $regex: /RECOVERED/i }

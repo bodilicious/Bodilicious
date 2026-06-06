@@ -22,9 +22,30 @@ const storeSettingsSchema = new mongoose.Schema(
     taxRatePercent: { type: Number, default: 18 },
 
     // 4. Notifications
+    // Master Switches
+    waAllEnabled: { type: Boolean, default: true },
+    emailAllEnabled: { type: Boolean, default: true },
+
+    // WhatsApp Triggers
+    waOrderPlacedEnabled: { type: Boolean, default: true },
+    waStaleCartEnabled: { type: Boolean, default: true },
+    waOutForDeliveryEnabled: { type: Boolean, default: true },
+    waTicketRaisedEnabled: { type: Boolean, default: true },
+    waTicketResolvedEnabled: { type: Boolean, default: true },
+    waTrendingProductsEnabled: { type: Boolean, default: true },
+    waReEngagementEnabled: { type: Boolean, default: true },
+    waPaymentFailureEnabled: { type: Boolean, default: true },
+
+    // Email Triggers
     notifyAdminOnOrder: { type: Boolean, default: true },
     adminNotificationEmail: { type: String, default: "admin@bodilicious.in" },
     sendOrderConfirmationToCustomer: { type: Boolean, default: true },
+    emailReturnApproved: { type: Boolean, default: true },
+    emailReturnRejected: { type: Boolean, default: true },
+    emailTicketRaised: { type: Boolean, default: true },
+    emailTicketReply: { type: Boolean, default: true },
+    emailTicketResolved: { type: Boolean, default: true },
+    emailTicketCancelled: { type: Boolean, default: true },
 
     // 5. Payments
     codEnabled: { type: Boolean, default: true },

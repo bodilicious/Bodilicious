@@ -12,7 +12,7 @@ async function generateMarkdownReport() {
     try {
         const mongoUri = process.env.MONGO_URI;
         const dbName = process.env.DB_NAME || 'myappdb';
-        await mongoose.connect(mongoUri, { dbName });
+        await mongoose.connect(mongoUri, { maxPoolSize: 3,  dbName });
 
         const products = await Product.find({ isActive: true }).lean();
         

@@ -9,7 +9,7 @@ async function run() {
   const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
   const DB_NAME = process.env.DB_NAME || 'myappdb';
   
-  await mongoose.connect(MONGO_URI, { dbName: DB_NAME });
+  await mongoose.connect(MONGO_URI, { maxPoolSize: 3,  dbName: DB_NAME });
   console.log('✅ Connected to MongoDB');
 
   const products = await Product.find({});

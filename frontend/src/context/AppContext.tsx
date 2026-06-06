@@ -277,10 +277,13 @@ const fetchUserProfileAndSync = useCallback(async () => {
 
         const existing = mergedMap.get(localItem.product.pid);
         if (existing) {
-          // If product exists in both, we sum quantities
-          // (Can also choose to take max or localItem's quantity)
-          existing.quantity = Number(existing.quantity || 0) + Number(localItem.quantity || 1);
-          hasChanges = true;
+          // Take the higher quantity rather than summing to prevent accidental
+          // doubling when the same item was added both as a guest and while logged in.
+          const mergedQty = Math.max(Number(existing.quantity || 0), Number(localItem.quantity || 1));
+          if (mergedQty !== existing.quantity) {
+            existing.quantity = mergedQty;
+            hasChanges = true;
+          }
         } else {
           // New item from guest session
           mergedMap.set(localItem.product.pid, { ...localItem });
@@ -507,6 +510,14 @@ const triggerPasswordReset = async (email: string) => {
 };
 
   const logout = async () => {
+    // Clear local state synchronously before Firebase signOut so the UI never
+    // briefly renders stale user data while onAuthStateChanged propagates.
+    setUser(null);
+    setCartItems([]);
+    setOrders([]);
+    setWishlist([]);
+    setRecentlyBought([]);
+    setAuthStatus('unauthenticated');
     await signOut(auth);
     navigateTo('home');
   };
@@ -680,7 +691,6 @@ const triggerPasswordReset = async (email: string) => {
   const addToCart = (product: Product, quantity: number = 1) => {
     if (!product) return;
 
-    let nextCart: CartItem[] = [];
     setCartItems(prev => {
       let isMutated = false;
       const newItems = prev.map(i => {
@@ -695,7 +705,9 @@ const triggerPasswordReset = async (email: string) => {
         newItems.push({ product, quantity });
       }
 
-      nextCart = newItems;
+      // Sync inside the updater so `newItems` is always the authoritative
+      // computed value — avoids stale-closure race conditions.
+      setTimeout(() => syncCartToBackend(newItems), 0);
       return newItems;
     });
 
@@ -721,28 +733,24 @@ const triggerPasswordReset = async (email: string) => {
         })
       }).catch(() => {});
     });
-
-    setTimeout(() => syncCartToBackend(nextCart), 0);
   };
 
   const removeFromCart = (pid: string) => {
-    let nextCart: CartItem[] = [];
     setCartItems(prev => {
-      nextCart = prev.filter(i => i.product && i.product.pid !== pid);
+      const nextCart = prev.filter(i => i.product && i.product.pid !== pid);
+      setTimeout(() => syncCartToBackend(nextCart), 0);
       return nextCart;
     });
-    setTimeout(() => syncCartToBackend(nextCart), 0);
   };
 
   const updateQuantity = (pid: string, qty: number) => {
-    let nextCart: CartItem[] = [];
     setCartItems(prev => {
-      nextCart = prev.map(i =>
+      const nextCart = prev.map(i =>
         i.product && i.product.pid === pid ? { ...i, quantity: Number(qty) } : i
       );
+      setTimeout(() => syncCartToBackend(nextCart), 0);
       return nextCart;
     });
-    setTimeout(() => syncCartToBackend(nextCart), 0);
   };
 
   /* =============================
@@ -1103,6 +1111,10 @@ const triggerPasswordReset = async (email: string) => {
 /* ================================
    Hook
 ================================ */
+// The hook is kept here for backward compatibility with the 40+ files that
+// import from this module. New code should import from `./useApp` instead,
+// which isolates the hook in its own file and satisfies the
+// react-refresh/only-export-components HMR rule.
 // eslint-disable-next-line react-refresh/only-export-components
 export function useApp() {
   const ctx = useContext(AppContext);

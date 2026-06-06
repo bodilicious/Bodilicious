@@ -8,7 +8,7 @@ const envFile = existsSync(".env.production") ? ".env.production" : ".env";
 dotenv.config({ path: envFile });
 
 async function main() {
-  await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+  await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
 
   const orderId = "69d3c0d0178e8365106cce79";
   

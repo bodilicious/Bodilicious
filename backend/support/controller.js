@@ -1,10 +1,13 @@
 import { Ticket, FAQ } from "./models.js";
 import {
-  sendTicketResolvedEmail,
   sendTicketAcknowledgementEmail,
   sendTicketReplyEmail,
+  sendTicketResolvedEmail,
+  sendTicketCancelledEmail,
 } from "../email/emailService.js";
 import { v2 as cloudinary } from "cloudinary";
+import { enqueueWhatsApp } from "../whatsapp/queue.js";
+import { getSettings } from "../settings/cache.js";
 
 // POST /api/v1/support/tickets
 export const createTicket = async (req, res) => {
@@ -45,6 +48,12 @@ export const createTicket = async (req, res) => {
         ticket.userId.email,
         ticket.userId.name || "Customer"
       ).catch((err) => console.error("Ticket ack email failed:", err.message));
+    }
+
+    // Enqueue WhatsApp Notification
+    const settings = await getSettings();
+    if (settings.waAllEnabled && settings.waTicketRaisedEnabled) {
+      enqueueWhatsApp("ticket_raised", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_raised:", err));
     }
 
     return res.status(201).json({ success: true, ticket });
@@ -204,12 +213,18 @@ export const updateTicketStatus = async (req, res) => {
       });
     }
 
+    // Fire WhatsApp notification if status changed to resolved
+    if (status === "resolved" && wasOpen) {
+      const settings = await getSettings();
+      if (settings.waAllEnabled && settings.waTicketResolvedEnabled) {
+        enqueueWhatsApp("ticket_resolved", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_resolved:", err));
+      }
+    }
+
     // Fire cancelled email
     if (status === "cancelled" && wasOpen && ticket.userId?.email) {
-      import("../email/emailService.js").then((mod) => {
-        mod.sendTicketCancelledEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
-          console.error("Failed to send ticket cancelled email:", id, err.message);
-        });
+      sendTicketCancelledEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
+        console.error("Failed to send ticket cancelled email:", id, err.message);
       });
     }
 

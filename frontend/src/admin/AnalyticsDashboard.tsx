@@ -122,7 +122,7 @@ const AnalyticsDashboard: React.FC = () => {
       if (lastSyncRef.current) {
         setSinceSec(Math.round((Date.now() - lastSyncRef.current.getTime()) / 1000));
       }
-    }, 5000);
+    }, 1000);
     return () => clearInterval(t);
   }, []);
 

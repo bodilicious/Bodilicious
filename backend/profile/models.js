@@ -19,6 +19,11 @@ const userProfileSchema = new mongoose.Schema(
       lowercase: true,
     },
 
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
     avatar: {
       type: String,
     },
@@ -104,6 +109,18 @@ const userProfileSchema = new mongoose.Schema(
     welcomeOfferUsed: {
       type: Boolean,
       default: false,
+    },
+    cartUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+    whatsappOptIn: {
+      type: Boolean,
+      default: false,
+    },
+    lastReEngagementSentAt: {
+      type: Date,
+      default: null,
     },
     role: {
       type: String,

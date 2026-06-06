@@ -110,9 +110,18 @@ const defaultForm = {
   // 1. General
   storeName: 'Bodilicious', supportEmail: 'bodiliciousnaturalproducts@gmail.com', supportPhone: '+91 9894451947', storeAddress: '',
   currency: 'INR', timezone: 'Asia/Kolkata',
-  // Notifications (merged into General)
+  // Notifications (Master Switches)
+  waAllEnabled: true, emailAllEnabled: true,
+  // Notifications (WhatsApp)
+  waOrderPlacedEnabled: true, waStaleCartEnabled: true, waOutForDeliveryEnabled: true,
+  waTicketRaisedEnabled: true, waTicketResolvedEnabled: true, waTrendingProductsEnabled: true,
+  waReEngagementEnabled: true, waPaymentFailureEnabled: true,
+  // Notifications (Email)
   notifyAdminOnOrder: true, sendOrderConfirmationToCustomer: true,
-  // System (merged into General)
+  emailReturnApproved: true, emailReturnRejected: true, emailTicketRaised: true,
+  emailTicketReply: true, emailTicketResolved: true, emailTicketCancelled: true,
+
+  // System
   maintenanceMode: false, maintenanceMessage: 'We are currently updating our store. Please check back soon!',
   maintenanceBypassSecret: '', lastUpdatedBy: null as string | null, lastUpdatedAt: null as string | null,
 
@@ -167,6 +176,7 @@ const tabs = [
   { id: 'returns', label: 'Returns & Refunds' },
   { id: 'bestsellers', label: 'Best Sellers' },
   { id: 'experience', label: 'Customer Experience' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'storefront', label: 'Storefront' },
 ];
 
@@ -311,34 +321,7 @@ export default function StoreSettings() {
             {/* ── 1. GENERAL ──────────────────────────────── */}
             {activeTab === 'general' && (
               <div className="space-y-6">
-                <Card title="General Info">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Field label="Store Name"><input type="text" className={inputCls} value={form.storeName} onChange={e => set('storeName', e.target.value)} required /></Field>
-                    <Field label="Support Email"><input type="email" className={inputCls} value={form.supportEmail} onChange={e => set('supportEmail', e.target.value)} required /></Field>
-                    <Field label="Support Phone"><input type="text" className={inputCls} value={form.supportPhone} onChange={e => set('supportPhone', e.target.value)} /></Field>
-                      <Field label="Currency">
-                        <Select
-                          value={form.currency}
-                          onChange={val => set('currency', val as string)}
-                          options={[
-                            { value: 'INR', label: 'INR (₹)' },
-                            { value: 'USD', label: 'USD ($)' }
-                          ]}
-                        />
-                      </Field>
-                    <Field label="Timezone"><input type="text" className={inputCls} value={form.timezone} onChange={e => set('timezone', e.target.value)} placeholder="e.g. Asia/Kolkata" /></Field>
-                    <div className="md:col-span-2">
-                      <Field label="Store Address (for invoices)"><textarea className={`${inputCls} h-24`} value={form.storeAddress} onChange={e => set('storeAddress', e.target.value)} /></Field>
-                    </div>
-                  </div>
-                </Card>
 
-                <Card title="Email Notifications">
-                  <div className="space-y-4">
-                    <ToggleRow label="Notify Admin on New Order" description="Send an alert to the primary admin when a new order is placed." checked={form.notifyAdminOnOrder} onChange={v => set('notifyAdminOnOrder', v)} />
-                    <ToggleRow label="Send Order Confirmation to Customer" description="Automatically email a receipt after successful checkout." checked={form.sendOrderConfirmationToCustomer} onChange={v => set('sendOrderConfirmationToCustomer', v)} />
-                  </div>
-                </Card>
 
                 <Card title="Maintenance Mode">
                   <div className="space-y-4">
@@ -668,6 +651,44 @@ export default function StoreSettings() {
                         <Callout type="warning">Incentivised reviews must be marked as such to comply with ASCI (Advertising Standards Council of India) guidelines. Ensure your review display clearly labels these as incentivised.</Callout>
                       </div>
                     )}
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {/* ── NOTIFICATIONS ──────────────────────────── */}
+            {activeTab === 'notifications' && (
+              <div className="space-y-6">
+                <Card title="Master Kill Switches">
+                  <div className="space-y-4">
+                    <ToggleRow label="Enable ALL WhatsApp Messages" description="If disabled, no WhatsApp messages will be sent by the system regardless of individual settings." checked={form.waAllEnabled} onChange={v => set('waAllEnabled', v)} danger />
+                    <ToggleRow label="Enable ALL Automated Emails" description="If disabled, no automated emails will be sent. (Excludes critical account emails like password reset)." checked={form.emailAllEnabled} onChange={v => set('emailAllEnabled', v)} danger />
+                  </div>
+                </Card>
+
+                <Card title="WhatsApp Triggers">
+                  <div className="space-y-4">
+                    <ToggleRow label="Order Placed" description="Sent immediately upon successful checkout." checked={form.waOrderPlacedEnabled} onChange={v => set('waOrderPlacedEnabled', v)} />
+                    <ToggleRow label="Payment Failure" description="Sent on Razorpay failure with a retry link." checked={form.waPaymentFailureEnabled} onChange={v => set('waPaymentFailureEnabled', v)} />
+                    <ToggleRow label="Out for Delivery" description="Sent via Shiprocket webhook when a package is out." checked={form.waOutForDeliveryEnabled} onChange={v => set('waOutForDeliveryEnabled', v)} />
+                    <ToggleRow label="Stale Cart" description="Nudge customers to complete a purchase for items sitting >30 days." checked={form.waStaleCartEnabled} onChange={v => set('waStaleCartEnabled', v)} />
+                    <ToggleRow label="Trending Products" description="Broadcast to active users when a product enters the top trending list." checked={form.waTrendingProductsEnabled} onChange={v => set('waTrendingProductsEnabled', v)} />
+                    <ToggleRow label="Re-engagement" description="Sent to users who haven't ordered in 60 days." checked={form.waReEngagementEnabled} onChange={v => set('waReEngagementEnabled', v)} />
+                    <ToggleRow label="Ticket Raised" description="Sent when a customer submits a support query." checked={form.waTicketRaisedEnabled} onChange={v => set('waTicketRaisedEnabled', v)} />
+                    <ToggleRow label="Ticket Resolved" description="Sent when an admin closes a support ticket." checked={form.waTicketResolvedEnabled} onChange={v => set('waTicketResolvedEnabled', v)} />
+                  </div>
+                </Card>
+
+                <Card title="Email Triggers">
+                  <div className="space-y-4">
+                    <ToggleRow label="Admin Alert: New Order" description="Send an alert to the admin email when a new order is placed." checked={form.notifyAdminOnOrder} onChange={v => set('notifyAdminOnOrder', v)} />
+                    <ToggleRow label="Order Confirmation" description="Automatically email a receipt to the customer after successful checkout." checked={form.sendOrderConfirmationToCustomer} onChange={v => set('sendOrderConfirmationToCustomer', v)} />
+                    <ToggleRow label="Return Approved" description="Email sent when a return request is approved." checked={form.emailReturnApproved} onChange={v => set('emailReturnApproved', v)} />
+                    <ToggleRow label="Return Rejected" description="Email sent when a return request is denied." checked={form.emailReturnRejected} onChange={v => set('emailReturnRejected', v)} />
+                    <ToggleRow label="Ticket Raised" description="Acknowledgement email when a customer submits a query." checked={form.emailTicketRaised} onChange={v => set('emailTicketRaised', v)} />
+                    <ToggleRow label="Ticket Reply" description="Email sent when support replies to a ticket." checked={form.emailTicketReply} onChange={v => set('emailTicketReply', v)} />
+                    <ToggleRow label="Ticket Resolved" description="Email sent when a ticket is closed." checked={form.emailTicketResolved} onChange={v => set('emailTicketResolved', v)} />
+                    <ToggleRow label="Ticket Cancelled" description="Email sent when a ticket is cancelled." checked={form.emailTicketCancelled} onChange={v => set('emailTicketCancelled', v)} />
                   </div>
                 </Card>
               </div>

@@ -23,7 +23,7 @@ const ENABLE_DELETE = process.argv.includes('--enable-delete');
 
 async function cleanup() {
     try {
-        await mongoose.connect(process.env.MONGO_URI, {
+        await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3, 
             dbName: process.env.DB_NAME,
         });
         console.log("Connected to MongoDB:", process.env.DB_NAME);

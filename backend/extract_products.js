@@ -19,7 +19,7 @@ async function generateReport() {
             throw new Error('MONGO_URI not found in .env');
         }
 
-        await mongoose.connect(mongoUri, { dbName });
+        await mongoose.connect(mongoUri, { maxPoolSize: 3,  dbName });
         console.log('Connected to MongoDB:', dbName);
 
         const collections = await mongoose.connection.db.listCollections().toArray();

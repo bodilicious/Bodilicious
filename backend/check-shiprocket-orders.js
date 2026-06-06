@@ -12,7 +12,7 @@ const checkOrders = async () => {
     const ordersWithShiprocket = await Order.find({ shiprocketOrderId: { $ne: null } });
     console.log(`Found ${ordersWithShiprocket.length} orders with Shiprocket Order ID`);
 
-    if (ordersWithShiprocket.length > 0) {
+    if (ordersWithShiprocket.length > 0, { maxPoolSize: 3,  maxPoolSize: 3 }) {
       console.log('Sample Order:', ordersWithShiprocket[0]._id, 'Status:', ordersWithShiprocket[0].orderStatus);
     }
 

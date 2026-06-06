@@ -1,21 +1,22 @@
-import { Queue } from 'bullmq';
-import Redis from 'ioredis';
 import { nanoid } from 'nanoid';
-
 
 // In-memory fallback
 import { processAuditBatch } from './worker.js'; 
 import { emitLiveEvent } from '../analytics/live.js'; 
 
-const redisUrl = process.env.REDIS_URL || null;
-let auditQueue = null;
+let buffer = [];
+let timer = null;
 
-if (redisUrl) {
-  const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
-  auditQueue = new Queue('audit_queue', { connection });
-} else {
-  console.warn('⚠️ No REDIS_URL found. Audit logs will be processed synchronously in-memory as a fallback.');
-}
+export const flushBuffer = async () => {
+  if (buffer.length === 0) return;
+  const eventsToProcess = [...buffer];
+  buffer = [];
+  try {
+    await processAuditBatch(eventsToProcess);
+  } catch(err) {
+    console.error('Background batch flush failed:', err);
+  }
+};
 
 /**
  * Mask PII from payloads before enqueuing
@@ -70,19 +71,17 @@ export async function logAuditEvent(event) {
     // Emit live event for real-time dashboard
     emitLiveEvent(payload.event_type, payload.metadata);
 
-    if (auditQueue) {
-      // Fire and forget, completely non-blocking
-      auditQueue.add('log_event', payload, {
-        removeOnComplete: true,
-        removeOnFail: 100 // Keep last 100 failed for DLQ
-      }).catch(err => {
-        console.error('Failed to enqueue audit log:', err.message);
-        // Fallback to synchronous
-        processAuditBatch([payload]).catch(e => console.error('Fallback audit log failed:', e.message));
-      });
-    } else {
-      // Synchronous fallback
-      processAuditBatch([payload]).catch(err => console.error('Fallback audit log failed:', err.message));
+    // In-memory batching without Redis
+    buffer.push(payload);
+    if (buffer.length >= 100) {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      flushBuffer();
+    } else if (!timer) {
+      timer = setTimeout(() => {
+        timer = null;
+        flushBuffer();
+      }, 500);
     }
   } catch (err) {
     console.error('CRITICAL: Audit logger failed completely', err);

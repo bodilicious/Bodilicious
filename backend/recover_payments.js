@@ -87,7 +87,7 @@ async function fetchAllCapturedPayments() {
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("🔌 Connecting to MongoDB…");
-  await mongoose.connect(process.env.MONGO_URI, {
+  await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3, 
     dbName: process.env.DB_NAME,
   });
   console.log("✅ Connected.\n");

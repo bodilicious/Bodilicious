@@ -12,7 +12,7 @@ const run = async () => {
     const order = await Order.findOne({ shiprocketOrderId: { $ne: null } }).sort({ createdAt: -1 });
     if (!order) {
         console.log('No order found with shiprocketOrderId');
-        process.exit(0);
+        process.exit(0, { maxPoolSize: 3,  maxPoolSize: 3 });
     }
 
     console.log('Found order:', order._id, 'with shiprocketOrderId:', order.shiprocketOrderId);

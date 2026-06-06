@@ -5,7 +5,7 @@ dotenv.config();
 
 const testUpsert = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+        await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
         console.log("Connected to MongoDB");
         
         const testUid = "test_uid_" + Date.now();

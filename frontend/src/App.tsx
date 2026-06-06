@@ -6,6 +6,9 @@ import Navbar from './components/Navbar';
 import PageTransition from './components/PageTransition';
 import ScrollToTop from './components/ScrollToTop';
 import { Toaster } from 'react-hot-toast';
+// AdminRoute is a layout-level guard used on every /admin sub-route.
+// Eagerly imported to prevent a Suspense flash on every admin tab switch.
+import AdminRoute from './components/AdminRoute';
 
 // Lazy load page components
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -35,7 +38,6 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 // Admin Pages
 const AdminLayout = lazy(() => import('./admin/AdminLayout'));
-const AdminRoute = lazy(() => import('./components/AdminRoute'));
 const AnalyticsDashboard = lazy(() => import('./admin/AnalyticsDashboard'));
 const AnalyticsPage = lazy(() => import('./admin/AnalyticsPage'));
 const ProductManagement = lazy(() => import('./admin/ProductManagement'));

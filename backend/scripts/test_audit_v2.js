@@ -9,7 +9,7 @@ async function verifyAuditLogs() {
   console.log("Connecting to MongoDB...");
   await mongoose.connect(process.env.MONGO_URI);
   
-  console.log("Publishing test audit event...");
+  console.log("Publishing test audit event...", { maxPoolSize: 3,  maxPoolSize: 3 });
   await logAuditEvent({
     event_type: "TEST_VERIFICATION",
     user_id: null,

@@ -59,6 +59,7 @@ export default function ShippingPage() {
 
     // ── Autofill state ────────────────────────────────────────────────────────────────────────────────────
     const [lastAutofillSource, setLastAutofillSource] = useState<AutofillSource>('none');
+    const lastAutofillSourceRef = useRef<AutofillSource>('none'); // always-current ref for use in effects
     const [autofillSuccess, setAutofillSuccess] = useState(false); // show a success badge briefly
 
     // ── Pincode lookup state ──────────────────────────────────────────────────────────────────────────────
@@ -137,12 +138,14 @@ export default function ShippingPage() {
         // Serve from cache instantly
         if (pincodeCache[pin]) {
             const c = pincodeCache[pin];
+            const src = lastAutofillSourceRef.current;
             setForm(prev => ({
                 ...prev,
-                city: lastAutofillSource !== 'street' || !prev.city ? c.city : prev.city,
-                state: lastAutofillSource !== 'street' || !prev.state ? c.state : prev.state,
+                city: src !== 'street' || !prev.city ? c.city : prev.city,
+                state: src !== 'street' || !prev.state ? c.state : prev.state,
                 country: 'India',
             }));
+            lastAutofillSourceRef.current = 'pincode';
             setLastAutofillSource('pincode');
             setPincodeStatus('success');
             setPincodeMsg(`Auto-filled from PIN ${pin}`);
@@ -174,12 +177,14 @@ export default function ShippingPage() {
 
                     pincodeCache[pin] = { city, state };
 
+                    const src = lastAutofillSourceRef.current;
                     setForm(prev => ({
                         ...prev,
-                        city: lastAutofillSource !== 'street' || !prev.city ? city : prev.city,
-                        state: lastAutofillSource !== 'street' || !prev.state ? state : prev.state,
+                        city: src !== 'street' || !prev.city ? city : prev.city,
+                        state: src !== 'street' || !prev.state ? state : prev.state,
                         country: 'India',
                     }));
+                    lastAutofillSourceRef.current = 'pincode';
                     setLastAutofillSource('pincode');
                     setPincodeStatus('success');
                     setPincodeMsg(`Showing results for ${po.Block || po.Name || pin}`);
@@ -277,6 +282,7 @@ export default function ShippingPage() {
             country: country || prev.country,
             pincode: postcode || prev.pincode,
         }));
+        lastAutofillSourceRef.current = 'street';
         setLastAutofillSource('street');
         setIsAddressLocked(true);
         setShowSuggestions(false);
@@ -580,7 +586,7 @@ export default function ShippingPage() {
                                                     value={form.city}
                                                     onChange={e => {
                                                         setForm(p => ({ ...p, city: e.target.value }));
-                                                        setLastAutofillSource('none');
+                                                        lastAutofillSourceRef.current = 'none'; setLastAutofillSource('none');
                                                     }}
                                                     onBlur={() => touch('city')}
                                                     className={fieldCls('city')}
@@ -594,7 +600,7 @@ export default function ShippingPage() {
                                                 value={form.state}
                                                 onChange={e => {
                                                     setForm(p => ({ ...p, state: e.target.value }));
-                                                    setLastAutofillSource('none');
+                                                    lastAutofillSourceRef.current = 'none'; setLastAutofillSource('none');
                                                 }}
                                                 onBlur={() => touch('state')}
                                                 className={fieldCls('state', false)}

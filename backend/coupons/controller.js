@@ -64,7 +64,12 @@ export const createCoupon = async (req, res) => {
  */
 export const updateCoupon = async (req, res) => {
   try {
-    const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const { code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive } = req.body;
+    const allowedFields = Object.fromEntries(
+      Object.entries({ code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive })
+      .filter(([, v]) => v !== undefined)
+    );
+    const coupon = await Coupon.findByIdAndUpdate(req.params.id, { $set: allowedFields }, { new: true, runValidators: true });
     if (!coupon) return res.status(404).json({ success: false, message: "Coupon not found" });
 
     await logAction(req, "coupon_updated", "coupon", coupon._id.toString(), req.body);

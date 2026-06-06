@@ -8,7 +8,7 @@ const Product = mongoose.models.Product || mongoose.model('Product', ProductSche
 
 async function checkRoseProducts() {
     try {
-        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/bodilicious');
+        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/bodilicious', { maxPoolSize: 3,  maxPoolSize: 3 });
         const products = await Product.find({ 
             isActive: true, 
             $or: [

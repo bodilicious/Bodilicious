@@ -10,7 +10,7 @@ async function checkAllProducts() {
     try {
         const uri = process.env.MONGO_URI.endsWith('/') ? process.env.MONGO_URI + process.env.DB_NAME : process.env.MONGO_URI + '/' + process.env.DB_NAME;
         await mongoose.connect(uri || 'mongodb://localhost:27017/bodilicious');
-        const products = await Product.find({});
+        const products = await Product.find({}, { maxPoolSize: 3,  maxPoolSize: 3 });
         console.log(JSON.stringify(products.map(p => ({ 
             name: p.name, 
             pid: p.pid, 

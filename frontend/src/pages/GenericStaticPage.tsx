@@ -2,24 +2,10 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Footer from '../components/Footer';
 
+// Only include routes that App.tsx actually delegates to GenericStaticPage.
+// Routes with dedicated page components (ContactPage, PrivacyPage, TermsPage,
+// ShippingPage) are intentionally excluded to avoid silently showing wrong content.
 const PAGE_CONTENT: Record<string, { title: string; content: string[] }> = {
-    '/contact': {
-        title: 'Contact Us',
-        content: [
-            'We would love to hear from you! Please reach out to us for any inquiries, concerns, or feedback.',
-            'Email: bodiliciousnaturalproducts@gmail.com',
-            'Phone: +91 9894451947',
-            'Hours: Monday to Friday, 9:00 AM - 6:00 PM IST',
-        ],
-    },
-    '/shipping': {
-        title: 'Shipping & Returns',
-        content: [
-            'We offer standard and expedited shipping options across India.',
-            'Orders are typically processed within 1-2 business days.',
-            'If you are not entirely satisfied with your purchase, we offer a 7-day return policy for unopened and unused items.',
-        ],
-    },
     '/faqs': {
         title: 'Frequently Asked Questions',
         content: [
@@ -32,24 +18,9 @@ const PAGE_CONTENT: Record<string, { title: string; content: string[] }> = {
     '/stores': {
         title: 'Store Locator',
         content: [
-            'Find bodilicious products in a retail store near you.',
+            'Find Bodilicious products in a retail store near you.',
             'New Delhi Flagship Store: 123 Beauty Avenue, Connaught Place, New Delhi',
             'Mumbai Retail Outlet: 456 Glow Street, Bandra West, Mumbai',
-        ],
-    },
-    '/terms-sale': {
-        title: 'Terms & Conditions of Sale',
-        content: [
-            'By placing an order on our website, you agree to our conditions of sale.',
-            'Prices are subject to change without notice.',
-            'We reserve the right to limit quantities of products purchased.',
-        ],
-    },
-    '/terms-use': {
-        title: 'Terms & Conditions of Use',
-        content: [
-            'Welcome to Bodilicious. By accessing our website, you agree to these terms and conditions.',
-            'All content on this site is the property of Bodilicious and protected by copyright laws.',
         ],
     },
     '/accessibility': {
@@ -57,13 +28,6 @@ const PAGE_CONTENT: Record<string, { title: string; content: string[] }> = {
         content: [
             'Bodilicious is committed to ensuring digital accessibility for people with disabilities.',
             'We are continually improving the user experience for everyone and applying the relevant accessibility standards.',
-        ],
-    },
-    '/privacy': {
-        title: 'Privacy Policy',
-        content: [
-            'Your privacy is important to us. We will not share your personal information with third parties without your consent.',
-            'We collect data strictly to process orders and improve your shopping experience.',
         ],
     },
     '/careers': {

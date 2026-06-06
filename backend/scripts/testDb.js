@@ -6,7 +6,7 @@ import Order from "../tracker/models.js";
 dotenv.config();
 
 async function run() {
-  await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+  await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
   console.log("Connected to MongoDB.");
   
   const users = await UserProfile.find({ email: /test_welcome/ }).lean();

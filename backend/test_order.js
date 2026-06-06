@@ -9,7 +9,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     console.log("Connected to MongoDB.");
     const orders = await Order.find().sort({ createdAt: -1 }).limit(5);
-    console.log("Recent 5 Orders:");
+    console.log("Recent 5 Orders:", { maxPoolSize: 3,  maxPoolSize: 3 });
     orders.forEach(o => {
       console.log(`ID: ${o._id}, User: ${o.user}, Amount: ${o.totalAmount}, Status: ${o.orderStatus}, Created: ${o.createdAt}`);
     });

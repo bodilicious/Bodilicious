@@ -60,7 +60,7 @@ const sensitiveLimiter = rateLimit({
 // ⚠️  IMPORTANT: Webhook must use raw body (not JSON-parsed) for HMAC to work correctly.
 // Register BEFORE express.json() so the raw Buffer is preserved for signature verification.
 app.post("/api/v1/payment/webhook",
-  express.raw({ type: "application/json" }),
+  express.raw({ type: "application/json", limit: "1mb" }),
   (req, res, next) => {
     // Expose raw buffer as req.rawBody for the controller
     req.rawBody = req.body;
@@ -79,9 +79,11 @@ app.use((req, res, next) => {
   if (req.params) mongoSanitize.sanitize(req.params);
   next();
 });
-app.use("/api/v1", globalLimiter, routes);
+// ⚠️  Order matters: sensitive sub-paths must be registered BEFORE the catch-all
+// /api/v1 route, otherwise Express has already matched them and these never fire.
 app.use("/api/v1/payment", sensitiveLimiter);
-app.use("/api/v1/profile", sensitiveLimiter);
+app.use("/api/v1/user", sensitiveLimiter);
+app.use("/api/v1", globalLimiter, routes);
 
 // Health check endpoint for UptimeRobot
 app.get("/health", (req, res) => {

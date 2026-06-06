@@ -72,7 +72,7 @@ const OTHER_COMMENTS = [
 async function generateReviews() {
     try {
         const uri = process.env.MONGO_URI.endsWith('/') ? process.env.MONGO_URI + process.env.DB_NAME : process.env.MONGO_URI + '/' + process.env.DB_NAME;
-        await mongoose.connect(uri || 'mongodb://localhost:27017/bodilicious');
+        await mongoose.connect(uri || 'mongodb://localhost:27017/bodilicious', { maxPoolSize: 3,  maxPoolSize: 3 });
         console.log("Connected to database:", mongoose.connection.name);
 
         const allNames = [...TAMIL_NAMES, ...TELUGU_NAMES];

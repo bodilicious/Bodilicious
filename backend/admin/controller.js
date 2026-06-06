@@ -121,7 +121,7 @@ export const getDashboardSummary = async (req, res) => {
  */
 export const getRecentOrders = async (req, res) => {
   try {
-    const { limit = 5 } = req.pagination; // From middleware
+    const limit = req.pagination?.limit ?? 5; // Fallback if middleware is skipped
     
     const orders = await Order.find()
       .populate("user", "name email")
@@ -357,9 +357,10 @@ const autoSyncOrdersWithShiprocket = async (orders) => {
           };
         }
 
-        if (Object.keys(updates).length > 0) {
-          const { $push, ...setFields } = updates;
-          const updateOp = { $set: setFields };
+        const { $push, ...setFields } = updates;
+        if (Object.keys(setFields).length > 0 || $push) {
+          const updateOp = {};
+          if (Object.keys(setFields).length > 0) updateOp.$set = setFields;
           if ($push) updateOp.$push = $push;
           await Order.findByIdAndUpdate(order._id, updateOp);
           
@@ -722,11 +723,11 @@ export const exportOrdersCSV = async (req, res) => {
       csv += `${o._id},${o.createdAt.toISOString()},"${o.shippingDetails.name}","${o.shippingDetails.email}",${o.totalAmount},${o.orderStatus},${o.paymentStatus}\n`;
     });
 
+    await logAction(req, "EXPORT_ORDERS", "Order", "all", { range });
+
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename=orders_${range}.csv`);
     res.status(200).send(csv);
-
-    await logAction(req, "EXPORT_ORDERS", "Order", "all", { range });
   } catch (err) {
     console.error("Admin ExportOrders Error:", err);
     res.status(500).json({ success: false, message: "Error exporting orders" });
@@ -1222,7 +1223,8 @@ export const adminSyncShiprocket = async (req, res) => {
       };
     }
 
-    if (Object.keys(updates).length === 0) {
+    const { $push, ...setFields } = updates;
+    if (Object.keys(setFields).length === 0 && !$push) {
       const populated = await Order.findById(order._id)
         .populate("user", "name email")
         .populate("items.product", "name pid price images");
@@ -1230,8 +1232,8 @@ export const adminSyncShiprocket = async (req, res) => {
     }
 
     // Separate $push from the rest to avoid conflict
-    const { $push, ...setFields } = updates;
-    const updateOp = { $set: setFields };
+    const updateOp = {};
+    if (Object.keys(setFields).length > 0) updateOp.$set = setFields;
     if ($push) updateOp.$push = $push;
 
     await Order.findByIdAndUpdate(order._id, updateOp);

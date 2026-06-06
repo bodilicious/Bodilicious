@@ -5,8 +5,7 @@ import {
   Phone, 
   ChevronLeft, 
   ChevronRight,
-  Clock,
-  ExternalLink
+  Clock
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -110,7 +109,7 @@ const AbandonedCheckouts: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-dark-red">
-                      ₹{order.totalAmount.toLocaleString()}
+                      ₹{(order.totalAmount ?? 0).toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200">

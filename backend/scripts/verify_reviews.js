@@ -10,7 +10,7 @@ async function verifyReviews() {
         const uri = process.env.MONGO_URI.endsWith('/') ? process.env.MONGO_URI + process.env.DB_NAME : process.env.MONGO_URI + '/' + process.env.DB_NAME;
         await mongoose.connect(uri || 'mongodb://localhost:27017/bodilicious');
 
-        const products = await Product.find({ isActive: true }).populate('reviews.user', 'name');
+        const products = await Product.find({ isActive: true }, { maxPoolSize: 3,  maxPoolSize: 3 }).populate('reviews.user', 'name');
         
         let total4s = 0;
         let total5s = 0;

@@ -8,7 +8,7 @@ dotenv.config();
 async function verifyETL() {
   try {
     console.log("Connecting to MongoDB...");
-    await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.DB_NAME });
+    await mongoose.connect(process.env.MONGO_URI, { maxPoolSize: 3,  dbName: process.env.DB_NAME });
 
     console.log("Running Analytics ETL Job...");
     await runETL();
