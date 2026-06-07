@@ -349,18 +349,13 @@ export const triggerEmailVerification = async (req, res) => {
 
     const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
     console.log("Using FRONTEND_URL for link:", frontendUrl);
-    
-    const actionCodeSettings = {
-      url: `${frontendUrl}/auth/action`,
-      handleCodeInApp: false,
-    };
 
     // 1. Generate the standard Firebase verification link
     let firebaseLink;
     try {
       firebaseLink = await admin
         .auth()
-        .generateEmailVerificationLink(userEmail, actionCodeSettings);
+        .generateEmailVerificationLink(userEmail);
     } catch (firebaseErr) {
       console.error("Firebase Link Gen Error:", firebaseErr.message);
       return res.status(500).json({
@@ -419,17 +414,13 @@ export const triggerPasswordReset = async (req, res) => {
     }
 
     const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
-    const actionCodeSettings = {
-      url: `${frontendUrl}/auth/action`,
-      handleCodeInApp: false,
-    };
 
     // 1. Generate the standard Firebase password reset link
     let firebaseLink;
     try {
       firebaseLink = await admin
         .auth()
-        .generatePasswordResetLink(email, actionCodeSettings);
+        .generatePasswordResetLink(email);
     } catch (firebaseErr) {
       // Don't expose whether the email exists or not for security reasons
       if (firebaseErr.code === 'auth/user-not-found') {
