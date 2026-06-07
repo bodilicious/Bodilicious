@@ -20,6 +20,9 @@ const getTransporter = () => {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS, // Gmail App Password
       },
+      connectionTimeout: 10000, // 10 seconds (Fail fast if SMTP port is blocked by hosting provider)
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
   }
 

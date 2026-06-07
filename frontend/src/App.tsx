@@ -34,6 +34,7 @@ const BrandStoryPage = lazy(() => import('./pages/BrandStoryPage'));
 const RitualFinderPage = lazy(() => import('./pages/RitualFinderPage'));
 const OfferPage = lazy(() => import('./pages/OfferPage'));
 const EmailActionPage = lazy(() => import('./pages/EmailActionPage'));
+const TicketsPage = lazy(() => import('./pages/TicketsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 // Admin Pages
@@ -131,6 +132,7 @@ function AppRoutes() {
             <Route path="/orders/:orderId" element={<PageTransition><OrderDetailsPage /></PageTransition>} />
             <Route path="/track/:orderId" element={<PageTransition><OrderDetailsPage /></PageTransition>} />
             <Route path="/auth/action" element={<PageTransition><EmailActionPage /></PageTransition>} />
+            <Route path="/account/tickets" element={<PageTransition><TicketsPage /></PageTransition>} />
 
             {/* Static Pages */}
             <Route path="/contact" element={<PageTransition><ContactPage /></PageTransition>} />
