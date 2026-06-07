@@ -382,7 +382,7 @@ export const triggerEmailVerification = async (req, res) => {
         success: false,
         message: "Link generated but failed to send email",
         error: emailErr.message,
-        hint: "Check EMAIL_USER and EMAIL_PASS environment variables (and Gmail App Password)."
+        hint: "Check RESEND_API_KEY environment variable and verified domains."
       });
     }
 
@@ -443,11 +443,18 @@ export const triggerPasswordReset = async (req, res) => {
     try {
       await sendPasswordResetEmail(email, brandedLink);
     } catch (emailErr) {
-      console.error("Email Service Error:", emailErr.message);
+      console.error("Email Service Error:", {
+        message: emailErr.message,
+        code: emailErr.code,
+        command: emailErr.command,
+        response: emailErr.response,
+        responseCode: emailErr.responseCode,
+      });
       return res.status(500).json({
         success: false,
         message: "Failed to send reset email.",
-        error: emailErr.message
+        error: emailErr.message,
+        code: emailErr.code
       });
     }
 

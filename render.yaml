@@ -31,3 +31,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: FRONTEND_URL
+        value: https://www.bodilicious.in
+      - key: RESEND_API_KEY
+        sync: false   # set this secret in the Render dashboard
+      - key: EMAIL_FROM
+        value: "Bodilicious <noreply@bodilicious.in>"
+      - key: EMAIL_FROM_SUPPORT
+        value: "Bodilicious Support <support@bodilicious.in>"
+      - key: EMAIL_FROM_ALERTS
+        value: "Bodilicious Alerts <alerts@bodilicious.in>"

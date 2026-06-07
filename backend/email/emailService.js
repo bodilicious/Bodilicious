@@ -1,47 +1,53 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import UserProfile from "../profile/models.js";
-import StoreSettings from "../settings/models.js";
 import { getSettings } from "../settings/cache.js";
 
-let transporter = null;
+let resendClient = null;
 
 /*
-  Create transporter only once (singleton)
+  Create Resend client only once (singleton)
 */
-const getTransporter = () => {
-  if (!transporter) {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      throw new Error("Email credentials missing in environment variables");
+const getResend = () => {
+  if (!resendClient) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is missing in environment variables");
     }
-
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, // Gmail App Password
-      },
-      connectionTimeout: 10000, // 10 seconds (Fail fast if SMTP port is blocked by hosting provider)
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    });
+    resendClient = new Resend(process.env.RESEND_API_KEY);
   }
-
-  return transporter;
+  return resendClient;
 };
+
+// Sender addresses — update the domain once you verify it in Resend
+const FROM_DEFAULT  = process.env.EMAIL_FROM        || "Bodilicious <noreply@bodilicious.in>";
+const FROM_SUPPORT  = process.env.EMAIL_FROM_SUPPORT || "Bodilicious Support <support@bodilicious.in>";
+const FROM_ALERTS   = process.env.EMAIL_FROM_ALERTS  || "Bodilicious Alerts <alerts@bodilicious.in>";
 
 // Helper to get primary admin email
 const getPrimaryAdminEmail = async () => {
   try {
     const adminUser = await UserProfile.findOne({ role: "primary_admin" });
     if (adminUser && adminUser.email) return adminUser.email;
-    return process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
-  } catch (err) {
-    return process.env.ADMIN_ALERT_EMAIL || process.env.EMAIL_USER;
+    return process.env.ADMIN_ALERT_EMAIL || "bodiliciousnaturalproducts@gmail.com";
+  } catch {
+    return process.env.ADMIN_ALERT_EMAIL || "bodiliciousnaturalproducts@gmail.com";
   }
 };
 
 /*
-  Base email layout wrapper only
+  Helper: send via Resend and log the result
+*/
+const sendEmail = async ({ from, to, subject, html, label }) => {
+  const { data, error } = await getResend().emails.send({ from, to, subject, html });
+  if (error) {
+    console.error(`[EmailService] ${label} failed:`, error);
+    throw new Error(error.message || "Resend API error");
+  }
+  console.log(`[EmailService] ${label} sent — id: ${data.id}`);
+  return data;
+};
+
+/*
+  Base email layout wrapper
 */
 const buildEmailLayout = (content, data = {}) => {
   const { customerName } = data;
@@ -81,9 +87,9 @@ const buildEmailLayout = (content, data = {}) => {
   `;
 };
 
-/*
-  ORDER CONFIRMATION EMAIL
-*/
+/* ─────────────────────────────────────────────
+   ORDER CONFIRMATION EMAIL
+───────────────────────────────────────────── */
 export const sendOrderConfirmationEmail = async (order, userEmail, userName) => {
   try {
     const settings = await getSettings();
@@ -187,7 +193,7 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
       </div>
 
       <p style="margin:18px 0 0;">
-        We’ll notify you again once your order has been shipped.
+        We'll notify you again once your order has been shipped.
       </p>
 
       <div style="text-align:center; margin:28px 0 0;">
@@ -200,19 +206,13 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
       </div>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_DEFAULT,
       to: userEmail,
       subject: "Order Confirmed - Bodilicious",
-      html: buildEmailLayout(content, {
-        customerName: shippingName,
-      }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-
-    console.log("Order email sent:", info.messageId);
-    return info;
+      html: buildEmailLayout(content, { customerName: shippingName }),
+      label: "Order confirmation",
+    });
   } catch (error) {
     console.error("Order email failed:", error);
     throw error;
@@ -256,13 +256,14 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
     }
   });
 };
-/*
-  ADMIN ALERT: NEW ORDER
-*/
+
+/* ─────────────────────────────────────────────
+   ADMIN ALERT: NEW ORDER
+───────────────────────────────────────────── */
 export const sendAdminNewOrderAlert = async (order) => {
   try {
     const settings = await getSettings();
-    if (!settings.emailAllEnabled || !settings.notifyAdminOnOrder) return; // Feature toggle
+    if (!settings.emailAllEnabled || !settings.notifyAdminOnOrder) return;
 
     const adminEmail = await getPrimaryAdminEmail();
     if (!adminEmail) return;
@@ -314,24 +315,21 @@ export const sendAdminNewOrderAlert = async (order) => {
       </p>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious Alerts" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_ALERTS,
       to: adminEmail,
       subject: `New Order Alert! [#${displayOrderId}] - ₹${totalAmount.toLocaleString("en-IN")}`,
       html: buildEmailLayout(content, { customerName: "Admin" }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Admin new order alert sent:", info.messageId);
-    return info;
+      label: "Admin new order alert",
+    });
   } catch (error) {
     console.error("Admin new order alert failed:", error.message);
   }
 };
 
-/*
-  ADMIN ALERT: PAYMENT SUCCESS NO ORDER
-*/
+/* ─────────────────────────────────────────────
+   ADMIN ALERT: PAYMENT SUCCESS NO ORDER
+───────────────────────────────────────────── */
 export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, amount) => {
   try {
     const adminEmail = await getPrimaryAdminEmail();
@@ -357,134 +355,108 @@ export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, am
       </p>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious Alerts" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_ALERTS,
       to: adminEmail,
       subject: `CRITICAL: Orphaned Payment Captured - ₹${amount.toLocaleString("en-IN")}`,
       html: buildEmailLayout(content, { customerName: "Admin" }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Admin orphaned payment alert sent:", info.messageId);
-    return info;
+      label: "Admin orphaned payment alert",
+    });
   } catch (error) {
     console.error("Admin orphaned payment alert failed:", error.message);
   }
 };
 
-
-/*
-  EMAIL VERIFICATION EMAIL
-*/
+/* ─────────────────────────────────────────────
+   EMAIL VERIFICATION EMAIL
+───────────────────────────────────────────── */
 export const sendVerificationEmail = async (userEmail, verificationLink, userName = "") => {
-  try {
-    const content = `
-      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
-        Verify Your Email
-      </h2>
+  const content = `
+    <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+      Verify Your Email
+    </h2>
 
-      <p style="margin:0 0 14px;">
-        Welcome to <strong>Bodilicious</strong>!
-      </p>
+    <p style="margin:0 0 14px;">
+      Welcome to <strong>Bodilicious</strong>!
+    </p>
 
-      <p style="margin:0 0 18px;">
-        Please verify your email address to activate your account and start shopping with us.
-      </p>
+    <p style="margin:0 0 18px;">
+      Please verify your email address to activate your account and start shopping with us.
+    </p>
 
-      <div style="text-align:center; margin:32px 0;">
-        <a
-          href="${verificationLink}"
-          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block; text-transform:uppercase;"
-        >
-          Verify My Email
-        </a>
-      </div>
+    <div style="text-align:center; margin:32px 0;">
+      <a
+        href="${verificationLink}"
+        style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block; text-transform:uppercase;"
+      >
+        Verify My Email
+      </a>
+    </div>
 
-      <p style="font-size:13px; color:#777777; margin:0 0 12px;">
-        If you didn’t create this account, you can safely ignore this email.
-      </p>
+    <p style="font-size:13px; color:#777777; margin:0 0 12px;">
+      If you didn't create this account, you can safely ignore this email.
+    </p>
 
-      <p style="font-size:12px; color:#999999; word-break:break-all; margin:0;">
-        Or copy and paste this link into your browser:<br>
-        ${verificationLink}
-      </p>
-    `;
+    <p style="font-size:12px; color:#999999; word-break:break-all; margin:0;">
+      Or copy and paste this link into your browser:<br>
+      ${verificationLink}
+    </p>
+  `;
 
-    const mailOptions = {
-      from: `"Bodilicious" <${process.env.EMAIL_USER}>`,
-      to: userEmail,
-      subject: "Verify Your Email - Bodilicious",
-      html: buildEmailLayout(content, {
-        customerName: userName,
-      }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-
-    console.log("Verification email sent:", info.messageId);
-  } catch (error) {
-    console.error("Verification email failed:", error);
-    throw error;
-  }
+  return await sendEmail({
+    from: FROM_DEFAULT,
+    to: userEmail,
+    subject: "Verify Your Email - Bodilicious",
+    html: buildEmailLayout(content, { customerName: userName }),
+    label: "Verification email",
+  });
 };
 
-/*
-  PASSWORD RESET EMAIL
-*/
+/* ─────────────────────────────────────────────
+   PASSWORD RESET EMAIL
+───────────────────────────────────────────── */
 export const sendPasswordResetEmail = async (userEmail, resetLink, userName = "") => {
-  try {
-    const content = `
-      <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
-        Reset Your Password
-      </h2>
+  const content = `
+    <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+      Reset Your Password
+    </h2>
 
-      <p style="margin:0 0 14px;">
-        Hello${userName ? ` ${userName}` : ""},
-      </p>
+    <p style="margin:0 0 18px;">
+      We received a request to reset the password for your Bodilicious account. 
+      Click the button below to choose a new password.
+    </p>
 
-      <p style="margin:0 0 18px;">
-        We received a request to reset the password for your Bodilicious account. 
-        Click the button below to choose a new password.
-      </p>
+    <div style="text-align:center; margin:32px 0;">
+      <a
+        href="${resetLink}"
+        style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block; text-transform:uppercase;"
+      >
+        Reset Password
+      </a>
+    </div>
 
-      <div style="text-align:center; margin:32px 0;">
-        <a
-          href="${resetLink}"
-          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block; text-transform:uppercase;"
-        >
-          Reset Password
-        </a>
-      </div>
+    <p style="font-size:13px; color:#777777; margin:0 0 12px;">
+      If you didn't request this password reset, you can safely ignore this email. Your password won't change until you create a new one.
+    </p>
 
-      <p style="font-size:13px; color:#777777; margin:0 0 12px;">
-        If you didn’t request this password reset, you can safely ignore this email. Your password won't change until you create a new one.
-      </p>
+    <p style="font-size:12px; color:#999999; word-break:break-all; margin:0;">
+      Or copy and paste this link into your browser:<br>
+      ${resetLink}
+    </p>
+  `;
 
-      <p style="font-size:12px; color:#999999; word-break:break-all; margin:0;">
-        Or copy and paste this link into your browser:<br>
-        ${resetLink}
-      </p>
-    `;
-
-    const mailOptions = {
-      from: `"Bodilicious" <${process.env.EMAIL_USER}>`,
-      to: userEmail,
-      subject: "Reset Your Password - Bodilicious",
-      html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Password reset email sent:", info.messageId);
-    return info;
-  } catch (error) {
-    console.error("Password reset email failed:", error);
-    throw error;
-  }
+  return await sendEmail({
+    from: FROM_DEFAULT,
+    to: userEmail,
+    subject: "Reset Your Password - Bodilicious",
+    html: buildEmailLayout(content, { customerName: userName }),
+    label: "Password reset email",
+  });
 };
 
-/*
-  RETURN APPROVED EMAIL
-*/
+/* ─────────────────────────────────────────────
+   RETURN APPROVED EMAIL
+───────────────────────────────────────────── */
 export const sendReturnApprovedEmail = async (order, userEmail, userName) => {
   try {
     const settings = await getSettings();
@@ -534,25 +506,22 @@ export const sendReturnApprovedEmail = async (order, userEmail, userName) => {
       </div>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_DEFAULT,
       to: userEmail,
       subject: `Return Approved - Order #${orderId} | Bodilicious`,
       html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Return approved email sent:", info.messageId);
-    return info;
+      label: "Return approved email",
+    });
   } catch (error) {
     console.error("Return approved email failed:", error);
     throw error;
   }
 };
 
-/*
-  RETURN REJECTED EMAIL
-*/
+/* ─────────────────────────────────────────────
+   RETURN REJECTED EMAIL
+───────────────────────────────────────────── */
 export const sendReturnRejectedEmail = async (order, userEmail, userName, rejectionReason) => {
   try {
     const settings = await getSettings();
@@ -593,25 +562,22 @@ export const sendReturnRejectedEmail = async (order, userEmail, userName, reject
       </div>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_DEFAULT,
       to: userEmail,
       subject: `Return Request Update - Order #${orderId} | Bodilicious`,
       html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Return rejected email sent:", info.messageId);
-    return info;
+      label: "Return rejected email",
+    });
   } catch (error) {
     console.error("Return rejected email failed:", error);
     throw error;
   }
 };
 
-/*
-  TICKET ACKNOWLEDGEMENT EMAIL — fires when a new ticket is created
-*/
+/* ─────────────────────────────────────────────
+   TICKET ACKNOWLEDGEMENT EMAIL
+───────────────────────────────────────────── */
 export const sendTicketAcknowledgementEmail = async (ticket, userEmail, userName) => {
   try {
     const settings = await getSettings();
@@ -658,25 +624,22 @@ export const sendTicketAcknowledgementEmail = async (ticket, userEmail, userName
       </p>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_SUPPORT,
       to: userEmail,
       subject: `We got your query! Ticket #${ticketId} | Bodilicious`,
       html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Ticket acknowledgement email sent:", info.messageId);
-    return info;
+      label: "Ticket acknowledgement email",
+    });
   } catch (error) {
     console.error("Ticket acknowledgement email failed:", error);
     throw error;
   }
 };
 
-/*
-  TICKET REPLY EMAIL — fires when admin replies to a ticket
-*/
+/* ─────────────────────────────────────────────
+   TICKET REPLY EMAIL
+───────────────────────────────────────────── */
 export const sendTicketReplyEmail = async (ticket, replyText, userEmail, userName) => {
   try {
     const settings = await getSettings();
@@ -735,26 +698,23 @@ export const sendTicketReplyEmail = async (ticket, replyText, userEmail, userNam
       </p>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_SUPPORT,
       to: userEmail,
-      replyTo: process.env.EMAIL_USER,
+      replyTo: FROM_SUPPORT,
       subject: `Re: Your Query [#${ticketId}] | Bodilicious Support`,
       html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Ticket reply email sent:", info.messageId);
-    return info;
+      label: "Ticket reply email",
+    });
   } catch (error) {
     console.error("Ticket reply email failed:", error);
     throw error;
   }
 };
 
-/*
-  TICKET RESOLVED EMAIL
-*/
+/* ─────────────────────────────────────────────
+   TICKET RESOLVED EMAIL
+───────────────────────────────────────────── */
 export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resolutionMessage = null) => {
   try {
     const settings = await getSettings();
@@ -763,7 +723,7 @@ export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resol
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
 
-    let messageHtml = '';
+    let messageHtml = "";
     if (resolutionMessage) {
       messageHtml = `
       <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
@@ -803,25 +763,22 @@ export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resol
       </div>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_SUPPORT,
       to: userEmail,
       subject: `Ticket Resolved: #${ticketId} | Bodilicious Support`,
       html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Ticket resolved email sent:", info.messageId);
-    return info;
+      label: "Ticket resolved email",
+    });
   } catch (error) {
     console.error("Ticket resolved email failed:", error);
     throw error;
   }
 };
 
-/*
-  TICKET CANCELLED EMAIL
-*/
+/* ─────────────────────────────────────────────
+   TICKET CANCELLED EMAIL
+───────────────────────────────────────────── */
 export const sendTicketCancelledEmail = async (ticket, userEmail, userName, cancelReason = null) => {
   try {
     const settings = await getSettings();
@@ -830,7 +787,7 @@ export const sendTicketCancelledEmail = async (ticket, userEmail, userName, canc
     const ticketId = ticket?.ticketId || "TKT-UNKNOWN";
     const typeLabel = ticket?.type ? ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1) : "Support";
 
-    let reasonHtml = '';
+    let reasonHtml = "";
     if (cancelReason) {
       reasonHtml = `
       <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
@@ -870,16 +827,13 @@ export const sendTicketCancelledEmail = async (ticket, userEmail, userName, canc
       </div>
     `;
 
-    const mailOptions = {
-      from: `"Bodilicious Support" <${process.env.EMAIL_USER}>`,
+    return await sendEmail({
+      from: FROM_SUPPORT,
       to: userEmail,
       subject: `Ticket Cancelled: #${ticketId} | Bodilicious Support`,
       html: buildEmailLayout(content, { customerName: userName }),
-    };
-
-    const info = await getTransporter().sendMail(mailOptions);
-    console.log("Ticket cancelled email sent:", info.messageId);
-    return info;
+      label: "Ticket cancelled email",
+    });
   } catch (error) {
     console.error("Ticket cancelled email failed:", error);
     throw error;

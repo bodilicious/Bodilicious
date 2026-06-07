@@ -323,8 +323,7 @@ export default function HomePage() {
         <m.div
           className="max-w-7xl mx-auto px-6"
           initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
+          animate="visible"
           variants={stagger}
         >
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
@@ -360,8 +359,7 @@ export default function HomePage() {
           <m.div
             className="max-w-7xl mx-auto px-6"
             initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
+            animate="visible"
             variants={stagger}
           >
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
