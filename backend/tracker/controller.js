@@ -3,7 +3,7 @@ import Order from "./models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
 import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, createShiprocketReturn } from "./shiprocketservice.js";
-import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice } from "../email/emailService.js";
+import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendOrderShippedEmail } from "../email/emailService.js";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
 import Razorpay from "razorpay";
@@ -509,6 +509,11 @@ export const shiprocketWebhook = async (req, res) => {
           // 🚀 Audit Fulfillment Events
           if (internalStatus === "shipped") {
              await logAction(req, "shipment_created", "order", order._id.toString(), { awb, status: shiprocketStatus }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+             
+             // 🚀 Trigger Shipment Email
+             const trackingUrl = `${process.env.FRONTEND_URL || 'https://www.bodilicious.in'}/account/tracking?awb=${awb}`;
+             await sendOrderShippedEmail(order, trackingUrl, order.shippingDetails?.email, order.shippingDetails?.name).catch(err => console.error("Shipment Email Failed:", err));
+
           } else if (internalStatus === "delivered") {
              await logAction(req, "order_delivered", "order", order._id.toString(), { awb }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
           } else if (internalStatus === "returned" || shiprocketStatus.includes("rto") || shiprocketStatus.includes("failed")) {

@@ -10,19 +10,8 @@ export const getSettings = async () => {
     return settingsCache;
   }
 
-  try {
-    const settings = await StoreSettings.findOne().lean();
-    if (settings) {
-      settingsCache = settings;
-      lastFetched = now;
-      return settingsCache;
-    }
-  } catch (error) {
-    console.error("[SettingsCache] Error fetching settings:", error);
-  }
-
-  // Fallback defaults if no document exists or error
-  return {
+  // Base default values
+  const defaultSettings = {
     waAllEnabled: true,
     emailAllEnabled: true,
     waOrderPlacedEnabled: true,
@@ -42,6 +31,20 @@ export const getSettings = async () => {
     emailTicketResolved: true,
     emailTicketCancelled: true,
   };
+
+  try {
+    const settings = await StoreSettings.findOne().lean();
+    if (settings) {
+      settingsCache = { ...defaultSettings, ...settings };
+      lastFetched = now;
+      return settingsCache;
+    }
+  } catch (error) {
+    console.error("[SettingsCache] Error fetching settings:", error);
+  }
+
+  // Fallback defaults if no document exists or error
+  return defaultSettings;
 };
 
 export const clearSettingsCache = () => {

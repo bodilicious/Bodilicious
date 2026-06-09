@@ -199,11 +199,12 @@ export default function ShopPage() {
 
   const [dynamicFilters, setDynamicFilters] = useState<any>(null);
 
+  const categoriesString = selectedCategories.join(',');
   useEffect(() => {
     let active = true;
     const fetchDynamicFilters = async () => {
       try {
-        const catQuery = selectedCategories.length > 0 ? `?category=${selectedCategories.join(',')}` : '';
+        const catQuery = categoriesString ? `?category=${categoriesString}` : '';
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/products/filters${catQuery}`);
         const json = await res.json();
         if (active && json.success) {
@@ -215,7 +216,7 @@ export default function ShopPage() {
     };
     fetchDynamicFilters();
     return () => { active = false; };
-  }, [selectedCategories.join(',')]);
+  }, [categoriesString]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {

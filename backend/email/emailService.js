@@ -256,6 +256,49 @@ export const sendOrderConfirmationAfterInvoice = async (order, accountEmail = ""
 };
 
 /* ─────────────────────────────────────────────
+   ORDER SHIPPED EMAIL
+───────────────────────────────────────────── */
+export const sendOrderShippedEmail = async (order, trackingUrl, userEmail, userName = "") => {
+  const fullOrderId = order?._id ? order._id.toString() : "";
+  const displayOrderId = fullOrderId ? fullOrderId.slice(-8).toUpperCase() : "ORDER";
+  const awb = order?.awb || "Pending";
+
+  const content = `
+    <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">
+      Your Order is on its Way! 🚚
+    </h2>
+
+    <p style="margin:0 0 18px;">
+      Great news! Your order <strong>#${displayOrderId}</strong> has been shipped and is currently on its way to you.
+    </p>
+
+    <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
+      <p style="margin:0 0 8px;"><strong>Tracking AWB:</strong> ${awb}</p>
+      <div style="text-align:center; margin:16px 0 0;">
+        <a
+          href="${trackingUrl}"
+          style="background:#8B0000; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:6px; font-size:14px; font-weight:bold; display:inline-block; text-transform:uppercase;"
+        >
+          Track Your Shipment
+        </a>
+      </div>
+    </div>
+
+    <p style="margin:0 0 18px;">
+      Please note that it might take up to 24 hours for the tracking information to update on the courier's website.
+    </p>
+  `;
+
+  return await sendEmail({
+    from: FROM_DEFAULT,
+    to: userEmail,
+    subject: `Your Bodilicious Order #${displayOrderId} has shipped!`,
+    html: buildEmailLayout(content, { customerName: userName }),
+    label: "Order shipped email",
+  });
+};
+
+/* ─────────────────────────────────────────────
    ADMIN ALERT: NEW ORDER
 ───────────────────────────────────────────── */
 export const sendAdminNewOrderAlert = async (order) => {
