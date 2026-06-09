@@ -75,6 +75,15 @@ interface AppContextType {
     shippingThreshold: number;
     shippingCost: number;
     announcementBar: { text: string; isActive: boolean; link: string };
+    launchModal: {
+      isActive: boolean;
+      badge: string;
+      title: string;
+      description: string;
+      ctaLabel: string;
+      ctaLink: string;
+      image: string;
+    };
     maintenanceMode: boolean;
     maintenanceMessage: string;
     bestSellerPids: string[];
@@ -178,6 +187,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     shippingThreshold: 999,
     shippingCost: 99,
     announcementBar: { text: '', isActive: false, link: '' },
+    launchModal: {
+      isActive: false,
+      badge: 'Just Launched',
+      title: 'New Collection',
+      description: 'Discover our latest additions, crafted with rare botanical extracts.',
+      ctaLabel: 'Explore Collection',
+      ctaLink: '/shop',
+      image: '',
+    },
     maintenanceMode: false,
     maintenanceMessage: 'We are currently down for maintenance. Please check back later.',
     bestSellerPids: [] as string[],

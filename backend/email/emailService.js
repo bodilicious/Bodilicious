@@ -223,7 +223,7 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
  * Fires the order confirmation email after a safe delay/non-blocking.
  * Prioritizes shipment email over account email.
  */
-export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
+export const sendOrderConfirmationAfterInvoice = async (order, accountEmail = "") => {
   const recipientEmail = order?.shippingDetails?.email || accountEmail;
 
   if (!recipientEmail) {
@@ -231,30 +231,28 @@ export const sendOrderConfirmationAfterInvoice = (order, accountEmail = "") => {
     return;
   }
 
-  setImmediate(async () => {
-    try {
-      const settings = await getSettings();
-      if (!settings.emailAllEnabled || !settings.sendOrderConfirmationToCustomer) {
-        console.log(`[EmailService] Skipping order confirmation email due to store settings`);
-        return;
-      }
-
-      console.log(`📧 Preparing order confirmation email for: ${recipientEmail}`, {
-        orderId: order?._id?.toString(),
-        invoiceNo: order?.invoiceNumber,
-      });
-
-      await sendOrderConfirmationEmail(
-        order,
-        recipientEmail,
-        order?.shippingDetails?.name || "Customer"
-      );
-
-      console.log(`✅ Order confirmation email sent to ${recipientEmail}`);
-    } catch (err) {
-      console.error(`❌ Non-blocking order email failed for ${recipientEmail}:`, err.message);
+  try {
+    const settings = await getSettings();
+    if (!settings.emailAllEnabled || !settings.sendOrderConfirmationToCustomer) {
+      console.log(`[EmailService] Skipping order confirmation email due to store settings`);
+      return;
     }
-  });
+
+    console.log(`📧 Preparing order confirmation email for: ${recipientEmail}`, {
+      orderId: order?._id?.toString(),
+      invoiceNo: order?.invoiceNumber,
+    });
+
+    await sendOrderConfirmationEmail(
+      order,
+      recipientEmail,
+      order?.shippingDetails?.name || "Customer"
+    );
+
+    console.log(`✅ Order confirmation email sent to ${recipientEmail}`);
+  } catch (err) {
+    console.error(`❌ Order email failed for ${recipientEmail}:`, err.message);
+  }
 };
 
 /* ─────────────────────────────────────────────

@@ -173,7 +173,7 @@ export const createOrder = async (req, res) => {
     const user = await UserProfile.findById(userId);
     
     if (invoiceNumber) {
-      sendOrderConfirmationAfterInvoice(populatedOrder, user?.email);
+      await sendOrderConfirmationAfterInvoice(populatedOrder, user?.email);
     } else {
       console.warn("⚠️ Invoice generation failed or missing, skipping email trigger.");
     }
@@ -183,10 +183,12 @@ export const createOrder = async (req, res) => {
        Trigger only if COD. For Razorpay, it's triggered after payment verification.
     ========================================================= */
     if (finalPaymentMethod === "cod") {
-      // 🚀 Background Push: Faster response to user
-      pushOrderToShiprocket(populatedOrder).catch(shipErr => {
+      // 🚀 Blocking Push: Safer for Serverless Environments
+      try {
+        await pushOrderToShiprocket(populatedOrder);
+      } catch (shipErr) {
         console.error("Shiprocket background push error:", shipErr.message);
-      });
+      }
     }
 
     // 🚀 Audit Order Placement
@@ -293,10 +295,21 @@ export const trackShiprocketOrder = async (req, res) => {
 
     const info = trackData?.tracking_data;
 
+    // If tracking is not yet live on Shiprocket but we have the AWB
     if (!info || info.track_status === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Tracking not available yet",
+      return res.json({
+        success: true,
+        data: {
+          awb: order.awb,
+          status: order.orderStatus.charAt(0).toUpperCase() + order.orderStatus.slice(1),
+          expectedDelivery: order.estimatedDeliveryDate 
+            ? new Date(order.estimatedDeliveryDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+            : "Soon",
+          timeline: [
+            { status: 'Order Confirmed', location: 'System', date: new Date(order.createdAt).toLocaleDateString(), completed: true },
+            { status: 'Processing', location: 'Warehouse', date: '', completed: false }
+          ]
+        }
       });
     }
 
@@ -307,13 +320,20 @@ export const trackShiprocketOrder = async (req, res) => {
         date: a.date,
         completed: true,
       })) || [];
+      
+    const currentStatus = info.shipment_track?.[0]?.current_status || order.orderStatus.charAt(0).toUpperCase() + order.orderStatus.slice(1);
+    const expectedDeliveryDate = info.shipment_track?.[0]?.edd 
+                                  ? new Date(info.shipment_track[0].edd).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+                                  : order.estimatedDeliveryDate 
+                                    ? new Date(order.estimatedDeliveryDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+                                    : "Coming soon";
 
     return res.json({
       success: true,
       data: {
         awb: order.awb,
-        status: info.shipment_status || "Processing",
-        expectedDelivery: "Coming soon",
+        status: currentStatus,
+        expectedDelivery: expectedDeliveryDate,
         timeline,
       },
     });
@@ -480,7 +500,7 @@ export const shiprocketWebhook = async (req, res) => {
           if (shiprocketStatus === "out for delivery") {
             const settings = await getSettings();
             if (settings.waAllEnabled && settings.waOutForDeliveryEnabled) {
-              enqueueWhatsApp("out_for_delivery", {
+              await enqueueWhatsApp("out_for_delivery", {
                 orderId: order._id.toString()
               }).catch(err => console.error("Failed to enqueue WhatsApp out_for_delivery:", err));
             }
@@ -488,11 +508,11 @@ export const shiprocketWebhook = async (req, res) => {
 
           // 🚀 Audit Fulfillment Events
           if (internalStatus === "shipped") {
-             logAction(req, "shipment_created", "order", order._id.toString(), { awb, status: shiprocketStatus }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+             await logAction(req, "shipment_created", "order", order._id.toString(), { awb, status: shiprocketStatus }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
           } else if (internalStatus === "delivered") {
-             logAction(req, "order_delivered", "order", order._id.toString(), { awb }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+             await logAction(req, "order_delivered", "order", order._id.toString(), { awb }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
           } else if (internalStatus === "returned" || shiprocketStatus.includes("rto") || shiprocketStatus.includes("failed")) {
-             logAction(req, "delivery_failed", "order", order._id.toString(), { awb, reason: shiprocketStatus }, { source: "shiprocket-webhook", severity: "WARNING" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+             await logAction(req, "delivery_failed", "order", order._id.toString(), { awb, reason: shiprocketStatus }, { source: "shiprocket-webhook", severity: "WARNING" }).catch(err => console.error("Fulfillment Audit Failed:", err));
           }
         }
       }
@@ -717,13 +737,13 @@ export const cancelOrder = async (req, res) => {
     }
 
     // 🚀 Audit Order Cancellation
-    logAction(req, "order_cancelled", "order", order._id.toString(), {
+    await logAction(req, "order_cancelled", "order", order._id.toString(), {
       reason: "Cancelled by user"
     }).catch(err => console.error("Order Cancelled Audit Failed:", err));
 
-    NotificationService.emit({
+    await NotificationService.emit({
         title: "Order Cancelled",
-        body: `Order ${order._id.toString().slice(-6).toUpperCase()} was cancelled by user.`,
+        body: `Order ${order._id.toString().slice(-6).toUpperCase()} was cancelled. Reason: ${req.body.reason || 'Not provided'}.`,
         type: "warning",
         sourceModule: "orders",
         sourceModel: "Order",
@@ -832,13 +852,15 @@ export const requestReturn = async (req, res) => {
     order.orderStatus = "return_requested";
     await order.save();
 
-    // 🚀 Automate Shiprocket Return Creation (Non-blocking)
+    // 🚀 Automate Shiprocket Return Creation (Blocking)
     const freshOrder = await Order.findById(order._id).populate("items.product");
-    createShiprocketReturn(freshOrder, reason.trim()).catch(err => {
+    try {
+      await createShiprocketReturn(freshOrder, reason.trim());
+    } catch (err) {
       console.error("Delayed Shiprocket return error:", err.message);
-    });
+    }
 
-    NotificationService.emit({
+    await NotificationService.emit({
         title: "Return Requested",
         body: `Order ${order._id.toString().slice(-6).toUpperCase()} requested a return: ${reason.trim()}`,
         type: "warning",

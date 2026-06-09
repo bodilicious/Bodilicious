@@ -46,9 +46,9 @@ export const createTicket = async (req, res) => {
     // Populate user for email
     await ticket.populate("userId", "name email");
 
-    // Send acknowledgement email (non-blocking)
+    // Send acknowledgement email (blocking)
     if (ticket.userId?.email) {
-      sendTicketAcknowledgementEmail(
+      await sendTicketAcknowledgementEmail(
         ticket,
         ticket.userId.email,
         ticket.userId.name || "Customer"
@@ -58,10 +58,10 @@ export const createTicket = async (req, res) => {
     // Enqueue WhatsApp Notification
     const settings = await getSettings();
     if (settings.waAllEnabled && settings.waTicketRaisedEnabled) {
-      enqueueWhatsApp("ticket_raised", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_raised:", err));
+      await enqueueWhatsApp("ticket_raised", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_raised:", err));
     }
 
-    NotificationService.emit({
+    await NotificationService.emit({
       title: "New Support Ticket",
       body: `Ticket #${ticket._id.toString().slice(-6).toUpperCase()} created for ${type}.`,
       type: "info",
@@ -169,9 +169,9 @@ export const addMessage = async (req, res) => {
     // Re-populate so the response has full userId data
     await ticket.populate("userId", "name email photoURL");
 
-    // If admin replied, notify the customer by email (non-blocking)
+    // If admin replied, notify the customer by email (blocking)
     if (authorRole === "admin" && ticket.userId?.email) {
-      sendTicketReplyEmail(
+      await sendTicketReplyEmail(
         ticket,
         text.trim(),
         ticket.userId.email,
@@ -181,7 +181,7 @@ export const addMessage = async (req, res) => {
 
     // If customer replied, notify admin
     if (authorRole === "customer") {
-      NotificationService.emit({
+      await NotificationService.emit({
         title: "Ticket Reply",
         body: `Customer replied to ticket #${ticket._id.toString().slice(-6).toUpperCase()}.`,
         type: "info",
@@ -234,7 +234,7 @@ export const updateTicketStatus = async (req, res) => {
 
     // Fire resolution email only on first resolve
     if (status === "resolved" && wasOpen && ticket.userId?.email) {
-      sendTicketResolvedEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
+      await sendTicketResolvedEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
         console.error("Failed to send ticket resolved email:", id, err.message);
       });
     }
@@ -243,13 +243,13 @@ export const updateTicketStatus = async (req, res) => {
     if (status === "resolved" && wasOpen) {
       const settings = await getSettings();
       if (settings.waAllEnabled && settings.waTicketResolvedEnabled) {
-        enqueueWhatsApp("ticket_resolved", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_resolved:", err));
+        await enqueueWhatsApp("ticket_resolved", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_resolved:", err));
       }
     }
 
     // Fire cancelled email
     if (status === "cancelled" && wasOpen && ticket.userId?.email) {
-      sendTicketCancelledEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
+      await sendTicketCancelledEmail(ticket, ticket.userId.email, ticket.userId.name || "Customer", message).catch((err) => {
         console.error("Failed to send ticket cancelled email:", id, err.message);
       });
     }

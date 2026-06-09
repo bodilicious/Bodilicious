@@ -24,7 +24,7 @@ const verifyShiprocketFlow = async () => {
         const payload = {
             order_id: "VERIFY_FLOW_" + Date.now(),
             order_date: new Date().toISOString().split("T")[0],
-            pickup_location: "Primary",
+            pickup_location: "Home",
             billing_customer_name: "Flow Verify",
             billing_last_name: "Test",
             billing_address: "123 Test Street",

@@ -62,6 +62,15 @@ const storeSettingsSchema = new mongoose.Schema(
       isActive: { type: Boolean, default: false },
       link: { type: String, default: "" },
     },
+    launchModal: {
+      isActive:    { type: Boolean, default: false },
+      badge:       { type: String, default: "Just Launched" },
+      title:       { type: String, default: "New Collection" },
+      description: { type: String, default: "Discover our latest additions, crafted with rare botanical extracts." },
+      ctaLabel:    { type: String, default: "Explore Collection" },
+      ctaLink:     { type: String, default: "/shop" },
+      image:       { type: String, default: "" },
+    },
     socialLinks: {
       instagram: { type: String, default: "" },
       facebook: { type: String, default: "" },

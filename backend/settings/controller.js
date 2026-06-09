@@ -22,6 +22,7 @@ export const getSettings = async (req, res) => {
         shippingThreshold: settings.shippingThreshold,
         shippingCost: settings.shippingCost,
         announcementBar: settings.announcementBar,
+        launchModal: settings.launchModal,
         maintenanceMode: req.query.bypass === settings.maintenanceBypassSecret ? false : settings.maintenanceMode,
         maintenanceMessage: settings.maintenanceMessage,
         bestSellerPids: settings.bestSellerPids || [],
@@ -122,6 +123,17 @@ export const updateSettings = async (req, res) => {
       if (req.body.announcementBar.text !== undefined) settings.announcementBar.text = req.body.announcementBar.text;
       if (req.body.announcementBar.isActive !== undefined) settings.announcementBar.isActive = req.body.announcementBar.isActive;
       if (req.body.announcementBar.link !== undefined) settings.announcementBar.link = req.body.announcementBar.link;
+    }
+
+    if (req.body.launchModal) {
+      const lm = req.body.launchModal;
+      if (lm.isActive    !== undefined) settings.launchModal.isActive    = lm.isActive;
+      if (lm.badge       !== undefined) settings.launchModal.badge       = lm.badge;
+      if (lm.title       !== undefined) settings.launchModal.title       = lm.title;
+      if (lm.description !== undefined) settings.launchModal.description = lm.description;
+      if (lm.ctaLabel    !== undefined) settings.launchModal.ctaLabel    = lm.ctaLabel;
+      if (lm.ctaLink     !== undefined) settings.launchModal.ctaLink     = lm.ctaLink;
+      if (lm.image       !== undefined) settings.launchModal.image       = lm.image;
     }
 
     if (req.body.socialLinks) {

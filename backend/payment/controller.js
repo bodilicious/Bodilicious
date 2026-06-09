@@ -87,7 +87,7 @@ export const initRazorpayOrder = async (req, res) => {
         });
 
         // 🚀 Audit Payment Initiated
-        logAction(req, "payment_initiated", "order", razorpayOrder.id, {
+        await logAction(req, "payment_initiated", "order", razorpayOrder.id, {
             amount: finalAmount,
             itemCount: items.length
         }).catch(err => console.error("Payment Initiated Audit Failed:", err));
@@ -146,7 +146,7 @@ export const verifyPayment = async (req, res) => {
 
         if (expectedSignature !== razorpay_signature) {
             // 🚀 Audit Verification Failed
-            logAction(req, "payment_verification_failed", "order", razorpay_order_id, {
+            await logAction(req, "payment_verification_failed", "order", razorpay_order_id, {
                 paymentId: razorpay_payment_id
             }, { severity: "CRITICAL" }).catch(err => console.error("Payment Verification Failed Audit Failed:", err));
             return res.status(400).json({ success: false, message: "Invalid payment signature" });
@@ -189,7 +189,7 @@ export const verifyPayment = async (req, res) => {
                 await product.save({ session });
 
                 if (product.stock <= (product.lowStockThreshold || 5)) {
-                    NotificationService.emit({
+                    await NotificationService.emit({
                         title: "Low Stock Alert",
                         body: `${product.name} is low on stock (${product.stock} left).`,
                         type: "warning",
@@ -259,13 +259,13 @@ export const verifyPayment = async (req, res) => {
             await UserProfile.findByIdAndUpdate(userId, { $set: { cart: [] } }, { session });
             
             // 🚀 Audit Order Placement (Razorpay)
-            logAction(req, "order_placed", "order", newOrder._id.toString(), {
+            await logAction(req, "order_placed", "order", newOrder._id.toString(), {
                 total: finalAmount,
                 itemCount: orderItems.length,
                 paymentMethod: "razorpay"
             }).catch(err => console.error("Order Placed Audit Failed (Razorpay):", err));
 
-            NotificationService.emit({
+            await NotificationService.emit({
                 title: "New Order Received",
                 body: `Order ${newOrder._id.toString().slice(-6).toUpperCase()} placed for ₹${finalAmount}.`,
                 type: "info",
@@ -298,17 +298,19 @@ export const verifyPayment = async (req, res) => {
             session.endSession();
             
             // 🚀 Audit Order Creation Failed
-            logAction(req, "order_creation_failed", "order", razorpay_order_id, {
+            await logAction(req, "order_creation_failed", "order", razorpay_order_id, {
                 error: txErr.message
             }, { severity: "ERROR" }).catch(err => console.error("Order Creation Failed Audit Failed:", err));
 
             throw txErr;
         }
 
-        // Non-blocking Shiprocket integration
-        pushOrderToShiprocket(order).catch(shipErr => {
+        // Blocking Shiprocket integration for serverless safety
+        try {
+            await pushOrderToShiprocket(order);
+        } catch (shipErr) {
             console.error("Shiprocket error after payment:", shipErr.message);
-        });
+        }
 
         // ── Generate Invoice ──────────────────────────────────────────────
         let invoiceNumber = null;
@@ -327,13 +329,13 @@ export const verifyPayment = async (req, res) => {
         if (invoiceNumber) {
             const user = await UserProfile.findById(userId);
             const freshPopulated = await Order.findById(order._id).populate("items.product");
-            sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
+            await sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
             // Send alert to admin
-            sendAdminNewOrderAlert(freshPopulated);
-            // 5. Fire non-blocking WhatsApp order placed notification
+            await sendAdminNewOrderAlert(freshPopulated);
+            // 5. Fire blocking WhatsApp order placed notification
             const settings = await getSettings();
             if (settings.waAllEnabled && settings.waOrderPlacedEnabled) {
-              enqueueWhatsApp("order_placed", { 
+              await enqueueWhatsApp("order_placed", { 
                 userId: userId.toString(), 
                 orderId: order._id.toString() 
               }).catch(err => console.error("Failed to enqueue WhatsApp order_placed:", err));
@@ -385,7 +387,7 @@ export const razorpayWebhook = async (req, res) => {
                 await existing.save();
                 
                 // 🚀 Audit Payment Captured
-                logAction(req, "payment_captured", "order", existing._id.toString(), {
+                await logAction(req, "payment_captured", "order", existing._id.toString(), {
                     paymentId: payment.id,
                     amount: payment.amount / 100
                 }, { source: "razorpay-webhook" }).catch(err => console.error("Payment Captured Audit Failed:", err));
@@ -410,13 +412,13 @@ export const razorpayWebhook = async (req, res) => {
                 if (invoiceNumber) {
                     const user = await UserProfile.findById(existing.user);
                     const freshPopulated = await Order.findById(populated._id).populate("items.product");
-                    sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
+                    await sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
                     // Send alert to admin
-                    sendAdminNewOrderAlert(freshPopulated);
+                    await sendAdminNewOrderAlert(freshPopulated);
                 }
             } else if (!existing) {
                 // 🚀 Audit Payment Success No Order
-                logAction(req, "payment_success_no_order", "order", payment.order_id, {
+                await logAction(req, "payment_success_no_order", "order", payment.order_id, {
                     paymentId: payment.id,
                     amount: payment.amount / 100
                 }, { source: "razorpay-webhook", severity: "CRITICAL" }).catch(err => console.error("Payment Success No Order Audit Failed:", err));
@@ -424,11 +426,12 @@ export const razorpayWebhook = async (req, res) => {
                 // Send critical alert to admins about the orphaned payment
                 sendAdminPaymentSuccessNoOrderAlert(payment.id, payment.order_id, payment.amount / 100);
 
-                NotificationService.emit({
-                    title: "Orphaned Payment Captured",
-                    body: `Payment ${payment.id} for ₹${payment.amount / 100} was captured but has no matching order!`,
+                await NotificationService.emit({
+                    title: "Orphaned Payment Received",
+                    body: `Payment of ₹${payment.amount / 100} was captured via Razorpay, but the corresponding order was not found in our database.`,
                     type: "critical",
-                    sourceModule: "payments",
+                    sourceModule: "payment",
+                    sourceId: payment.id
                 });
             }
         } else if (event === "payment.failed") {
@@ -440,22 +443,23 @@ export const razorpayWebhook = async (req, res) => {
             );
 
             // 🚀 Audit Payment Failed
-            logAction(req, "payment_failed", "order", payment.order_id, {
+            await logAction(req, "payment_failed", "order", payment.order_id, {
                 paymentId: payment.id,
                 reason: payment.error_description
             }, { source: "razorpay-webhook", severity: "WARNING" }).catch(err => console.error("Payment Failed Audit Failed:", err));
 
-            NotificationService.emit({
+            await NotificationService.emit({
                 title: "Payment Failed",
-                body: `Payment ${payment.id} failed: ${payment.error_description}`,
+                body: `A payment attempt of ₹${payment.amount / 100} failed. Reason: ${payment.error_description}`,
                 type: "warning",
-                sourceModule: "payments",
+                sourceModule: "payment",
+                sourceId: payment.id
             });
 
             // Fire WhatsApp payment failure alert after a slight delay
             const settings = await getSettings();
             if (settings.waAllEnabled && settings.waPaymentFailureEnabled) {
-              enqueueWhatsApp("payment_failure", {
+              await enqueueWhatsApp("payment_failure", {
                 razorpayOrderId: payment.order_id,
                 amount: payment.amount / 100
               }, { delay: 3000 }).catch(err => console.error("Failed to enqueue WhatsApp payment_failure:", err));
@@ -471,7 +475,7 @@ export const razorpayWebhook = async (req, res) => {
                 await order.save();
                 
                 // 🚀 Audit Refund Confirmed
-                logAction(req, "refund_confirmed", "order", order._id.toString(), {
+                await logAction(req, "refund_confirmed", "order", order._id.toString(), {
                     refundId: refund.id,
                     amount: refund.amount / 100
                 }, { source: "system" }).catch(err => console.error("Refund Confirmed Audit Failed:", err));

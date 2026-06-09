@@ -2,6 +2,7 @@ import Order from "../tracker/models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
 import RitualResponse from "./ritualModels.js";
+import AuditLogV2 from "../audit/models.js";
 
 /**
  * GET /api/v1/admin/analytics/sales?startDate=&endDate=
@@ -319,20 +320,50 @@ export const getCustomerAnalytics = async (req, res) => {
       };
     }));
 
-    // New vs Returning Trend
-    // This is complex as it requires checking if it's the user's first order
-    // Simplified: group orders by date and check if user had previous orders
-    const trendData = await Order.aggregate([
-      { $match: { ...query, paymentStatus: "paid" } },
-      { $sort: { createdAt: 1 } },
+    // New vs Returning Trend — batch approach, no N+1
+    // Step 1: Get all orders in range
+    const ordersInRange = await Order.find(
+      { ...query, paymentStatus: "paid" },
+      "user createdAt"
+    ).lean();
+
+    // Step 2: Collect unique user IDs across the range
+    const userIdsInRange = [...new Set(ordersInRange.map(o => o.user?.toString()).filter(Boolean))];
+
+    // Step 3: Single batch aggregate — find the first-ever order date for each user in the set
+    const { default: mongoose } = await import("mongoose");
+    const firstOrderBatch = await Order.aggregate([
       {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
-          orders: { $push: { user: "$user", id: "$_id" } }
+        $match: {
+          paymentStatus: "paid",
+          user: { $in: userIdsInRange.map(id => new mongoose.Types.ObjectId(id)) }
         }
       },
-      { $sort: { _id: 1 } }
+      { $group: { _id: "$user", firstOrderDate: { $min: "$createdAt" } } }
     ]);
+
+
+    // Build a lookup map: userId -> their first-ever order date
+    const firstOrderMap = new Map();
+    firstOrderBatch.forEach(r => firstOrderMap.set(r._id.toString(), r.firstOrderDate));
+
+    // Step 4: Classify each order in memory by month
+    const rangeStartDate = query.createdAt?.$gte || new Date(0);
+    const monthMap = new Map();
+    ordersInRange.forEach(order => {
+      const monthKey = order.createdAt.toISOString().slice(0, 7);
+      if (!monthMap.has(monthKey)) monthMap.set(monthKey, { date: monthKey, newBuyers: 0, returningBuyers: 0 });
+      const bucket = monthMap.get(monthKey);
+      const userId = order.user?.toString();
+      const firstDate = userId ? firstOrderMap.get(userId) : null;
+      // If their very first order falls within the range start date, they're "new" for this period
+      if (!firstDate || firstDate >= rangeStartDate) {
+        bucket.newBuyers++;
+      } else {
+        bucket.returningBuyers++;
+      }
+    });
+    const trendData = Array.from(monthMap.values()).sort((a, b) => a.date.localeCompare(b.date));
     
     // Retention Funnel Data (Rough distribution of purchase counts)
     const funnelData = await Order.aggregate([
@@ -360,7 +391,7 @@ export const getCustomerAnalytics = async (req, res) => {
       data: { 
         segmentStats, 
         funnelData,
-        trendData // Note: this needs further processing in FE for New vs Returning
+        trendData
       } 
     });
   } catch (err) {
@@ -479,5 +510,96 @@ export const getOrderAnalytics = async (req, res) => {
   } catch (err) {
     console.error("Order Analytics Error:", err);
     res.status(500).json({ success: false, message: "Error fetching order analytics" });
+  }
+};
+
+/**
+ * GET /api/v1/admin/analytics/behavioral
+ * Returns:
+ *   - peakOrders: orders grouped by hour and dayOfWeek for a heatmap
+ *   - errorRates: backend ERROR audit events + checkout failures, by event_type
+ */
+export const getBehavioralAnalytics = async (req, res) => {
+  try {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    // Peak order heatmap: { hour, dayOfWeek, orders }
+    const peakOrders = await Order.aggregate([
+      { $match: { paymentStatus: { $in: ["paid", "refunded"] }, createdAt: { $gte: ninetyDaysAgo } } },
+      {
+        $group: {
+          _id: {
+            hour: { $hour: "$createdAt" },
+            dayOfWeek: { $dayOfWeek: "$createdAt" } // 1=Sun, 7=Sat
+          },
+          orders: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          hour: "$_id.hour",
+          dayOfWeek: "$_id.dayOfWeek",
+          orders: 1
+        }
+      },
+      { $sort: { dayOfWeek: 1, hour: 1 } }
+    ]);
+
+    // Backend error rates by event_type (last 90 days)
+    const backendErrors = await AuditLogV2.aggregate([
+      { $match: { severity: "ERROR", createdAt: { $gte: ninetyDaysAgo } } },
+      {
+        $group: {
+          _id: "$event_type",
+          count: { $sum: 1 },
+          lastSeen: { $max: "$createdAt" }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 20 },
+      { $project: { _id: 0, event_type: "$_id", count: 1, lastSeen: 1, category: { $literal: "backend" } } }
+    ]);
+
+    // Checkout failures: orders that were created but payment failed or status is failed/pending old
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const checkoutFailures = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo },
+          paymentStatus: { $in: ["failed", "pending"] },
+          orderStatus: { $in: ["pending", "payment_failed"] }
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$totalAmount" }
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, date: "$_id", count: 1, totalAmount: 1 } }
+    ]);
+
+    const checkoutFailureTotal = checkoutFailures.reduce((s, d) => s + d.count, 0);
+    const checkoutRevenueLost = checkoutFailures.reduce((s, d) => s + d.totalAmount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        peakOrders,
+        backendErrors,
+        checkoutFailures,
+        checkoutFailureTotal,
+        checkoutRevenueLost
+      }
+    });
+  } catch (error) {
+    console.error("[Analytics] Error in getBehavioralAnalytics:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch behavioral analytics" });
   }
 };

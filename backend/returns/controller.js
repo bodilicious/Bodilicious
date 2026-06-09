@@ -71,14 +71,12 @@ export const approveReturn = async (req, res) => {
 
     await order.save();
 
-    // Fire approval email non-blocking
+    // Fire approval email directly (blocking)
     const userEmail = order.shippingDetails?.email || order.user?.email;
     const userName = order.shippingDetails?.name || order.user?.name || "Customer";
     if (userEmail) {
-      setImmediate(async () => {
-        try { await sendReturnApprovedEmail(order, userEmail, userName); }
-        catch (e) { console.error("Return approval email failed:", e.message); }
-      });
+      try { await sendReturnApprovedEmail(order, userEmail, userName); }
+      catch (e) { console.error("Return approval email failed:", e.message); }
     }
 
     await logAction(req, "return_approved", "order", order._id.toString(), {
@@ -117,14 +115,12 @@ export const rejectReturn = async (req, res) => {
 
     await order.save();
 
-    // Fire rejection email non-blocking
+    // Fire rejection email directly (blocking)
     const userEmail = order.shippingDetails?.email || order.user?.email;
     const userName = order.shippingDetails?.name || order.user?.name || "Customer";
     if (userEmail) {
-      setImmediate(async () => {
-        try { await sendReturnRejectedEmail(order, userEmail, userName, rejectionReason); }
-        catch (e) { console.error("Return rejection email failed:", e.message); }
-      });
+      try { await sendReturnRejectedEmail(order, userEmail, userName, rejectionReason); }
+      catch (e) { console.error("Return rejection email failed:", e.message); }
     }
 
     await logAction(req, "return_rejected", "order", order._id.toString(), {

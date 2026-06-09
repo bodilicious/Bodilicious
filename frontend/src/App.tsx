@@ -10,6 +10,7 @@ import { Toaster } from 'react-hot-toast';
 // Eagerly imported to prevent a Suspense flash on every admin tab switch.
 import AdminRoute from './components/AdminRoute';
 import SessionTracker from './components/SessionTracker';
+import LaunchModal from './components/LaunchModal';
 
 // Lazy load page components
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -32,6 +33,7 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 const ShippingRefundPage = lazy(() => import('./pages/ShippingRefundPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const BrandStoryPage = lazy(() => import('./pages/BrandStoryPage'));
+const HowToOrderPage = lazy(() => import('./pages/HowToOrderPage'));
 const RitualFinderPage = lazy(() => import('./pages/RitualFinderPage'));
 const OfferPage = lazy(() => import('./pages/OfferPage'));
 const EmailActionPage = lazy(() => import('./pages/EmailActionPage'));
@@ -151,6 +153,7 @@ function AppRoutes() {
             <Route path="/about" element={<PageTransition><AboutPage /></PageTransition>} />
             <Route path="/brand-story" element={<PageTransition><BrandStoryPage /></PageTransition>} />
             <Route path="/offers" element={<PageTransition><OfferPage /></PageTransition>} />
+            <Route path="/how-to-order" element={<PageTransition><HowToOrderPage /></PageTransition>} />
 
             {/* Admin Routes */}
               <Route element={<AdminRoute />}>
@@ -187,6 +190,7 @@ export default function App() {
   return (
     <AppProvider>
       <SessionTracker />
+      <LaunchModal />
       <LazyMotion features={domAnimation} strict>
         <Toaster
           position="top-center"

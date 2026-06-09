@@ -20,6 +20,7 @@ export default function Footer() {
             </h3>
             <ul className="space-y-2.5">
               {[
+                { label: 'How to Order', path: '/how-to-order' },
                 { label: 'Contact Us', path: '/contact' },
                 { label: 'Shipping & Returns', path: '/tracking' },
                 { label: 'FAQs', path: '/#faq' }

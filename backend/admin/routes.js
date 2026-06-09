@@ -78,6 +78,7 @@ router.get("/analytics/customers", analyticsCtrl.getCustomerAnalytics);
 router.get("/analytics/operations", analyticsCtrl.getOperationAnalytics);
 router.get("/analytics/ritual-finder", analyticsCtrl.getRitualAnalytics);
 router.get("/analytics/orders", analyticsCtrl.getOrderAnalytics);
+router.get("/analytics/behavioral", analyticsCtrl.getBehavioralAnalytics);
 
 // Products — bulk routes MUST come before /:id routes
 router.post("/products/bulk-stock", adminCtrl.bulkStockImport);

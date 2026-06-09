@@ -163,6 +163,7 @@ const defaultForm = {
 
   // 7. Storefront
   announcementBar: { text: '', isActive: false, link: '' },
+  launchModal: { isActive: false, badge: '', title: '', description: '', ctaLabel: '', ctaLink: '', image: '' },
   socialLinks: { instagram: '', facebook: '', twitter: '', youtube: '' },
   seoMeta: { title: 'Bodilicious', description: 'Premium skincare and wellness products', ogImage: '' },
 };
@@ -210,6 +211,7 @@ export default function StoreSettings() {
           ...defaultForm,
           ...d,
           announcementBar: { ...defaultForm.announcementBar, ...(d.announcementBar || {}) },
+          launchModal: { ...defaultForm.launchModal, ...(d.launchModal || {}) },
           socialLinks: { ...defaultForm.socialLinks, ...(d.socialLinks || {}) },
           seoMeta: { ...defaultForm.seoMeta, ...(d.seoMeta || {}) },
           returnReasonTags: Array.isArray(d.returnReasonTags) ? d.returnReasonTags : defaultForm.returnReasonTags,
@@ -274,6 +276,50 @@ export default function StoreSettings() {
       toast.error('An error occurred while saving.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLaunchModalImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const file = e.target.files[0];
+    const uploadToast = toast.loading('Uploading image...');
+    try {
+      const headers = await getAuthHeaders();
+      delete (headers as any)['Content-Type']; 
+      const payload = new FormData();
+      payload.append('image', file);
+      const res = await fetch(`${API_URL}/api/v1/admin/upload`, { method: 'POST', headers, body: payload });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNested('launchModal', 'image', data.path);
+        toast.success(`Image uploaded successfully`, { id: uploadToast });
+      } else {
+        toast.error('Error uploading image', { id: uploadToast });
+      }
+    } catch (err) {
+      toast.error('Error uploading image', { id: uploadToast });
+    }
+  };
+
+  const handleOGImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const file = e.target.files[0];
+    const uploadToast = toast.loading('Uploading OG Image...');
+    try {
+      const headers = await getAuthHeaders();
+      delete (headers as any)['Content-Type']; 
+      const payload = new FormData();
+      payload.append('image', file);
+      const res = await fetch(`${API_URL}/api/v1/admin/upload`, { method: 'POST', headers, body: payload });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNested('seoMeta', 'ogImage', data.path);
+        toast.success(`OG Image uploaded successfully`, { id: uploadToast });
+      } else {
+        toast.error('Error uploading image', { id: uploadToast });
+      }
+    } catch (err) {
+      toast.error('Error uploading image', { id: uploadToast });
     }
   };
 
@@ -715,6 +761,52 @@ export default function StoreSettings() {
                   </div>
                 </div>
 
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-silk-light shadow-sm">
+                  <div className="flex justify-between items-center mb-6 border-b border-silk-light pb-4">
+                    <h3 className="font-bold text-lg text-dark-red">Launch Modal (Pop-up)</h3>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <span className="text-sm font-bold text-gray-600">Active</span>
+                      <div className="relative">
+                        <input type="checkbox" className="sr-only" checked={form.launchModal?.isActive || false} onChange={e => setNested('launchModal', 'isActive', e.target.checked)} />
+                        <div className={`block w-10 h-6 rounded-full transition-colors ${form.launchModal?.isActive ? 'bg-dark-red' : 'bg-gray-300'}`} />
+                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${form.launchModal?.isActive ? 'translate-x-4' : ''}`} />
+                      </div>
+                    </label>
+                  </div>
+                  <div className="space-y-4">
+                    <Field label="Badge Text"><input type="text" className={inputCls} value={form.launchModal?.badge || ''} onChange={e => setNested('launchModal', 'badge', e.target.value)} placeholder="e.g. Just Launched" /></Field>
+                    <Field label="Title"><input type="text" className={inputCls} value={form.launchModal?.title || ''} onChange={e => setNested('launchModal', 'title', e.target.value)} placeholder="e.g. New Collection" /></Field>
+                    <Field label="Description"><textarea className={`${inputCls} h-20`} value={form.launchModal?.description || ''} onChange={e => setNested('launchModal', 'description', e.target.value)} placeholder="Enter details..." /></Field>
+                    <Field label="CTA Button Label"><input type="text" className={inputCls} value={form.launchModal?.ctaLabel || ''} onChange={e => setNested('launchModal', 'ctaLabel', e.target.value)} placeholder="e.g. Explore Collection" /></Field>
+                    <Field label="CTA Button Link"><input type="text" className={inputCls} value={form.launchModal?.ctaLink || ''} onChange={e => setNested('launchModal', 'ctaLink', e.target.value)} placeholder="e.g. /shop" /></Field>
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-grey-beige uppercase tracking-wider mb-2">Popup Image</label>
+                      <div className="flex items-center gap-4">
+                        {form.launchModal?.image && (
+                          <div className="relative group w-24 h-24 rounded-xl border border-silk-light overflow-hidden bg-gray-50 shrink-0">
+                            <img src={form.launchModal.image} alt="Popup Graphic" className="w-full h-full object-cover" />
+                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                type="button"
+                                onClick={() => setNested('launchModal', 'image', '')}
+                                className="bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center shadow-md font-bold"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <label className="flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-silk-light rounded-xl hover:bg-gray-50 cursor-pointer transition-colors text-center">
+                          <span className="text-dark-red font-bold block mb-1">Click to Upload Image</span>
+                          <span className="text-sm text-gray-500">JPG, PNG, WEBP (Transparent background recommended)</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={handleLaunchModalImageUpload} />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <Card title="Social Links">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(['instagram', 'facebook', 'twitter', 'youtube'] as const).map(platform => (
@@ -729,7 +821,30 @@ export default function StoreSettings() {
                   <div className="space-y-4">
                     <Field label="Meta Title"><input type="text" className={inputCls} value={form.seoMeta.title} onChange={e => setNested('seoMeta', 'title', e.target.value)} /></Field>
                     <Field label="Meta Description"><textarea className={`${inputCls} h-20`} value={form.seoMeta.description} onChange={e => setNested('seoMeta', 'description', e.target.value)} /></Field>
-                    <Field label="OG Image URL"><input type="url" className={inputCls} value={form.seoMeta.ogImage} onChange={e => setNested('seoMeta', 'ogImage', e.target.value)} placeholder="https://..." /></Field>
+                    <div>
+                      <label className="block text-xs font-bold text-grey-beige uppercase tracking-wider mb-2">OG Image (Social Sharing)</label>
+                      <div className="flex items-center gap-4">
+                        {form.seoMeta.ogImage && (
+                          <div className="relative group w-24 h-24 rounded-xl border border-silk-light overflow-hidden bg-gray-50 shrink-0">
+                            <img src={form.seoMeta.ogImage} alt="OG Image" className="w-full h-full object-cover" />
+                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                type="button"
+                                onClick={() => setNested('seoMeta', 'ogImage', '')}
+                                className="bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center shadow-md font-bold"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <label className="flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-silk-light rounded-xl hover:bg-gray-50 cursor-pointer transition-colors text-center">
+                          <span className="text-dark-red font-bold block mb-1">Click to Upload OG Image</span>
+                          <span className="text-sm text-gray-500">Ideal size: 1200x630 pixels (JPG, PNG)</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={handleOGImageUpload} />
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </Card>
               </div>
