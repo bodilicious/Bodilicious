@@ -3,7 +3,7 @@ import Order from "./models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
 import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, createShiprocketReturn } from "./shiprocketservice.js";
-import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendOrderShippedEmail } from "../email/emailService.js";
+import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendOrderShippedEmail, sendAdminNewOrderAlert } from "../email/emailService.js";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
 import Razorpay from "razorpay";
@@ -177,6 +177,9 @@ export const createOrder = async (req, res) => {
     } else {
       console.warn("⚠️ Invoice generation failed or missing, skipping email trigger.");
     }
+    
+    // ── Trigger Admin New Order Alert ──
+    await sendAdminNewOrderAlert(populatedOrder).catch(err => console.error("Admin Alert Failed:", err));
 
     /* =========================================================
        SHIPROCKET INTEGRATION (Non-blocking)
