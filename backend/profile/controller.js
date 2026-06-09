@@ -161,28 +161,114 @@ export const syncCart = async (req, res) => {
 
     await user.save();
 
-    // 🚀 Audit Cart Changes
+    // 🚀 Audit Cart Changes & Update cartHistory
+    const bulkOps = [];
     for (const [pid, newQty] of newCartMap.entries()) {
       const oldQty = oldCartMap.get(pid) || 0;
       if (newQty > oldQty) {
+        const addedQty = newQty - oldQty;
+        
+        // Track cartHistory additions securely via $inc
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: user._id, "cartHistory.productId": pid },
+            update: {
+              $inc: { "cartHistory.$.timesAdded": addedQty },
+              $set: { "cartHistory.$.lastAddedAt": new Date() }
+            }
+          }
+        });
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: user._id, "cartHistory.productId": { $ne: pid } },
+            update: {
+              $push: {
+                cartHistory: {
+                  productId: pid,
+                  timesAdded: addedQty,
+                  lastAddedAt: new Date()
+                }
+              }
+            }
+          }
+        });
+
         logAction(req, "cart_item_added", "product", pid, {
-          quantity_added: newQty - oldQty,
+          quantity_added: addedQty,
           total_quantity: newQty
         }).catch(err => console.error("Cart Item Added Audit Failed:", err));
       } else if (newQty < oldQty) {
+        const removedQty = oldQty - newQty;
+        
+        // Track cartHistory removals
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: user._id, "cartHistory.productId": pid },
+            update: {
+              $inc: { "cartHistory.$.timesRemoved": removedQty },
+              $set: { "cartHistory.$.lastRemovedAt": new Date() }
+            }
+          }
+        });
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: user._id, "cartHistory.productId": { $ne: pid } },
+            update: {
+              $push: {
+                cartHistory: {
+                  productId: pid,
+                  timesRemoved: removedQty,
+                  lastRemovedAt: new Date()
+                }
+              }
+            }
+          }
+        });
+
         logAction(req, "cart_item_removed", "product", pid, {
-          quantity_removed: oldQty - newQty,
+          quantity_removed: removedQty,
           total_quantity: newQty
         }).catch(err => console.error("Cart Item Removed Audit Failed:", err));
       }
     }
+    
     for (const pid of oldCartMap.keys()) {
       if (!newCartMap.has(pid)) {
+        const removedQty = oldCartMap.get(pid);
+        
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: user._id, "cartHistory.productId": pid },
+            update: {
+              $inc: { "cartHistory.$.timesRemoved": removedQty },
+              $set: { "cartHistory.$.lastRemovedAt": new Date() }
+            }
+          }
+        });
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: user._id, "cartHistory.productId": { $ne: pid } },
+            update: {
+              $push: {
+                cartHistory: {
+                  productId: pid,
+                  timesRemoved: removedQty,
+                  lastRemovedAt: new Date()
+                }
+              }
+            }
+          }
+        });
+
         logAction(req, "cart_item_removed", "product", pid, {
-          quantity_removed: oldCartMap.get(pid),
+          quantity_removed: removedQty,
           total_quantity: 0
         }).catch(err => console.error("Cart Item Removed Audit Failed:", err));
       }
+    }
+
+    if (bulkOps.length > 0) {
+      await UserProfile.bulkWrite(bulkOps).catch(err => console.error("Failed to bulk write cartHistory:", err));
     }
 
     const userWithPopulatedCart = await UserProfile.findById(user._id)

@@ -15,6 +15,7 @@ import {
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import Select from '../components/Select';
+import { useLocation } from 'react-router-dom';
 
 interface Message {
   _id: string;
@@ -56,9 +57,15 @@ function formatTime(iso: string) {
 
 const TicketManagement: React.FC = () => {
   const { getAuthHeaders } = useApp();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: '', type: '' });
+  const [filters, setFilters] = useState({ 
+    status: queryParams.get('status') || '', 
+    type: '' 
+  });
   const [search, setSearch] = useState('');
 
   // Drawer state
@@ -298,6 +305,15 @@ const TicketManagement: React.FC = () => {
       t.userId?.email?.toLowerCase().includes(s) ||
       t.description.toLowerCase().includes(s)
     );
+  }).sort((a, b) => {
+    // 1. Open tickets first
+    if (a.status === 'open' && b.status !== 'open') return -1;
+    if (a.status !== 'open' && b.status === 'open') return 1;
+    // 2. Then by priority
+    if (a.priority === 'high' && b.priority !== 'high') return -1;
+    if (a.priority !== 'high' && b.priority === 'high') return 1;
+    // 3. Then by creation date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
   const totalOpen = tickets.filter((t) => t.status === 'open').length;

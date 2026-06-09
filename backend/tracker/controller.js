@@ -11,6 +11,7 @@ import crypto from "crypto";
 import StoreSettings from "../settings/models.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
+import NotificationService from "../procurement/notificationService.js";
 
 
 
@@ -720,6 +721,15 @@ export const cancelOrder = async (req, res) => {
       reason: "Cancelled by user"
     }).catch(err => console.error("Order Cancelled Audit Failed:", err));
 
+    NotificationService.emit({
+        title: "Order Cancelled",
+        body: `Order ${order._id.toString().slice(-6).toUpperCase()} was cancelled by user.`,
+        type: "warning",
+        sourceModule: "orders",
+        sourceModel: "Order",
+        sourceId: order._id.toString()
+    });
+
     return res.json({
       success: true,
       data: order,
@@ -826,6 +836,15 @@ export const requestReturn = async (req, res) => {
     const freshOrder = await Order.findById(order._id).populate("items.product");
     createShiprocketReturn(freshOrder, reason.trim()).catch(err => {
       console.error("Delayed Shiprocket return error:", err.message);
+    });
+
+    NotificationService.emit({
+        title: "Return Requested",
+        body: `Order ${order._id.toString().slice(-6).toUpperCase()} requested a return: ${reason.trim()}`,
+        type: "warning",
+        sourceModule: "orders",
+        sourceModel: "Order",
+        sourceId: order._id.toString()
     });
 
     return res.status(201).json({

@@ -1,5 +1,5 @@
 import express from "express";
-import { protect } from "../middleware/auth.js";
+import { protect, tryProtect } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import rateLimit from "express-rate-limit";
 
@@ -29,6 +29,12 @@ import {
   triggerEmailVerification,
   triggerPasswordReset,
 } from "./controller.js";
+
+import {
+  startSession,
+  pingSession,
+  endSession
+} from "../user/sessionController.js";
 
 import UserProfile from "./models.js";
 import { updateUserProfileSchema } from "./schema.js";
@@ -74,6 +80,11 @@ router.put("/address/:addressId", protect, updateAddress);
 router.delete("/address/:addressId", protect, deleteAddress);
 router.patch("/address/:addressId/default", protect, setDefaultAddress);
 router.post("/send-verification", protect, triggerEmailVerification);
+
+// SESSIONS
+router.post("/session/start", tryProtect, startSession);
+router.post("/session/ping", pingSession);
+router.post("/session/end", endSession);
 
 // PUBLIC ROUTES
 router.post("/forgot-password", forgotPasswordLimiter, triggerPasswordReset);

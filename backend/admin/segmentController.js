@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import UserProfile from "../profile/models.js";
+import Product from "../products/models.js";
 import Order from "../tracker/models.js";
 import { exportToCSV } from "../utils/exportCSV.js";
 import { logAction } from "./controller.js";
@@ -296,8 +298,11 @@ export const exportSegmentCSV = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // CUSTOMER ANALYSIS ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
-import Product from "../products/models.js";
+// CUSTOMER ANALYSIS ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
 import { Ticket } from "../support/models.js";
+import UserSession from "../audit/sessionModel.js";
+import AuditLogV2 from "../audit/models.js";
 
 /**
  * GET /api/v1/admin/customers/:id/summary
@@ -310,7 +315,7 @@ export const getCustomerSummary = async (req, res) => {
 
     const user = await UserProfile.findById(
       id,
-      "name email phone avatar segment lifetimeSpend adminNotes createdAt lastLoginAt isBlocked role skinType skinConcerns preferredRoutine gender dateOfBirth"
+      "name email phone avatar segment lifetimeSpend adminNotes createdAt lastLoginAt isBlocked role skinType skinConcerns preferredRoutine gender dateOfBirth lifetimeSessions cartHistory productViewCounts"
     ).lean();
     if (!user) return res.status(404).json({ success: false, message: "Customer not found" });
 
@@ -599,3 +604,263 @@ export const getCustomerCart = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/admin/customers/:id/cart-history
+ */
+export const getCustomerCartHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    
+    // Optional date filter
+    const query = {
+      user_id: id,
+      event_type: { $in: ["CART_ITEM_ADDED", "CART_ITEM_REMOVED"] }
+    };
+    if (req.query.startDate && req.query.endDate) {
+      query.timestamp_utc = { 
+        $gte: new Date(req.query.startDate), 
+        $lte: new Date(req.query.endDate) 
+      };
+    }
+
+    const [rawLogs, total] = await Promise.all([
+      AuditLogV2.find(query)
+        .sort({ timestamp_utc: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      AuditLogV2.countDocuments(query)
+    ]);
+
+    // Enrich logs with product name from targetId if missing
+    const productIds = rawLogs
+      .map(l => l.metadata?.targetId)
+      .filter(id => id && mongoose.isValidObjectId(id));
+      
+    const products = await Product.find({ _id: { $in: productIds } }, "name").lean();
+    const productMap = {};
+    products.forEach(p => productMap[p._id.toString()] = p.name);
+
+    const logs = rawLogs.map(log => {
+      if (log.metadata && log.metadata.targetId && productMap[log.metadata.targetId.toString()]) {
+        log.metadata.productName = log.metadata.productName || productMap[log.metadata.targetId.toString()];
+      }
+      return log;
+    });
+
+    const user = await UserProfile.findById(id).populate("cartHistory.productId", "name").lean();
+
+    res.json({
+      success: true,
+      data: logs,
+      aggregatedData: user?.cartHistory || [],
+      pagination: { page, pages: Math.ceil(total / limit), total }
+    });
+  } catch (err) {
+    console.error("CartHistory Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/payment-history
+ */
+export const getCustomerPaymentHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Fetch from Orders
+    const orders = await Order.find({ user: id })
+      .sort({ createdAt: -1 })
+      .select('orderId totalAmount paymentStatus paymentMethod createdAt orderStatus')
+      .lean();
+      
+    // Fetch PAYMENT_FAILED from AuditLogV2
+    const failedLogs = await AuditLogV2.find({
+      user_id: id,
+      event_type: "PAYMENT_FAILED"
+    }).sort({ timestamp_utc: -1 }).lean();
+
+    res.json({
+      success: true,
+      data: {
+        orders,
+        failedAttempts: failedLogs
+      }
+    });
+  } catch (err) {
+    console.error("PaymentHistory Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/activity
+ * Estimates session durations based on first/last event per session_id.
+ */
+export const getCustomerActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const mongoose = (await import("mongoose")).default;
+    const objectId = mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id) : null;
+    if (!objectId) return res.status(400).json({ success: false, message: "Invalid user ID" });
+
+    const total = await UserSession.countDocuments({ user_id: objectId });
+    const rawSessions = await UserSession.find({ user_id: objectId })
+      .sort({ start_time: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    // Resolve stale/crashed sessions and map to frontend shape
+    const resolvedSessions = UserSession.resolveStaleSessions(rawSessions);
+    
+    const mappedSessions = resolvedSessions.map(s => ({
+      _id: s.session_id,
+      startTime: s.start_time,
+      endTime: s.end_time,
+      durationMs: s.durationMs,
+      network: s.network
+    }));
+
+    res.json({
+      success: true,
+      data: mappedSessions,
+      pagination: { page, pages: Math.ceil(total / limit), total }
+    });
+  } catch (err) {
+    console.error("CustomerActivity Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/audit
+ */
+export const getCustomerAuditLogs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const { startDate, endDate, eventType } = req.query;
+    const query = { user_id: id };
+    
+    if (eventType) {
+      query.event_type = eventType;
+    }
+    if (startDate && endDate) {
+      query.timestamp_utc = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const [rawLogs, total] = await Promise.all([
+      AuditLogV2.find(query)
+        .sort({ timestamp_utc: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      AuditLogV2.countDocuments(query)
+    ]);
+
+    // Enrich logs with product name from targetId if missing
+    const productIds = rawLogs
+      .map(l => l.metadata?.targetId)
+      .filter(id => id && mongoose.isValidObjectId(id));
+      
+    const products = await Product.find({ _id: { $in: productIds } }, "name").lean();
+    const productMap = {};
+    products.forEach(p => productMap[p._id.toString()] = p.name);
+
+    const logs = rawLogs.map(log => {
+      if (log.metadata && log.metadata.targetId && productMap[log.metadata.targetId.toString()]) {
+        log.metadata.productName = log.metadata.productName || productMap[log.metadata.targetId.toString()];
+      }
+      return log;
+    });
+
+    res.json({
+      success: true,
+      data: logs,
+      pagination: { page, pages: Math.ceil(total / limit), total }
+    });
+  } catch (err) {
+    console.error("CustomerAuditLogs Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/v1/admin/customers/:id/engagement
+ * Lazy-loaded engagement analytics
+ */
+export const getCustomerEngagement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const objectId = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
+    if (!objectId) return res.status(400).json({ success: false, message: "Invalid user ID" });
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const [sessionAgg, orderAgg] = await Promise.all([
+      UserSession.aggregate([
+        { $match: { user_id: objectId, start_time: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: null,
+            totalDurationMs: { $sum: "$durationMs" },
+            sessionCount: { $sum: 1 },
+          }
+        }
+      ]),
+      Order.aggregate([
+        { $match: { user: objectId } },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            paidOrders: { $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0] } },
+            failedOrders: { $sum: { $cond: [{ $eq: ["$paymentStatus", "failed"] }, 1, 0] } },
+            couponUsageCount: {
+              $sum: { $cond: [{ $ifNull: ["$coupon", false] }, 1, 0] }
+            }
+          }
+        }
+      ])
+    ]);
+
+    const sessionData = sessionAgg[0] || { totalDurationMs: 0, sessionCount: 0 };
+    const orderData = orderAgg[0] || { totalOrders: 0, paidOrders: 0, failedOrders: 0, couponUsageCount: 0 };
+
+    res.json({
+      success: true,
+      data: {
+        sessions6m: {
+          totalDurationMs: sessionData.totalDurationMs,
+          sessionCount: sessionData.sessionCount,
+          averageDurationMs: sessionData.sessionCount > 0 ? Math.floor(sessionData.totalDurationMs / sessionData.sessionCount) : 0
+        },
+        orders: {
+          totalOrders: orderData.totalOrders,
+          paidOrders: orderData.paidOrders,
+          failedOrders: orderData.failedOrders,
+          couponUsageCount: orderData.couponUsageCount,
+          successRate: orderData.totalOrders > 0 ? parseFloat(((orderData.paidOrders / orderData.totalOrders) * 100).toFixed(1)) : 0
+        }
+      }
+    });
+  } catch (err) {
+    console.error("CustomerEngagement Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

@@ -11,6 +11,7 @@ import { trackServerEvent } from "../utils/posthog.js";
 import StoreSettings from "../settings/models.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
+import NotificationService from "../procurement/notificationService.js";
 
 /* =========================================================
    INIT RAZORPAY ORDER
@@ -186,6 +187,17 @@ export const verifyPayment = async (req, res) => {
 
                 product.stock -= item.quantity;
                 await product.save({ session });
+
+                if (product.stock <= (product.lowStockThreshold || 5)) {
+                    NotificationService.emit({
+                        title: "Low Stock Alert",
+                        body: `${product.name} is low on stock (${product.stock} left).`,
+                        type: "warning",
+                        sourceModule: "products",
+                        sourceModel: "Product",
+                        sourceId: product._id.toString()
+                    });
+                }
             }
 
             const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
@@ -252,6 +264,15 @@ export const verifyPayment = async (req, res) => {
                 itemCount: orderItems.length,
                 paymentMethod: "razorpay"
             }).catch(err => console.error("Order Placed Audit Failed (Razorpay):", err));
+
+            NotificationService.emit({
+                title: "New Order Received",
+                body: `Order ${newOrder._id.toString().slice(-6).toUpperCase()} placed for ₹${finalAmount}.`,
+                type: "info",
+                sourceModule: "orders",
+                sourceModel: "Order",
+                sourceId: newOrder._id.toString()
+            });
 
             // 🚀 PostHog Server-Side Tracking
             trackServerEvent(userId, 'Order Completed', {
@@ -402,6 +423,13 @@ export const razorpayWebhook = async (req, res) => {
                 
                 // Send critical alert to admins about the orphaned payment
                 sendAdminPaymentSuccessNoOrderAlert(payment.id, payment.order_id, payment.amount / 100);
+
+                NotificationService.emit({
+                    title: "Orphaned Payment Captured",
+                    body: `Payment ${payment.id} for ₹${payment.amount / 100} was captured but has no matching order!`,
+                    type: "critical",
+                    sourceModule: "payments",
+                });
             }
         } else if (event === "payment.failed") {
             const payment = payload.payment.entity;
@@ -416,6 +444,13 @@ export const razorpayWebhook = async (req, res) => {
                 paymentId: payment.id,
                 reason: payment.error_description
             }, { source: "razorpay-webhook", severity: "WARNING" }).catch(err => console.error("Payment Failed Audit Failed:", err));
+
+            NotificationService.emit({
+                title: "Payment Failed",
+                body: `Payment ${payment.id} failed: ${payment.error_description}`,
+                type: "warning",
+                sourceModule: "payments",
+            });
 
             // Fire WhatsApp payment failure alert after a slight delay
             const settings = await getSettings();

@@ -8,6 +8,11 @@ import {
 import { v2 as cloudinary } from "cloudinary";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
+import Redis from "ioredis";
+import NotificationService from "../procurement/notificationService.js";
+
+const redisUrl = process.env.REDIS_URL || null;
+const redis = redisUrl ? new Redis(redisUrl) : { incr: () => {} };
 
 // POST /api/v1/support/tickets
 export const createTicket = async (req, res) => {
@@ -55,6 +60,15 @@ export const createTicket = async (req, res) => {
     if (settings.waAllEnabled && settings.waTicketRaisedEnabled) {
       enqueueWhatsApp("ticket_raised", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_raised:", err));
     }
+
+    NotificationService.emit({
+      title: "New Support Ticket",
+      body: `Ticket #${ticket._id.toString().slice(-6).toUpperCase()} created for ${type}.`,
+      type: "info",
+      sourceModule: "support",
+      sourceModel: "Ticket",
+      sourceId: ticket._id.toString(),
+    });
 
     return res.status(201).json({ success: true, ticket });
   } catch (error) {
@@ -165,6 +179,18 @@ export const addMessage = async (req, res) => {
       ).catch((err) => console.error("Ticket reply email failed:", err.message));
     }
 
+    // If customer replied, notify admin
+    if (authorRole === "customer") {
+      NotificationService.emit({
+        title: "Ticket Reply",
+        body: `Customer replied to ticket #${ticket._id.toString().slice(-6).toUpperCase()}.`,
+        type: "info",
+        sourceModule: "support",
+        sourceModel: "Ticket",
+        sourceId: ticket._id.toString(),
+      });
+    }
+
     return res.status(201).json({ success: true, ticket });
   } catch (error) {
     console.error("Error adding message:", error);
@@ -227,6 +253,9 @@ export const updateTicketStatus = async (req, res) => {
         console.error("Failed to send ticket cancelled email:", id, err.message);
       });
     }
+
+    // Invalidate users cache since tickets affect user stats/flags
+    await redis.incr("admin:users:version");
 
     return res.status(200).json({ success: true, ticket });
   } catch (error) {

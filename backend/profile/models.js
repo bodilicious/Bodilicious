@@ -150,6 +150,23 @@ const userProfileSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    cartHistory: [
+      {
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+        timesAdded: { type: Number, default: 0 },
+        timesRemoved: { type: Number, default: 0 },
+        lastAddedAt: { type: Date, default: null },
+        lastRemovedAt: { type: Date, default: null }
+      }
+    ],
+    productViewCounts: [
+      {
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+        count: { type: Number, default: 0 },
+        lastViewedAt: { type: Date, default: null }
+      }
+    ],
+    lifetimeSessions: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -158,6 +175,8 @@ userProfileSchema.index({ email: 1 });
 userProfileSchema.index({ createdAt: -1 });
 userProfileSchema.index({ role: 1 });
 userProfileSchema.index({ lifetimeSpend: -1 });
+userProfileSchema.index({ "cartHistory.productId": 1 });
+userProfileSchema.index({ "productViewCounts.productId": 1 });
 
 const UserProfile =
   mongoose.models.UserProfile ||

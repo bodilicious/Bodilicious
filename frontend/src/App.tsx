@@ -9,6 +9,7 @@ import { Toaster } from 'react-hot-toast';
 // AdminRoute is a layout-level guard used on every /admin sub-route.
 // Eagerly imported to prevent a Suspense flash on every admin tab switch.
 import AdminRoute from './components/AdminRoute';
+import SessionTracker from './components/SessionTracker';
 
 // Lazy load page components
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -45,6 +46,7 @@ const ProductManagement = lazy(() => import('./admin/ProductManagement'));
 const ProductForm = lazy(() => import('./admin/ProductForm'));
 const OrderManagement = lazy(() => import('./admin/OrderManagement'));
 const UserManagement = lazy(() => import('./admin/UserManagement'));
+const CustomerDetails = lazy(() => import('./admin/CustomerDetails'));
 const AuditLogs = lazy(() => import('./admin/AuditLogs'));
 const ReturnsManagement = lazy(() => import('./admin/ReturnsManagement'));
 const CouponManagement = lazy(() => import('./admin/CouponManagement'));
@@ -165,6 +167,7 @@ function AppRoutes() {
                 <Route path="coupons" element={<CouponManagement />} />
                 <Route path="insights" element={<Insights />} />
                 <Route path="users" element={<UserManagement />} />
+                <Route path="users/:id" element={<CustomerDetails />} />
                 <Route path="tickets" element={<TicketManagement />} />
                 <Route path="settings" element={<StoreSettings />} />
                 <Route path="logs" element={<AuditLogs />} />
@@ -183,6 +186,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppProvider>
+      <SessionTracker />
       <LazyMotion features={domAnimation} strict>
         <Toaster
           position="top-center"

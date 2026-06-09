@@ -293,6 +293,40 @@ export const getProductByPid = async (req, res) => {
       });
     }
 
+    // 🚀 NEW: Update UserProfile productViewCounts if user is logged in
+    if (req.user && req.user._id) {
+      // Dynamic import to avoid circular dependency if any, or just require it
+      import("../profile/models.js").then(({ default: UserProfile }) => {
+        const pidObj = product._id;
+        const bulkOps = [
+          {
+            updateOne: {
+              filter: { _id: req.user._id, "productViewCounts.productId": pidObj },
+              update: {
+                $inc: { "productViewCounts.$.count": 1 },
+                $set: { "productViewCounts.$.lastViewedAt": new Date() }
+              }
+            }
+          },
+          {
+            updateOne: {
+              filter: { _id: req.user._id, "productViewCounts.productId": { $ne: pidObj } },
+              update: {
+                $push: {
+                  productViewCounts: {
+                    productId: pidObj,
+                    count: 1,
+                    lastViewedAt: new Date()
+                  }
+                }
+              }
+            }
+          }
+        ];
+        UserProfile.bulkWrite(bulkOps).catch(err => console.error("Failed to update productViewCounts:", err));
+      }).catch(err => console.error("Failed to import UserProfile:", err));
+    }
+
     // Map populated user object to just the name string for the frontend
     if (product.reviews && product.reviews.length > 0) {
       product.reviews = product.reviews.map(r => ({

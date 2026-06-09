@@ -25,11 +25,58 @@ import { useApp } from '../context/AppContext';
 import NotificationsDrawer from './NotificationsDrawer';
 
 const AdminLayout: React.FC = () => {
-  const { logout, user, isPrimaryAdmin } = useApp();
+  const { logout, user, isPrimaryAdmin, getAuthHeaders } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
   // Default to closed on mobile, open on desktop
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
+  const [tooltipData, setTooltipData] = useState<{ text: string; top: number; left: number } | null>(null);
+
+  // Live notification counts
+  const [notificationCounts, setNotificationCounts] = useState({
+    tickets: 0,
+    users: 0,
+    logs: 0
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCounts = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/sidebar-badges`, { headers });
+        const json = await res.json();
+        if (json.success && isMounted) {
+          setNotificationCounts({
+            tickets: json.data.tickets || 0,
+            users: json.data.users || 0,
+            logs: json.data.logs || 0
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch notification counts", err);
+      }
+    };
+    if (user) {
+      fetchCounts();
+      const interval = setInterval(fetchCounts, 60000); // refresh every minute
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
+    }
+  }, [user, getAuthHeaders]);
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLElement>, text: string) => {
+    if (!isSidebarOpen && window.innerWidth > 1024) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltipData({ text, top: rect.top + rect.height / 2, left: rect.right + 8 });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setTooltipData(null);
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -72,15 +119,15 @@ const AdminLayout: React.FC = () => {
       title: 'Marketing & CRM',
       items: [
         { name: 'Coupons', path: '/admin/coupons', icon: Tag },
-        { name: 'Users & Segments', path: '/admin/users', icon: Users },
-        { name: 'Support Tickets', path: '/admin/tickets', icon: Ticket },
+        { name: 'Users & Segments', path: '/admin/users', icon: Users, badge: notificationCounts.users },
+        { name: 'Support Tickets', path: '/admin/tickets', icon: Ticket, badge: notificationCounts.tickets },
       ]
     },
     {
       title: 'Settings',
       items: [
         { name: 'Settings', path: '/admin/settings', icon: Settings },
-        { name: 'Audit Logs', path: '/admin/logs', icon: History },
+        { name: 'Audit Logs', path: '/admin/logs', icon: History, badge: notificationCounts.logs },
       ]
     }
   ];
@@ -107,7 +154,7 @@ const AdminLayout: React.FC = () => {
         className={`bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex flex-col fixed h-full z-30 ${
           isSidebarOpen 
             ? 'translate-x-0 w-64' 
-            : '-translate-x-full lg:translate-x-0 lg:w-20 w-64'
+            : '-translate-x-full lg:translate-x-0 lg:w-16 w-64'
         }`}
       >
         <div className="p-6 flex items-center justify-between">
@@ -131,16 +178,16 @@ const AdminLayout: React.FC = () => {
           
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 hover:bg-[#F5F2EC] text-dark-red rounded-md transition-colors lg:block hidden"
+            className="p-1 hover:bg-[#F5F2EC] text-dark-red rounded-md transition-all duration-200 hover:scale-110 lg:block hidden"
           >
-            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            {isSidebarOpen ? <X size={20} className="animate-in zoom-in spin-in-12" /> : <Menu size={20} className="animate-in zoom-in" />}
           </button>
 
           <button 
             onClick={() => setIsSidebarOpen(false)}
-            className="p-1 hover:bg-[#F5F2EC] text-dark-red rounded-md transition-colors lg:hidden"
+            className="p-1 hover:bg-[#F5F2EC] text-dark-red rounded-md transition-all duration-200 hover:scale-110 lg:hidden"
           >
-            <X size={20} />
+            <X size={20} className="animate-in zoom-in spin-in-12" />
           </button>
         </div>
 
@@ -153,22 +200,40 @@ const AdminLayout: React.FC = () => {
               {group.items.map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
+                const targetPath = item.badge && item.badge > 0 && item.path === '/admin/logs' 
+                  ? '/admin/logs?event_type=PAYMENT_FAILED' 
+                  : item.badge && item.badge > 0 && item.path === '/admin/tickets'
+                  ? '/admin/tickets?status=open'
+                  : item.path;
+
                 return (
                   <Link
                     key={item.name}
-                    to={item.path}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-r-xl rounded-l-none transition-all my-1 ${
+                    to={targetPath}
+                    onMouseEnter={(e) => handleMouseEnter(e, item.name)}
+                    onMouseLeave={handleMouseLeave}
+                    className={`flex items-center justify-between px-4 py-2.5 rounded-r-xl rounded-l-none transition-all my-1 ${
                       isActive 
                         ? 'border-l-4 border-dark-red bg-[#F5F2EC] text-dark-red font-bold' 
                         : 'border-l-4 border-transparent text-grey-beige hover:bg-[#F5F2EC] hover:text-dark-red'
                     }`}
                   >
-                    <Icon size={20} className="shrink-0" />
-                    <span className={`text-sm whitespace-nowrap transition-opacity duration-200 ${
-                      isSidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'
-                    }`}>
-                      {item.name}
-                    </span>
+                    <div className="flex items-center gap-3 relative">
+                      <Icon size={20} className="shrink-0" />
+                      {!isSidebarOpen && item.badge && item.badge > 0 ? (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-b-burgundy rounded-full border border-white hidden lg:block"></span>
+                      ) : null}
+                      <span className={`text-sm whitespace-nowrap transition-opacity duration-200 ${
+                        isSidebarOpen ? 'opacity-100' : 'opacity-0 lg:hidden'
+                      }`}>
+                        {item.name}
+                      </span>
+                    </div>
+                    {item.badge && item.badge > 0 ? (
+                      <span className={`bg-b-burgundy text-white text-[10px] font-bold px-2 py-0.5 rounded-full ${isSidebarOpen ? 'block' : 'hidden lg:hidden'}`}>
+                        {item.badge}
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}
@@ -179,6 +244,8 @@ const AdminLayout: React.FC = () => {
         <div className="p-4 border-t border-gray-100">
           <button
             onClick={handleLogout}
+            onMouseEnter={(e) => handleMouseEnter(e, 'Sign Out')}
+            onMouseLeave={handleMouseLeave}
             className="w-full flex items-center gap-3 px-4 py-2.5 text-grey-beige hover:bg-[#F5F2EC] hover:text-dark-red border-l-4 border-transparent rounded-r-xl rounded-l-none transition-all"
           >
             <LogOut size={20} className="shrink-0" />
@@ -192,7 +259,7 @@ const AdminLayout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 w-full min-w-0 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} ml-0 p-3 sm:p-6 lg:p-8`}>
+      <main className={`flex-1 transition-all duration-300 w-full min-w-0 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-16'} ml-0 p-3 sm:p-6 lg:p-8`}>
         {/* Header */}
         <header className="mb-6 lg:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -232,10 +299,19 @@ const AdminLayout: React.FC = () => {
         </header>
 
         {/* Content Area */}
-        <div className="bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-silk-light min-h-[calc(100vh-12rem)] p-3 sm:p-6 lg:p-8 overflow-x-auto">
+        <div className="bg-white rounded-2xl lg:rounded-3xl shadow-sm border border-silk-light min-h-[calc(100vh-12rem)] p-3 sm:p-6 lg:p-8">
           <Outlet />
         </div>
       </main>
+      {/* Fixed Tooltip */}
+      {tooltipData && (
+        <div 
+          className="fixed z-50 pointer-events-none rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-md -translate-y-1/2 transition-opacity animate-in fade-in"
+          style={{ top: tooltipData.top, left: tooltipData.left }}
+        >
+          {tooltipData.text}
+        </div>
+      )}
     </div>
   );
 };

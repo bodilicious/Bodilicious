@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { 
   Search, Plus, Edit2, Eye, EyeOff,
   ChevronLeft, ChevronRight,
-  CheckSquare, Square, Upload, BarChart2, Loader2
+  CheckSquare, Square, Upload, BarChart2, Loader2, Check, X, Package
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -23,6 +23,10 @@ const ProductManagement: React.FC = () => {
 
   // Stock history drawer
   const [stockProduct, setStockProduct] = useState<{ id: string; name: string } | null>(null);
+
+  // Inline editing state
+  const [editingStockId, setEditingStockId] = useState<string | null>(null);
+  const [editingStockValue, setEditingStockValue] = useState<string>('');
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -80,10 +84,18 @@ const ProductManagement: React.FC = () => {
     } catch { toast.error('Failed to update status'); }
   };
 
-  const updateStock = async (product: any) => {
-    const newStock = prompt('Enter new stock level:', product.stock.toString());
-    if (newStock === null) return;
-    const stock = parseInt(newStock);
+  const handleStockEditStart = (product: any) => {
+    setEditingStockId(product._id);
+    setEditingStockValue(product.stock.toString());
+  };
+
+  const handleStockEditCancel = () => {
+    setEditingStockId(null);
+    setEditingStockValue('');
+  };
+
+  const saveStock = async (product: any) => {
+    const stock = parseInt(editingStockValue);
     if (isNaN(stock) || stock < 0) { toast.error('Invalid stock value'); return; }
     try {
       const headers = await getAuthHeaders();
@@ -91,7 +103,11 @@ const ProductManagement: React.FC = () => {
         method: 'PUT', headers,
         body: JSON.stringify({ stock })
       });
-      if (res.ok) { toast.success('Stock updated'); fetchProducts(); }
+      if (res.ok) { 
+        toast.success('Stock updated'); 
+        setEditingStockId(null);
+        fetchProducts(); 
+      }
     } catch { toast.error('Failed to update stock'); }
   };
 
@@ -259,7 +275,7 @@ const ProductManagement: React.FC = () => {
       )}
 
       {/* Product Table */}
-      <div className="overflow-x-auto">
+      <div className="table-scroll-container">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-silk-light">
@@ -281,14 +297,20 @@ const ProductManagement: React.FC = () => {
           <tbody className="divide-y divide-silk-light/50">
             {loading ? (
               [...Array(5)].map((_, i) => (
-                <tr key={i} className="animate-pulse">
-                  <td colSpan={7} className="px-6 py-8 h-16 bg-gray-50/50 rounded-lg" />
+                <tr key={i} className="border-b border-silk-light/50">
+                  <td className="px-3 py-4"><div className="skeleton h-4 w-4" /></td>
+                  <td className="px-4 py-4"><div className="flex gap-4"><div className="skeleton h-12 w-12 rounded-xl" /><div><div className="skeleton h-5 w-32 mb-1" /><div className="skeleton h-3 w-20" /></div></div></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-16 rounded-full" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-16" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-12" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-20" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-8 w-20 ml-auto" /></td>
                 </tr>
               ))
             ) : products.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-16 text-center text-gray-400">
-                  <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
+                  <Package size={32} className="mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No products found</p>
                 </td>
               </tr>
@@ -324,18 +346,37 @@ const ProductManagement: React.FC = () => {
                 </td>
                 <td className="px-4 py-4 font-bold text-dark-red">₹{product.price}</td>
                 <td className="px-4 py-4">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-dark-red">
-                      {product.stock}
-                    </span>
-                    <button
-                      onClick={() => updateStock(product)}
-                      className="p-1 hover:bg-silk-light rounded text-grey-beige hover:text-dark-red transition-all"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-
-                  </div>
+                  {editingStockId === product._id ? (
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number"
+                        min="0"
+                        className="w-16 p-1 text-sm border border-dark-red rounded outline-none focus:ring-1 focus:ring-dark-red"
+                        value={editingStockValue}
+                        onChange={(e) => setEditingStockValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveStock(product);
+                          if (e.key === 'Escape') handleStockEditCancel();
+                        }}
+                        autoFocus
+                      />
+                      <button onClick={() => saveStock(product)} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Save"><Check size={14} /></button>
+                      <button onClick={handleStockEditCancel} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Cancel"><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-dark-red">
+                        {product.stock}
+                      </span>
+                      <button
+                        onClick={() => handleStockEditStart(product)}
+                        className="p-1 hover:bg-silk-light rounded text-grey-beige hover:text-dark-red transition-all"
+                        title="Edit Stock"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-4">
                   <button
@@ -347,17 +388,18 @@ const ProductManagement: React.FC = () => {
                   </button>
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-end gap-1">
                     <button
                       onClick={() => setStockProduct({ id: product._id, name: product.name })}
                       title="Stock History"
-                      className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-silk-light text-grey-beige hover:text-dark-red transition-all"
+                      className="admin-action-btn text-grey-beige"
                     >
                       <BarChart2 size={15} />
                     </button>
                     <button 
                       onClick={() => navigate(`/admin/products/${product.pid}`)}
-                      className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-silk-light text-grey-beige hover:text-dark-red transition-all"
+                      title="Edit Product"
+                      className="admin-action-btn text-grey-beige"
                     >
                       <Edit2 size={15} />
                     </button>
@@ -374,14 +416,14 @@ const ProductManagement: React.FC = () => {
           Showing <span className="font-bold text-dark-red">{products.length}</span> of <span className="font-bold text-dark-red">{total}</span> products
         </p>
         <div className="flex gap-2">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="p-2 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red">
-            <ChevronLeft size={20} />
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 flex items-center gap-1 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red font-bold text-sm transition-colors">
+            <ChevronLeft size={16} /> <span className="hidden sm:inline">Previous</span>
           </button>
           <div className="flex items-center px-4 font-bold text-sm text-dark-red">
             Page {pages === 0 ? 0 : page} of {pages}
           </div>
-          <button disabled={page >= pages || pages === 0} onClick={() => setPage(p => p + 1)} className="p-2 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red">
-            <ChevronRight size={20} />
+          <button disabled={page >= pages || pages === 0} onClick={() => setPage(p => p + 1)} className="px-4 py-2 flex items-center gap-1 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red font-bold text-sm transition-colors">
+            <span className="hidden sm:inline">Next</span> <ChevronRight size={16} />
           </button>
         </div>
       </div>

@@ -1,22 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Search, 
   Shield, 
-  UserMinus, 
-  UserCheck, 
   ChevronLeft,
   ChevronRight,
   Mail,
   Calendar,
-  Lock,
-  Unlock,
   Download,
-  Crown
+  Crown,
+  Users
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
 import toast from 'react-hot-toast';
-import CustomerAnalysisModal from './CustomerAnalysisModal';
 import Select from '../components/Select';
 
 const UserManagement: React.FC = () => {
@@ -28,8 +25,14 @@ const UserManagement: React.FC = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [computing, setComputing] = useState(false);
-  const [filters, setFilters] = useState({ role: '', isBlocked: '', segment: '' });
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const [filters, setFilters] = useState({ 
+    role: '', 
+    isBlocked: '', 
+    segment: queryParams.get('segment') || '' 
+  });
 
   const SEGMENT_CONFIG = [
     { key: 'high_value', label: 'High Value', color: 'bg-amber-50 border-amber-200 text-amber-700', dot: 'bg-amber-400' },
@@ -134,6 +137,7 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  // @ts-ignore
   const handleToggleBlock = async (id: string, currentlyBlocked: boolean) => {
     if (id === currentUser?.uid) {
       toast.error("You cannot block yourself");
@@ -208,14 +212,19 @@ const UserManagement: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {SEGMENT_CONFIG.map(seg => {
           const stats = segmentStats.find(s => s.segment === seg.key);
+          const isSelected = filters.segment === seg.key;
           return (
-            <div key={seg.key} className={`rounded-2xl border p-4 ${seg.color}`}>
+            <div 
+              key={seg.key} 
+              onClick={() => setFilters(prev => ({ ...prev, segment: isSelected ? '' : seg.key }))}
+              className={`rounded-2xl border p-4 cursor-pointer transition-all hover:shadow-md ${seg.color} ${isSelected ? 'ring-2 ring-offset-2 ring-current opacity-100' : 'opacity-80 hover:opacity-100'}`}
+            >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <span className={`w-2.5 h-2.5 rounded-full ${seg.dot}`} />
                   <span className="text-sm font-semibold">{seg.label}</span>
                 </div>
-                <button onClick={() => handleSegmentExport(seg.key)}
+                <button onClick={(e) => { e.stopPropagation(); handleSegmentExport(seg.key); }}
                   title="Download CSV"
                   className="p-1 hover:opacity-70 transition-opacity">
                   <Download size={14} />
@@ -270,14 +279,15 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Users Table */}
-      <div className="overflow-x-auto">
+      <div className="table-scroll-container">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-silk-light">
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">User</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Segments</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Role</th>
-              <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Status</th>
+              <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Orders</th>
+              <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Revenue</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider">Last Login</th>
               <th className="px-6 py-4 text-xs font-bold text-grey-beige uppercase tracking-wider text-right">Actions</th>
             </tr>
@@ -285,15 +295,32 @@ const UserManagement: React.FC = () => {
           <tbody className="divide-y divide-silk-light/50">
             {loading ? (
               [...Array(5)].map((_, i) => (
-                <tr key={i} className="animate-pulse" aria-hidden="true">
-                  <td colSpan={6} className="px-6 py-8 h-16 bg-gray-50/50 rounded-lg"></td>
+                <tr key={i} className="border-b border-silk-light/50 animate-pulse">
+                  <td className="px-6 py-4"><div className="flex items-center gap-4"><div className="skeleton h-10 w-10 rounded-full" /><div><div className="skeleton h-4 w-32 mb-1" /><div className="skeleton h-3 w-40" /></div></div></td>
+                  <td className="px-6 py-4"><div className="flex gap-1"><div className="skeleton h-4 w-16 rounded" /><div className="skeleton h-4 w-12 rounded" /></div></td>
+                  <td className="px-6 py-4"><div className="skeleton h-5 w-20 rounded-full" /></td>
+                  <td className="px-6 py-4"><div className="skeleton h-4 w-10" /></td>
+                  <td className="px-6 py-4"><div className="skeleton h-4 w-16" /></td>
+                  <td className="px-6 py-4"><div className="skeleton h-4 w-24" /></td>
+                  <td className="px-6 py-4"><div className="skeleton h-8 w-20 ml-auto" /></td>
                 </tr>
               ))
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-16 text-center text-gray-400">
+                  <Users size={32} className="mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No users found</p>
+                </td>
+              </tr>
             ) : users.map((u) => (
               <tr
                 key={(u as any)._id || u.uid}
-                className="group hover:bg-silk-light/30 transition-colors cursor-pointer"
-                onClick={() => setSelectedUserId((u as any)._id || u.uid)}
+                className={`group transition-colors cursor-pointer border-l-4 ${
+                  (u as any).hasOpenQuery || (u as any).hasPaymentFailure
+                    ? 'bg-rose-50 hover:bg-rose-100 border-ruby-red'
+                    : 'hover:bg-silk-light/30 border-transparent'
+                }`}
+                onClick={() => navigate(`/admin/users/${(u as any)._id || u.uid}`)}
                 title="Click to view full customer profile"
               >
                 <td className="px-6 py-4">
@@ -302,7 +329,12 @@ const UserManagement: React.FC = () => {
                       {u.photoURL ? <img src={u.photoURL} alt="" /> : ((u as any).name || u.displayName || 'U')[0]}
                     </div>
                     <div>
-                      <h4 className="font-bold text-dark-red text-sm">{(u as any).name || u.displayName || u.email?.split('@')[0] || 'Unknown User'}</h4>
+                      <h4 className="font-bold text-dark-red text-sm flex items-center gap-2">
+                        {(u as any).name || u.displayName || u.email?.split('@')[0] || 'Unknown User'}
+                        {((u as any).hasOpenQuery || (u as any).hasPaymentFailure) && (
+                          <span className="w-2 h-2 rounded-full bg-ruby-red animate-pulse" title="Requires Attention" />
+                        )}
+                      </h4>
                       <p className="flex items-center gap-1 text-xs text-grey-beige font-medium font-mono lowercase">
                         <Mail size={12} /> {u.email}
                       </p>
@@ -333,11 +365,11 @@ const UserManagement: React.FC = () => {
                     {u.role === 'primary_admin' ? 'Primary Admin' : u.role || 'user'}
                   </span>
                 </td>
-                <td className="px-6 py-4">
-                   <div className={`flex items-center gap-2 text-xs font-bold ${u.isBlocked ? 'text-ruby-red' : 'text-green-600'}`}>
-                     {u.isBlocked ? <Lock size={14} /> : <Unlock size={14} />}
-                     {u.isBlocked ? 'BLOCKED' : 'ACTIVE'}
-                   </div>
+                <td className="px-6 py-4 text-sm font-bold text-dark-red">
+                  {((u as any).totalOrders || 0).toLocaleString()}
+                </td>
+                <td className="px-6 py-4 text-sm font-bold text-dark-red">
+                  ₹{((u as any).totalRevenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </td>
                 <td className="px-6 py-4 text-sm text-grey-beige">
                   <div className="flex items-center gap-2">
@@ -346,24 +378,17 @@ const UserManagement: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-end gap-2">
                     {/* Role-change button: only visible to Primary Admin, hidden for primary_admin targets */}
                     {isPrimaryAdmin && u.role !== 'primary_admin' && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleChangeRole((u as any)._id, u.role || 'user'); }}
-                        className="p-2 hover:bg-amber-50 rounded-lg border border-transparent hover:border-amber-200 text-grey-beige hover:text-amber-700 transition-all"
+                        className="admin-action-btn text-grey-beige"
                         title={u.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
                       >
                         <Shield size={18} />
                       </button>
                     )}
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleToggleBlock((u as any)._id, u.isBlocked || false); }}
-                      className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-silk-light text-grey-beige hover:text-ruby-red transition-all"
-                      title={u.isBlocked ? 'Unblock Account' : 'Block Account'}
-                    >
-                      {u.isBlocked ? <UserCheck size={18} /> : <UserMinus size={18} />}
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -380,9 +405,9 @@ const UserManagement: React.FC = () => {
           <button 
             disabled={page <= 1}
             onClick={() => setPage(p => p - 1)}
-            className="p-2 border border-silk-light text-dark-red rounded-xl disabled:opacity-30 hover:bg-silk-light"
+            className="px-4 py-2 flex items-center gap-1 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red font-bold text-sm transition-colors"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={16} /> <span className="hidden sm:inline">Previous</span>
           </button>
           <div className="flex items-center px-4 font-bold text-sm text-dark-red">
             Page {pages === 0 ? 0 : page} of {pages}
@@ -390,17 +415,12 @@ const UserManagement: React.FC = () => {
           <button 
             disabled={page >= pages || pages === 0}
             onClick={() => setPage(p => p + 1)}
-            className="p-2 border border-silk-light text-dark-red rounded-xl disabled:opacity-30 hover:bg-silk-light"
+            className="px-4 py-2 flex items-center gap-1 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red font-bold text-sm transition-colors"
           >
-            <ChevronRight size={20} />
+            <span className="hidden sm:inline">Next</span> <ChevronRight size={16} />
           </button>
         </div>
       </div>
-      {/* Customer Analysis Modal */}
-      <CustomerAnalysisModal
-        userId={selectedUserId}
-        onClose={() => setSelectedUserId(null)}
-      />
     </div>
   );
 };

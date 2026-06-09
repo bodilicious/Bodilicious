@@ -8,6 +8,15 @@ import AuditLogV2 from "../audit/models.js";
 import { logAuditEvent } from "../audit/logger.js";
 import mongoose from "mongoose";
 import { pushOrderToShiprocket as srPush, getShiprocketToken } from "../tracker/shiprocketservice.js";
+import Redis from "ioredis";
+import { Ticket } from "../support/models.js";
+
+const redisUrl = process.env.REDIS_URL || null;
+const redis = redisUrl ? new Redis(redisUrl) : {
+  get: () => null,
+  setex: () => {},
+  del: () => {}
+}; // Fallback if no redis url
 
 /**
  * Helper to log administrative actions
@@ -113,6 +122,72 @@ export const getDashboardSummary = async (req, res) => {
   } catch (err) {
     console.error("Dashboard Summary Error:", err);
     res.status(500).json({ success: false, message: "Error fetching dashboard summary" });
+  }
+};
+
+/**
+ * GET /api/v1/admin/notifications
+ */
+export const getNotificationCounts = async (req, res) => {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // To count users requiring attention, we need an aggregate
+    const usersReqAttention = await UserProfile.aggregate([
+      {
+        $lookup: {
+          from: "orders",
+          localField: "_id",
+          foreignField: "user",
+          as: "userOrders"
+        }
+      },
+      {
+        $lookup: {
+          from: "tickets",
+          localField: "_id",
+          foreignField: "user",
+          let: { userId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $and: [ { $eq: ["$user", "$$userId"] }, { $eq: ["$status", "open"] } ] } } },
+            { $limit: 1 }
+          ],
+          as: "openTickets"
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { "userOrders.paymentStatus": "failed" },
+            { openTickets: { $not: { $size: 0 } } }
+          ]
+        }
+      },
+      { $count: "count" }
+    ]);
+
+    const usersCount = usersReqAttention[0]?.count || 0;
+
+    const [tickets, logs] = await Promise.all([
+      Ticket.countDocuments({ status: "open" }),
+      AuditLogV2.countDocuments({ 
+        event_type: "PAYMENT_FAILED", 
+        timestamp_utc: { $gte: sevenDaysAgo } 
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        tickets,
+        users: usersCount,
+        logs
+      }
+    });
+  } catch (err) {
+    console.error("Notification Counts Error:", err);
+    res.status(500).json({ success: false, message: "Error fetching notification counts" });
   }
 };
 
@@ -499,6 +574,10 @@ export const updateOrderStatusAdmin = async (req, res) => {
     }
 
     await order.save();
+    
+    // Invalidate users cache since orders affect user stats/flags
+    await redis.incr("admin:users:version");
+
     res.json({ success: true, data: order });
   } catch (err) {
     console.error("Admin UpdateOrderStatus Error:", err);
@@ -512,7 +591,7 @@ export const updateOrderStatusAdmin = async (req, res) => {
 export const getAllUsersAdmin = async (req, res) => {
   try {
     const { limit, skip } = req.pagination;
-    const { search, role, isBlocked } = req.query;
+    const { search, role, isBlocked, segment } = req.query;
 
     const query = {};
     if (search) {
@@ -525,22 +604,98 @@ export const getAllUsersAdmin = async (req, res) => {
     if (isBlocked === "true" || isBlocked === "false") {
       query.isBlocked = isBlocked === "true";
     }
+    if (segment && segment !== "") query.segment = segment;
+
+    const version = (await redis.get("admin:users:version")) || "0";
+    const cacheKey = `admin:users:v${version}:${JSON.stringify(query)}:${skip}:${limit}`;
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
+
+    const pipeline = [
+      { $match: query },
+      {
+        $lookup: {
+          from: "orders",
+          localField: "_id",
+          foreignField: "user",
+          as: "userOrders"
+        }
+      },
+      {
+        $lookup: {
+          from: "tickets",
+          localField: "_id",
+          foreignField: "user",
+          let: { userId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $and: [ { $eq: ["$user", "$$userId"] }, { $eq: ["$status", "open"] } ] } } },
+            { $limit: 1 }
+          ],
+          as: "openTickets"
+        }
+      },
+      {
+        $addFields: {
+          totalOrders: {
+            $size: {
+              $filter: {
+                input: "$userOrders",
+                as: "o",
+                cond: { $in: ["$$o.orderStatus", ["pending", "processing", "shipped", "delivered"]] }
+              }
+            }
+          },
+          totalRevenue: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: "$userOrders",
+                    as: "o",
+                    cond: { $in: ["$$o.orderStatus", ["pending", "processing", "shipped", "delivered"]] }
+                  }
+                },
+                as: "o",
+                in: "$$o.totalAmount"
+              }
+            }
+          },
+          hasPaymentFailure: {
+            $in: ["failed", "$userOrders.paymentStatus"]
+          },
+          hasOpenQuery: { $gt: [{ $size: "$openTickets" }, 0] }
+        }
+      },
+      { $project: { userOrders: 0, openTickets: 0 } },
+      {
+        $sort: {
+          hasOpenQuery: -1,
+          hasPaymentFailure: -1,
+          createdAt: -1
+        }
+      },
+      { $skip: skip },
+      { $limit: limit }
+    ];
 
     const [users, total] = await Promise.all([
-      UserProfile.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      UserProfile.aggregate(pipeline),
       UserProfile.countDocuments(query)
     ]);
 
-    res.json({
+    const responseData = {
       success: true,
       data: users,
       total,
       page: req.pagination.page,
       pages: Math.ceil(total / limit)
-    });
+    };
+
+    await redis.setex(cacheKey, 180, JSON.stringify(responseData));
+
+    res.json(responseData);
   } catch (err) {
     console.error("Admin GetAllUsers Error:", err);
     res.status(500).json({ success: false, message: "Error fetching users" });
@@ -786,6 +941,8 @@ export const bulkUpdateOrderStatus = async (req, res) => {
         after: { status: orderStatus },
         meta: { count: updated.length, source }
       });
+      // Invalidate users cache since orders affect user stats/flags
+      await redis.incr("admin:users:version");
     }
 
     res.json({ success: true, updated: updated.length, failed });

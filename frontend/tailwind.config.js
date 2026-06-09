@@ -11,6 +11,11 @@ export default {
         'indian-red': '#AC746C',
         'silk-light': '#F2EBE4',
         'silk-dark': '#C9A990',
+        'b-bg': '#FAF7F4',
+        'b-burgundy': '#6B1E2E',
+        'b-gold': '#C9A96E',
+        'b-text-primary': '#1A1A1A',
+        'b-text-secondary': '#6B6B6B',
       },
       fontFamily: {
         serif: ['Playfair Display', 'Georgia', 'serif'],

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Eye, 
@@ -14,13 +15,13 @@ import {
   Square,
   Layers,
   RefreshCw,
-  Send
+  Send,
+  RotateCcw
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import OrderTimelineModal from './OrderTimelineModal';
 import ShippingLabel from './ShippingLabel';
-import CustomerAnalysisModal from './CustomerAnalysisModal';
 import Select from '../components/Select';
 
 const OrderManagement: React.FC = () => {
@@ -36,7 +37,7 @@ const OrderManagement: React.FC = () => {
   // modal/drawer state
   const [timelineOrder, setTimelineOrder] = useState<any | null>(null);
   const [labelOrder, setLabelOrder]       = useState<any | null>(null);
-  const [customerUserId, setCustomerUserId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -85,13 +86,15 @@ const OrderManagement: React.FC = () => {
     setPage(1);
   }, [search, filters]);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'processing': return <Clock size={16} className="text-blue-500" />;
-      case 'shipped':    return <Truck size={16} className="text-orange-500" />;
-      case 'delivered':  return <CheckCircle2 size={16} className="text-green-500" />;
-      case 'cancelled':  return <XCircle size={16} className="text-red-500" />;
-      default:           return <Clock size={16} className="text-gray-400" />;
+      case 'processing': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200"><Clock size={14} /> Processing</span>;
+      case 'shipped':    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200"><Truck size={14} /> Shipped</span>;
+      case 'delivered':  return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200"><CheckCircle2 size={14} /> Delivered</span>;
+      case 'cancelled':  return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200"><XCircle size={14} /> Cancelled</span>;
+      case 'return_requested': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200"><RotateCcw size={14} /> Return Req</span>;
+      case 'returned':   return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200"><RotateCcw size={14} /> Returned</span>;
+      default:           return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-700 border border-gray-200"><Clock size={14} /> {status}</span>;
     }
   };
 
@@ -275,7 +278,7 @@ const OrderManagement: React.FC = () => {
       )}
 
       {/* Orders Table */}
-      <div className="overflow-x-auto">
+      <div className="table-scroll-container">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-silk-light">
@@ -299,8 +302,15 @@ const OrderManagement: React.FC = () => {
           <tbody className="divide-y divide-silk-light/50">
             {loading ? (
               [...Array(5)].map((_, i) => (
-                <tr key={i} className="animate-pulse">
-                  <td colSpan={8} className="px-6 py-8 h-16 bg-gray-50/50 rounded-lg" />
+                <tr key={i} className="border-b border-silk-light/50">
+                  <td className="px-3 py-4"><div className="skeleton h-4 w-4" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-16" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-32 mb-1" /><div className="skeleton h-3 w-24" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-4 w-20" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-16" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-6 w-24 rounded-full" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-5 w-24" /></td>
+                  <td className="px-4 py-4"><div className="skeleton h-8 w-24 ml-auto" /></td>
                 </tr>
               ))
             ) : orders.length === 0 ? (
@@ -330,13 +340,12 @@ const OrderManagement: React.FC = () => {
                   </td>
                   <td className="px-4 py-4">
                     <div>
-                      <button
-                        onClick={() => setCustomerUserId(order.user?._id || order.user)}
-                        className="font-bold text-dark-red hover:text-ruby-red hover:underline text-sm transition-colors"
-                      >
+                      <button onClick={() => { if(order.user?._id || order.user) navigate(`/admin/users/${order.user?._id || order.user}`); }} className="font-bold text-dark-red text-sm hover:underline text-left transition-colors hover:text-ruby-red">
                         {order.shippingDetails?.name || order.user?.name || '—'}
                       </button>
-                      <p className="text-xs text-grey-beige font-medium">{order.shippingDetails?.email || order.user?.email}</p>
+                      <p className="flex items-center gap-1 text-xs text-grey-beige font-medium mt-1">
+                        {order.shippingDetails?.email || order.user?.email}
+                      </p>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-sm text-grey-beige">
@@ -346,12 +355,7 @@ const OrderManagement: React.FC = () => {
                     ₹{Number(order.totalAmount || 0).toFixed(0)}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(order.orderStatus)}
-                      <span className="text-xs font-bold uppercase tracking-wider text-dark-red">
-                        {order.orderStatus}
-                      </span>
-                    </div>
+                    {getStatusBadge(order.orderStatus)}
                   </td>
                   <td className="px-4 py-4">
                     {order.awb ? (
@@ -422,14 +426,14 @@ const OrderManagement: React.FC = () => {
           Showing <span className="font-bold text-dark-red">{orders.length}</span> of <span className="font-bold text-dark-red">{total}</span> orders
         </p>
         <div className="flex gap-2">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="p-2 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red">
-            <ChevronLeft size={20} />
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 flex items-center gap-1 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red font-bold text-sm transition-colors">
+            <ChevronLeft size={16} /> <span className="hidden sm:inline">Previous</span>
           </button>
           <div className="flex items-center px-4 font-bold text-sm text-dark-red">
             Page {pages === 0 ? 0 : page} of {pages}
           </div>
-          <button disabled={page >= pages || pages === 0} onClick={() => setPage(p => p + 1)} className="p-2 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red">
-            <ChevronRight size={20} />
+          <button disabled={page >= pages || pages === 0} onClick={() => setPage(p => p + 1)} className="px-4 py-2 flex items-center gap-1 border border-silk-light rounded-xl disabled:opacity-30 hover:bg-silk-light text-dark-red font-bold text-sm transition-colors">
+            <span className="hidden sm:inline">Next</span> <ChevronRight size={16} />
           </button>
         </div>
       </div>
@@ -437,7 +441,6 @@ const OrderManagement: React.FC = () => {
       {/* Modals & Drawers */}
       {timelineOrder && <OrderTimelineModal order={timelineOrder} onClose={() => setTimelineOrder(null)} />}
       {labelOrder && <ShippingLabel order={labelOrder} onClose={() => setLabelOrder(null)} />}
-      {customerUserId && <CustomerAnalysisModal userId={customerUserId} onClose={() => setCustomerUserId(null)} />}
     </div>
   );
 };

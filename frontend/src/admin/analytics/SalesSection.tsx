@@ -17,8 +17,8 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Graph 1: Revenue Trend (Gross vs Net) */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
               <h3 className="text-lg font-bold text-gray-800">Revenue Performance</h3>
               <p className="text-sm text-gray-400">Gross vs Net revenue comparison</p>
@@ -28,7 +28,7 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
               <div className="flex items-center gap-1.5"><span className="w-2 h-2 bg-green-500 rounded-full" /> Net</div>
             </div>
           </div>
-          <div className="h-[350px]">
+          <div className="h-[350px] min-w-[600px]">
             {salesTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={salesTrend}>
@@ -129,12 +129,12 @@ const SalesSection: React.FC<SalesSectionProps> = ({ salesTrend, paymentSplit })
       </div>
 
       {/* Graph 3: AOV & Order Count Trend */}
-      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+      <div className="bg-white p-6 sm:p-8 rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
           <div className="mb-8">
             <h3 className="text-lg font-bold text-gray-800">AOV & Volume Efficiency</h3>
             <p className="text-sm text-gray-400">Average net order value vs total order volume</p>
           </div>
-          <div className="h-[300px]">
+          <div className="h-[300px] min-w-[600px]">
             {salesTrend.length > 0 ? (
                <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={salesTrend}>

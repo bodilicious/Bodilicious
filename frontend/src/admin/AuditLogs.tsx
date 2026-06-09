@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import Select from '../components/Select';
+import { useLocation } from 'react-router-dom';
 
 const AuditLogs: React.FC = () => {
   const { getAuthHeaders } = useApp();
@@ -19,7 +20,10 @@ const AuditLogs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const [eventTypeFilter, setEventTypeFilter] = useState('');
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  
+  const [eventTypeFilter, setEventTypeFilter] = useState(queryParams.get('event_type') || '');
   const [severityFilter, setSeverityFilter] = useState('');
   const [isAnomalyFilter, setIsAnomalyFilter] = useState('');
 
@@ -106,17 +110,6 @@ const AuditLogs: React.FC = () => {
   const toggleExpand = (id: string) => {
     setExpandedId(prev => (prev === id ? null : id));
   };
-
-  const filteredLogs = logs.filter(log => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      log.event_type?.toLowerCase().includes(term) ||
-      log.correlation_id?.toLowerCase().includes(term) ||
-      log.user_id?.name?.toLowerCase().includes(term) ||
-      log.user_id?.email?.toLowerCase().includes(term)
-    );
-  });
 
   return (
     <div className="space-y-6">

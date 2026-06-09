@@ -48,7 +48,7 @@ const globalLimiter = rateLimit({
 // Stricter limiter for sensitive endpoints (payment, profile)
 const sensitiveLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 150,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

@@ -60,6 +60,7 @@ router.use((req, res, next) => {
 // Dashboard
 router.get("/dashboard/summary", adminCtrl.getDashboardSummary);
 router.get("/dashboard/recent-orders", enforcePagination, adminCtrl.getRecentOrders);
+router.get("/sidebar-badges", adminCtrl.getNotificationCounts);
 
 // Uploads (magic-byte validated)
 router.post("/upload", upload.single("image"), verifyFileType, adminCtrl.uploadImage);
@@ -117,6 +118,11 @@ router.get("/customers/:id/orders",   segmentCtrl.getCustomerOrders);
 router.get("/customers/:id/reviews",  segmentCtrl.getCustomerReviews);
 router.get("/customers/:id/tickets",  segmentCtrl.getCustomerTickets);
 router.get("/customers/:id/cart",     segmentCtrl.getCustomerCart);
+router.get("/customers/:id/cart-history", segmentCtrl.getCustomerCartHistory);
+router.get("/customers/:id/payment-history", segmentCtrl.getCustomerPaymentHistory);
+router.get("/customers/:id/activity", segmentCtrl.getCustomerActivity);
+router.get("/customers/:id/audit",    segmentCtrl.getCustomerAuditLogs);
+router.get("/customers/:id/engagement", segmentCtrl.getCustomerEngagement);
 router.get("/customers/:id/profile",  segmentCtrl.getCustomerProfile);
 router.patch("/customers/:id/notes",  segmentCtrl.updateAdminNotes);
 

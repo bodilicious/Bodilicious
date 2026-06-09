@@ -16,7 +16,7 @@ import {
   BarChart, Bar, Cell, Legend
 } from 'recharts';
 
-type Tab = 'overview' | 'live' | 'marketing' | 'funnel' | 'behavioral' | 'intelligence' | 'search' | 'cohorts' | 'at-risk' | 'stock';
+type Tab = 'overview' | 'marketing' | 'funnel' | 'behavioral' | 'intelligence' | 'search' | 'cohorts' | 'at-risk' | 'stock';
 
 const FUNNEL_COLORS = ['#6366f1', '#8b5cf6', '#ec4899'];
 
@@ -36,7 +36,7 @@ const AnalyticsPage: React.FC = () => {
   const [marketingData, setMarketingData] = useState<any[]>([]);
   const [searchData, setSearchData] = useState<any>(null);
   const [inventoryForecast, setInventoryForecast] = useState<any[]>([]);
-  const [liveData, setLiveData] = useState<{ activeVisitors: number, events: any[] }>({ activeVisitors: 0, events: [] });
+
   const [timeRange, setTimeRange] = useState('30');
 
   const API_URL = import.meta.env.VITE_API_URL || '';
@@ -97,45 +97,13 @@ const AnalyticsPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  // Setup EventSource for Live View
-  useEffect(() => {
-    let eventSource: EventSource | null = null;
 
-    const initLive = async () => {
-      try {
-        const headers: any = await getAuthHeaders();
-        const token = headers.Authorization ? headers.Authorization.split(' ')[1] : '';
-        eventSource = new EventSource(`${API_URL}/api/v1/admin/analytics/live?token=${token}`);
-        
-        eventSource.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.type === 'SYNC') {
-            setLiveData(prev => ({ ...prev, activeVisitors: data.activeVisitors }));
-          } else {
-            setLiveData(prev => ({
-              activeVisitors: data.activeVisitors,
-              events: [data, ...prev.events].slice(0, 50) // Keep last 50 events
-            }));
-          }
-        };
-      } catch (err) {
-        console.error('Failed to init live view', err);
-      }
-    };
-
-    initLive();
-
-    return () => {
-      if (eventSource) eventSource.close();
-    };
-  }, [API_URL, getAuthHeaders]);
 
   const fmt = (val: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
-    { id: 'live', label: 'Live View', icon: Activity },
     { id: 'marketing', label: 'Marketing', icon: TrendingUp },
     { id: 'search', label: 'Storefront', icon: Eye },
     { id: 'behavioral', label: 'Behavioral', icon: ActivitySquare },
@@ -735,54 +703,6 @@ const AnalyticsPage: React.FC = () => {
             </motion.div>
           )}
 
-{/* ─── TAB: LIVE VIEW ─── */}
-{activeTab === 'live' && (
-  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-      <div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Active Visitors</p>
-        <h3 className="text-5xl font-black text-gray-800 flex items-center gap-3">
-          {liveData.activeVisitors}
-          <span className="flex h-3 w-3 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-          </span>
-        </h3>
-      </div>
-      <div className="w-16 h-16 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-        <Activity size={32} />
-      </div>
-    </div>
-    
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="p-5 border-b border-gray-100 bg-gray-50/50 font-bold text-gray-800">
-        Live Event Stream
-      </div>
-      <div className="p-0 overflow-y-auto max-h-[500px]">
-        {liveData.events.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">Waiting for live events...</div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {liveData.events.map((ev, i) => (
-              <div key={i} className="p-4 hover:bg-gray-50/50 flex items-start gap-4">
-                <div className="bg-gray-100 p-2 rounded-lg text-gray-500 mt-1">
-                  <Activity size={16} />
-                </div>
-                <div>
-                  <div className="font-bold text-gray-800 capitalize">{ev.type.replace(/_/g, ' ')}</div>
-                  <div className="text-sm text-gray-500">{new Date(ev.timestamp).toLocaleTimeString()}</div>
-                  <div className="mt-2 text-xs font-mono bg-gray-50 p-2 rounded text-gray-600 overflow-x-auto">
-                    {JSON.stringify(ev.metadata)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  </motion.div>
-)}
 
 {/* ─── TAB: MARKETING ─── */}
 {activeTab === 'marketing' && (

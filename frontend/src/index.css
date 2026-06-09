@@ -50,4 +50,29 @@
   .font-sans {
     font-family: 'Inter', system-ui, sans-serif;
   }
+
+  /* Admin Action Buttons */
+  .admin-action-btn {
+    @apply p-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-dark-red focus:ring-offset-1;
+  }
+  .admin-action-btn:hover {
+    @apply bg-gray-100;
+  }
+
+  /* Loading Skeletons */
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded-md;
+  }
+
+  /* Table Scroll Wrapper */
+  .table-scroll-container {
+    @apply w-full overflow-x-auto rounded-2xl border border-silk-light shadow-sm bg-white relative;
+  }
+
+  /* Optional: hint shadow for horizontal scrolling on tablets */
+  .table-scroll-container::after {
+    content: '';
+    @apply absolute top-0 right-0 bottom-0 w-8 pointer-events-none;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.9));
+  }
 }
