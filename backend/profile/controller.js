@@ -10,7 +10,6 @@ import { logAction } from "../admin/controller.js";
 */
 export const getProfile = async (req, res) => {
   try {
-    console.log("req.user:", req.user);
 
     const user = await UserProfile.findById(req.user._id)
       .populate("wishlist")

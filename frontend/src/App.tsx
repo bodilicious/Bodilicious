@@ -58,10 +58,11 @@ const DraftOrders = lazy(() => import('./admin/DraftOrders'));
 const StoreSettings = lazy(() => import('./admin/StoreSettings'));
 const TicketManagement = lazy(() => import('./admin/TicketManagement'));
 
-// Simple loading fallback
+// Simple loading fallback with a full-screen transparent block to prevent clicks during lazy loading transitions
 const PageLoader = () => (
-  <div className="min-h-[60vh] flex items-center justify-center">
-    <div className="w-8 h-8 border-2 border-dark-red border-t-transparent rounded-full animate-spin" />
+  <div className="min-h-[60vh] flex items-center justify-center relative">
+    <div className="fixed inset-0 z-[10000]" aria-hidden="true" />
+    <div className="w-8 h-8 border-2 border-dark-red border-t-transparent rounded-full animate-spin z-[10001]" />
   </div>
 );
 

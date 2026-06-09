@@ -53,7 +53,7 @@ export default function ConfirmationPage() {
     // ── Auto-poll: re-fetch profile until the order appears ─────────────────
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [pollCount, setPollCount] = useState(0);
-    const MAX_POLLS = 10; // try up to 10 times (every 2s = 20s max)
+    const MAX_POLLS = 15; // try up to 15 times (every 2.5s = ~37s max)
 
     useEffect(() => {
         if (orderLoaded || !resolvedState) return; // already have it, or no state
@@ -66,7 +66,7 @@ export default function ConfirmationPage() {
         // kick off immediately
         run();
 
-        pollRef.current = setInterval(run, 2000);
+        pollRef.current = setInterval(run, 2500);
 
         return () => {
             if (pollRef.current) clearInterval(pollRef.current);
@@ -85,6 +85,18 @@ export default function ConfirmationPage() {
         }
     }, [orderLoaded, pollCount]);
 
+    // Block back-button while order is loading (prevents losing confirmation state)
+    useEffect(() => {
+        if (orderLoaded || !resolvedState) return;
+
+        const handlePopState = () => {
+            window.history.pushState(null, '', window.location.href);
+        };
+        window.history.pushState(null, '', window.location.href);
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [orderLoaded, resolvedState]);
+
     // ── Redirect if no state at all ──────────────────────────────────────────
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -99,7 +111,7 @@ export default function ConfirmationPage() {
     if (!orderLoaded) {
         const timedOut = pollCount >= MAX_POLLS;
         return (
-            <div className="min-h-screen bg-neutral-50 flex flex-col pt-24 items-center justify-center gap-6 px-4">
+            <div className="fixed inset-0 z-[9999] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center gap-6 px-4">
                 {timedOut ? (
                     <div className="text-center space-y-4 max-w-sm">
                         <AlertTriangle size={40} className="text-amber-500 mx-auto" />
@@ -119,7 +131,7 @@ export default function ConfirmationPage() {
                     <div className="text-center space-y-4">
                         <div className="animate-spin rounded-full h-14 w-14 border-b-2 border-dark-red mx-auto" />
                         <p className="font-sans text-sm text-gray-600 tracking-wide">
-                            Fetching your invoice — please don't refresh this page…
+                            Fetching your invoice — please don't close or refresh this page…
                         </p>
                     </div>
                 )}
@@ -256,12 +268,18 @@ export default function ConfirmationPage() {
                             <div className="border-t border-silk pt-4 space-y-2">
                                 <div className="flex justify-between font-sans text-sm text-gray-600">
                                     <span>Subtotal</span>
-                                    <span>₹{(order.totalAmount - (order.totalAmount < storeSettings.shippingThreshold ? storeSettings.shippingCost : 0)).toLocaleString('en-IN')}</span>
+                                    <span>₹{order.items.reduce((sum: number, item: any) => sum + (item.priceAtPurchase * item.quantity), 0).toLocaleString('en-IN')}</span>
                                 </div>
                                 <div className="flex justify-between items-center py-2">
                                     <span className="text-gray-500 text-sm font-sans">Shipping</span>
                                     <span className="text-sm font-sans text-gray-600">{order.totalAmount < storeSettings.shippingThreshold ? `₹${storeSettings.shippingCost}` : 'Free'}</span>
                                 </div>
+                                {(order as any).discountAmount > 0 && (
+                                    <div className="flex justify-between items-center py-1">
+                                        <span className="text-gray-500 text-sm font-sans">Discount {(order as any).isWelcomeOfferApplied ? '(Welcome Offer)' : ''}</span>
+                                        <span className="text-sm font-sans text-green-700">-₹{(order as any).discountAmount.toLocaleString('en-IN')}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-serif text-xl text-dark-red mt-4 pt-4 border-t border-silk">
                                     <span>Total Amount</span>
                                     <span>₹{order.totalAmount.toLocaleString('en-IN')}</span>

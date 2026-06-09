@@ -13,6 +13,10 @@ const objectId = z
 ========================================= */
 const orderItemSchema = z.object({
   productId: objectId,
+  // pid is the friendly product identifier (e.g. 'bodilicious-rose-cream').
+  // It is used server-side as a fallback lookup when findById(productId) fails.
+  // Must be declared here so Zod's parse() does NOT strip it before the controller sees it.
+  pid: z.string().optional(),
   quantity: z
     .number({
       required_error: "Quantity is required",
@@ -58,10 +62,19 @@ const shippingDetailsSchema = z.object({
 
 
 /* =========================================
+   Marketing Schema (optional UTM data)
+========================================= */
+const marketingSchema = z.object({
+  source: z.string().optional().nullable(),
+  medium: z.string().optional().nullable(),
+  campaign: z.string().optional().nullable(),
+}).optional();
+
+
+/* =========================================
    Create Order Schema
 ========================================= */
-export const createOrderSchema = z
-  .object({
+export const createOrderSchema = z.object({
     items: z
       .array(orderItemSchema)
       .min(1, "At least one item is required"),
@@ -72,16 +85,24 @@ export const createOrderSchema = z
       .default("cod"),
 
     shippingDetails: shippingDetailsSchema,
-  })
-  .strict();
+
+    // UTM / marketing attribution — optional, never fail on missing
+    marketing: marketingSchema,
+  });
+
 
 /* =========================================
    Verify Payment Schema
+   Only validate the 3 Razorpay IDs — we look up items/shippingDetails
+   from the draft order already stored in MongoDB (never trust the frontend
+   for payment verification).
 ========================================= */
-export const verifyPaymentSchema = createOrderSchema
-  .extend({
-    razorpay_order_id: z.string({ required_error: "Razorpay order ID is required" }),
-    razorpay_payment_id: z.string({ required_error: "Razorpay payment ID is required" }),
-    razorpay_signature: z.string({ required_error: "Razorpay signature is required" }),
-  })
-  .strict();
+export const verifyPaymentSchema = z.object({
+  razorpay_order_id: z.string({ required_error: "Razorpay order ID is required" }),
+  razorpay_payment_id: z.string({ required_error: "Razorpay payment ID is required" }),
+  razorpay_signature: z.string({ required_error: "Razorpay signature is required" }),
+  // Optional passthrough fields (sent by frontend, ignored server-side but must not fail)
+  items: z.array(z.any()).optional(),
+  shippingDetails: z.any().optional(),
+  marketing: marketingSchema,
+});

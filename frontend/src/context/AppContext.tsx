@@ -813,8 +813,11 @@ const triggerPasswordReset = async (email: string) => {
     const json = await response.json();
     const { order } = json.data;
 
-    // Cart was cleared server-side; clear locally
+    // Cart was cleared server-side; clear locally immediately
+    // (must be synchronous before navigate() fires, otherwise useEffect
+    //  persist runs after navigation and localStorage keeps stale cart)
     setCartItems([]);
+    localStorage.removeItem(CART_STORAGE_KEY);
     setOrders(prev => [order, ...prev]);
 
     // Clear UTM tracking after successful checkout
@@ -833,10 +836,14 @@ const triggerPasswordReset = async (email: string) => {
     if (authStatus !== 'authenticated') throw new Error('Please sign in');
 
     const headers = await getAuthHeaders();
+    // Include UTM marketing attribution — same as COD checkout does
+    const utmStorage = localStorage.getItem('bodilicious_utm');
+    const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
+
     const res = await fetch(`${API_BASE}/payment/razorpay/init`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ items, shippingDetails }),
+      body: JSON.stringify({ items, shippingDetails, marketing }),
     });
 
     if (!res.ok) {
@@ -875,6 +882,22 @@ const triggerPasswordReset = async (email: string) => {
       }),
     });
 
+    // ── 202: Payment captured but order creation failed after all retries ──────
+    // The backend tried 3 times with exponential backoff. The money IS taken.
+    // The Razorpay webhook (payment.captured) will still process the order async.
+    // Throw a TYPED error so PaymentPage shows a proper screen — not just a toast.
+    if (res.status === 202) {
+      const body = await res.json().catch(() => ({}));
+      // Clear cart locally — customer HAS paid, their cart is gone server-side
+      setCartItems([]);
+      localStorage.removeItem('bodilicious_utm');
+      const err: any = new Error(body.message || 'Payment captured, order pending');
+      err.paymentCaptured = true;
+      err.razorpayPaymentId = body.razorpay_payment_id || razorpay_payment_id;
+      err.orderId = body.orderId;
+      throw err;
+    }
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => null);
       throw new Error(errorData?.message || 'Payment verification failed');
@@ -882,9 +905,21 @@ const triggerPasswordReset = async (email: string) => {
 
     const { data: order } = await res.json();
 
-    // Cart was cleared server-side; clear locally
+    // Cart was cleared server-side; clear locally immediately
+    // (must be synchronous before navigate() fires)
     setCartItems([]);
-    setOrders(prev => [order, ...prev]);
+    localStorage.removeItem(CART_STORAGE_KEY);
+
+    // Deduplicate: only prepend if this order is not already in state
+    // (prevents double-entry when verifyPayment returns an already-processed order)
+    setOrders(prev => {
+      const alreadyExists = prev.some(o => (o as any)._id === (order as any)._id);
+      if (alreadyExists) {
+        // Update in place with latest data
+        return prev.map(o => (o as any)._id === (order as any)._id ? order : o);
+      }
+      return [order, ...prev];
+    });
 
     // Clear UTM tracking after successful checkout
     localStorage.removeItem('bodilicious_utm');

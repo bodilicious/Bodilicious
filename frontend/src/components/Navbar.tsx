@@ -186,6 +186,7 @@ export default function Navbar() {
   // Detect if we're on the home page for transparent nav behaviour
   const isHome = location.pathname === '/' || location.pathname === '/home';
   const isTransparent = isHome && !scrolled && !menuOpen;
+  const isCheckoutPhase = location.pathname === '/payment' || location.pathname === '/confirmation';
 
   return (
     <nav
@@ -195,7 +196,7 @@ export default function Navbar() {
           : isHome
             ? 'bg-transparent'
             : 'bg-white/95 backdrop-blur-sm'
-      }`}
+      } ${isCheckoutPhase ? 'pointer-events-none opacity-50 grayscale' : ''}`}
     >
       <AnimatePresence>
         {storeSettings?.announcementBar?.isActive && storeSettings.announcementBar.text && !announcementDismissed && (

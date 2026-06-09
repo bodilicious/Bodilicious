@@ -7,6 +7,7 @@ import { initSupportCleanupCron } from "./support/cleanup.js";
 import { shutdownPosthog } from "./utils/posthog.js";
 import { startWhatsAppWorker } from "./whatsapp/worker.js";
 import { initWhatsAppCrons } from "./whatsapp/cron.js";
+import { initPaymentReconciliationCron } from "./payment/reconciliation.js";
 import { runSettingsMigration } from "./settings/migration.js";
 import { flushBuffer as flushAuditBuffer } from "./audit/logger.js";
 
@@ -74,6 +75,7 @@ mongoose
     initSupportCleanupCron(); // Start orphaned Cloudinary upload cleanup
     startWhatsAppWorker(); // Start BullMQ worker for WhatsApp jobs
     initWhatsAppCrons(); // Start WhatsApp scheduled tasks
+    initPaymentReconciliationCron(); // Recover payments captured but never verified
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {

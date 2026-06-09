@@ -1,5 +1,5 @@
 import { Instagram, Facebook, Youtube, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 export default function Footer() {
@@ -7,9 +7,11 @@ export default function Footer() {
    
   const welcomeOffer = (user as any)?.welcomeOffer;
   const showBanner = authStatus !== 'authenticated' || welcomeOffer?.eligible === true;
+  const location = useLocation();
+  const isCheckoutPhase = location.pathname === '/payment' || location.pathname === '/confirmation';
 
   return (
-    <footer className="bg-silk-light border-t border-silk">
+    <footer className={`bg-silk-light border-t border-silk ${isCheckoutPhase ? 'pointer-events-none opacity-50 grayscale' : ''}`}>
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 px-6 py-14">
           

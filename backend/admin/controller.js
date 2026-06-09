@@ -568,8 +568,75 @@ export const updateOrderStatusAdmin = async (req, res) => {
         after: { status: orderStatus },
         meta: { source, note }
       });
+
+      // ── IF CANCELLED: trigger side effects (refund, shiprocket, stock) ──
+      if (orderStatus === "cancelled") {
+        // 1. Shiprocket Cancel
+        if (order.awb || order.shiprocketOrderId) {
+          try {
+            if (process.env.SHIPROCKET_EMAIL) {
+              const { getShiprocketToken } = await import("../tracker/shiprocketservice.js");
+              const token = await getShiprocketToken();
+              if (order.awb) {
+                await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ awbs: [order.awb] })
+                });
+              } else if (order.shiprocketOrderId) {
+                await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ ids: [order.shiprocketOrderId] })
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Admin cancel: Failed to cancel on Shiprocket:", err.message);
+          }
+        }
+
+        // 2. Razorpay Refund
+        if ((order.paymentStatus === "paid" || paymentStatus === "paid") && order.razorpayPaymentId) {
+          try {
+            const Razorpay = (await import("razorpay")).default;
+            const razorpayInstance = new Razorpay({
+              key_id: process.env.RAZORPAY_KEY_ID,
+              key_secret: process.env.RAZORPAY_KEY_SECRET,
+            });
+            const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+              amount: Math.round(order.totalAmount * 100),
+              speed: "normal",
+              notes: { reason: "Order cancelled by admin" },
+            });
+            order.refundId = refund.id;
+            order.refundStatus = "pending";
+            order.refundAmount = order.totalAmount;
+            order.paymentStatus = "refunded";
+          } catch (refundErr) {
+            console.error("Admin cancel: Razorpay refund failed:", refundErr.message);
+            order.refundStatus = "failed";
+            order.refundAmount = order.totalAmount;
+          }
+        }
+
+        // 3. Restore Stock (if paid or COD)
+        const shouldRestoreStock = order.paymentMethod === "cod" || order.paymentStatus === "paid" || order.paymentStatus === "refunded" || paymentStatus === "paid";
+        if (shouldRestoreStock && order.items && order.items.length > 0) {
+          try {
+            const Product = (await import("../products/models.js")).default;
+            const bulkOps = order.items.map(item => ({
+              updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
+            }));
+            await Product.bulkWrite(bulkOps);
+          } catch (stockErr) {
+            console.error("Admin cancel: Failed to restore stock:", stockErr.message);
+          }
+        }
+      }
     }
-    if (paymentStatus) {
+    
+    if (paymentStatus && order.paymentStatus !== "refunded") {
       order.paymentStatus = paymentStatus;
     }
 

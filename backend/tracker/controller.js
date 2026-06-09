@@ -88,6 +88,10 @@ export const createOrder = async (req, res) => {
     const existingOrdersCount = await Order.countDocuments({
       user: userId,
       orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
+      $or: [
+        { paymentMethod: "cod" },
+        { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
+      ]
     }).session(session);
 
     if (existingOrdersCount === 0) {
@@ -148,7 +152,7 @@ export const createOrder = async (req, res) => {
 
     await UserProfile.findByIdAndUpdate(
       userId,
-      { $push: { orders: order._id }, $set: { cart: [] } },
+      { $addToSet: { orders: order._id }, $set: { cart: [] } },
       { session }
     );
 
@@ -521,6 +525,25 @@ export const shiprocketWebhook = async (req, res) => {
              await logAction(req, "order_delivered", "order", order._id.toString(), { awb }, { source: "shiprocket-webhook" }).catch(err => console.error("Fulfillment Audit Failed:", err));
           } else if (internalStatus === "returned" || shiprocketStatus.includes("rto") || shiprocketStatus.includes("failed")) {
              await logAction(req, "delivery_failed", "order", order._id.toString(), { awb, reason: shiprocketStatus }, { source: "shiprocket-webhook", severity: "WARNING" }).catch(err => console.error("Fulfillment Audit Failed:", err));
+             
+             if ((internalStatus === "cancelled" || shiprocketStatus === "rto delivered") && !order.isStockRestored) {
+               if (order.items && order.items.length > 0) {
+                 try {
+                   const bulkOps = order.items.map(item => ({
+                     updateOne: {
+                       filter: { _id: item.product },
+                       update: { $inc: { stock: item.quantity } },
+                     },
+                   }));
+                   await Product.bulkWrite(bulkOps);
+                   order.isStockRestored = true;
+                   isUpdated = true;
+                   console.log(`[Shiprocket Webhook] Restored stock for order ${order._id}`);
+                 } catch (stockErr) {
+                   console.error("Failed to restore stock on webhook:", stockErr.message);
+                 }
+               }
+             }
           }
         }
       }
@@ -728,8 +751,11 @@ export const cancelOrder = async (req, res) => {
 
     await order.save();
 
-    // Restore stock for all cancelled items
-    if (order.items && order.items.length > 0) {
+    // Restore stock for all cancelled items ONLY if they were actually deducted
+    // (COD orders deduct immediately, Razorpay only deducts on success)
+    const shouldRestoreStock = order.paymentMethod === "cod" || order.paymentStatus === "paid" || order.paymentStatus === "refunded";
+
+    if (shouldRestoreStock && order.items && order.items.length > 0) {
       try {
         const bulkOps = order.items.map(item => ({
           updateOne: {

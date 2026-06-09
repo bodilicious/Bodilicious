@@ -242,6 +242,11 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
+    isStockRestored: {
+      type: Boolean,
+      default: false,
+    },
+
     physicalReceived: {
       type: Boolean,
       default: false,
