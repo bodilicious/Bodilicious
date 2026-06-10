@@ -13,16 +13,21 @@ export const startSession = async (req, res) => {
     // Use token-derived user_id if present
     const user_id = req.user ? req.user._id : null;
 
-    const newSession = await UserSession.create({
-      session_id,
-      user_id,
-      start_time: new Date(),
-      last_ping: new Date(),
-      network: {
-        ip_address: network?.ip_address || req.ip,
-        user_agent: network?.user_agent || req.headers["user-agent"]
-      }
-    });
+    const newSession = await UserSession.findOneAndUpdate(
+      { session_id },
+      {
+        $setOnInsert: { start_time: new Date() },
+        $set: {
+          user_id,
+          last_ping: new Date(),
+          network: {
+            ip_address: network?.ip_address || req.ip,
+            user_agent: network?.user_agent || req.headers["user-agent"]
+          }
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     if (user_id) {
       await UserProfile.findByIdAndUpdate(user_id, { $inc: { lifetimeSessions: 1 } });

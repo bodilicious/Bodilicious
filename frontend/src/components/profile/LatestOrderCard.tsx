@@ -84,8 +84,8 @@ export default function LatestOrderCard({ order, navigateTo, onReorder }: Props)
                     <div className="flex-1">
                         <p className="font-sans text-sm text-dark font-medium leading-snug">
                             {order.items.length > 1 
-                                ? `${order.items[0].product?.name || 'Product'} & ${order.items.length - 1} other item${order.items.length > 2 ? 's' : ''}`
-                                : order.items[0].product?.name || 'Product'
+                                ? `${order.items[0]?.product?.name || 'Product'} & ${order.items.length - 1} other item${order.items.length > 2 ? 's' : ''}`
+                                : order.items[0]?.product?.name || 'Product'
                             }
                         </p>
                         <p className="font-sans text-xs text-grey-beige mt-0.5">Total Amount: ₹{order.totalAmount.toLocaleString('en-IN')}</p>
