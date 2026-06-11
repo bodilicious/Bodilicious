@@ -95,10 +95,11 @@ const ProductHealthSection: React.FC<ProductHealthSectionProps> = ({
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  {/* @ts-expect-error Recharts internal ref issue */}
                   <Pie
-                    activeIndex={activeCatIndex}
-                    activeShape={renderActiveShape}
+                    {...({
+                      activeIndex: activeCatIndex,
+                      activeShape: renderActiveShape
+                    } as any)}
                     data={categoryData}
                     cx="50%"
                     cy="50%"

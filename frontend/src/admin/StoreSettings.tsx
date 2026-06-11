@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Settings, Save, AlertCircle, AlertTriangle, Info, X, Plus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { COUNTRIES } from '../utils/countries';
 import toast from 'react-hot-toast';
 import Select from '../components/Select';
 
@@ -124,6 +125,7 @@ const defaultForm = {
   // System
   maintenanceMode: false, maintenanceMessage: 'We are currently updating our store. Please check back soon!',
   maintenanceBypassSecret: '', lastUpdatedBy: null as string | null, lastUpdatedAt: null as string | null,
+  usdExchangeRate: 83.5, usdExchangeRateLastUpdated: null as string | null,
 
   // 2. Orders & Invoicing
   invoicePrefix: 'BOD-', orderIdStartFrom: 1000, gstNumber: '', panNumber: '', businessType: 'Sole Proprietor',
@@ -137,6 +139,13 @@ const defaultForm = {
   showEstimatedDeliveryDate: true, averageDeliveryDays: 5,
   pincodeCheckEnabled: false, pincodeServiceabilitySource: 'manual',
   temperatureSensitiveWarningEnabled: true,
+  // International
+  internationalShippingEnabled: false,
+  internationalCheckoutEnabled: false,
+  autoCurrencySwitchingEnabled: true,
+  internationalShippingCost: 2000,
+  internationalShippingThreshold: 10000,
+  supportedCountries: COUNTRIES as string[],
 
   // 4. Returns & Refunds
   returnWindowDays: 7,
@@ -216,6 +225,7 @@ export default function StoreSettings() {
           seoMeta: { ...defaultForm.seoMeta, ...(d.seoMeta || {}) },
           returnReasonTags: Array.isArray(d.returnReasonTags) ? d.returnReasonTags : defaultForm.returnReasonTags,
           bestSellerPids: Array.isArray(d.bestSellerPids) ? d.bestSellerPids : [],
+          supportedCountries: Array.isArray(d.supportedCountries) && d.supportedCountries.length > 0 ? d.supportedCountries : COUNTRIES,
         };
         setForm(merged);
         setIsDirty(false);
@@ -368,6 +378,11 @@ export default function StoreSettings() {
             {activeTab === 'general' && (
               <div className="space-y-6">
 
+                {(!form.usdExchangeRateLastUpdated || (Date.now() - new Date(form.usdExchangeRateLastUpdated).getTime() > 48 * 60 * 60 * 1000)) && (
+                  <Callout type="danger">
+                    <strong>Critical Issue:</strong> The USD Exchange Rate is stale or missing! The automated cron job hasn't successfully updated it in over 48 hours. International pricing may be incorrect.
+                  </Callout>
+                )}
 
                 <Card title="Maintenance Mode">
                   <div className="space-y-4">
@@ -476,6 +491,27 @@ export default function StoreSettings() {
                           />
                         </Field>
                         <Callout type="info">Pincode checking requires API credentials or a pincode list to be configured separately. Enabling this toggle without a data source will block all checkouts.</Callout>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card title="International Commerce">
+                  <div className="space-y-4">
+                    <ToggleRow label="Enable Auto Currency Switching" description="Automatically switch to USD for customers outside India based on their IP address." checked={form.autoCurrencySwitchingEnabled} onChange={v => set('autoCurrencySwitchingEnabled', v)} />
+                    <ToggleRow label="Enable International Shipping" description="Allow physical deliveries outside India." checked={form.internationalShippingEnabled} onChange={v => set('internationalShippingEnabled', v)} />
+                    <ToggleRow label="Enable International Checkout (Payments)" description="Allow Razorpay checkout for international customers. Only enable after FEMA compliance is approved." checked={form.internationalCheckoutEnabled} onChange={v => set('internationalCheckoutEnabled', v)} danger />
+                    {form.internationalShippingEnabled && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                          <Field label="International Shipping Cost (₹)"><input type="number" min="0" className={inputCls} value={form.internationalShippingCost} onChange={e => set('internationalShippingCost', Number(e.target.value))} /></Field>
+                          <Field label="Free Int. Shipping Threshold (₹)"><input type="number" min="0" className={inputCls} value={form.internationalShippingThreshold} onChange={e => set('internationalShippingThreshold', Number(e.target.value))} /></Field>
+                        </div>
+                        <Field label="Supported Countries">
+                          <p className="text-sm text-gray-500 mb-2">Customers from unlisted countries will be blocked at checkout. Example: 'United States', 'United Kingdom', 'Canada'.</p>
+                          <TagInput tags={form.supportedCountries} onChange={tags => set('supportedCountries', tags)} />
+                        </Field>
+                        <Callout type="warning">Note: International Razorpay payments and Shiprocket shipments require explicit approval from your account managers. Proceed only if your accounts are activated for cross-border commerce.</Callout>
                       </div>
                     )}
                   </div>

@@ -138,7 +138,7 @@ export const pushOrderToShiprocket = async (order) => {
       billing_city: shippingDetails.city || "Delhi",
       billing_pincode: finalPincode,
       billing_state: shippingDetails.state || "Delhi",
-      billing_country: "India",
+      billing_country: shippingDetails.country || "India",
       billing_email: shippingDetails.email || "customer@bodilicious.in",
       billing_phone: finalPhone,
       shipping_is_billing: true,
@@ -167,9 +167,15 @@ export const pushOrderToShiprocket = async (order) => {
       }
     } else {
       console.error("Shiprocket Order Creation Failed:", await createRes.text());
+      if (order.paymentStatus === "paid") {
+        await Order.findByIdAndUpdate(order._id, { orderStatus: "payment_captured_fulfillment_pending" });
+      }
     }
   } catch (err) {
     console.error("Shiprocket push error:", err.message);
+    if (order && order.paymentStatus === "paid") {
+      await Order.findByIdAndUpdate(order._id, { orderStatus: "payment_captured_fulfillment_pending" }).catch(e => console.error(e));
+    }
   }
 };
 

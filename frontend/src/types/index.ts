@@ -19,6 +19,7 @@ export interface UsageData {
 }
 
 export interface Product {
+  _id?: string;
   pid: string;
   name: string;
   slug?: string;

@@ -1,4 +1,5 @@
 import StoreSettings from "./models.js";
+import { COUNTRIES } from "../utils/countries.js";
 import { logAction } from "../admin/controller.js";
 import { clearSettingsCache } from "./cache.js";
 
@@ -14,6 +15,22 @@ export const getSettings = async (req, res) => {
       settings = await StoreSettings.create({});
     }
 
+    // Determine country code from Cloudflare header, fallback to 'IN'
+    const cfCountry = req.headers['cf-ipcountry'];
+    const detectedCountryCode = cfCountry && cfCountry !== 'XX' && cfCountry !== 'T1' 
+        ? cfCountry 
+        : 'IN';
+
+    // Check for stale exchange rate (> 48 hours)
+    if (settings.exchangeRatesLastUpdated) {
+        const msSinceUpdate = Date.now() - new Date(settings.exchangeRatesLastUpdated).getTime();
+        if (msSinceUpdate > 48 * 60 * 60 * 1000) {
+            console.warn(`[WARNING] Exchange Rates are stale! Last updated: ${settings.exchangeRatesLastUpdated}`);
+        }
+    } else {
+        console.warn("[WARNING] Exchange Rates have never been updated.");
+    }
+
     res.json({
       success: true,
       data: {
@@ -26,12 +43,21 @@ export const getSettings = async (req, res) => {
         maintenanceMode: req.query.bypass === settings.maintenanceBypassSecret ? false : settings.maintenanceMode,
         maintenanceMessage: settings.maintenanceMessage,
         bestSellerPids: settings.bestSellerPids || [],
+        internationalShippingEnabled: settings.internationalShippingEnabled,
+        internationalCheckoutEnabled: settings.internationalCheckoutEnabled,
+        internationalShippingCost: settings.internationalShippingCost,
+        internationalShippingThreshold: settings.internationalShippingThreshold,
+        supportedCountries: settings.supportedCountries || COUNTRIES,
         reviewSkinTypeTaggingEnabled: settings.reviewSkinTypeTaggingEnabled ?? true,
         reviewBeforeAfterPhotosEnabled: settings.reviewBeforeAfterPhotosEnabled ?? true,
         reviewVerifiedBadgeEnabled: settings.reviewVerifiedBadgeEnabled ?? true,
         reviewIncentiveEnabled: settings.reviewIncentiveEnabled ?? false,
         reviewIncentiveDiscountPercent: settings.reviewIncentiveDiscountPercent ?? 10,
         reviewModerationEnabled: settings.reviewModerationEnabled ?? true,
+        autoCurrencySwitchingEnabled: settings.autoCurrencySwitchingEnabled ?? true,
+        detectedCountryCode,
+        usdExchangeRate: settings.usdExchangeRate || 83.5,
+        exchangeRates: settings.exchangeRates || {},
       },
     });
   } catch (err) {
@@ -94,9 +120,10 @@ export const updateSettings = async (req, res) => {
       // Returns & Refunds
       "allowReturnOpened", "allowReturnUnopened", "requirePhotoForReturn",
       "adverseReactionReturnEnabled", "adverseReactionWindowDays", "refundMethod",
-      // Cold Chain
+      // Cold Chain & International
       "fragilePackagingSurchargeEnabled", "fragilePackagingSurcharge", "showEstimatedDeliveryDate",
       "averageDeliveryDays", "pincodeCheckEnabled", "pincodeServiceabilitySource", "temperatureSensitiveWarningEnabled",
+      "internationalShippingEnabled", "internationalCheckoutEnabled", "autoCurrencySwitchingEnabled", "internationalShippingCost", "internationalShippingThreshold",
       // Skin Profile
       "skinQuizEnabled", "productCompatibilityWarningsEnabled", "storeSkinProfileOnAccount",
       // Reviews
@@ -116,6 +143,9 @@ export const updateSettings = async (req, res) => {
     }
     if (Array.isArray(req.body.bestSellerPids)) {
       settings.bestSellerPids = req.body.bestSellerPids.filter(p => typeof p === "string" && p.trim());
+    }
+    if (Array.isArray(req.body.supportedCountries)) {
+      settings.supportedCountries = req.body.supportedCountries.filter(c => typeof c === "string" && c.trim());
     }
 
     // Nested fields

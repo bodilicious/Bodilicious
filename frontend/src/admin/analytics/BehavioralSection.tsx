@@ -94,7 +94,6 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
   };
 
   // Checkout failure sparkline data (last 30 days, by date)
-  const checkoutSparkData = checkoutFailures.map(c => c.count);
 
   // Backend errors with sparklines (mock last-7-day trend with flat values since we only have totals)
   const totalBackendErrors = backendErrors.reduce((s, e) => s + e.count, 0);
@@ -358,7 +357,7 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
                   />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 10 }} width={28} />
                   <Tooltip
-                    formatter={(val: any, name: string) => [val, name === 'count' ? 'Failures' : '₹ at Risk']}
+                    formatter={(val: any, name: any) => [val, name === 'count' ? 'Failures' : '₹ at Risk']}
                     contentStyle={{ borderRadius: 14, border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', fontFamily: 'Inter,sans-serif' }}
                   />
                   <Bar dataKey="count" name="count" radius={[4, 4, 0, 0]}>

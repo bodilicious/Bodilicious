@@ -1,11 +1,14 @@
 import { Router } from "express";
-import { initRazorpayOrder, verifyPayment, razorpayWebhook } from "./controller.js";
+import { initRazorpayOrder, verifyPayment, razorpayWebhook, getOrderQuote } from "./controller.js";
 import { runPaymentReconciliation } from "./reconciliation.js";
-import { protect } from "../middleware/auth.js";
+import { protect, tryProtect } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { createOrderSchema, verifyPaymentSchema } from "../tracker/schema.js";
 
 const router = Router();
+
+// Get order quote (subtotal, shipping, HMAC signed quoteId) - Supports guests via tryProtect
+router.post("/quote", tryProtect, getOrderQuote);
 
 // Init Razorpay order (creates only a Razorpay order, no DB record)
 router.post("/razorpay/init", protect, validate(createOrderSchema), initRazorpayOrder);

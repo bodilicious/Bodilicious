@@ -1,24 +1,28 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Address } from '../types';
 import {
-    Check, ChevronRight, Truck, MapPin, Loader2, AlertCircle,
-    Search, User, Mail, Phone, Map, Building, CheckCircle2, Globe
+    Check, ChevronRight, MapPin, Loader2, AlertCircle,
+    Search, User, Mail, Phone, Map, Building, CheckCircle2, Globe, ChevronDown, Clock
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import RequireAuth from '../components/RequireAuth';
+import { getCountryFlag } from '../utils/countries';
+
+import { useCurrency } from '../hooks/useCurrency';
+import { getIsoAlpha2Code } from '../utils/countryMapper';
 
 // ─── Module-level pincode cache ────────────────────────────────────────────────
-const pincodeCache: Record<string, { city: string; state: string }> = {};
+const pincodeCache: Record<string, { city: string; state: string; areas: string[] }> = {};
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface ShippingForm {
     name: string;
     email: string;
     phone: string;
-    houseNumber: string;
     address: string;
+    area: string;
     city: string;
     state: string;
     pincode: string;
@@ -28,8 +32,12 @@ interface ShippingForm {
 type AutofillSource = 'none' | 'street' | 'pincode';
 
 const INDIA_ALIASES = new Set(['india', 'in', 'bharat', 'ind']);
+const NAME_RE = /^[a-zA-Z\u00C0-\u024F\s'\-]{2,}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^\+?[0-9\s\-()\u2010-\u2015]{7,20}$/;
+const UK_POSTCODE_RE = /^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i;
+const US_POSTCODE_RE = /^\d{5}(-\d{4})?$/;
+const CA_POSTCODE_RE = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/i;
+const GLOBAL_POSTCODE_RE = /^[a-zA-Z0-9\s\-]{3,12}$/;
 
 function isIndiaCountry(c: string) {
     return !c.trim() || INDIA_ALIASES.has(c.toLowerCase().trim());
@@ -37,7 +45,8 @@ function isIndiaCountry(c: string) {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 export default function ShippingPage() {
-    const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings } = useApp();
+    const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings, fetchShippingQuote } = useApp();
+    const { formatPrice, userCurrency } = useCurrency();
     const navigate = useNavigate();
 
     // ── Form state ───────────────────────────────────────────────────────────────
@@ -45,8 +54,8 @@ export default function ShippingPage() {
         name: user?.displayName || '',
         email: user?.email || '',
         phone: user?.phone || '',
-        houseNumber: (user as { houseNumber?: string })?.houseNumber || '',
         address: user?.address || '',
+        area: '',
         city: user?.city || '',
         state: user?.state || '',
         pincode: user?.pincode || '',
@@ -56,8 +65,17 @@ export default function ShippingPage() {
     const [touched, setTouched] = useState<Partial<Record<keyof ShippingForm, boolean>>>({});
     const touch = (field: keyof ShippingForm) => setTouched(prev => ({ ...prev, [field]: true }));
 
-    // ── Autofill state ───────────────────────────────────────────────────────────
-    const [lastAutofillSource, setLastAutofillSource] = useState<AutofillSource>('none');
+    // ── UI state ─────────────────────────────────────────────────────────────────
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+    const [countrySearchQuery, setCountrySearchQuery] = useState('');
+    const countryDropdownRef = useRef<HTMLDivElement>(null);
+
+    const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
+    const [areaSearchQuery, setAreaSearchQuery] = useState('');
+    const areaDropdownRef = useRef<HTMLDivElement>(null);
+
+    const [, setLastAutofillSource] = useState<AutofillSource>('none');
     const lastAutofillSourceRef = useRef<AutofillSource>('none');
     const [autofillSuccess, setAutofillSuccess] = useState(false);
 
@@ -87,10 +105,11 @@ export default function ShippingPage() {
             name: addr.name || prev.name,
             phone: addr.phone || prev.phone,
             address: addr.addressLine,
+            area: '',
             city: addr.city,
             state: addr.state,
             pincode: addr.pincode,
-            country: 'India',
+            country: (addr as any).country || 'India',
         }));
         setAddressQuery(addr.addressLine);
         setIsAddressLocked(true);
@@ -115,8 +134,8 @@ export default function ShippingPage() {
             name: prev.name || user.displayName || '',
             email: prev.email || user.email || '',
             phone: prev.phone || user.phone || '',
-            houseNumber: prev.houseNumber || (user as { houseNumber?: string })?.houseNumber || '',
             address: prev.address || user.address || '',
+            area: prev.area || '',
             city: prev.city || user.city || '',
             state: prev.state || user.state || '',
             pincode: prev.pincode || user.pincode || '',
@@ -127,54 +146,189 @@ export default function ShippingPage() {
     }, [user]);
 
     // ── Cart calculations ────────────────────────────────────────────────────────
-    const validCartItems = cartItems.filter(i => i && i.product);
-    const shippingCost = cartTotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
-    const total = cartTotal + shippingCost;
+    // useMemo gives a stable reference — a plain .filter() creates a new array every render
+    // which would cause the quote useEffect to loop infinitely.
+    const validCartItems = useMemo(
+        () => cartItems.filter(i => i && i.product),
+        [cartItems]
+    );
+
+    // Dynamic Quote State
+    const [quoteError, setQuoteError] = useState<string | null>(null);
+    // Rate-limit countdown: seconds remaining until retry is allowed (null = not rate-limited)
+    const [rateLimitSecs, setRateLimitSecs] = useState<number | null>(null);
+    const rateLimitTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [quoteData, setQuoteData] = useState<{ shippingCost: number; total: number; threshold: number }>({
+        shippingCost: storeSettings.shippingCost,
+        total: cartTotal + storeSettings.shippingCost,
+        threshold: storeSettings.shippingThreshold
+    });
+
+    useEffect(() => {
+        if (validCartItems.length === 0) return;
+        let isMounted = true;
+        setQuoteError(null);
+
+        // Prepare lightweight items list to send to the API (avoid sending full product objects)
+        const itemsForQuote = validCartItems.map((item: any) => ({
+            productId: item.product?._id || item.product,
+            pid: item.product?.pid,
+            quantity: item.quantity,
+        }));
+
+        fetchShippingQuote(itemsForQuote, { country: form.country })
+            .then(data => {
+                if (isMounted) {
+                    setRateLimitSecs(null);
+                    if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
+                    setQuoteData({
+                        shippingCost: data.shippingCost,
+                        total: data.totalAmount,
+                        threshold: isIndiaCountry(form.country)
+                            ? storeSettings.shippingThreshold
+                            : storeSettings.internationalShippingThreshold
+                    });
+                }
+            })
+            .catch(err => {
+                console.error("Quote fetch failed:", err);
+                if (!isMounted) return;
+                if (err.isRateLimit) {
+                    // Show countdown and auto-retry when it hits zero
+                    const totalSecs = Math.ceil((err.retryAfterMs || 60000) / 1000);
+                    setRateLimitSecs(totalSecs);
+                    setQuoteError(null);
+                    if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
+                    rateLimitTickRef.current = setInterval(() => {
+                        setRateLimitSecs(prev => {
+                            if (prev === null || prev <= 1) {
+                                clearInterval(rateLimitTickRef.current!);
+                                // Re-trigger the quote by briefly clearing to force effect rerun
+                                // We do this via a dummy state flip handled below
+                                return null;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+                } else {
+                    setQuoteError(err.message || "Failed to fetch shipping quote.");
+                }
+            });
+
+        return () => {
+            isMounted = false;
+            if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
+        };
+    // storeSettings deliberately omitted — changes there don't need to re-fetch the quote.
+    // fetchShippingQuote is a stable useCallback from AppContext so safe to include.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [validCartItems, form.country, fetchShippingQuote]);
+
+    const shippingCost = quoteData.shippingCost;
+    const total = quoteData.total;
 
     // ── Validation ───────────────────────────────────────────────────────────────
     const errors: Partial<Record<keyof ShippingForm, string>> = {};
-    if (touched.name && !form.name.trim()) errors.name = 'Full name is required.';
+    if (touched.name) {
+        if (!form.name.trim()) errors.name = 'Full name is required.';
+        else if (form.name.trim().length < 2) errors.name = 'Name must be at least 2 characters.';
+        else if (!NAME_RE.test(form.name)) errors.name = 'Name contains invalid characters.';
+    }
     if (touched.email && !EMAIL_RE.test(form.email)) errors.email = 'Enter a valid email address.';
-    if (touched.phone && !PHONE_RE.test(form.phone)) errors.phone = 'Enter a valid phone number.';
-    if (touched.address && !form.address.trim()) errors.address = 'Street address is required.';
-    if (touched.city && !form.city.trim()) errors.city = 'City is required.';
-    if (touched.state && !form.state.trim()) errors.state = 'State is required.';
+    
+    const strippedPhone = form.phone.replace(/\D/g, '');
+    if (touched.phone) {
+        if (!form.phone.trim()) errors.phone = 'Phone number is required.';
+        else if (isIndiaCountry(form.country) && strippedPhone.length < 10) errors.phone = 'Indian phone must have at least 10 digits.';
+        else if (strippedPhone.length < 7) errors.phone = 'Enter a valid phone number (min 7 digits).';
+    }
+
+    if (touched.address && form.address.trim().length < 3) errors.address = 'Street address is required.';
+    if (touched.city && form.city.trim().length < 3) errors.city = 'City is required.';
+    
+    const stateRequired = ['India', 'United States of America', 'Canada', 'Australia'].some(c => c.toLowerCase() === form.country.trim().toLowerCase());
+    if (touched.state && stateRequired && form.state.trim().length < 2) errors.state = 'State is required for this country.';
     if (touched.country && !form.country.trim()) errors.country = 'Country is required.';
+    
     if (touched.pincode) {
-        if (!form.pincode.trim()) errors.pincode = 'Pincode is required.';
-        else if (isIndiaCountry(form.country) && !/^\d{6}$/.test(form.pincode))
-            errors.pincode = 'Indian pincode must be exactly 6 digits.';
+        if (!form.pincode.trim()) errors.pincode = 'Postal code is required.';
+        else {
+            const countryLower = form.country.trim().toLowerCase();
+            if (isIndiaCountry(form.country) && !/^[1-9][0-9]{5}$/.test(form.pincode)) errors.pincode = 'Indian PIN code must be exactly 6 digits.';
+            else if (countryLower === 'united kingdom' && !UK_POSTCODE_RE.test(form.pincode)) errors.pincode = 'Enter a valid UK Postcode.';
+            else if (countryLower === 'united states of america' && !US_POSTCODE_RE.test(form.pincode)) errors.pincode = 'Enter a valid US ZIP Code.';
+            else if (countryLower === 'canada' && !CA_POSTCODE_RE.test(form.pincode)) errors.pincode = 'Enter a valid Canadian Postal Code.';
+            else if (!['india', 'in', 'bharat', 'ind', 'united kingdom', 'united states of america', 'canada'].includes(countryLower) && !GLOBAL_POSTCODE_RE.test(form.pincode)) errors.pincode = 'Enter a valid postal code.';
+        }
     }
 
     const isFormValid =
+        NAME_RE.test(form.name) &&
         EMAIL_RE.test(form.email) &&
-        PHONE_RE.test(form.phone) &&
-        (['name', 'email', 'phone', 'address', 'city', 'state', 'pincode', 'country'] as (keyof ShippingForm)[])
-            .every(k => form[k].trim().length > 0);
+        strippedPhone.length >= 7 &&
+        (!isIndiaCountry(form.country) || strippedPhone.length >= 10) &&
+        form.address.trim().length >= 3 &&
+        form.city.trim().length >= 3 &&
+        (!stateRequired || form.state.trim().length >= 2) &&
+        form.country.trim().length > 0 &&
+        (
+            (isIndiaCountry(form.country) && /^[1-9][0-9]{5}$/.test(form.pincode)) ||
+            (form.country.trim().toLowerCase() === 'united kingdom' && UK_POSTCODE_RE.test(form.pincode)) ||
+            (form.country.trim().toLowerCase() === 'united states of america' && US_POSTCODE_RE.test(form.pincode)) ||
+            (form.country.trim().toLowerCase() === 'canada' && CA_POSTCODE_RE.test(form.pincode)) ||
+            (!['india', 'in', 'bharat', 'ind', 'united kingdom', 'united states of america', 'canada'].includes(form.country.trim().toLowerCase()) && GLOBAL_POSTCODE_RE.test(form.pincode))
+        );
 
     // ── Pincode → City/State autofill ────────────────────────────────────────────
     useEffect(() => {
-        const pin = form.pincode.replace(/\D/g, '').slice(0, 6);
-        if (pin !== form.pincode) setForm(prev => ({ ...prev, pincode: pin }));
+        const rawPin = form.pincode.trim();
+        const isIndia = isIndiaCountry(form.country);
+        const isoCode = isIndia ? 'in' : getIsoAlpha2Code(form.country);
 
-        if (pin.length !== 6 || !isIndiaCountry(form.country)) {
-            if (pin.length < 6) { setPincodeStatus('idle'); setPincodeMsg(''); }
+        // Clear if no valid country/iso code or pin is too short
+        if (!isoCode || (isIndia && rawPin.length < 6) || (!isIndia && rawPin.length < 3)) {
+            setPincodeStatus('idle');
+            setPincodeMsg('');
+            if (isIndia) {
+                const cleanPin = rawPin.replace(/\D/g, '').slice(0, 6);
+                if (cleanPin !== form.pincode) {
+                    setForm(prev => ({ ...prev, pincode: cleanPin, area: '' }));
+                    setAreaSearchQuery('');
+                }
+            }
             return;
         }
 
-        if (pincodeCache[pin]) {
-            const c = pincodeCache[pin];
+        let pinToFetch = rawPin;
+        if (isIndia) {
+            pinToFetch = rawPin.replace(/\D/g, '').slice(0, 6);
+            if (pinToFetch !== form.pincode) {
+                setForm(prev => ({ ...prev, pincode: pinToFetch, area: '' }));
+                setAreaSearchQuery('');
+            }
+            if (pinToFetch.length !== 6) return;
+        }
+
+        const cacheKey = `${isoCode}_${pinToFetch.toLowerCase()}`;
+
+        if (pincodeCache[cacheKey]) {
+            const c = pincodeCache[cacheKey];
             const src = lastAutofillSourceRef.current;
             setForm(prev => ({
                 ...prev,
                 city: src !== 'street' || !prev.city ? c.city : prev.city,
                 state: src !== 'street' || !prev.state ? c.state : prev.state,
-                country: 'India',
+                country: isIndia ? 'India' : prev.country,
             }));
             lastAutofillSourceRef.current = 'pincode';
             setLastAutofillSource('pincode');
             setPincodeStatus('success');
-            setPincodeMsg(`Auto-filled from PIN ${pin}`);
+            if (isIndia && c.areas.length) {
+                const areaStr = c.areas.slice(0, 3).join(', ') + (c.areas.length > 3 ? '...' : '');
+                setPincodeMsg(`Auto-filled: ${c.city}, ${c.state} (${areaStr})`);
+            } else {
+                setPincodeMsg(`Auto-filled: ${c.city}, ${c.state}`);
+            }
             showAutofillBadge();
             return;
         }
@@ -185,39 +339,72 @@ export default function ShippingPage() {
         setPincodeStatus('loading');
         setPincodeMsg('');
 
+        // Use same debounce timeout to avoid excessive calls
         const timerId = setTimeout(async () => {
             try {
                 const hardTimeout = setTimeout(() => ctrl.abort(), 7000);
-                const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`, { signal: ctrl.signal });
+                
+                let res;
+                if (isIndia) {
+                    res = await fetch(`https://api.postalpincode.in/pincode/${pinToFetch}`, { signal: ctrl.signal });
+                } else {
+                    res = await fetch(`https://api.zippopotam.us/${isoCode}/${encodeURIComponent(pinToFetch)}`, { signal: ctrl.signal });
+                }
+                
                 clearTimeout(hardTimeout);
                 if (!res.ok) throw new Error('network');
                 const data = await res.json();
 
-                if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length > 0) {
-                    const po = data[0].PostOffice[0];
-                    const city = po.District || po.Division || po.Region || '';
-                    const state = po.State || '';
-                    pincodeCache[pin] = { city, state };
+                let city = '';
+                let state = '';
+                let areas: string[] = [];
+                let success = false;
+
+                if (isIndia) {
+                    if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length > 0) {
+                        const po = data[0].PostOffice[0];
+                        city = po.District || po.Division || po.Region || '';
+                        state = po.State || '';
+                        areas = data[0].PostOffice.map((p: any) => p.Name).filter(Boolean);
+                        success = true;
+                    }
+                } else {
+                    if (data && data.places && data.places.length > 0) {
+                        const place = data.places[0];
+                        city = place['place name'] || '';
+                        state = place['state abbreviation'] || place['state'] || '';
+                        success = true;
+                    }
+                }
+
+                if (success) {
+                    pincodeCache[cacheKey] = { city, state, areas };
                     const src = lastAutofillSourceRef.current;
                     setForm(prev => ({
                         ...prev,
                         city: src !== 'street' || !prev.city ? city : prev.city,
                         state: src !== 'street' || !prev.state ? state : prev.state,
-                        country: 'India',
+                        country: isIndia ? 'India' : prev.country,
                     }));
                     lastAutofillSourceRef.current = 'pincode';
                     setLastAutofillSource('pincode');
                     setPincodeStatus('success');
-                    setPincodeMsg(`Showing results for ${po.Block || po.Name || pin}`);
+                    
+                    if (isIndia && areas.length) {
+                        const areaStr = areas.slice(0, 3).join(', ') + (areas.length > 3 ? '...' : '');
+                        setPincodeMsg(`Auto-filled: ${city}, ${state} (${areaStr})`);
+                    } else {
+                        setPincodeMsg(`Auto-filled: ${city}, ${state}`);
+                    }
                     showAutofillBadge();
                 } else {
                     setPincodeStatus('error');
-                    setPincodeMsg('Pincode not found. Please fill city & state manually.');
+                    setPincodeMsg('Postal code not found. Please fill manually.');
                 }
             } catch (err: unknown) {
                 if (err instanceof Error && err.name !== 'AbortError') {
                     setPincodeStatus('error');
-                    setPincodeMsg('Could not look up pincode. Please fill manually.');
+                    setPincodeMsg('Could not look up postal code. Please fill manually.');
                 }
             }
         }, 600);
@@ -289,14 +476,17 @@ export default function ShippingPage() {
         const displayAddress = street || city || state;
 
         setAddressQuery(displayAddress);
-        setForm(prev => ({
-            ...prev,
-            address: displayAddress,
-            city: city || prev.city,
-            state: state || prev.state,
-            country: country || prev.country,
-            pincode: postcode || prev.pincode,
-        }));
+        setForm(prev => {
+            const hasValidPincode = isIndiaCountry(prev.country) && prev.pincode.length === 6 && pincodeStatus === 'success';
+            return {
+                ...prev,
+                address: displayAddress,
+                city: hasValidPincode ? prev.city : (city || prev.city),
+                state: hasValidPincode ? prev.state : (state || prev.state),
+                country: country || prev.country,
+                pincode: prev.pincode || postcode,
+            };
+        });
         lastAutofillSourceRef.current = 'street';
         setLastAutofillSource('street');
         setIsAddressLocked(true);
@@ -356,15 +546,34 @@ export default function ShippingPage() {
         setTouched(Object.fromEntries(requiredFields.map(k => [k, true])));
         if (!isFormValid) return;
 
-        const finalAddress = [form.houseNumber, form.address].filter(Boolean).join(', ');
-        navigate('/payment', { state: { shippingDetails: { ...form, address: finalAddress } } });
+        setIsSubmitting(true);
+        const finalAddress = [form.address, form.area].filter(Boolean).join(', ');
+        
+        // Simulating minor delay for UX / submission before navigation
+        setTimeout(() => {
+            navigate('/payment', { state: { shippingDetails: { ...form, address: finalAddress } } });
+        }, 300);
     };
 
+    // ── Close country dropdown on click outside ──────────────────────────────────
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
+                setIsCountryDropdownOpen(false);
+            }
+            if (areaDropdownRef.current && !areaDropdownRef.current.contains(event.target as Node)) {
+                setIsAreaDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // ── Shared input classes ─────────────────────────────────────────────────────
-    const inputBase = 'w-full py-3 pr-3 border bg-neutral-50 font-sans text-sm focus:outline-none transition-all rounded-sm placeholder:text-gray-400';
-    const inputNormal = 'border-silk focus:border-dark-red focus:ring-1 focus:ring-dark-red/20';
-    const inputError = 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-200';
-    const inputOk = 'border-emerald-400 focus:border-emerald-500';
+    const inputBase = 'w-full h-11 pr-3 border bg-neutral-50 font-sans text-sm focus:outline-none transition-all rounded-sm placeholder:text-gray-400';
+    const inputNormal = 'border-silk focus:border-dark-red focus:ring-2 focus:ring-dark-red/20';
+    const inputError = 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200';
+    const inputOk = 'border-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200';
 
     const fieldCls = (field: keyof ShippingForm, hasIcon = true, value?: string) => {
         const v = value ?? form[field];
@@ -516,9 +725,11 @@ export default function ShippingPage() {
                                         {/* Name + Email */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div>
+                                                <label htmlFor="shipping-name" className="sr-only">Full Name</label>
                                                 <div className="relative">
                                                     <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
                                                     <input
+                                                        id="shipping-name"
                                                         type="text" required placeholder="Full Name"
                                                         value={form.name}
                                                         onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
@@ -530,9 +741,11 @@ export default function ShippingPage() {
                                                 {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                                             </div>
                                             <div>
+                                                <label htmlFor="shipping-email" className="sr-only">Email</label>
                                                 <div className="relative">
                                                     <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
                                                     <input
+                                                        id="shipping-email"
                                                         type="email" required placeholder="Email"
                                                         value={form.email}
                                                         onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
@@ -547,9 +760,11 @@ export default function ShippingPage() {
 
                                         {/* Phone */}
                                         <div>
+                                            <label htmlFor="shipping-phone" className="sr-only">Phone Number</label>
                                             <div className="relative">
                                                 <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
                                                 <input
+                                                    id="shipping-phone"
                                                     type="tel" required placeholder="Phone Number (e.g. +91 98765 43210)"
                                                     value={form.phone}
                                                     onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
@@ -561,109 +776,293 @@ export default function ShippingPage() {
                                             {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
                                         </div>
 
-                                        {/* House Number (optional) */}
-                                        <div className="relative">
-                                            <Building size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
-                                            <input
-                                                type="text" placeholder="House / Flat No. (Optional)"
-                                                value={form.houseNumber}
-                                                onChange={e => setForm(p => ({ ...p, houseNumber: e.target.value }))}
-                                                className={`${inputBase} pl-10 ${inputNormal}`}
-                                                autoComplete="address-line2"
-                                            />
+                                        {/* Country Dropdown */}
+                                        <div className="relative" ref={countryDropdownRef}>
+                                            <label htmlFor="shipping-country" className="sr-only">Country</label>
+                                            <div className="relative">
+                                                <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                                                <button
+                                                    id="shipping-country"
+                                                    type="button"
+                                                    onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+                                                    onBlur={() => touch('country')}
+                                                    className={`${fieldCls('country')} text-left flex items-center justify-between cursor-pointer`}
+                                                    aria-haspopup="listbox"
+                                                    aria-expanded={isCountryDropdownOpen}
+                                                >
+                                                    <span className="truncate flex items-center gap-2">
+                                                        {form.country && getCountryFlag(form.country) && (
+                                                            <span className="text-lg">{getCountryFlag(form.country)}</span>
+                                                        )}
+                                                        {form.country || 'Select Country'}
+                                                    </span>
+                                                    <ChevronRight size={16} className={`text-gray-400 transition-transform ${isCountryDropdownOpen ? 'rotate-90' : ''}`} />
+                                                </button>
+                                            </div>
+                                            {errors.country && <p className="text-xs text-red-500 mt-1">{errors.country}</p>}
+
+                                            {isCountryDropdownOpen && (
+                                                <div className="absolute z-40 w-full mt-1 bg-white border border-silk shadow-2xl rounded-sm">
+                                                    <div className="p-2 border-b border-gray-100">
+                                                        <div className="relative">
+                                                            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search country..."
+                                                                value={countrySearchQuery}
+                                                                onChange={(e) => setCountrySearchQuery(e.target.value)}
+                                                                className="w-full pl-8 pr-3 py-2 text-sm border-none bg-neutral-50 focus:ring-1 focus:ring-dark-red/20 rounded-sm outline-none"
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <ul className="max-h-60 overflow-y-auto py-1" role="listbox">
+                                                        {(storeSettings.supportedCountries?.length > 0 ? storeSettings.supportedCountries : ['India'])
+                                                            .filter((c: string) => c.toLowerCase().includes(countrySearchQuery.toLowerCase()))
+                                                            .map((c: string) => (
+                                                                <li
+                                                                    key={c}
+                                                                    role="option"
+                                                                    aria-selected={form.country === c}
+                                                                    className={`px-4 py-2 text-sm cursor-pointer hover:bg-red-50 transition-colors flex items-center gap-2 ${form.country === c ? 'bg-red-50 text-dark-red font-medium' : 'text-gray-700'}`}
+                                                                    onMouseDown={() => {
+                                                                        setForm(prev => ({ ...prev, country: c }));
+                                                                        setIsCountryDropdownOpen(false);
+                                                                        setCountrySearchQuery('');
+                                                                    }}
+                                                                >
+                                                                    {getCountryFlag(c) && <span className="text-lg">{getCountryFlag(c)}</span>}
+                                                                    {c}
+                                                                </li>
+                                                            ))}
+                                                        {(storeSettings.supportedCountries?.length > 0 ? storeSettings.supportedCountries : ['India'])
+                                                            .filter((c: string) => c.toLowerCase().includes(countrySearchQuery.toLowerCase()))
+                                                            .length === 0 && (
+                                                                <li className="px-4 py-3 text-sm text-gray-400 text-center">No countries found.</li>
+                                                            )}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Street Autocomplete */}
+                                                                                {/* Postal Code (Moved up) */}
                                         <div>
-                                            <div className="relative" ref={dropdownRef}>
-                                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                                            <label htmlFor="shipping-pincode" className="sr-only">Postal Code</label>
+                                            <div className="relative">
                                                 <input
+                                                    id="shipping-pincode"
                                                     type="text" required
-                                                    placeholder="Street, Area, or Landmark"
-                                                    value={addressQuery}
-                                                    onChange={handleAddressChange}
-                                                    onKeyDown={handleKeyDown}
-                                                    onBlur={() => {
-                                                        touch('address');
-                                                        setTimeout(() => setShowSuggestions(false), 200);
-                                                    }}
-                                                    onFocus={() => {
-                                                        if (addressQuery.trim().length >= 3 && !isAddressLocked)
-                                                            setShowSuggestions(true);
-                                                    }}
-                                                    className={fieldCls('address', true, addressQuery)}
-                                                    autoComplete="street-address"
-                                                    aria-autocomplete="list"
-                                                    aria-expanded={showSuggestions}
+                                                    placeholder={isIndiaCountry(form.country) ? '6-digit PIN Code' : 
+                                                                 form.country.trim().toLowerCase() === 'united states of america' ? 'ZIP Code' :
+                                                                 ['united kingdom', 'australia'].includes(form.country.trim().toLowerCase()) ? 'Postcode' :
+                                                                 'Postal Code'}
+                                                    value={form.pincode}
+                                                    onChange={e => setForm(p => ({ ...p, pincode: e.target.value }))}
+                                                    onBlur={() => touch('pincode')}
+                                                    inputMode={isIndiaCountry(form.country) ? 'numeric' : 'text'}
+                                                    maxLength={isIndiaCountry(form.country) ? 6 : 12}
+                                                    className={fieldCls('pincode', false)}
+                                                    autoComplete="postal-code"
                                                 />
+                                                {pincodeStatus === 'loading' && (
+                                                    <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" />
+                                                )}
+                                                {pincodeStatus === 'success' && (
+                                                    <CheckCircle2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" />
+                                                )}
+                                                {pincodeStatus === 'error' && touched.pincode && (
+                                                    <AlertCircle size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                                                )}
+                                            </div>
+                                            {errors.pincode && <p className="text-xs text-red-500 mt-1">{errors.pincode}</p>}
+                                            {!errors.pincode && pincodeStatus === 'success' && (
+                                                <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                                                    <CheckCircle2 size={11} /> {pincodeMsg}
+                                                </p>
+                                            )}
+                                            {!errors.pincode && pincodeStatus === 'error' && (
+                                                <p className="text-xs text-orange-600 mt-1">{pincodeMsg}</p>
+                                            )}
+                                        </div>
 
-                                                {showSuggestions && (
-                                                    <div className="absolute z-30 w-full mt-1 bg-white border border-silk shadow-2xl rounded-sm max-h-64 overflow-y-auto">
-                                                        {isFetchingSuggestions && (
-                                                            <div className="px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
-                                                                <Loader2 size={15} className="animate-spin text-dark-red" /> Searching…
-                                                            </div>
-                                                        )}
-                                                        {!isFetchingSuggestions && suggestionError && (
-                                                            <div className="px-4 py-3 text-sm text-orange-600 flex items-center gap-2">
-                                                                <AlertCircle size={15} /> {suggestionError}
-                                                            </div>
-                                                        )}
-                                                        {!isFetchingSuggestions && !suggestionError && suggestions.length === 0 && (
-                                                            <div className="px-4 py-3 text-sm text-gray-400">No results. Try a different search.</div>
-                                                        )}
-                                                        {addressQuery.trim().length > 0 && (
-                                                            <button
-                                                                type="button"
-                                                                onMouseDown={handleManualAddressSelect}
-                                                                onMouseEnter={() => setActiveIdx(0)}
-                                                                className={`w-full text-left px-4 py-3 border-b border-gray-50 flex items-start gap-3 transition-colors
-                                                                    ${activeIdx === 0 ? 'bg-red-50' : 'hover:bg-neutral-50'}`}
-                                                            >
-                                                                <MapPin size={16} className="text-gray-400 shrink-0 mt-0.5" />
-                                                                <div className="min-w-0">
-                                                                    <p className="text-sm font-medium text-gray-800 truncate">Use typed address:</p>
-                                                                    <p className="text-xs text-dark-red truncate font-medium">{addressQuery}</p>
+                                        {/* Address Details Group */}
+                                        <div className="space-y-4 p-4 bg-neutral-50/50 border border-gray-100 rounded-sm">
+                                            {/* Street Autocomplete (Address Line) */}
+                                            <div>
+                                                <label htmlFor="shipping-street" className="sr-only">Address Line</label>
+                                                <div className="relative" ref={dropdownRef}>
+                                                    <Building size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                                                    <input
+                                                        id="shipping-street"
+                                                        type="text" required
+                                                        placeholder="House / Flat No., Building, Street Address"
+                                                        value={addressQuery}
+                                                        onChange={handleAddressChange}
+                                                        onKeyDown={handleKeyDown}
+                                                        onBlur={() => {
+                                                            touch('address');
+                                                            setTimeout(() => setShowSuggestions(false), 200);
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (addressQuery.trim().length >= 3 && !isAddressLocked)
+                                                                setShowSuggestions(true);
+                                                        }}
+                                                        className={fieldCls('address', true, addressQuery)}
+                                                        autoComplete="street-address"
+                                                        aria-autocomplete="list"
+                                                        aria-expanded={showSuggestions}
+                                                    />
+
+                                                    {showSuggestions && (
+                                                        <div className="absolute z-30 w-full mt-1 bg-white border border-silk shadow-2xl rounded-sm max-h-64 overflow-y-auto">
+                                                            {isFetchingSuggestions && (
+                                                                <div className="px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
+                                                                    <Loader2 size={15} className="animate-spin text-dark-red" /> Searching…
                                                                 </div>
-                                                            </button>
-                                                        )}
-                                                        {suggestions.map((s, idx) => {
-                                                            const p = s.properties || {};
-                                                            const primary = [p.housenumber, p.street || p.name].filter(Boolean).join(' ') || p.city || p.state;
-                                                            const secondary = [p.city || p.town || p.village, p.state, p.country].filter(Boolean).join(', ');
-                                                            const currentIdx = addressQuery.trim().length > 0 ? idx + 1 : idx;
-                                                            return (
+                                                            )}
+                                                            {!isFetchingSuggestions && suggestionError && (
+                                                                <div className="px-4 py-3 text-sm text-orange-600 flex items-center gap-2">
+                                                                    <AlertCircle size={15} /> {suggestionError}
+                                                                </div>
+                                                            )}
+                                                            {!isFetchingSuggestions && !suggestionError && suggestions.length === 0 && (
+                                                                <div className="px-4 py-3 text-sm text-gray-400">No results. Try a different search.</div>
+                                                            )}
+                                                            {addressQuery.trim().length > 0 && (
                                                                 <button
-                                                                    key={p.osm_id ?? idx}
                                                                     type="button"
-                                                                    onMouseDown={() => handleSuggestionClick(s)}
-                                                                    onMouseEnter={() => setActiveIdx(currentIdx)}
+                                                                    onMouseDown={handleManualAddressSelect}
+                                                                    onMouseEnter={() => setActiveIdx(0)}
                                                                     className={`w-full text-left px-4 py-3 border-b border-gray-50 flex items-start gap-3 transition-colors
-                                                                        ${activeIdx === currentIdx ? 'bg-red-50' : 'hover:bg-neutral-50'}`}
+                                                                        ${activeIdx === 0 ? 'bg-red-50' : 'hover:bg-neutral-50'}`}
                                                                 >
-                                                                    <MapPin size={16} className="text-dark-red shrink-0 mt-0.5" />
+                                                                    <MapPin size={16} className="text-gray-400 shrink-0 mt-0.5" />
                                                                     <div className="min-w-0">
-                                                                        <p className="text-sm font-medium text-gray-800 truncate">{primary}</p>
-                                                                        <p className="text-xs text-gray-500 truncate">{secondary}</p>
+                                                                        <p className="text-sm font-medium text-gray-800 truncate">Use typed address:</p>
+                                                                        <p className="text-xs text-dark-red truncate font-medium">{addressQuery}</p>
                                                                     </div>
                                                                 </button>
-                                                            );
-                                                        })}
+                                                            )}
+                                                            {suggestions.map((s, idx) => {
+                                                                const p = s.properties || {};
+                                                                const primary = [p.housenumber, p.street || p.name].filter(Boolean).join(' ') || p.city || p.state;
+                                                                const secondary = [p.city || p.town || p.village, p.state, p.country].filter(Boolean).join(', ');
+                                                                const currentIdx = addressQuery.trim().length > 0 ? idx + 1 : idx;
+                                                                return (
+                                                                    <button
+                                                                        key={p.osm_id ?? idx}
+                                                                        type="button"
+                                                                        onMouseDown={() => handleSuggestionClick(s)}
+                                                                        onMouseEnter={() => setActiveIdx(currentIdx)}
+                                                                        className={`w-full text-left px-4 py-3 border-b border-gray-50 flex items-start gap-3 transition-colors
+                                                                            ${activeIdx === currentIdx ? 'bg-red-50' : 'hover:bg-neutral-50'}`}
+                                                                    >
+                                                                        <MapPin size={16} className="text-dark-red shrink-0 mt-0.5" />
+                                                                        <div className="min-w-0">
+                                                                            <p className="text-sm font-medium text-gray-800 truncate">{primary}</p>
+                                                                            <p className="text-xs text-gray-500 truncate">{secondary}</p>
+                                                                        </div>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+                                            </div>
+
+                                            {/* Area / Locality (Dropdown or free-text depending on Pincode) */}
+                                            <div className="relative" ref={areaDropdownRef}>
+                                                <label htmlFor="shipping-area" className="sr-only">Area / Locality</label>
+                                                <div className="relative">
+                                                    <Map size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                                                    <input
+                                                        id="shipping-area"
+                                                        type="text"
+                                                        placeholder="Area / Locality"
+                                                        value={isAreaDropdownOpen ? areaSearchQuery : form.area}
+                                                        onChange={e => {
+                                                            if (isAreaDropdownOpen) {
+                                                                setAreaSearchQuery(e.target.value);
+                                                            } else {
+                                                                setForm(p => ({ ...p, area: e.target.value }));
+                                                            }
+                                                        }}
+                                                        onFocus={() => {
+                                                            if (isIndiaCountry(form.country) && form.pincode.length === 6 && pincodeCache[form.pincode]?.areas?.length) {
+                                                                setIsAreaDropdownOpen(true);
+                                                                setAreaSearchQuery('');
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            touch('area');
+                                                            // If they leave without selecting from dropdown, save what they typed
+                                                            if (isAreaDropdownOpen && areaSearchQuery) {
+                                                                setForm(p => ({ ...p, area: areaSearchQuery }));
+                                                                setIsAreaDropdownOpen(false);
+                                                            }
+                                                        }}
+                                                        className={fieldCls('area')}
+                                                        autoComplete="address-level3"
+                                                        role="combobox"
+                                                        aria-expanded={isAreaDropdownOpen}
+                                                        aria-controls="area-listbox"
+                                                    />
+                                                    {isIndiaCountry(form.country) && form.pincode.length === 6 && pincodeStatus === 'success' && (
+                                                        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                                    )}
+                                                </div>
+                                                {errors.area && <p className="text-xs text-red-500 mt-1">{errors.area}</p>}
+                                                
+                                                {isAreaDropdownOpen && pincodeCache[form.pincode]?.areas && (
+                                                    <div className="absolute z-30 w-full mt-1 bg-white border border-silk shadow-2xl rounded-sm max-h-60 overflow-y-auto">
+                                                        <ul id="area-listbox" role="listbox">
+                                                            {pincodeCache[form.pincode].areas
+                                                                .filter(a => a.toLowerCase().includes(areaSearchQuery.toLowerCase()))
+                                                                .map(area => (
+                                                                    <li
+                                                                        key={area}
+                                                                        role="option"
+                                                                        aria-selected={form.area === area}
+                                                                        className={`px-4 py-2 text-sm cursor-pointer hover:bg-red-50 transition-colors flex items-center gap-2 ${form.area === area ? 'bg-red-50 text-dark-red font-medium' : 'text-gray-700'}`}
+                                                                        onMouseDown={(e) => {
+                                                                            e.preventDefault();
+                                                                            setForm(prev => ({ ...prev, area }));
+                                                                            setIsAreaDropdownOpen(false);
+                                                                            setAreaSearchQuery('');
+                                                                        }}
+                                                                    >
+                                                                        {area}
+                                                                    </li>
+                                                                ))}
+                                                            {pincodeCache[form.pincode].areas
+                                                                .filter(a => a.toLowerCase().includes(areaSearchQuery.toLowerCase()))
+                                                                .length === 0 && (
+                                                                    <li 
+                                                                        className="px-4 py-3 text-sm text-dark-red cursor-pointer hover:bg-neutral-50"
+                                                                        onMouseDown={(e) => {
+                                                                            e.preventDefault();
+                                                                            setForm(prev => ({ ...prev, area: areaSearchQuery }));
+                                                                            setIsAreaDropdownOpen(false);
+                                                                        }}
+                                                                    >
+                                                                        <span className="font-medium">Use typed area:</span> {areaSearchQuery}
+                                                                    </li>
+                                                                )}
+                                                        </ul>
                                                     </div>
                                                 )}
                                             </div>
-                                            {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
-                                            {!errors.address && (
-                                                <p className="text-xs text-gray-400 mt-1">Start typing to see address suggestions.</p>
-                                            )}
                                         </div>
 
                                         {/* City + State */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div>
+                                                <label htmlFor="shipping-city" className="sr-only">City</label>
                                                 <div className="relative">
                                                     <Map size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
                                                     <input
+                                                        id="shipping-city"
                                                         type="text" required placeholder="City / District"
                                                         value={form.city}
                                                         onChange={e => {
@@ -677,7 +1076,9 @@ export default function ShippingPage() {
                                                 {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
                                             </div>
                                             <div>
+                                                <label htmlFor="shipping-state" className="sr-only">State</label>
                                                 <input
+                                                    id="shipping-state"
                                                     type="text" required placeholder="State / Province"
                                                     value={form.state}
                                                     onChange={e => {
@@ -690,77 +1091,30 @@ export default function ShippingPage() {
                                                 {errors.state && <p className="text-xs text-red-500 mt-1">{errors.state}</p>}
                                             </div>
                                         </div>
-
-                                        {/* Country + Pincode */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                            <div>
-                                                <div className="relative">
-                                                    <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
-                                                    <input
-                                                        type="text" required placeholder="Country"
-                                                        value={form.country}
-                                                        onChange={e => setForm(p => ({ ...p, country: e.target.value }))}
-                                                        onBlur={() => touch('country')}
-                                                        className={fieldCls('country')}
-                                                        autoComplete="country-name"
-                                                    />
-                                                </div>
-                                                {errors.country && <p className="text-xs text-red-500 mt-1">{errors.country}</p>}
-                                            </div>
-                                            <div className="sm:col-span-2">
-                                                <div className="relative">
-                                                    <input
-                                                        type="text" required
-                                                        placeholder={isIndiaCountry(form.country) ? '6-digit PIN Code' : 'Zip / Postal Code'}
-                                                        value={form.pincode}
-                                                        onChange={e => setForm(p => ({ ...p, pincode: e.target.value }))}
-                                                        onBlur={() => touch('pincode')}
-                                                        inputMode="numeric"
-                                                        maxLength={isIndiaCountry(form.country) ? 6 : 12}
-                                                        className={fieldCls('pincode', false)}
-                                                        autoComplete="postal-code"
-                                                    />
-                                                    {pincodeStatus === 'loading' && (
-                                                        <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" />
-                                                    )}
-                                                    {pincodeStatus === 'success' && (
-                                                        <CheckCircle2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" />
-                                                    )}
-                                                    {pincodeStatus === 'error' && touched.pincode && (
-                                                        <AlertCircle size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
-                                                    )}
-                                                </div>
-                                                {errors.pincode && <p className="text-xs text-red-500 mt-1">{errors.pincode}</p>}
-                                                {!errors.pincode && pincodeStatus === 'success' && (
-                                                    <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                                                        <CheckCircle2 size={11} /> {pincodeMsg}
-                                                    </p>
-                                                )}
-                                                {!errors.pincode && pincodeStatus === 'error' && (
-                                                    <p className="text-xs text-orange-600 mt-1">{pincodeMsg}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Form actions */}
+                                    </div>{/* Form actions */}
+                                    {quoteError && <p className="text-xs text-red-500 mb-2 text-center">{quoteError}</p>}
                                     <div className="flex gap-4 pt-2">
                                         <button
                                             type="button"
                                             onClick={() => navigate('/cart')}
-                                            className="w-1/3 py-4 border border-silk text-dark-red font-sans text-sm tracking-widest uppercase hover:bg-red-50 transition-all rounded-sm"
+                                            className="w-1/3 h-12 border border-silk text-dark-red font-sans text-sm tracking-widest uppercase hover:bg-red-50 transition-all rounded-sm"
                                         >
                                             Back
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={!isFormValid}
-                                            className={`w-2/3 py-4 font-sans text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-all rounded-sm
-                                                ${!isFormValid
+                                            disabled={!isFormValid || isSubmitting || !!quoteError}
+                                            aria-disabled={!isFormValid || isSubmitting || !!quoteError}
+                                            className={`w-2/3 h-12 font-sans text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-all rounded-sm
+                                                ${(!isFormValid || isSubmitting || !!quoteError)
                                                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                                     : 'bg-dark-red text-white hover:bg-rose-900 shadow-md hover:shadow-lg active:scale-[0.99]'}`}
                                         >
-                                            Continue to Payment <ChevronRight size={16} />
+                                            {isSubmitting ? (
+                                                <Loader2 size={16} className="animate-spin" />
+                                            ) : (
+                                                <>Continue to Payment <ChevronRight size={16} /></>
+                                            )}
                                         </button>
                                     </div>
                                 </form>
@@ -772,16 +1126,22 @@ export default function ShippingPage() {
                                     <button
                                         type="button"
                                         onClick={() => navigate('/cart')}
-                                        className="w-1/3 py-4 border border-silk text-dark-red font-sans text-sm tracking-widest uppercase hover:bg-red-50 transition-all rounded-sm"
+                                        className="w-1/3 h-12 border border-silk text-dark-red font-sans text-sm tracking-widest uppercase hover:bg-red-50 transition-all rounded-sm"
                                     >
                                         Back
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handleSubmit}
-                                        className="w-2/3 py-4 bg-dark-red text-white font-sans text-sm tracking-widest uppercase flex items-center justify-center gap-2 hover:bg-rose-900 shadow-md hover:shadow-lg active:scale-[0.99] transition-all rounded-sm"
+                                        disabled={isSubmitting}
+                                        aria-disabled={isSubmitting}
+                                        className={`w-2/3 h-12 font-sans text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-all rounded-sm ${isSubmitting ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-dark-red text-white hover:bg-rose-900 shadow-md hover:shadow-lg active:scale-[0.99]'}`}
                                     >
-                                        Continue to Payment <ChevronRight size={16} />
+                                        {isSubmitting ? (
+                                            <Loader2 size={16} className="animate-spin" />
+                                        ) : (
+                                            <>Continue to Payment <ChevronRight size={16} /></>
+                                        )}
                                     </button>
                                 </div>
                             )}
@@ -808,7 +1168,8 @@ export default function ShippingPage() {
                                                 <p className="font-sans text-xs text-gray-500">Qty: {item.quantity}</p>
                                             </div>
                                             <p className="shrink-0 font-sans text-sm font-semibold text-gray-900 pt-1">
-                                                ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                                                {formatPrice(item.product.price * item.quantity)}
+                                                {userCurrency === 'USD' && <span className="text-[10px] ml-0.5 opacity-60">*</span>}
                                             </p>
                                         </div>
                                     ))}
@@ -817,24 +1178,50 @@ export default function ShippingPage() {
                                 <div className="border-t border-silk pt-4 space-y-2 font-sans text-sm text-gray-600">
                                     <div className="flex justify-between">
                                         <span>Subtotal</span>
-                                        <span>₹{cartTotal.toLocaleString('en-IN')}</span>
+                                        <span>{formatPrice(cartTotal)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Shipping</span>
                                         <span className={shippingCost === 0 ? 'text-emerald-700 font-medium' : ''}>
-                                            {shippingCost === 0 ? 'Free' : `₹${shippingCost}`}
+                                            {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="border-t border-silk mt-4 pt-4 flex justify-between font-serif text-xl text-dark-red">
                                     <span>Total</span>
-                                    <span>₹{total.toLocaleString('en-IN')}</span>
+                                    <span>
+                                        {formatPrice(total)}
+                                        {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
+                                    </span>
                                 </div>
 
-                                <div className="mt-6 flex items-center justify-center gap-2 text-dark-red bg-red-50 p-3 rounded-sm border border-red-100 text-xs font-medium tracking-wide">
-                                    <Truck size={16} /> Free shipping on orders over ₹{storeSettings.shippingThreshold}
+                                <div className="mt-6">
+                                    {shippingCost === 0 ? (
+                                        <div className="flex flex-col items-center justify-center gap-1 text-emerald-700 bg-emerald-50 p-4 rounded-sm border border-emerald-100 text-sm font-medium tracking-wide">
+                                            <div className="flex items-center gap-2"><CheckCircle2 size={16} /> You've unlocked Free Shipping!</div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-neutral-50 p-4 rounded-sm border border-silk space-y-2">
+                                            <div className="flex justify-between text-xs font-sans text-gray-600">
+                                                <span>Add {formatPrice(storeSettings.shippingThreshold - cartTotal)} for Free Shipping</span>
+                                                <span className="font-medium text-dark-red">{formatPrice(cartTotal)} / {formatPrice(storeSettings.shippingThreshold)}</span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="bg-dark-red h-full rounded-full transition-all duration-500 ease-out"
+                                                    style={{ width: `${Math.min(100, (cartTotal / storeSettings.shippingThreshold) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+                                
+                                {quoteError && (
+                                    <div className="mt-4 p-3 bg-red-50 text-red-700 text-xs font-sans border border-red-200 rounded text-center">
+                                        {quoteError}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

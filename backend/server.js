@@ -8,6 +8,8 @@ import { shutdownPosthog } from "./utils/posthog.js";
 import { startWhatsAppWorker } from "./whatsapp/worker.js";
 import { initWhatsAppCrons } from "./whatsapp/cron.js";
 import { initPaymentReconciliationCron } from "./payment/reconciliation.js";
+import { initExchangeRateCron } from "./cron/exchangeRates.js";
+import { initDraftOrderCleanupCron } from "./cron/draftOrders.js";
 import { runSettingsMigration } from "./settings/migration.js";
 import { flushBuffer as flushAuditBuffer } from "./audit/logger.js";
 
@@ -76,6 +78,8 @@ mongoose
     startWhatsAppWorker(); // Start BullMQ worker for WhatsApp jobs
     initWhatsAppCrons(); // Start WhatsApp scheduled tasks
     initPaymentReconciliationCron(); // Recover payments captured but never verified
+    initExchangeRateCron(); // Fetch exchange rates periodically
+    initDraftOrderCleanupCron(); // Delete abandoned draft orders
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {

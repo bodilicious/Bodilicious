@@ -284,7 +284,7 @@ export const syncCart = async (req, res) => {
 */
 export const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id })
+    const orders = await Order.find({ user: req.user._id, orderStatus: { $ne: "abandoned" } })
       .sort({ createdAt: -1 })
       .populate("items.product");
 

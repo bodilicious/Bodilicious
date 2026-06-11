@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   TrendingUp, Users, ShoppingCart, IndianRupee,
   Activity, Package, RefreshCw, TrendingDown,
   Bell, Eye, MousePointerClick, CreditCard, AlertTriangle,
-  BarChart3, Download, BrainCircuit, ActivitySquare, AlertOctagon,
+  BarChart3, Download, BrainCircuit, AlertOctagon,
   Truck, Sparkles, ChevronRight
 } from 'lucide-react';
 import Papa from 'papaparse';
@@ -13,9 +13,8 @@ import { motion } from 'framer-motion';
 import Select from '../components/Select';
 import { useSearchParams } from 'react-router-dom';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, AreaChart, Area,
-  BarChart, Bar, Cell, Legend
+  XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 
 // Modular section components
@@ -70,7 +69,6 @@ const AnalyticsPage: React.FC = () => {
   // === ADMIN analytics (chart-heavy)
   const [salesData, setSalesData] = useState<any>(null);
   const [productData, setProductData] = useState<any>(null);
-  const [inventoryData, setInventoryData] = useState<any>(null);
   const [customerData, setCustomerData] = useState<any>(null);
   const [operationData, setOperationData] = useState<any>(null);
   const [ritualData, setRitualData] = useState<any>(null);
@@ -82,8 +80,6 @@ const AnalyticsPage: React.FC = () => {
   const [cohortData, setCohortData] = useState<any[]>([]);
   const [funnelData, setFunnelData] = useState<any>(null);
   const [lowStockData, setLowStockData] = useState<any[]>([]);
-  const [deepBehavioralData, setDeepBehavioralData] = useState<any>(null);
-  const [intelligenceData, setIntelligenceData] = useState<any[]>([]);
   const [atRiskData, setAtRiskData] = useState<any[]>([]);
   const [marketingData, setMarketingData] = useState<any[]>([]);
   const [searchData, setSearchData] = useState<any>(null);
@@ -136,9 +132,9 @@ const AnalyticsPage: React.FC = () => {
       };
 
       const [
-        sData, pData, iData, cData, oData, rData, bData,
-        sumData, trData, coData, fuData, stData, dbData,
-        inData, arData, mkData, seData, foData
+        sData, pData, cData, oData, rData, bData,
+        sumData, trData, coData, fuData, stData,
+        arData, mkData, seData, foData
       ] = await Promise.all([
         safeJson(salesRes), safeJson(prodRes), safeJson(invRes), safeJson(custRes),
         safeJson(opsRes), safeJson(ritRes), safeJson(behRes),
@@ -149,7 +145,6 @@ const AnalyticsPage: React.FC = () => {
 
       if (sData?.success)   setSalesData(sData.data);
       if (pData?.success)   setProductData(pData.data);
-      if (iData?.success)   setInventoryData(iData.data);
       if (cData?.success)   setCustomerData(cData.data);
       if (oData?.success)   setOperationData(oData.data);
       if (rData?.success)   setRitualData(rData.data);
@@ -159,8 +154,6 @@ const AnalyticsPage: React.FC = () => {
       if (coData?.success)  setCohortData(coData.data);
       if (fuData?.success)  setFunnelData(fuData.data);
       if (stData?.success)  setLowStockData(stData.data);
-      if (dbData?.success)  setDeepBehavioralData(dbData.data);
-      if (inData?.success)  setIntelligenceData(inData.data);
       if (arData?.success)  setAtRiskData(arData.data);
       if (mkData?.success)  setMarketingData(mkData.data);
       if (seData?.success)  setSearchData(seData.data);

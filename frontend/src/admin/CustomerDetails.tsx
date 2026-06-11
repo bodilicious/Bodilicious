@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  X, User, ShoppingCart, Star, Headphones, Package,
+  User, ShoppingCart, Star, Headphones, Package,
   TrendingUp, TrendingDown, BarChart2, AlertCircle,
-  Loader2, ShoppingBag, MessageSquare, MapPin,
-  CheckCircle2, Clock, XCircle, RotateCcw, Save,
+  ShoppingBag, MessageSquare, MapPin,
+  CheckCircle2, Clock, XCircle, RotateCcw,
   ChevronLeft, ChevronRight, BadgeCheck, Heart,
-  Phone, Mail, Calendar, Activity, Shield,
-  CreditCard, History, List
+  Phone, Mail, Calendar, Activity,
+  CreditCard, List
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -59,12 +59,7 @@ type TabKey = 'overview' | 'orders' | 'payment' | 'reviews' | 'support' | 'cart'
 const fmtINR = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-const SEGMENT_STYLES: Record<string, string> = {
-  high_value: 'bg-amber-100 text-amber-700',
-  loyal: 'bg-teal-100 text-teal-700',
-  at_risk: 'bg-red-100 text-red-600',
-  new: 'bg-blue-100 text-blue-700',
-};
+
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; icon: any }> = {
   pending:          { bg: 'bg-yellow-50',  text: 'text-yellow-700', icon: Clock },
@@ -76,7 +71,7 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; icon: any }> = {
   returned:         { bg: 'bg-gray-50',    text: 'text-gray-600',   icon: RotateCcw },
 };
 
-const PIE_COLORS = ['#3D0A05', '#7C1A13', '#B85C4A', '#D4928A', '#ECC9C4', '#94a3b8'];
+
 
 function StarRating({ rating }: { rating: number }) {
   return (

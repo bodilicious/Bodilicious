@@ -197,7 +197,6 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
   const [expanded, setExpanded] = useState(false);
 
   const adminReplies = ticket.messages.filter((m) => m.authorRole === 'admin');
-  const lastAdminReply = adminReplies[adminReplies.length - 1];
 
   return (
     <div className="bg-white border border-silk rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-sm">

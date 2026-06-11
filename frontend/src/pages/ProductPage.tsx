@@ -50,6 +50,7 @@ import { Product } from '../types';
 import { getIngredientData } from '../data/ingredientMeta';
 import { useSEO } from '../hooks/useSEO';
 import { usePostHog } from 'posthog-js/react';
+import { useCurrency } from '../hooks/useCurrency';
 
 const AccordionItem = ({
   title,
@@ -108,6 +109,8 @@ export default function ProductPage() {
     getAuthHeaders,
     storeSettings,
   } = useApp();
+
+  const { formatPrice, userCurrency } = useCurrency();
 
   const productId = pid || searchParams.get('id') || contextPid;
 
@@ -754,7 +757,8 @@ export default function ProductPage() {
             </div>
 
             <p className="text-2xl sm:text-[30px] font-sans text-dark-red mb-5 sm:mb-6">
-              ₹{product.price.toLocaleString('en-IN')}
+              {formatPrice(product.price)}
+              {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
             </p>
 
             <p className="text-dark-red/80 font-sans text-sm sm:text-base leading-7 mb-7 sm:mb-8 max-w-2xl">

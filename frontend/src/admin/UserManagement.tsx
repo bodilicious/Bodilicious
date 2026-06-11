@@ -137,7 +137,7 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // @ts-ignore
+  // @ts-expect-error Backend typing incomplete
   const handleToggleBlock = async (id: string, currentlyBlocked: boolean) => {
     if (id === currentUser?.uid) {
       toast.error("You cannot block yourself");

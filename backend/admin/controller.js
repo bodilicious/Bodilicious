@@ -595,7 +595,10 @@ export const updateOrderStatusAdmin = async (req, res) => {
             console.error("Admin cancel: Failed to cancel on Shiprocket:", err.message);
           }
         }
+      }
 
+      // ── IF CANCELLED OR RETURNED: trigger refund and restore stock ──
+      if (orderStatus === "cancelled" || orderStatus === "returned") {
         // 2. Razorpay Refund
         if ((order.paymentStatus === "paid" || paymentStatus === "paid") && order.razorpayPaymentId) {
           try {
@@ -622,13 +625,14 @@ export const updateOrderStatusAdmin = async (req, res) => {
 
         // 3. Restore Stock (if paid or COD)
         const shouldRestoreStock = order.paymentMethod === "cod" || order.paymentStatus === "paid" || order.paymentStatus === "refunded" || paymentStatus === "paid";
-        if (shouldRestoreStock && order.items && order.items.length > 0) {
+        if (shouldRestoreStock && order.items && order.items.length > 0 && !order.isStockRestored) {
           try {
             const Product = (await import("../products/models.js")).default;
             const bulkOps = order.items.map(item => ({
               updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
             }));
             await Product.bulkWrite(bulkOps);
+            order.isStockRestored = true;
           } catch (stockErr) {
             console.error("Admin cancel: Failed to restore stock:", stockErr.message);
           }

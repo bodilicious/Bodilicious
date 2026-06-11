@@ -32,6 +32,7 @@ const shippingDetailsSchema = new mongoose.Schema(
     city: { type: String, required: true },
     state: { type: String, required: true },
     pincode: { type: String, required: true },
+    country: { type: String, default: "India" },
     email: { type: String, trim: true, lowercase: true, default: "" },
   },
   { _id: false }
@@ -97,10 +98,25 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
+    shippingCost: {
+      type: Number,
+      default: 0,
+    },
+
+    taxAmount: {
+      type: Number,
+      default: 0,
+    },
+
     paymentStatus: {
       type: String,
       enum: ["pending", "paid", "failed", "refunded"],
       default: "pending",
+    },
+
+    paymentClaimedAt: {
+      type: Date,
+      default: null,
     },
 
     orderStatus: {
@@ -199,6 +215,12 @@ const orderSchema = new mongoose.Schema(
     shippingDetails: {
       type: shippingDetailsSchema,
       required: true,
+    },
+
+    billingDetails: {
+      type: shippingDetailsSchema,
+      required: false,
+      default: null,
     },
 
     /* =========================================

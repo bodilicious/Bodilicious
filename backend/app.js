@@ -27,6 +27,8 @@ app.use(trackActiveSession);
 app.use(cors({
   origin: [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
     "https://bodilicious.in",
     "https://www.bodilicious.in",
     "https://bodilicious.netlify.app"
@@ -35,20 +37,35 @@ app.use(cors({
 }));
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 60 * 1000, // 1 minute
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: "Too many requests from this IP, please try again after 15 minutes."
+    message: "Too many requests from this IP, please try again after 1 minute."
   }
 });
 
-// Stricter limiter for sensitive endpoints (payment, profile)
+// Quote endpoint: price calculation only — called on shipping page, payment page,
+// and on tab-focus. High limit since it moves no money and is expected to be frequent.
+const quoteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many quote requests, please wait a moment before retrying."
+  }
+});
+
+// Strict limiter only for endpoints that actually move money or create accounts.
+// Intentionally kept tight — these should never be called more than a handful
+// of times per checkout session.
 const sensitiveLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 150,
+  windowMs: 60 * 1000, // 1 minute
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -79,10 +96,17 @@ app.use((req, res, next) => {
   if (req.params) mongoSanitize.sanitize(req.params);
   next();
 });
-// ⚠️  Order matters: sensitive sub-paths must be registered BEFORE the catch-all
+// ⚠️  Order matters: specific sub-paths must be registered BEFORE the catch-all
 // /api/v1 route, otherwise Express has already matched them and these never fire.
-app.use("/api/v1/payment", sensitiveLimiter);
-app.use("/api/v1/user", sensitiveLimiter);
+
+// /quote — price calculator, called on shipping + payment pages and tab-focus
+app.use("/api/v1/payment/quote", quoteLimiter);
+
+// Actual money-moving endpoints — strict limit
+app.use("/api/v1/payment/razorpay/init", sensitiveLimiter);
+app.use("/api/v1/payment/verify", sensitiveLimiter);
+
+// Everything else under /api/v1 (includes remaining /payment/* like /webhook)
 app.use("/api/v1", globalLimiter, routes);
 
 // Health check endpoint for UptimeRobot

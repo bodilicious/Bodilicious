@@ -1,7 +1,6 @@
- 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, CheckCircle2, Sun, Moon, RefreshCcw, MessageCircle, Sparkles } from 'lucide-react';
+import { Sparkles, ArrowRight, CheckCircle2, Sun, Moon, RefreshCcw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Product } from '../types';
 import toast from 'react-hot-toast';

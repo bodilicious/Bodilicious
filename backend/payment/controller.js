@@ -6,12 +6,16 @@ import Product from "../products/models.js";
 import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket } from "../tracker/shiprocketservice.js";
 import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendAdminNewOrderAlert, sendAdminPaymentSuccessNoOrderAlert } from "../email/emailService.js";
 import Razorpay from "razorpay";
+import { COUNTRIES } from "../utils/countries.js";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
 import StoreSettings from "../settings/models.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
+import { calculateDiscount } from "../utils/pricing.js";
+import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits } from "../utils/currencies.js";
+import orderEvents from "../events/orderEvents.js";
 
 /* =========================================================
    PROCESS PAID ORDER (Helper)
@@ -20,82 +24,60 @@ import NotificationService from "../procurement/notificationService.js";
 export const processPaidOrder = async (orderId, paymentId, signature, req) => {
     // orderId is the MongoDB Order _id
 
-    // ── Atomic claim: set paymentStatus → "paid" only if it's still "pending" or "failed" ──
-    // This prevents double-processing when both the frontend verify AND the
-    // Razorpay webhook fire at the same time (e.g., slow network reconnect).
-    const claimed = await Order.findOneAndUpdate(
-        { _id: orderId, paymentStatus: { $in: ["pending", "failed"] } },
-        { $set: { paymentStatus: "paid", razorpayPaymentId: paymentId } },
-        { new: false } // return old doc to confirm it was pending
-    );
-
-    if (!claimed) {
-        // Either order doesn't exist OR was already processed — load and return
-        const existingOrder = await Order.findById(orderId).populate("items.product");
-        if (!existingOrder) throw new Error("Order not found");
-        return { success: true, message: "Already processed", order: existingOrder };
-    }
-
     const session = await mongoose.startSession();
     session.startTransaction();
 
     let populatedOrder;
     try {
-        // Re-fetch inside session now that we own this order
-        const order = await Order.findById(orderId).populate("items.product").session(session);
-        if (!order) throw new Error("Order not found after claim");
+        // ── Atomic claim inside transaction ──
+        // This ensures that if the transaction rolls back, the "paid" status is safely reverted.
+        const order = await Order.findOneAndUpdate(
+            { _id: orderId, paymentStatus: { $in: ["pending", "failed"] } },
+            { $set: { paymentStatus: "paid", razorpayPaymentId: paymentId, paymentClaimedAt: new Date() } },
+            { new: true, session }
+        ).populate("items.product");
+
+        if (!order) {
+            // Already processed or not found
+            const existingOrder = await Order.findById(orderId).populate("items.product").session(session);
+            if (!existingOrder) throw new Error("Order not found");
+            await session.abortTransaction();
+            session.endSession();
+            return { success: true, message: "Already processed", order: existingOrder };
+        }
 
         if (order.orderStatus === "cancelled") {
             order.orderStatus = "pending"; // un-cancel it since it's now paid
         }
 
         let totalWeightGrams = 0;
-        let outOfStockWarnings = [];
 
-        // Deduct stock (allow negative if paid, just warn)
+        // Stock was already reserved in initRazorpayOrder
         for (const orderItem of order.items) {
             const product = await Product.findById(orderItem.product._id).session(session);
             if (!product) continue;
             
-            if (product.stock < orderItem.quantity) {
-                 outOfStockWarnings.push(`${product.name} (req: ${orderItem.quantity}, had: ${product.stock})`);
-            }
-            
-            product.stock -= orderItem.quantity;
-            await product.save({ session });
-            
             const itemWeightG = product.product_weight_g || (product.product_weight_ml ? product.product_weight_ml * 1.05 : 200);
             totalWeightGrams += itemWeightG * orderItem.quantity;
-
-            if (product.stock <= (product.lowStockThreshold || 5)) {
-                await NotificationService.emit({
-                    title: "Low Stock Alert",
-                    body: `${product.name} is low on stock (${product.stock} left).`,
-                    type: "warning",
-                    sourceModule: "products",
-                    sourceModel: "Product",
-                    sourceId: product._id.toString()
-                });
-            }
         }
 
-        if (outOfStockWarnings.length > 0) {
-            order.adminNote = (order.adminNote ? order.adminNote + "\n" : "") + 
-                `⚠️ Paid with insufficient stock: ${outOfStockWarnings.join(", ")}`;
-        }
-
-        // EDD
-        const totalWeight = Math.max(0.5, totalWeightGrams / 1000);
-        try {
-            const eddResponse = await getEstimatedDeliveryDate(order.shippingDetails.pincode, totalWeight, false);
-            if (eddResponse) {
-                order.estimatedDeliveryDate = eddResponse.estimatedDeliveryDate;
-                order.estimatedDeliveryDays = eddResponse.estimatedDeliveryDays;
-                order.estimatedCourierName = eddResponse.estimatedCourierName;
-                order.eddCalculatedAt = new Date();
+        // EDD — only applicable for India orders (Shiprocket only covers Indian pincodes)
+        const isIndiaOrder = !order.shippingDetails.country || 
+            ['india', 'in', 'bharat', 'ind'].includes((order.shippingDetails.country || '').toLowerCase().trim());
+        
+        if (isIndiaOrder) {
+            const totalWeight = Math.max(0.5, totalWeightGrams / 1000);
+            try {
+                const eddResponse = await getEstimatedDeliveryDate(order.shippingDetails.pincode, totalWeight, false);
+                if (eddResponse) {
+                    order.estimatedDeliveryDate = eddResponse.estimatedDeliveryDate;
+                    order.estimatedDeliveryDays = eddResponse.estimatedDeliveryDays;
+                    order.estimatedCourierName = eddResponse.estimatedCourierName;
+                    order.eddCalculatedAt = new Date();
+                }
+            } catch (e) {
+                console.error("EDD fetch failed:", e.message);
             }
-        } catch (e) {
-            console.error("EDD fetch failed:", e.message);
         }
 
         // paymentStatus and razorpayPaymentId were already set atomically before
@@ -106,7 +88,11 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
 
         await order.save({ session });
 
-        await UserProfile.findByIdAndUpdate(order.user, { $addToSet: { orders: order._id }, $set: { cart: [] } }, { session });
+        const productIdsToRemove = order.items.map(i => i.product._id);
+        await UserProfile.findByIdAndUpdate(order.user, { 
+            $addToSet: { orders: order._id }, 
+            $pull: { cart: { product: { $in: productIdsToRemove } } } 
+        }, { session });
 
         // 🚀 Audit Order Placed / Payment Captured
         await logAction(req, "payment_captured", "order", order._id.toString(), {
@@ -124,19 +110,8 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             sourceId: order._id.toString()
         });
 
-        // 🚀 PostHog Server-Side Tracking
-        trackServerEvent(order.user.toString(), 'Order Completed', {
-            orderId: order._id.toString(),
-            revenue: order.totalAmount,
-            shipping: 0,
-            tax: 0,
-            paymentMethod: "razorpay",
-            products: order.items.map(item => ({
-                productId: item.product._id.toString(),
-                price: item.priceAtPurchase,
-                quantity: item.quantity
-            }))
-        });
+        // 🚀 PostHog Server-Side Tracking, Shiprocket, Emails, WhatsApp moved to orderEvents
+        orderEvents.emit("order_placed", order);
 
         await session.commitTransaction();
         session.endSession();
@@ -160,13 +135,6 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
         throw txErr;
     }
 
-    // Blocking Shiprocket integration for serverless safety
-    try {
-        await pushOrderToShiprocket(populatedOrder);
-    } catch (shipErr) {
-        console.error("Shiprocket error after payment:", shipErr.message);
-    }
-
     // ── Generate Invoice ──────────────────────────────────────────────
     let invoiceNumber = null;
     try {
@@ -178,42 +146,185 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
         console.log(`🧾 Invoice generated for order ${populatedOrder._id}: ${invoiceNumber}`);
     } catch (invErr) {
         console.error("❌ Invoice generation failed:", invErr.message);
-        // Invoice failure is non-fatal — notifications must still fire so the
-        // customer always receives their confirmation email.
-    }
-
-    // ── Trigger Order Confirmation Email & Notifications ─────────────
-    // Runs regardless of whether invoice generation succeeded.
-    // The customer MUST receive a confirmation email even if the invoice
-    // number failed to save — we use sendOrderConfirmationAfterInvoice
-    // which handles a null/missing invoice number gracefully.
-    try {
-        const user = await UserProfile.findById(populatedOrder.user);
-        // Re-fetch so the email includes the invoice number if it was saved
-        const freshPopulated = await Order.findById(populatedOrder._id).populate("items.product");
-        
-        if (invoiceNumber) {
-            await sendOrderConfirmationAfterInvoice(freshPopulated, user?.email);
-        } else {
-            // Invoice didn't save — fall back to basic confirmation email
-            await sendOrderConfirmationEmail(freshPopulated, user?.email);
-        }
-
-        await sendAdminNewOrderAlert(freshPopulated);
-        
-        const settings = await getSettings();
-        if (settings.waAllEnabled && settings.waOrderPlacedEnabled) {
-            await enqueueWhatsApp("order_placed", { 
-                userId: populatedOrder.user.toString(), 
-                orderId: populatedOrder._id.toString() 
-            }).catch(err => console.error("Failed to enqueue WhatsApp order_placed:", err));
-        }
-    } catch (notifyErr) {
-        // Notification failure must never crash order creation — order IS confirmed.
-        console.error("❌ Post-order notification failed:", notifyErr.message);
     }
 
     return { success: true, message: "Payment verified and order created successfully", order: populatedOrder };
+};
+
+/* =========================================================
+   GET ORDER QUOTE
+   POST /api/payment/quote
+   Generates a sealed quote to prevent tampering.
+========================================================= */
+export const getOrderQuote = async (req, res) => {
+    try {
+        const { items, shippingDetails } = req.body;
+        const userId = req.user?._id;
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ success: false, message: "No items provided" });
+        }
+
+        // Strictly validate and merge duplicate items
+        const mergedItemsMap = {};
+        for (const item of items) {
+            if (!item.quantity || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+                return res.status(400).json({ success: false, message: "Invalid item quantity" });
+            }
+            const id = item.productId || item.pid;
+            if (!id) return res.status(400).json({ success: false, message: "Invalid item ID" });
+            
+            if (!mergedItemsMap[id]) mergedItemsMap[id] = { ...item, quantity: 0 };
+            mergedItemsMap[id].quantity += item.quantity;
+        }
+        const mergedItems = Object.values(mergedItemsMap);
+
+        if (!shippingDetails?.country) {
+            return res.status(400).json({ success: false, message: "Shipping country required" });
+        }
+
+        const settings = await StoreSettings.findOne() || { 
+            shippingThreshold: 999, shippingCost: 99,
+            internationalShippingEnabled: false, internationalShippingCost: 2000, internationalShippingThreshold: 10000,
+            supportedCountries: COUNTRIES
+        };
+
+        const isIndia = !shippingDetails.country.trim() || ["india", "in", "bharat", "ind"].includes(shippingDetails.country.toLowerCase().trim());
+        
+        if (!isIndia) {
+            if (!settings.internationalShippingEnabled) {
+                return res.status(400).json({ success: false, message: "International shipping is not enabled." });
+            }
+            if (!settings.internationalCheckoutEnabled) {
+                return res.status(400).json({ success: false, message: "International checkout is currently disabled. Please check back later." });
+            }
+            const supported = (settings.supportedCountries || []).map(c => c.toLowerCase());
+            if (!supported.includes(shippingDetails.country.toLowerCase().trim())) {
+                return res.status(400).json({ success: false, message: `We do not currently ship to ${shippingDetails.country}.` });
+            }
+        }
+
+        let totalAmount = 0;
+        for (const item of mergedItems) {
+            let product;
+            if (mongoose.Types.ObjectId.isValid(item.productId)) {
+                product = await Product.findById(item.productId);
+            }
+            if (!product) {
+                const searchPid = item.pid || item.productId;
+                product = await Product.findOne({ pid: searchPid });
+            }
+            if (!product) {
+                return res.status(400).json({ success: false, message: "Product not found" });
+            }
+            if (product.stock < item.quantity) {
+                return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
+            }
+            totalAmount += product.price * item.quantity;
+        }
+
+        let shippingCost = 0;
+        if (isIndia) {
+            shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
+        } else {
+            shippingCost = totalAmount >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost;
+        }
+
+        let existingOrdersCount = 1; // Default to 1 for guests (no welcome offer)
+        if (userId) {
+            existingOrdersCount = await Order.countDocuments({
+                user: userId,
+                orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
+                $or: [
+                    { paymentMethod: "cod" },
+                    { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
+                ]
+            });
+        }
+
+        const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
+
+        // ── Currency selection ────────────────────────────────────────────────
+        // Display currency = what the user selected (any of 160+)
+        // Checkout currency = must be in CHECKOUT_CURRENCIES (Razorpay-supported)
+        // If display currency is not in checkout list, fall back to INR for payment
+        // but still convert display amounts for the quote response.
+        const requestedCurrency = (req.body.targetCurrency || "INR").toUpperCase();
+        const checkoutCurrency = CHECKOUT_CURRENCIES.has(requestedCurrency) ? requestedCurrency : "INR";
+        const isFallback = checkoutCurrency !== requestedCurrency;
+
+        let conversionRate = 1;
+        if (checkoutCurrency !== "INR") {
+            // Mongoose Map objects use .get(); plain objects use bracket notation
+            const rawRate = settings.exchangeRates?.get
+                ? settings.exchangeRates.get(checkoutCurrency)
+                : settings.exchangeRates?.[checkoutCurrency];
+
+            // USD fallback in case cron hasn't run yet
+            const resolvedRate = rawRate ||
+                (checkoutCurrency === "USD" && settings.usdExchangeRate ? 1 / settings.usdExchangeRate : null);
+
+            if (!resolvedRate || resolvedRate <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Exchange rate for ${checkoutCurrency} is currently unavailable. Please select another currency or try again later.`
+                });
+            }
+            conversionRate = resolvedRate;
+        }
+
+        const applyConversion = (val) => roundForCurrency(val * conversionRate, checkoutCurrency);
+
+        const convertedSubtotal      = applyConversion(pricing.subtotal);
+        const convertedShippingCost  = applyConversion(pricing.shippingCost);
+        const convertedDiscountAmount = applyConversion(pricing.discountAmount);
+        const convertedFinalAmount   = applyConversion(pricing.finalAmount);
+        const convertedOriginalAmount = applyConversion(pricing.originalAmount);
+
+        const expiry = Date.now() + 30 * 60 * 1000; // 30 minutes
+
+        const quotePayload = {
+            userId: userId ? userId.toString() : null,
+            subtotal: convertedSubtotal,
+            shippingCost: convertedShippingCost,
+            discountAmount: convertedDiscountAmount,
+            finalAmount: convertedFinalAmount,
+            originalAmount: convertedOriginalAmount,
+            isWelcomeOfferApplied: pricing.isWelcomeOfferApplied,
+            expiry,
+            country: shippingDetails.country.trim(),
+            currency: checkoutCurrency,
+            requestedCurrency,   // stored for display purposes only
+            isFallback,          // tells frontend if we fell back to INR
+            exchangeRate: conversionRate
+        };
+
+        const signature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "fallback_secret")
+            .update(JSON.stringify(quotePayload))
+            .digest("hex");
+
+        const quoteId = Buffer.from(JSON.stringify({ payload: quotePayload, signature })).toString('base64');
+        const deliveryEstimate = isIndia ? "3-5 business days" : "7-21 business days";
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                quoteId,
+                subtotal: convertedSubtotal,
+                shippingCost: convertedShippingCost,
+                discountAmount: convertedDiscountAmount,
+                totalAmount: convertedFinalAmount,
+                deliveryEstimate,
+                currency: checkoutCurrency,
+                isFallback,               // frontend shows toast if true
+                requestedCurrency
+            }
+        });
+    } catch (err) {
+        console.error("Get Quote error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
 };
 
 /* =========================================================
@@ -223,21 +334,87 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
 ========================================================= */
 export const initRazorpayOrder = async (req, res) => {
     try {
-        const { items, shippingDetails, marketing } = req.body;
+        const { items, shippingDetails, billingDetails, marketing, quoteId } = req.body;
         const userId = req.user._id;
+
+        if (!quoteId) return res.status(400).json({ success: false, message: "Missing quoteId. Please refresh cart." });
+
+        let decodedQuote;
+        try {
+            decodedQuote = JSON.parse(Buffer.from(quoteId, 'base64').toString('utf8'));
+        } catch (e) {
+            return res.status(400).json({ success: false, message: "Invalid quote format" });
+        }
+
+        const { payload, signature } = decodedQuote;
+        if (!payload || !signature) return res.status(400).json({ success: false, message: "Invalid quote structure" });
+
+        const expectedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "fallback_secret")
+            .update(JSON.stringify(payload))
+            .digest("hex");
+
+        if (expectedSignature !== signature) {
+            return res.status(400).json({ success: false, message: "Quote signature mismatch. Please refresh." });
+        }
+
+        if (Date.now() > payload.expiry) {
+            return res.status(400).json({ success: false, message: "Quote expired. Please refresh checkout." });
+        }
+
+        if (payload.userId !== (userId ? userId.toString() : null)) {
+            return res.status(400).json({ success: false, message: "Invalid quote for this user. Please refresh checkout." });
+        }
+
+        // Fix BUG 15: Re-verify welcome offer eligibility to prevent multi-tab exploits
+        if (payload.isWelcomeOfferApplied) {
+            const existingOrdersCount = await Order.countDocuments({
+                user: userId,
+                orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
+                $or: [
+                    { paymentMethod: "cod" },
+                    { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
+                ]
+            });
+            if (existingOrdersCount > 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Welcome offer no longer valid because a previous order was completed. Please refresh your checkout." 
+                });
+            }
+        }
+
+        if (payload.country !== shippingDetails?.country?.trim()) {
+            return res.status(400).json({ success: false, message: "Shipping country changed. Please recalculate quote." });
+        }
 
         if (!items || items.length === 0) {
             return res.status(400).json({ success: false, message: "No items provided" });
         }
+
+        // Strictly validate and merge duplicate items
+        const mergedItemsMap = {};
+        for (const item of items) {
+            if (!item.quantity || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+                return res.status(400).json({ success: false, message: "Invalid item quantity" });
+            }
+            const id = item.productId || item.pid;
+            if (!id) return res.status(400).json({ success: false, message: "Invalid item ID" });
+            
+            if (!mergedItemsMap[id]) mergedItemsMap[id] = { ...item, quantity: 0 };
+            mergedItemsMap[id].quantity += item.quantity;
+        }
+        const mergedItems = Object.values(mergedItemsMap);
+
         if (!shippingDetails?.address) {
             return res.status(400).json({ success: false, message: "Shipping details required" });
         }
 
-        // Calculate price from DB — never trust the frontend
-        let totalAmount = 0;
+        // Recalculate subtotal to ensure items haven't changed
+        let subtotal = 0;
         const orderItems = [];
 
-        for (const item of items) {
+        for (const item of mergedItems) {
             let product;
             if (mongoose.Types.ObjectId.isValid(item.productId)) {
                 product = await Product.findById(item.productId);
@@ -253,7 +430,7 @@ export const initRazorpayOrder = async (req, res) => {
             if (product.stock < item.quantity) {
                 return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
             }
-            totalAmount += product.price * item.quantity;
+            subtotal += product.price * item.quantity;
             
             orderItems.push({
                 product: product._id,
@@ -262,26 +439,16 @@ export const initRazorpayOrder = async (req, res) => {
             });
         }
 
-        // Welcome offer check
-        const existingOrdersCount = await Order.countDocuments({
-            user: userId,
-            orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
-            $or: [
-                { paymentMethod: "cod" },
-                { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
-            ]
-        });
-        const settings = await StoreSettings.findOne() || { shippingThreshold: 999, shippingCost: 99 };
-        const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
-        const originalAmount = totalAmount + shippingCost;
-
-        let discountAmount = 0;
-        let isWelcomeOfferApplied = false;
-        if (existingOrdersCount === 0) {
-            isWelcomeOfferApplied = true;
-            discountAmount = Math.round(originalAmount * 0.10);
+        if (subtotal !== payload.subtotal) {
+            // Re-derive the INR subtotal converted to the quote's currency for comparison
+            const convertedRecalculated = roundForCurrency(subtotal * (payload.exchangeRate || 1), payload.currency || "INR");
+            if (Math.abs(convertedRecalculated - payload.subtotal) > 0.05) {
+                return res.status(400).json({ success: false, message: "Cart contents changed. Please refresh quote." });
+            }
         }
-        const finalAmount = Math.max(0, originalAmount - discountAmount);
+
+        const finalAmount = payload.finalAmount;
+        const targetCurrency = payload.currency || "INR";
 
         // Create Razorpay order
         const razorpayInstance = new Razorpay({
@@ -289,9 +456,11 @@ export const initRazorpayOrder = async (req, res) => {
             key_secret: process.env.RAZORPAY_KEY_SECRET,
         });
 
+        const razorpayAmount = toRazorpayMinorUnits(finalAmount, targetCurrency);
+
         const razorpayOrder = await razorpayInstance.orders.create({
-            amount: finalAmount * 100, // paise
-            currency: "INR",
+            amount: razorpayAmount,
+            currency: targetCurrency,
             receipt: `rp_${Date.now()}`,
             notes: {
                 userId: userId.toString(),
@@ -299,36 +468,61 @@ export const initRazorpayOrder = async (req, res) => {
             },
         });
 
-        // 🚀 CREATE DB ORDER AS PENDING (Draft Order)
-        const newOrder = await Order.create({
-            user: userId,
-            items: orderItems,
-            totalAmount: finalAmount,
-            discountAmount,
-            isWelcomeOfferApplied,
-            originalAmount,
-            paymentMethod: "razorpay",
-            paymentStatus: "pending",
-            orderStatus: "pending",
-            razorpayOrderId: razorpayOrder.id,
-            shippingDetails,
-            marketing: marketing || undefined
-        });
+        // ── Inventory Reservation Transaction ──
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            // Deduct stock immediately
+            const bulkOps = orderItems.map(item => ({
+                updateOne: {
+                    filter: { _id: item.product },
+                    update: { $inc: { stock: -item.quantity } }
+                }
+            }));
+            await Product.bulkWrite(bulkOps, { session });
 
-        // 🚀 Audit Payment Initiated
-        await logAction(req, "payment_initiated", "order", razorpayOrder.id, {
-            amount: finalAmount,
-            itemCount: items.length,
-            dbOrderId: newOrder._id.toString()
-        }).catch(err => console.error("Payment Initiated Audit Failed:", err));
+            // 🚀 CREATE DB ORDER AS PENDING (Draft Order)
+            const [newOrder] = await Order.create([{
+                user: userId,
+                items: orderItems,
+                totalAmount: finalAmount,
+                shippingCost: payload.shippingCost,
+                discountAmount: payload.discountAmount,
+                isWelcomeOfferApplied: payload.isWelcomeOfferApplied,
+                originalAmount: payload.originalAmount,
+                paymentMethod: "razorpay",
+                paymentStatus: "pending",
+                orderStatus: "pending",
+                razorpayOrderId: razorpayOrder.id,
+                currency: targetCurrency,
+                exchangeRate: payload.exchangeRate || 1,
+                shippingDetails,
+                billingDetails: billingDetails || null,
+                marketing: marketing || undefined
+            }], { session });
 
-        return res.status(201).json({
-            success: true,
-            data: {
-                razorpayOrder,
-                calculatedAmount: finalAmount,
-            },
-        });
+            await session.commitTransaction();
+            session.endSession();
+
+            // 🚀 Audit Payment Initiated
+            await logAction(req, "payment_initiated", "order", razorpayOrder.id, {
+                amount: finalAmount,
+                itemCount: items.length,
+                dbOrderId: newOrder._id.toString()
+            }).catch(err => console.error("Payment Initiated Audit Failed:", err));
+
+            return res.status(201).json({
+                success: true,
+                data: {
+                    razorpayOrder,
+                    calculatedAmount: finalAmount,
+                },
+            });
+        } catch (dbErr) {
+            if (session.inTransaction()) await session.abortTransaction();
+            session.endSession();
+            throw dbErr;
+        }
 
     } catch (err) {
         console.error("Init Razorpay Order error:", err);
@@ -410,7 +604,7 @@ export const verifyPayment = async (req, res) => {
         // ── Verify Razorpay signature ─────────────────────────────────────────
         const body = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "fallback_secret")
             .update(body.toString())
             .digest("hex");
 
@@ -468,10 +662,10 @@ export const verifyPayment = async (req, res) => {
                     attemptSucceeded = true;
                 } else {
                     // Atomic claim fired but session transaction aborted.
-                    // The cart was NOT cleared (session rolled back $set: { cart: [] }).
-                    // Force-clear it now so the customer doesn't see paid items in cart.
+                    // The cart was NOT cleared. Force-clear the specific items now.
+                    const productIdsToRemove = existingOrder.items.map(i => i.product._id || i.product);
                     await UserProfile.findByIdAndUpdate(existingOrder.user, {
-                        $set: { cart: [] }
+                        $pull: { cart: { product: { $in: productIdsToRemove } } }
                     }).catch(e => console.error("[verifyPayment] Failed to clear cart on partial failure:", e.message));
 
                     // Webhook safety net will complete the order.
@@ -544,11 +738,68 @@ export const razorpayWebhook = async (req, res) => {
 
         if (event === "payment.captured") {
             const payment = payload.payment.entity;
-            const existing = await Order.findOne({ razorpayOrderId: payment.order_id });
             
-            if (existing && existing.paymentStatus !== "paid") {
-                // Draft order exists, process it
-                await processPaidOrder(existing._id, payment.id, null, req);
+            let existing = null;
+            if (payment.order_id) {
+                existing = await Order.findOne({ razorpayOrderId: payment.order_id });
+            }
+            
+            // Fallback for Admin Payment Links (they don't store razorpayOrderId before payment)
+            if (!existing && payment.notes?.orderId) {
+                existing = await Order.findById(payment.notes.orderId);
+            }
+            
+            if (existing) {
+                if (existing.orderStatus === "cancelled") {
+                    console.warn(`[Webhook] Order ${existing._id} was cancelled, but payment was captured. Initiating auto-refund.`);
+                    try {
+                        const razorpayInstance = new Razorpay({
+                            key_id: process.env.RAZORPAY_KEY_ID,
+                            key_secret: process.env.RAZORPAY_KEY_SECRET,
+                        });
+                        await razorpayInstance.payments.refund(payment.id, {
+                            amount: payment.amount,
+                            notes: { reason: "Order was already cancelled before payment was processed." }
+                        });
+                        console.log(`[Webhook] Auto-refund initiated for payment ${payment.id}`);
+                        
+                        await logAction(req, "payment_auto_refunded", "order", existing._id.toString(), {
+                            paymentId: payment.id,
+                            amount: payment.amount / 100,
+                            reason: "Order was cancelled"
+                        }, { source: "razorpay-webhook", severity: "WARNING" });
+                        
+                    } catch (refundErr) {
+                        console.error(`[Webhook] Failed to auto-refund payment ${payment.id}:`, refundErr);
+                    }
+                    return res.status(200).json({ success: true, message: "Order is cancelled. Auto-refund initiated." });
+                }
+
+                // Pessimistic check: Did the transaction ACTUALLY complete?
+                const isFullyProcessed = await UserProfile.exists({ _id: existing.user, orders: existing._id });
+                
+                if (!isFullyProcessed) {
+                    if (existing.paymentStatus === "paid") {
+                        // The order was claimed, but transaction never finished.
+                        // Is it actively running, or did the Node server crash?
+                        const lockAgeMs = Date.now() - (existing.paymentClaimedAt?.getTime() || 0);
+                        
+                        if (lockAgeMs > 120000) { // 2 minutes timeout
+                            console.warn(`[Webhook] Force-releasing STALE 'paid' lock for order ${existing._id} (age: ${lockAgeMs}ms). Recovering from crash.`);
+                            await Order.updateOne({ _id: existing._id }, { $set: { paymentStatus: "pending" } });
+                            await processPaidOrder(existing._id, payment.id, null, req);
+                        } else {
+                            console.warn(`[Webhook] Order ${existing._id} is actively processing (lock age: ${lockAgeMs}ms). Returning 409 to force webhook retry.`);
+                            // Return 409 so Razorpay retries the webhook in a few minutes
+                            return res.status(409).json({ success: false, message: "Transaction actively processing. Please retry later." });
+                        }
+                    } else {
+                        // Normal draft state
+                        await processPaidOrder(existing._id, payment.id, null, req);
+                    }
+                } else {
+                    console.log(`[Webhook] Order ${existing._id} already fully processed. Ignored.`);
+                }
             } else if (!existing) {
                 // 🚀 Audit Payment Success No Order (should be very rare now!)
                 await logAction(req, "payment_success_no_order", "order", payment.order_id, {
@@ -601,12 +852,64 @@ export const razorpayWebhook = async (req, res) => {
             if (order) {
                 order.paymentStatus = "refunded";
                 order.refundStatus = "processed";
+                
+                // CRITICAL: If an admin refunded this directly on Razorpay, we MUST cancel the order
+                // so we don't accidentally ship it for free.
+                if (order.orderStatus !== "cancelled" && order.orderStatus !== "returned") {
+                    order.orderStatus = "cancelled";
+                    order.statusHistory = order.statusHistory || [];
+                    order.statusHistory.push({
+                        status: "cancelled",
+                        source: "razorpay-webhook",
+                        note: "Order auto-cancelled because a refund was processed on Razorpay"
+                    });
+                    
+                    // 1. Shiprocket Cancel
+                    if (order.awb || order.shiprocketOrderId) {
+                        try {
+                            if (process.env.SHIPROCKET_EMAIL) {
+                                const { getShiprocketToken } = await import("../tracker/shiprocketservice.js");
+                                const token = await getShiprocketToken();
+                                if (order.awb) {
+                                    await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                        body: JSON.stringify({ awbs: [order.awb] })
+                                    });
+                                } else if (order.shiprocketOrderId) {
+                                    await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                        body: JSON.stringify({ ids: [order.shiprocketOrderId] })
+                                    });
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Webhook cancel: Failed to cancel on Shiprocket:", err.message);
+                        }
+                    }
+
+                    // 2. Restore Stock
+                    if (!order.isStockRestored && order.items && order.items.length > 0) {
+                        try {
+                            const bulkOps = order.items.map(item => ({
+                                updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
+                            }));
+                            await Product.bulkWrite(bulkOps);
+                            order.isStockRestored = true;
+                        } catch (stockErr) {
+                            console.error("Webhook cancel: Failed to restore stock:", stockErr.message);
+                        }
+                    }
+                }
+
                 await order.save();
                 
                 await logAction(req, "refund_confirmed", "order", order._id.toString(), {
                     refundId: refund.id,
-                    amount: refund.amount / 100
-                }, { source: "system" }).catch(err => console.error("Refund Confirmed Audit Failed:", err));
+                    amount: refund.amount / 100,
+                    autoCancelled: true
+                }, { source: "razorpay-webhook" }).catch(err => console.error("Refund Confirmed Audit Failed:", err));
             }
         }
 
@@ -645,7 +948,7 @@ export const generatePaymentLink = async (req, res) => {
 
         const paymentLinkReq = {
             amount: Math.round(order.totalAmount * 100),
-            currency: "INR",
+            currency: order.currency || "INR",
             accept_partial: false,
             description: `Payment for Bodilicious Order ${order._id}`,
             customer: {

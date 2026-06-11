@@ -1,9 +1,9 @@
 import React from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, Legend
+  BarChart, Bar, Cell
 } from 'recharts';
-import { Users, TrendingUp, Heart, Zap } from 'lucide-react';
+import { Users, TrendingUp, Zap } from 'lucide-react';
 
 interface CustomerCRMSectionProps {
   segmentStats: any[];

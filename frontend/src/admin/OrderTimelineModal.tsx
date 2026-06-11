@@ -30,6 +30,7 @@ interface Order {
   _id: string;
   orderStatus: string;
   shippingDetails: { name: string; address: string; city: string; state: string; pincode: string; phone: string; email?: string };
+  billingDetails?: { name: string; address: string; city: string; state: string; pincode: string; country?: string } | null;
   items?: any[];
   totalAmount: number;
   paymentMethod: string;
@@ -85,7 +86,7 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
         </div>
 
         {/* Order summary */}
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 grid grid-cols-3 gap-4 text-sm">
+        <div className={`px-6 py-4 bg-gray-50 border-b border-gray-100 grid ${order.billingDetails ? 'grid-cols-4' : 'grid-cols-3'} gap-4 text-sm`}>
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Customer</p>
             <p className="font-medium text-gray-800">{order.shippingDetails.name}</p>
@@ -103,6 +104,17 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
               {order.shippingDetails.city}, {order.shippingDetails.state} {order.shippingDetails.pincode}
             </p>
           </div>
+          {order.billingDetails && (
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Billing</p>
+              <p className="font-medium text-gray-800 text-xs leading-snug">
+                {order.billingDetails.name}<br />
+                {order.billingDetails.address},<br />
+                {order.billingDetails.city}, {order.billingDetails.state} {order.billingDetails.pincode}<br />
+                {order.billingDetails.country && <span className="text-gray-500">{order.billingDetails.country}</span>}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Shiprocket Info Block */}

@@ -8,8 +8,7 @@ import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import Select from '../components/Select';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Area, AreaChart 
+  Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart 
 } from 'recharts';
 
 type Tab = 'overview' | 'products' | 'cohorts';

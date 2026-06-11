@@ -250,13 +250,7 @@ export default function ShopPage() {
   // Sub-categories, Types, Concerns, and Ingredients are derived from dynamicFilters (which are scoped by Category).
   // If dynamicFilters hasn't loaded yet, we fall back to the global filters.
   
-  const SUBCATEGORY_OPTIONS: Option[] = useMemo(() => {
-    const all: string[] = filters?.subCategories || [];
-    const valid = new Set(dynamicFilters?.subCategories?.map((s: string) => s.toLowerCase()));
-    return all
-      .filter(v => dynamicFilters ? valid.has(v.toLowerCase()) : true)
-      .map((v: string) => ({ value: v, label: titleCase(v) }));
-  }, [filters, dynamicFilters]);
+
 
   const TYPE_OPTIONS: Option[] = useMemo(() => {
     const all: string[] = filters?.productTypes || [];
@@ -321,8 +315,7 @@ export default function ShopPage() {
     (inStock !== '' ? 1 : 0) +
     (priceMax !== String(computedMaxPrice) || priceMin !== '0' ? 1 : 0);
 
-  // Correct URL param name for product_type filter pill removal
-  const handleTypePillRemove = (value: string) => handleToggle('type', value);
+
 
   // ─── Shared filter panel content ──────────────────────────────────────────
   const FilterPanelContent = () => {

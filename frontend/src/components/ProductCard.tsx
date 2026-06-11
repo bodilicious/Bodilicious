@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import { Heart, ShoppingBag, Eye } from 'lucide-react';
 import { Product } from '../types';
 import { useApp } from '../context/AppContext';
+import { useCurrency } from '../hooks/useCurrency';
 import { Link } from 'react-router-dom';
 import StarRating from './StarRating';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
@@ -38,6 +39,7 @@ export default memo(function ProductCard({
   salePercent,
 }: ProductCardProps) {
   const { addToCart, toggleWishlist, isInWishlist } = useApp();
+  const { formatPrice, userCurrency } = useCurrency();
   const inWishlist = isInWishlist(product.pid);
   const [addedFlash, setAddedFlash] = useState(false);
 
@@ -185,11 +187,12 @@ export default memo(function ProductCard({
           <div className="flex items-baseline gap-1.5">
             {salePercent && (
               <span className="text-[11px] font-sans text-grey-beige line-through">
-                ₹{Math.round(product.price / (1 - salePercent / 100)).toLocaleString('en-IN')}
+                {formatPrice(Math.round(product.price / (1 - salePercent / 100)))}
               </span>
             )}
             <span className="font-sans font-semibold text-dark-red text-sm">
-              ₹{product.price.toLocaleString('en-IN')}
+              {formatPrice(product.price)}
+              {userCurrency === 'USD' && <span className="text-[10px] ml-0.5 opacity-60">*</span>}
             </span>
           </div>
         </div>

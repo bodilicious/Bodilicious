@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { calculateDiscount } from "../utils/pricing.js";
 import Order from "./models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
@@ -12,7 +13,7 @@ import StoreSettings from "../settings/models.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
-
+import orderEvents from "../events/orderEvents.js";
 
 
 /* =========================================================
@@ -24,7 +25,7 @@ export const createOrder = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { items, shippingDetails, paymentMethod, marketing } = req.body;
+    const { items, shippingDetails, billingDetails, paymentMethod, marketing } = req.body;
     const userId = req.user._id;
 
     // Razorpay orders must use /api/payment/razorpay/init + /api/payment/verify flow
@@ -36,8 +37,29 @@ export const createOrder = async (req, res) => {
       throw new Error("No items provided");
     }
 
+    // Strictly validate and merge duplicate items
+    const mergedItemsMap = {};
+    for (const item of items) {
+        if (!item.quantity || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+            throw new Error("Invalid item quantity");
+        }
+        const id = item.productId || item.pid;
+        if (!id) throw new Error("Invalid item ID");
+        
+        if (!mergedItemsMap[id]) mergedItemsMap[id] = { ...item, quantity: 0 };
+        mergedItemsMap[id].quantity += item.quantity;
+    }
+    const mergedItems = Object.values(mergedItemsMap);
+
     if (!shippingDetails?.address) {
       throw new Error("Shipping details required");
+    }
+
+    const country = shippingDetails.country?.trim() || "India";
+    const isIndia = ["india", "in", "bharat", "ind"].includes(country.toLowerCase());
+    
+    if (!isIndia) {
+        throw new Error("Cash on Delivery (COD) is only available within India. Please use online payment for international orders.");
     }
 
     let totalAmount = 0;
@@ -45,7 +67,7 @@ export const createOrder = async (req, res) => {
     const orderItems = [];
 
     // 🔹 Validate stock + calculate total
-    for (const item of items) {
+    for (const item of mergedItems) {
       let product;
       if (mongoose.Types.ObjectId.isValid(item.productId)) {
         product = await Product.findById(item.productId).session(session);
@@ -78,11 +100,6 @@ export const createOrder = async (req, res) => {
 
     const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
     const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
-    let originalAmount = totalAmount + shippingCost;
-    let finalAmount = originalAmount;
-    let isWelcomeOfferApplied = false;
-    let discountAmount = 0;
-
     // 🔹 Verify Welcome Offer Eligibility
     // Only eligible if there are no past orders in an active/successful state
     const existingOrdersCount = await Order.countDocuments({
@@ -94,11 +111,8 @@ export const createOrder = async (req, res) => {
       ]
     }).session(session);
 
-    if (existingOrdersCount === 0) {
-      isWelcomeOfferApplied = true;
-      discountAmount = Math.round(originalAmount * 0.10); // 10% off
-      finalAmount = Math.max(0, originalAmount - discountAmount); // Ensure order total doesn't go below 0
-    }
+    const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
+    const { finalAmount, discountAmount, originalAmount, isWelcomeOfferApplied } = pricing;
 
     const finalPaymentMethod = paymentMethod || "cod";
     
@@ -137,6 +151,7 @@ export const createOrder = async (req, res) => {
           user: userId,
           items: orderItems,
           totalAmount: finalAmount,
+          shippingCost,
           discountAmount,
           isWelcomeOfferApplied,
           originalAmount,
@@ -144,17 +159,18 @@ export const createOrder = async (req, res) => {
           paymentStatus: "pending",
           orderStatus: "pending",
           shippingDetails,
+          billingDetails: billingDetails || null,
           marketing: marketing || undefined,
           ...eddData,
         }],
       { session }
     );
 
-    await UserProfile.findByIdAndUpdate(
-      userId,
-      { $addToSet: { orders: order._id }, $set: { cart: [] } },
-      { session }
-    );
+    const productIdsToRemove = orderItems.map(i => i.product);
+    await UserProfile.findByIdAndUpdate(userId, { 
+      $addToSet: { orders: order._id },
+      $pull: { cart: { product: { $in: productIdsToRemove } } }
+    }).session(session);
 
     await session.commitTransaction();
     session.endSession();
@@ -172,30 +188,13 @@ export const createOrder = async (req, res) => {
       console.error("❌ Invoice generation failed:", invErr.message);
     }
 
-    // ── Trigger Order Confirmation Email (Asynchronous/Non-blocking) ──
-    const populatedOrder = await Order.findById(order._id).populate("items.product");
-    const user = await UserProfile.findById(userId);
-    
-    if (invoiceNumber) {
-      await sendOrderConfirmationAfterInvoice(populatedOrder, user?.email);
-    } else {
-      console.warn("⚠️ Invoice generation failed or missing, skipping email trigger.");
-    }
-    
-    // ── Trigger Admin New Order Alert ──
-    await sendAdminNewOrderAlert(populatedOrder).catch(err => console.error("Admin Alert Failed:", err));
-
-    /* =========================================================
-       SHIPROCKET INTEGRATION (Non-blocking)
-       Trigger only if COD. For Razorpay, it's triggered after payment verification.
-    ========================================================= */
-    if (finalPaymentMethod === "cod") {
-      // 🚀 Blocking Push: Safer for Serverless Environments
-      try {
-        await pushOrderToShiprocket(populatedOrder);
-      } catch (shipErr) {
-        console.error("Shiprocket background push error:", shipErr.message);
-      }
+    // ── Third Party Events (Decoupled) ────────────────────────────────
+    let populatedOrder;
+    try {
+        populatedOrder = await Order.findById(order._id).populate("items.product");
+        orderEvents.emit("order_placed", populatedOrder);
+    } catch (eventErr) {
+        console.error("❌ Failed to emit order events:", eventErr);
     }
 
     // 🚀 Audit Order Placement
@@ -205,23 +204,9 @@ export const createOrder = async (req, res) => {
       paymentMethod: order.paymentMethod
     }).catch(err => console.error("Order Placed Audit Failed:", err));
 
-    // 🚀 PostHog Server-Side Tracking
-    trackServerEvent(userId, 'Order Completed', {
-      orderId: order._id.toString(),
-      revenue: order.totalAmount,
-      shipping: shippingCost,
-      tax: 0,
-      paymentMethod: order.paymentMethod,
-      products: orderItems.map(item => ({
-        productId: item.product.toString(),
-        price: item.priceAtPurchase,
-        quantity: item.quantity
-      }))
-    });
-
     return res.status(201).json({
       success: true,
-      data: { order: populatedOrder },
+      data: { order: populatedOrder || order },
     });
 
   } catch (err) {
@@ -360,7 +345,14 @@ export const trackShiprocketOrder = async (req, res) => {
 ========================================================= */
 export const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id })
+    const orders = await Order.find({
+      user: req.user._id,
+      orderStatus: { $ne: "abandoned" },
+      $or: [
+        { paymentMethod: { $ne: "razorpay" } },
+        { paymentStatus: { $ne: "pending" } }
+      ]
+    })
       .sort({ createdAt: -1 })
       .populate("items.product");
 
@@ -386,6 +378,11 @@ export const getSingleOrder = async (req, res) => {
     const order = await Order.findOne({
       _id: req.params.orderId,
       user: req.user._id,
+      orderStatus: { $ne: "abandoned" },
+      $or: [
+        { paymentMethod: { $ne: "razorpay" } },
+        { paymentStatus: { $ne: "pending" } }
+      ]
     }).populate("items.product");
 
     if (!order) {
@@ -687,39 +684,6 @@ export const cancelOrder = async (req, res) => {
     }
 
     /* =========================================================
-       Cancel on Shiprocket if shipmentId/AWB exists
-    ========================================================= */
-    if (order.awb || order.shiprocketOrderId) {
-      try {
-        if (process.env.SHIPROCKET_EMAIL) {
-          const token = await getShiprocketToken();
-
-          if (order.awb) {
-            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ awbs: [order.awb] })
-            });
-          } else if (order.shiprocketOrderId) {
-            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ ids: [order.shiprocketOrderId] })
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to cancel on Shiprocket:", err.message);
-      }
-    }
-
-    /* =========================================================
        Razorpay Refund — only if paid online
     ========================================================= */
     let refundResult = null;
@@ -749,13 +713,11 @@ export const cancelOrder = async (req, res) => {
       }
     }
 
-    await order.save();
-
     // Restore stock for all cancelled items ONLY if they were actually deducted
     // (COD orders deduct immediately, Razorpay only deducts on success)
     const shouldRestoreStock = order.paymentMethod === "cod" || order.paymentStatus === "paid" || order.paymentStatus === "refunded";
 
-    if (shouldRestoreStock && order.items && order.items.length > 0) {
+    if (shouldRestoreStock && order.items && order.items.length > 0 && !order.isStockRestored) {
       try {
         const bulkOps = order.items.map(item => ({
           updateOne: {
@@ -764,9 +726,48 @@ export const cancelOrder = async (req, res) => {
           },
         }));
         await Product.bulkWrite(bulkOps);
+        order.isStockRestored = true;
       } catch (stockErr) {
         // Non-fatal: log but don't block the cancellation response
         console.error("Failed to restore stock after cancellation:", stockErr.message);
+      }
+    }
+
+    // 🚀 CRITICAL: Save all DB state (refund status, stock restored flag) atomically 
+    // BEFORE calling Shiprocket. If Node crashes during the Shiprocket call, the DB
+    // is fully consistent and the webhook won't double-restore stock.
+    await order.save();
+
+    /* =========================================================
+       Cancel on Shiprocket if shipmentId/AWB exists
+    ========================================================= */
+    if (order.awb || order.shiprocketOrderId) {
+      try {
+        if (process.env.SHIPROCKET_EMAIL) {
+          const token = await getShiprocketToken();
+
+          if (order.awb) {
+            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ awbs: [order.awb] })
+            });
+          } else if (order.shiprocketOrderId) {
+            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ ids: [order.shiprocketOrderId] })
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to cancel on Shiprocket:", err.message);
       }
     }
 

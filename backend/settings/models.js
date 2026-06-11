@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { COUNTRIES } from "../utils/countries.js";
 
 const storeSettingsSchema = new mongoose.Schema(
   {
@@ -8,6 +9,10 @@ const storeSettingsSchema = new mongoose.Schema(
     supportPhone: { type: String, default: "+91 9894451947" },
     storeAddress: { type: String, default: "" },
     currency: { type: String, default: "INR" },
+    usdExchangeRate: { type: Number, default: 83.5 },
+    usdExchangeRateLastUpdated: { type: Date, default: null },
+    exchangeRates: { type: Map, of: Number, default: {} },
+    exchangeRatesLastUpdated: { type: Date, default: null },
     timezone: { type: String, default: "Asia/Kolkata" },
 
     // 2. Orders & Invoicing
@@ -119,6 +124,12 @@ const storeSettingsSchema = new mongoose.Schema(
     pincodeCheckEnabled: { type: Boolean, default: false },
     pincodeServiceabilitySource: { type: String, default: "manual", enum: ["manual", "shiprocket", "delhivery"] },
     temperatureSensitiveWarningEnabled: { type: Boolean, default: true },
+    internationalShippingEnabled: { type: Boolean, default: false },
+    internationalCheckoutEnabled: { type: Boolean, default: false },
+    autoCurrencySwitchingEnabled: { type: Boolean, default: true },
+    internationalShippingCost: { type: Number, default: 2000 },
+    internationalShippingThreshold: { type: Number, default: 10000 },
+    supportedCountries: { type: [String], default: COUNTRIES },
 
     // 12. Skin Profile & Personalisation
     skinQuizEnabled: { type: Boolean, default: true },

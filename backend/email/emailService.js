@@ -145,6 +145,19 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
         }
       </div>
 
+      ${
+        order?.shippingDetails?.country && !["india", "in", "bharat", "ind"].includes(order.shippingDetails.country.toLowerCase().trim())
+        ? `<div style="background:#fff3cd; border:1px solid #ffeeba; padding:16px 18px; border-radius:8px; margin-bottom:24px;">
+             <h4 style="margin:0 0 8px; color:#856404; font-size:16px;">International Shipping Notice</h4>
+             <p style="margin:0; color:#856404; font-size:14px;">
+               <strong>Important:</strong> Import duties, taxes, and customs clearance fees may apply depending on your country. These are the buyer's responsibility.
+               <br/><br/>
+               <strong>Estimated Delivery:</strong> 7-21 business days.
+             </p>
+           </div>`
+        : `<p style="margin:0 0 14px;"><strong>Estimated Delivery:</strong> 3-5 business days.</p>`
+      }
+
       <h3 style="margin:0 0 12px; color:#222222; font-size:18px;">Order Summary</h3>
 
       <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">

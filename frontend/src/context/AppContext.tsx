@@ -31,6 +31,7 @@ import {
   Address
 } from '../types';
 import { usePostHog } from 'posthog-js/react';
+import { getCurrencyForCountry } from '../utils/currencies';
 
 /* ================================
    Types
@@ -44,6 +45,7 @@ export interface ShippingDetails {
   city: string;
   state: string;
   pincode: string;
+  country?: string; // optional for backwards compatibility; defaults to 'India' on backend
 }
 
 interface AppContextType {
@@ -93,7 +95,18 @@ interface AppContextType {
     reviewIncentiveEnabled: boolean;
     reviewIncentiveDiscountPercent: number;
     reviewModerationEnabled: boolean;
+    autoCurrencySwitchingEnabled: boolean;
+    detectedCountryCode: string;
+    usdExchangeRate: number;
+    internationalShippingEnabled: boolean;
+    internationalShippingCost: number;
+    internationalShippingThreshold: number;
+    supportedCountries: string[];
+    exchangeRates?: Record<string, number>;
   };
+
+  userCurrency: string;
+  setUserCurrency: (currency: string) => void;
 
   isChatOpen: boolean;
   setIsChatOpen: (isOpen: boolean) => void;
@@ -120,9 +133,10 @@ interface AppContextType {
   removeFromCart: (pid: string) => void;
   updateQuantity: (pid: string, qty: number) => void;
 
-  checkout: (shippingDetails: ShippingDetails) => Promise<{ order: Order }>;
-  initRazorpayOrder: (items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
+  checkout: (shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null) => Promise<{ order: Order }>;
+  initRazorpayOrder: (items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, quoteId?: string) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
   verifyPayment: (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string, items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails) => Promise<Order>;
+  fetchShippingQuote: (items: any[], shippingDetails: any) => Promise<any>;
 
   cancelOrder: (orderId: string) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
@@ -205,7 +219,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reviewIncentiveEnabled: false,
     reviewIncentiveDiscountPercent: 10,
     reviewModerationEnabled: true,
+    autoCurrencySwitchingEnabled: true,
+    detectedCountryCode: 'IN',
+    usdExchangeRate: 83.5,
+    internationalShippingEnabled: false,
+    internationalShippingCost: 2000,
+    internationalShippingThreshold: 10000,
+    supportedCountries: ['IN'],
   });
+
+  const [userCurrency, _setUserCurrency] = useState<string>('INR');
+
+  const setUserCurrency = useCallback((currency: string) => {
+    if (storeSettings.autoCurrencySwitchingEnabled === false) return;
+    _setUserCurrency(currency);
+    localStorage.setItem('bodilicious_currency_preference', currency);
+  }, [storeSettings.autoCurrencySwitchingEnabled]);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const toggleChat = useCallback(() => setIsChatOpen(prev => !prev), []);
@@ -351,6 +380,55 @@ const fetchUserProfileAndSync = useCallback(async () => {
     setCartLoading(false);
   }
 }, [getAuthHeaders]);
+
+  const fetchShippingQuote = useCallback(async (items: any[], shippingDetails: any) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/payment/quote`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, shippingDetails, targetCurrency: userCurrency }),
+        signal: controller.signal,
+      });
+
+      // Handle rate limiting before parsing JSON — attach retry timing for the UI
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        // RateLimit-Reset = seconds until the window resets (express-rate-limit draft-6)
+        const resetHeader = res.headers.get('RateLimit-Reset');
+        const retryAfterMs = resetHeader
+          ? Math.max(1000, parseInt(resetHeader) * 1000)
+          : 60_000; // fallback: 1 minute
+        const err: any = new Error(data.message || 'Too many requests. Please wait before retrying.');
+        err.isRateLimit = true;
+        err.retryAfterMs = retryAfterMs;
+        throw err;
+      }
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+
+      // Notify the user if their selected display currency isn't supported at checkout
+      if (data.data?.isFallback && data.data?.requestedCurrency) {
+        const { toast } = await import('react-hot-toast');
+        toast(`${data.data.requestedCurrency} isn't available at checkout — your order will be charged in INR.`, {
+          icon: 'ℹ️',
+          duration: 6000,
+        });
+      }
+
+      return data.data;
+    } catch (err: any) {
+      console.error('Failed to fetch shipping quote:', err);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }, [getAuthHeaders, userCurrency]);
+
 
   /* =============================
      Firebase auth listener
@@ -608,6 +686,23 @@ const triggerPasswordReset = async (email: string) => {
       const json = await res.json();
       if (json.success && json.data) {
         setStoreSettings(json.data);
+        
+        // Handle currency detection
+        if (json.data.autoCurrencySwitchingEnabled === false) {
+          _setUserCurrency('INR');
+          localStorage.removeItem('bodilicious_currency_preference');
+          localStorage.setItem('bodilicious_currency_auto', 'INR');
+        } else {
+          const pref = localStorage.getItem('bodilicious_currency_preference');
+          if (pref) {
+            _setUserCurrency(pref);
+          } else {
+            // Auto-detect: map the IP-detected country code to its local currency
+            const detected = getCurrencyForCountry(json.data.detectedCountryCode || 'IN');
+            _setUserCurrency(detected);
+            localStorage.setItem('bodilicious_currency_auto', detected);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch store settings', err);
@@ -775,7 +870,8 @@ const triggerPasswordReset = async (email: string) => {
      Checkout (COD only)
   ============================== */
   const checkout = async (
-    shippingDetails: ShippingDetails
+    shippingDetails: ShippingDetails,
+    billingDetails?: ShippingDetails | null
   ): Promise<{ order: Order }> => {
     if (authStatus !== 'authenticated') throw new Error('Please sign in to checkout');
     if (cartItems.length === 0) throw new Error('Your cart is empty');
@@ -799,11 +895,23 @@ const triggerPasswordReset = async (email: string) => {
     const utmStorage = localStorage.getItem('bodilicious_utm');
     const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
 
-    const response = await fetch(`${API_BASE}/orders`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ items, shippingDetails, paymentMethod: 'cod', marketing }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let response;
+    try {
+      response = await fetch(`${API_BASE}/orders`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ items, shippingDetails, billingDetails, paymentMethod: 'cod', marketing }),
+        signal: controller.signal
+      });
+    } catch (err: any) {
+      if (err.name === 'AbortError') throw new Error('Server took too long to respond. Please try again.');
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
@@ -813,11 +921,17 @@ const triggerPasswordReset = async (email: string) => {
     const json = await response.json();
     const { order } = json.data;
 
-    // Cart was cleared server-side; clear locally immediately
-    // (must be synchronous before navigate() fires, otherwise useEffect
-    //  persist runs after navigation and localStorage keeps stale cart)
-    setCartItems([]);
-    localStorage.removeItem(CART_STORAGE_KEY);
+    // Only remove purchased items from local cart to match backend $pull logic
+    const purchasedProductIds = new Set(order.items.map((i: any) => i.product._id || i.product));
+    setCartItems(prev => {
+      const newCart = prev.filter(item => !purchasedProductIds.has(item.product._id));
+      if (newCart.length === 0) {
+        localStorage.removeItem(CART_STORAGE_KEY);
+      } else {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newCart));
+      }
+      return newCart;
+    });
     setOrders(prev => [order, ...prev]);
 
     // Clear UTM tracking after successful checkout
@@ -831,7 +945,9 @@ const triggerPasswordReset = async (email: string) => {
   ============================== */
   const initRazorpayOrder = async (
     items: { productId: string; quantity: number }[],
-    shippingDetails: ShippingDetails
+    shippingDetails: ShippingDetails,
+    billingDetails?: ShippingDetails | null,
+    quoteId?: string
   ): Promise<{ razorpayOrder: any; calculatedAmount: number }> => {
     if (authStatus !== 'authenticated') throw new Error('Please sign in');
 
@@ -840,11 +956,23 @@ const triggerPasswordReset = async (email: string) => {
     const utmStorage = localStorage.getItem('bodilicious_utm');
     const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
 
-    const res = await fetch(`${API_BASE}/payment/razorpay/init`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ items, shippingDetails, marketing }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/payment/razorpay/init`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ items, shippingDetails, billingDetails, marketing, quoteId }),
+        signal: controller.signal
+      });
+    } catch (err: any) {
+      if (err.name === 'AbortError') throw new Error('Server took too long to respond. Please try again.');
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -869,18 +997,31 @@ const triggerPasswordReset = async (email: string) => {
     const utmStorage = localStorage.getItem('bodilicious_utm');
     const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
 
-    const res = await fetch(`${API_BASE}/payment/verify`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        items,
-        shippingDetails,
-        marketing,
-      }),
-    });
+    const controller = new AbortController();
+    // 35s timeout to allow for backend retries (which take ~5-15s) and UI timeout to trigger first
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/payment/verify`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          razorpay_order_id,
+          razorpay_payment_id,
+          razorpay_signature,
+          items,
+          shippingDetails,
+          marketing,
+        }),
+        signal: controller.signal
+      });
+    } catch (err: any) {
+      if (err.name === 'AbortError') throw new Error('Server took too long to confirm payment. Please check your account in a few minutes.');
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // ── 202: Payment captured but order creation failed after all retries ──────
     // The backend tried 3 times with exponential backoff. The money IS taken.
@@ -888,9 +1029,10 @@ const triggerPasswordReset = async (email: string) => {
     // Throw a TYPED error so PaymentPage shows a proper screen — not just a toast.
     if (res.status === 202) {
       const body = await res.json().catch(() => ({}));
-      // Clear cart locally — customer HAS paid, their cart is gone server-side
+      // Fallback local wipe if 202 because we don't have the final order structure yet
+      // The backend pulls specific items, so a refresh will correct this.
       setCartItems([]);
-      localStorage.removeItem('bodilicious_utm');
+      localStorage.removeItem(CART_STORAGE_KEY);
       const err: any = new Error(body.message || 'Payment captured, order pending');
       err.paymentCaptured = true;
       err.razorpayPaymentId = body.razorpay_payment_id || razorpay_payment_id;
@@ -905,10 +1047,17 @@ const triggerPasswordReset = async (email: string) => {
 
     const { data: order } = await res.json();
 
-    // Cart was cleared server-side; clear locally immediately
-    // (must be synchronous before navigate() fires)
-    setCartItems([]);
-    localStorage.removeItem(CART_STORAGE_KEY);
+    // Only remove purchased items from local cart to match backend $pull logic
+    const purchasedProductIds = new Set(order.items.map((i: any) => i.product._id || i.product));
+    setCartItems(prev => {
+      const newCart = prev.filter(item => !purchasedProductIds.has(item.product._id));
+      if (newCart.length === 0) {
+        localStorage.removeItem(CART_STORAGE_KEY);
+      } else {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newCart));
+      }
+      return newCart;
+    });
 
     // Deduplicate: only prepend if this order is not already in state
     // (prevents double-entry when verifyPayment returns an already-processed order)
@@ -1136,6 +1285,7 @@ const triggerPasswordReset = async (email: string) => {
         checkout,
         initRazorpayOrder,
         verifyPayment,
+        fetchShippingQuote,
         cancelOrder,
         deleteOrder,
         requestReturn,
@@ -1151,6 +1301,8 @@ const triggerPasswordReset = async (email: string) => {
         isChatOpen,
         setIsChatOpen,
         toggleChat,
+        userCurrency,
+        setUserCurrency,
         cartLoading,
         refreshProfile: fetchUserProfileAndSync,
         storeSettings,

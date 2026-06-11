@@ -53,7 +53,7 @@ export default function ConfirmationPage() {
     // ── Auto-poll: re-fetch profile until the order appears ─────────────────
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [pollCount, setPollCount] = useState(0);
-    const MAX_POLLS = 15; // try up to 15 times (every 2.5s = ~37s max)
+    const MAX_POLLS = 10; // try up to 10 times (every 2.5s = ~25s max)
 
     useEffect(() => {
         if (orderLoaded || !resolvedState) return; // already have it, or no state
@@ -235,7 +235,7 @@ export default function ConfirmationPage() {
                                     {order.shippingDetails.address}<br />
                                     {order.shippingDetails.city}, {order.shippingDetails.state} {order.shippingDetails.pincode}
                                 </p>
-                                <p className="font-sans text-sm text-gray-800 mt-2">Phone: +91 {order.shippingDetails.phone}</p>
+                                <p className="font-sans text-sm text-gray-800 mt-2">Phone: {order.shippingDetails.phone}</p>
                             </div>
                         </div>
 
@@ -272,7 +272,14 @@ export default function ConfirmationPage() {
                                 </div>
                                 <div className="flex justify-between items-center py-2">
                                     <span className="text-gray-500 text-sm font-sans">Shipping</span>
-                                    <span className="text-sm font-sans text-gray-600">{order.totalAmount < storeSettings.shippingThreshold ? `₹${storeSettings.shippingCost}` : 'Free'}</span>
+                                    <span className="text-sm font-sans text-gray-600">
+                                        {(() => {
+                                            const shippingPaid = (order as any).shippingCost || 0;
+                                            if (shippingPaid <= 0) return 'Free';
+                                            const cur = (order as any).currency || 'INR';
+                                            return cur === 'INR' ? `₹${shippingPaid.toLocaleString('en-IN')}` : `${cur} ${shippingPaid}`;
+                                        })()}
+                                    </span>
                                 </div>
                                 {(order as any).discountAmount > 0 && (
                                     <div className="flex justify-between items-center py-1">

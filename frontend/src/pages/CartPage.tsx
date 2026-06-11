@@ -1,14 +1,63 @@
 import { Trash2, Minus, Plus, ShoppingBag, ArrowRight, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useCurrency } from '../hooks/useCurrency';
 import Footer from '../components/Footer';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function CartPage() {
-  const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings } = useApp();
+  const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings, fetchShippingQuote } = useApp();
+  const { formatPrice, userCurrency } = useCurrency();
   const navigate = useNavigate();
 
-  const validCartItems = cartItems.filter(item => item && item.product);
+  // 1. Memoize validCartItems to avoid creating a new array reference on every render
+  const validCartItems = useMemo(
+    () => cartItems.filter(item => item && item.product),
+    [cartItems]
+  );
 
+  // 2. Call all hooks BEFORE any conditional returns (Rules of Hooks)
+  const [quoteData, setQuoteData] = useState<{ shippingCost: number; discountAmount: number; total: number; threshold: number }>({
+    shippingCost: storeSettings.shippingCost,
+    discountAmount: 0,
+    total: cartTotal + storeSettings.shippingCost,
+    threshold: storeSettings.shippingThreshold
+  });
+
+  useEffect(() => {
+    if (validCartItems.length === 0) return;
+    let isMounted = true;
+    
+    // Use userCurrency to proxy their country for the cart preview.
+    // They will enter their real country on the next step (ShippingPage).
+    const guessCountry = userCurrency === 'USD' ? 'US' : 'IN';
+    
+    // Prepare lightweight items list to send to the API (avoid sending full product objects)
+    const itemsForQuote = validCartItems.map((item: any) => ({
+      productId: item.product?._id || item.product,
+      pid: item.product?.pid,
+      quantity: item.quantity,
+    }));
+
+    fetchShippingQuote(itemsForQuote, { country: guessCountry })
+      .then(data => {
+        if (isMounted) {
+          setQuoteData({
+            shippingCost: data.shippingCost,
+            discountAmount: data.discountAmount,
+            total: data.totalAmount,
+            threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold
+          });
+        }
+      })
+      .catch(err => console.error("Quote fetch failed:", err));
+      
+    return () => { isMounted = false; };
+  // remove storeSettings from dependencies to prevent unnecessary fetches
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validCartItems, userCurrency, fetchShippingQuote]);
+
+  // 3. Early return can now safely happen after all hooks
   if (validCartItems.length === 0) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
@@ -30,8 +79,11 @@ export default function CartPage() {
     );
   }
 
-  const shipping = cartTotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
-  const total = cartTotal + shipping;
+
+  const shipping = quoteData.shippingCost;
+  const currentThreshold = quoteData.threshold;
+  const total = quoteData.total;
+  const discountAmount = quoteData.discountAmount;
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -75,12 +127,13 @@ export default function CartPage() {
                       <h3 className="font-serif text-dark-red text-base">{item.product.name}</h3>
                     </div>
                     <span className="font-sans font-semibold text-dark-red whitespace-nowrap">
-                      ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                      {formatPrice(item.product.price * item.quantity)}
+                      {userCurrency === 'USD' && <span className="text-xs ml-0.5 opacity-60">*</span>}
                     </span>
                   </div>
 
                   <p className="font-sans text-grey-beige text-xs mt-1 mb-4">
-                    ₹{item.product.price.toLocaleString('en-IN')} each
+                    {formatPrice(item.product.price)} each
                   </p>
 
                   <div className="flex items-center justify-between">
@@ -123,36 +176,33 @@ export default function CartPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm font-sans">
                   <span className="text-grey-beige">Subtotal</span>
-                  <span className="text-dark-red">₹{cartTotal.toLocaleString('en-IN')}</span>
+                  <span className="text-dark-red">{formatPrice(cartTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-sans">
                   <span className="text-grey-beige">Shipping</span>
                   <span className={shipping === 0 ? 'text-ruby-red font-medium' : 'text-dark-red'}>
-                    {shipping === 0 ? 'Free' : `₹${shipping}`}
+                    {shipping === 0 ? 'Free' : formatPrice(shipping)}
                   </span>
                 </div>
                 {shipping > 0 && (
                   <p className="text-xs font-sans mt-2 text-dark-red/80 flex items-center gap-1.5 justify-center">
                     <Truck size={14} /> 
-                    Free shipping on orders above ₹{storeSettings.shippingThreshold}
+                    Free shipping on orders above {formatPrice(currentThreshold)}
                   </p>
                 )}
 
-                {user?.welcomeOffer?.eligible && (
+                {discountAmount > 0 && (
                   <div className="flex justify-between text-sm font-sans text-emerald-600">
                     <span>Welcome Offer (10%)</span>
-                    <span>-₹{Math.round(total * 0.10)}</span>
+                    <span>-{formatPrice(discountAmount)}</span>
                   </div>
                 )}
 
                 <div className="border-t border-silk pt-3 flex justify-between font-sans font-semibold text-dark-red">
                   <span>Total</span>
                   <span>
-                    ₹
-                    {Math.max(
-                      0,
-                      total - (user?.welcomeOffer?.eligible ? Math.round(total * 0.10) : 0)
-                    ).toLocaleString('en-IN')}
+                    {formatPrice(total)}
+                    {userCurrency === 'USD' && <span className="text-xs ml-1 opacity-60">*</span>}
                   </span>
                 </div>
               </div>

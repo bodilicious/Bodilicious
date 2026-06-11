@@ -1,27 +1,53 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Check, ShieldCheck, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
+import { Check, ShieldCheck, ChevronRight, Loader2, AlertTriangle, Clock } from 'lucide-react';
 import Footer from '../components/Footer';
 import RequireAuth from '../components/RequireAuth';
 import toast from 'react-hot-toast';
 import { CartItem } from '../types';
+import { COUNTRIES } from '../utils/countries';
+import { useCurrency } from '../hooks/useCurrency';
+
+// ─── Checkout session timeout constants ──────────────────────────────────────
+// ⚠️ TEST VALUES — restore for production:
+//   SESSION_DURATION_MS = 10 * 60 * 1000  (10 min)
+//   WARN_AT_SECS        = 3 * 60           (3 min)
+//   URGENT_AT_SECS      = 60               (1 min)
+const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+const WARN_AT_SECS = 3 * 60;               // show banner at 3 minutes remaining
+const URGENT_AT_SECS = 60;                 // turn red at 1 minute remaining
+
+type BillingForm = {
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country: string;
+};
 
 // ─── Razorpay script loader (idempotent) ─────────────────────────────────────
 const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
         if ((window as any).Razorpay) { resolve(true); return; }
+        
+        // 10 second timeout max for loading script
+        const timeout = setTimeout(() => {
+            resolve(!!(window as any).Razorpay);
+        }, 10000);
+
         const existing = document.querySelector('script[src*="checkout.razorpay.com"]');
         if (existing) {
-            existing.addEventListener('load', () => resolve(!!(window as any).Razorpay));
-            existing.addEventListener('error', () => resolve(false));
+            existing.addEventListener('load', () => { clearTimeout(timeout); resolve(!!(window as any).Razorpay); });
+            existing.addEventListener('error', () => { clearTimeout(timeout); resolve(false); });
             return;
         }
         const script = document.createElement('script');
         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = () => resolve(!!(window as any).Razorpay);
-        script.onerror = () => resolve(false);
+        script.onload = () => { clearTimeout(timeout); resolve(!!(window as any).Razorpay); };
+        script.onerror = () => { clearTimeout(timeout); resolve(false); };
         document.body.appendChild(script);
     });
 };
@@ -33,9 +59,18 @@ const VERIFY_TIMEOUT_MS = 25_000;
 type OverlayState = 'none' | 'init' | 'verifying' | 'success' | 'timeout' | 'captured_failed' | 'cod_processing';
 
 export default function PaymentPage() {
-    const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings } = useApp();
+    const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings, cartLoading, fetchShippingQuote } = useApp();
+    const { formatPrice, userCurrency } = useCurrency();
     const location = useLocation();
     const navigate = useNavigate();
+
+    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string } | null>(null);
+    const [quoteLoading, setQuoteLoading] = useState(true);
+    const [quoteError, setQuoteError] = useState<string | null>(null);
+
+    // Rate-limit countdown: seconds remaining until retry is allowed (null = not rate-limited)
+    const [rateLimitSecs, setRateLimitSecs] = useState<number | null>(null);
+    const rateLimitTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const [paymentMethod, setPaymentMethod] = useState('card');
     // isProcessing = button spinner (init phase only)
@@ -43,6 +78,17 @@ export default function PaymentPage() {
     // overlay = full-screen lock once Razorpay handler fires
     const [overlay, setOverlay] = useState<OverlayState>('none');
     const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+    const shippingDetails = location.state?.shippingDetails;
+
+    const [billingDetails, setBillingDetails] = useState<BillingForm>({
+        name: shippingDetails?.name || '',
+        address: shippingDetails?.address || '',
+        city: shippingDetails?.city || '',
+        state: shippingDetails?.state || '',
+        pincode: shippingDetails?.pincode || '',
+        country: shippingDetails?.country || 'India'
+    });
+    const [billingTouched, setBillingTouched] = useState<Record<string, boolean>>({});
 
     const razorpayInstanceRef = useRef<any>(null);
     // COD double-submit guard
@@ -54,14 +100,212 @@ export default function PaymentPage() {
     // True while the Razorpay modal is open — keeps isLocked=true so tab-close is blocked
     const [razorpayModalOpen, setRazorpayModalOpen] = useState(false);
 
-    const shippingDetails = location.state?.shippingDetails;
+    // isLocked must be declared early so the session timer hooks below can read it via a ref
     const isLocked = isProcessing || overlay !== 'none' || razorpayModalOpen;
+    // Keep a ref so intervals always read the latest value without stale closure issues
+    const isLockedRef = useRef(isLocked);
+    useEffect(() => { isLockedRef.current = isLocked; }, [isLocked]);
+
+    // ── Checkout session timer ────────────────────────────────────────────────
+    // secsRemaining=null → timer not yet started / hidden
+    const [secsRemaining, setSecsRemaining] = useState<number | null>(null);
+    const sessionEndRef = useRef<number | null>(null);
+    const sessionTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const startOrResetSessionTimer = useCallback(() => {
+        sessionEndRef.current = Date.now() + SESSION_DURATION_MS;
+        // Don't show the banner yet — only reveal once we're in the warning zone
+        setSecsRemaining(null);
+    }, []);
+
+    // Kick off the timer once the page is ready (quote loaded)
+    useEffect(() => {
+        if (quoteLoading || !shippingDetails) return;
+        startOrResetSessionTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quoteLoading]);
+
+    // Tick every second — starts once the quote is loaded (sessionEndRef populated)
+    useEffect(() => {
+        // Don't start the tick until the session timer has been kicked off
+        if (quoteLoading || !shippingDetails) return;
+
+        if (sessionTickRef.current) clearInterval(sessionTickRef.current);
+
+        sessionTickRef.current = setInterval(() => {
+            // Pause countdown while payment is in progress
+            if (isLockedRef.current) return;
+            // Guard in case sessionEndRef hasn't been set yet
+            if (!sessionEndRef.current) return;
+
+            const remaining = Math.max(0, Math.floor((sessionEndRef.current - Date.now()) / 1000));
+
+            if (remaining <= WARN_AT_SECS) {
+                setSecsRemaining(remaining);
+            }
+
+            if (remaining === 0) {
+                if (sessionTickRef.current) clearInterval(sessionTickRef.current);
+                toast.error('Your checkout session expired. Please review your cart and try again.', {
+                    id: 'session-expired',
+                    duration: 6000,
+                });
+                navigate('/cart', { replace: true });
+            }
+        }, 1000);
+
+        return () => {
+            if (sessionTickRef.current) clearInterval(sessionTickRef.current);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quoteLoading, shippingDetails, navigate]);
+
+    // Reset timer on user activity (only while not locked)
+    useEffect(() => {
+        if (quoteLoading || !shippingDetails) return;
+        const handleActivity = () => {
+            if (!isLockedRef.current && sessionEndRef.current) {
+                startOrResetSessionTimer();
+            }
+        };
+        window.addEventListener('click', handleActivity);
+        window.addEventListener('keydown', handleActivity);
+        window.addEventListener('scroll', handleActivity, { passive: true });
+        return () => {
+            window.removeEventListener('click', handleActivity);
+            window.removeEventListener('keydown', handleActivity);
+            window.removeEventListener('scroll', handleActivity);
+        };
+    }, [isLocked, quoteLoading, shippingDetails, startOrResetSessionTimer]);
+
+    // Helper to format seconds as M:SS
+    const formatCountdown = (secs: number) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${String(s).padStart(2, '0')}`;
+    };
+
+
+    const validCartItems = cartItems.filter((item: CartItem) => item && item.product);
+
+    // ── Build items payload ───────────────────────────────────────────────────
+    const buildItemsPayload = useCallback(() => {
+        return validCartItems
+            .map((item: CartItem) => {
+                const anyP = item.product as any;
+                let productId = anyP?._id ? String(anyP._id) : null;
+                if (!productId) {
+                    const match = products.find((x: any) => x.pid === item.product.pid) as any;
+                    if (match?._id) productId = String(match._id);
+                }
+                return productId ? { productId, pid: item.product.pid, quantity: item.quantity } : null;
+            })
+            .filter(Boolean) as { productId: string; quantity: number }[];
+    }, [validCartItems, products]);
 
     // ── Redirect if no shipping details ──────────────────────────────────────
     useEffect(() => {
         window.scrollTo(0, 0);
         if (!shippingDetails) navigate('/cart', { replace: true });
     }, [shippingDetails, navigate]);
+
+    // ── Fetch Quote on Mount & Visibility Change ─────────────────────────────
+    // Track when the last quote was successfully fetched so the visibility-change
+    // handler can enforce a cooldown and not hammer the endpoint on rapid tab switches.
+    const lastQuoteFetchRef = useRef<number>(0);
+    const QUOTE_REFRESH_COOLDOWN_MS = 60_000; // at most once per minute on tab focus
+
+    useEffect(() => {
+        if (!shippingDetails || cartLoading) return;
+        if (validCartItems.length === 0 && !submittingRef.current && overlay !== 'success' && overlay !== 'cod_processing') {
+            navigate('/cart', { replace: true });
+            return;
+        }
+
+        let isMounted = true;
+        let isFetching = false;
+        
+        const fetchQuote = async (isBackgroundRefresh = false) => {
+            // isLockedRef is used here (not isLocked) to avoid adding isLocked to deps
+            // which would cause this whole effect — and another quote fetch — to re-run
+            // every time the Razorpay modal opens or overlay state changes.
+            if (isFetching || isLockedRef.current) return;
+            isFetching = true;
+            try {
+                // Use buildItemsPayload to properly resolve product IDs using the products list
+                const itemsForQuote = buildItemsPayload();
+                const data = await fetchShippingQuote(itemsForQuote, shippingDetails);
+                
+                if (isMounted) {
+                    setRateLimitSecs(null);
+                    setQuoteError(null);
+                    if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
+                    lastQuoteFetchRef.current = Date.now();
+                    setQuoteData({
+                        quoteId: data.quoteId,
+                        shippingCost: data.shippingCost,
+                        total: data.totalAmount || data.total,
+                        deliveryEstimate: data.deliveryEstimate
+                    });
+                    if (isBackgroundRefresh) {
+                        toast.success("Prices refreshed", { id: 'quote-refresh' });
+                    }
+                }
+            } catch (err: any) {
+                if (isMounted) {
+                    if (err.isRateLimit) {
+                        // Show countdown and auto-retry when it hits zero
+                        const totalSecs = Math.ceil((err.retryAfterMs || 60000) / 1000);
+                        setRateLimitSecs(totalSecs);
+                        setQuoteError(null);
+                        if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
+                        rateLimitTickRef.current = setInterval(() => {
+                            setRateLimitSecs(prev => {
+                                if (prev === null || prev <= 1) {
+                                    clearInterval(rateLimitTickRef.current!);
+                                    fetchQuote(true); // Retry silently
+                                    return null;
+                                }
+                                return prev - 1;
+                            });
+                        }, 1000);
+                    } else {
+                        const isTimeout = err.name === 'AbortError' || err.message?.includes('aborted');
+                        toast.error(isTimeout ? 'Server is taking too long to respond. Please check your connection.' : 'Session expired — please review your cart.');
+                        navigate('/cart', { replace: true });
+                    }
+                }
+            } finally {
+                if (isMounted) {
+                    setQuoteLoading(false);
+                    isFetching = false;
+                }
+            }
+        };
+
+        // Initial fetch
+        fetchQuote();
+
+        function handleVisibilityChange() {
+            if (document.visibilityState === 'visible') {
+                // Enforce cooldown: don't re-fetch if a quote was fetched recently
+                const sinceLastFetch = Date.now() - lastQuoteFetchRef.current;
+                if (sinceLastFetch < QUOTE_REFRESH_COOLDOWN_MS) return;
+                fetchQuote(true);
+            }
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            isMounted = false;
+            if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+        
+    // isLocked intentionally excluded — use isLockedRef inside instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shippingDetails, navigate, cartLoading, validCartItems.length, fetchShippingQuote, buildItemsPayload, userCurrency]);
 
     // ── Pre-load Razorpay on mount ────────────────────────────────────────────
     useEffect(() => {
@@ -79,7 +323,7 @@ export default function PaymentPage() {
         };
 
         // Block the back button
-        const handlePopState = (e: PopStateEvent) => {
+        const handlePopState = () => {
             if (isLocked) {
                 // Push state back to prevent navigation
                 window.history.pushState(null, '', window.location.href);
@@ -104,26 +348,41 @@ export default function PaymentPage() {
         };
     }, []);
 
-    if (!shippingDetails) return null;
+    if (!shippingDetails || quoteLoading) return (
+        <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center">
+            <Loader2 className="w-10 h-10 animate-spin text-dark-red mb-4" />
+            <p className="text-xs uppercase tracking-widest font-sans text-dark-red">Calculating final total…</p>
+        </div>
+    );
 
-    const validCartItems = cartItems.filter((item: CartItem) => item && item.product);
-    const shippingCost = cartTotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
-    const total = cartTotal + shippingCost;
+    const shippingCost = quoteData?.shippingCost ?? storeSettings.shippingCost;
+    const total = quoteData?.total ?? (cartTotal + shippingCost);
 
-    // ── Build items payload ───────────────────────────────────────────────────
-    const buildItemsPayload = () => {
-        return validCartItems
-            .map((item: CartItem) => {
-                const anyP = item.product as any;
-                let productId = anyP?._id ? String(anyP._id) : null;
-                if (!productId) {
-                    const match = products.find((x: any) => x.pid === item.product.pid) as any;
-                    if (match?._id) productId = String(match._id);
-                }
-                return productId ? { productId, pid: item.product.pid, quantity: item.quantity } : null;
-            })
-            .filter(Boolean) as { productId: string; quantity: number }[];
-    };
+
+    // ── Billing validation logic ──────────────────────────────────────────────
+    const isIndiaCountry = (c: string) => ['india', 'in', 'bharat', 'ind'].includes((c || '').toLowerCase().trim());
+    
+    const billingErrors: Partial<BillingForm> = {};
+    if (billingTouched.name && !billingDetails.name.trim()) billingErrors.name = 'Name is required.';
+    if (billingTouched.address && !billingDetails.address.trim()) billingErrors.address = 'Address is required.';
+    if (billingTouched.city && !billingDetails.city.trim()) billingErrors.city = 'City is required.';
+    if (billingTouched.state && !billingDetails.state.trim()) billingErrors.state = 'State is required.';
+    if (billingTouched.pincode) {
+        if (!billingDetails.pincode.trim()) billingErrors.pincode = 'Postal code is required.';
+        else if (isIndiaCountry(billingDetails.country) && !/^\d{6}$/.test(billingDetails.pincode))
+            billingErrors.pincode = 'Invalid 6-digit Indian PIN code.';
+    }
+
+    const isBillingValid = billingSameAsShipping || (
+        (!isIndiaCountry(billingDetails.country) || /^\d{6}$/.test(billingDetails.pincode)) &&
+        (['name', 'address', 'city', 'state', 'pincode', 'country'] as (keyof BillingForm)[]).every(k => billingDetails[k].trim().length > 0)
+    );
+
+    const touchBilling = (field: keyof BillingForm) => setBillingTouched(prev => ({ ...prev, [field]: true }));
+    const fieldCls = (f: keyof BillingForm) => 
+        `w-full px-4 py-3 bg-white border outline-none transition-colors font-sans text-sm rounded-sm ${
+            billingErrors[f] ? 'border-red-500 focus:border-red-500' : 'border-silk focus:border-dark-red text-gray-900'
+        }`;
 
     // ── Main submit handler ───────────────────────────────────────────────────
     const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -135,11 +394,27 @@ export default function PaymentPage() {
         setIsProcessing(true);
 
         try {
+            if (!billingSameAsShipping) {
+                setBillingTouched({ name: true, address: true, city: true, state: true, pincode: true, country: true });
+                if (!isBillingValid) {
+                    toast.error('Please complete the billing address properly.');
+                    submittingRef.current = false;
+                    setIsProcessing(false);
+                    return;
+                }
+            }
+            
+            const finalBillingDetails = billingSameAsShipping ? null : billingDetails;
+
             if (paymentMethod === 'cod') {
                 setOverlay('cod_processing');
-                const { order } = await checkout(shippingDetails);
-                // Don't reset isProcessing — navigate immediately
-                navigate('/confirmation', { state: { orderId: (order as any)._id, status: 'success' }, replace: true });
+                try {
+                    const { order } = await checkout(shippingDetails, finalBillingDetails as any);
+                    navigate('/confirmation', { state: { orderId: (order as any)._id, status: 'success' }, replace: true });
+                } finally {
+                    // Always reset guard so user can retry if navigation or confirmation throws
+                    submittingRef.current = false;
+                }
 
             } else {
                 // ── 1. Ensure Razorpay SDK is available ──────────────────────
@@ -159,7 +434,7 @@ export default function PaymentPage() {
                 }
 
                 setOverlay('init');
-                const { razorpayOrder } = await initRazorpayOrder(items, shippingDetails);
+                const { razorpayOrder } = await initRazorpayOrder(items, shippingDetails, finalBillingDetails as any, quoteData?.quoteId);
                 setIsProcessing(false); // spinner → overlay takes over
 
                 const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
@@ -317,9 +592,41 @@ export default function PaymentPage() {
         </div>
     );
 
+    // Determine banner urgency
+    const showSessionBanner = secsRemaining !== null && !isLocked;
+    const isSessionUrgent = secsRemaining !== null && secsRemaining <= URGENT_AT_SECS;
+
     return (
         <RequireAuth>
             <div className="min-h-screen bg-neutral-50 flex flex-col pt-24 relative">
+
+                {/* ── Checkout Session Timer Banner ───────────────────────── */}
+                {showSessionBanner && (
+                    <div
+                        className={`fixed top-0 left-0 right-0 z-[9998] flex items-center justify-center gap-3 px-4 py-2.5 text-sm font-sans font-medium transition-colors ${
+                            isSessionUrgent
+                                ? 'bg-red-600 text-white'
+                                : 'bg-amber-500 text-white'
+                        }`}
+                        role="alert"
+                        aria-live="polite"
+                    >
+                        <Clock size={15} className={isSessionUrgent ? 'animate-pulse' : ''} />
+                        <span>
+                            {isSessionUrgent
+                                ? `⚠️ Session expiring in ${formatCountdown(secsRemaining!)} — complete your payment now!`
+                                : `Your checkout session expires in ${formatCountdown(secsRemaining!)}. Please complete your payment.`
+                            }
+                        </span>
+                        <button
+                            onClick={startOrResetSessionTimer}
+                            className="ml-2 underline underline-offset-2 text-white/90 hover:text-white text-xs tracking-wide"
+                            title="Extend session"
+                        >
+                            Extend
+                        </button>
+                    </div>
+                )}
 
                 {/* ── Full-screen Processing Overlay ─────────────────────── */}
                 {(overlay === 'verifying' || overlay === 'success' || overlay === 'timeout' || overlay === 'init' || overlay === 'captured_failed' || overlay === 'cod_processing') && (
@@ -533,17 +840,25 @@ export default function PaymentPage() {
                                         </div>
 
                                         <div>
-                                            <label className="flex items-center px-4 py-4 cursor-pointer hover:bg-neutral-50 transition-colors">
+                                            <label className={`flex items-center px-4 py-4 ${!isIndiaCountry(shippingDetails.country) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50'} transition-colors`}>
                                                 <input
                                                     type="radio"
                                                     name="payment"
                                                     value="cod"
                                                     checked={paymentMethod === 'cod'}
-                                                    onChange={() => setPaymentMethod('cod')}
-                                                    className="w-4 h-4 text-dark-red focus:ring-dark-red"
+                                                    onChange={() => {
+                                                        if (isIndiaCountry(shippingDetails.country)) {
+                                                            setPaymentMethod('cod');
+                                                        }
+                                                    }}
+                                                    disabled={!isIndiaCountry(shippingDetails.country) || isLocked}
+                                                    className="w-4 h-4 text-dark-red focus:ring-dark-red disabled:bg-gray-200"
                                                 />
-                                                <div className="ml-4 flex items-center w-full">
+                                                <div className="ml-4 flex flex-col w-full">
                                                     <span className="font-sans text-sm tracking-wide text-gray-800">Cash on Delivery</span>
+                                                    {!isIndiaCountry(shippingDetails.country) && (
+                                                        <span className="font-sans text-[10px] text-gray-500 mt-0.5">Not available for international shipping</span>
+                                                    )}
                                                 </div>
                                             </label>
                                         </div>
@@ -562,14 +877,115 @@ export default function PaymentPage() {
                                         <span className="font-sans text-sm text-gray-700">Billing address same as shipping</span>
                                     </label>
                                 </div>
+                                
+                                {!billingSameAsShipping && (
+                                    <div className="mt-4 p-5 border border-silk bg-neutral-50/50 rounded-sm space-y-4">
+                                        <h3 className="font-serif text-lg text-dark-red">Billing Address</h3>
+                                        <div>
+                                            <select
+                                                value={billingDetails.country}
+                                                onChange={e => setBillingDetails(p => ({ ...p, country: e.target.value }))}
+                                                onBlur={() => touchBilling('country')}
+                                                className={fieldCls('country')}
+                                                disabled={isLocked}
+                                            >
+                                                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <input
+                                                type="text"
+                                                placeholder="Full Name"
+                                                value={billingDetails.name}
+                                                onChange={e => setBillingDetails(p => ({ ...p, name: e.target.value }))}
+                                                onBlur={() => touchBilling('name')}
+                                                className={fieldCls('name')}
+                                                disabled={isLocked}
+                                            />
+                                            {billingErrors.name && <p className="text-xs text-red-500 mt-1">{billingErrors.name}</p>}
+                                        </div>
+                                        <div>
+                                            <input
+                                                type="text"
+                                                placeholder="Address / Street"
+                                                value={billingDetails.address}
+                                                onChange={e => setBillingDetails(p => ({ ...p, address: e.target.value }))}
+                                                onBlur={() => touchBilling('address')}
+                                                className={fieldCls('address')}
+                                                disabled={isLocked}
+                                            />
+                                            {billingErrors.address && <p className="text-xs text-red-500 mt-1">{billingErrors.address}</p>}
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="md:col-span-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="City"
+                                                    value={billingDetails.city}
+                                                    onChange={e => setBillingDetails(p => ({ ...p, city: e.target.value }))}
+                                                    onBlur={() => touchBilling('city')}
+                                                    className={fieldCls('city')}
+                                                    disabled={isLocked}
+                                                />
+                                                {billingErrors.city && <p className="text-xs text-red-500 mt-1">{billingErrors.city}</p>}
+                                            </div>
+                                            <div className="md:col-span-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="State / Province"
+                                                    value={billingDetails.state}
+                                                    onChange={e => setBillingDetails(p => ({ ...p, state: e.target.value }))}
+                                                    onBlur={() => touchBilling('state')}
+                                                    className={fieldCls('state')}
+                                                    disabled={isLocked}
+                                                />
+                                                {billingErrors.state && <p className="text-xs text-red-500 mt-1">{billingErrors.state}</p>}
+                                            </div>
+                                            <div className="md:col-span-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder={isIndiaCountry(billingDetails.country) ? '6-digit PIN Code' : 'Zip / Postal Code'}
+                                                    value={billingDetails.pincode}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        if (isIndiaCountry(billingDetails.country)) {
+                                                            if (val === '' || /^\d+$/.test(val)) setBillingDetails(p => ({ ...p, pincode: val }));
+                                                        } else {
+                                                            setBillingDetails(p => ({ ...p, pincode: val }));
+                                                        }
+                                                    }}
+                                                    onBlur={() => touchBilling('pincode')}
+                                                    className={fieldCls('pincode')}
+                                                    maxLength={isIndiaCountry(billingDetails.country) ? 6 : 12}
+                                                    disabled={isLocked}
+                                                />
+                                                {billingErrors.pincode && <p className="text-xs text-red-500 mt-1">{billingErrors.pincode}</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="pt-4">
+                                    {rateLimitSecs !== null && (
+                                        <div className="bg-orange-50 border border-orange-200 p-4 flex flex-col items-center justify-center gap-2 rounded-sm mb-4">
+                                            <div className="flex items-center gap-2 text-orange-800 font-sans font-medium text-sm">
+                                                <Clock size={16} className="animate-pulse" />
+                                                Too many requests
+                                            </div>
+                                            <p className="text-xs text-orange-700 text-center">
+                                                Retrying shipping quote in <strong>{rateLimitSecs}s</strong>...
+                                            </p>
+                                        </div>
+                                    )}
+                                    {quoteError && !rateLimitSecs && (
+                                        <p className="text-xs text-red-500 mb-4 text-center">{quoteError}</p>
+                                    )}
                                     <button
                                         type="submit"
-                                        disabled={isLocked}
+                                        disabled={isLocked || rateLimitSecs !== null || !!quoteError}
                                         aria-busy={isLocked}
                                         className={`w-full py-4 text-white font-sans text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-all ${
-                                            isLocked
+                                            isLocked || rateLimitSecs !== null || !!quoteError
                                                 ? 'bg-gray-300 cursor-not-allowed text-gray-500'
                                                 : 'bg-dark-red hover:bg-ruby-red shadow-md hover:shadow-lg active:scale-[0.99]'
                                         }`}
@@ -580,10 +996,21 @@ export default function PaymentPage() {
                                                 Processing…
                                             </>
                                         ) : (
-                                            <>Place Order (₹{total.toLocaleString('en-IN')}) <ChevronRight size={16} /></>
+                                            <>Place Order ({formatPrice(total)}) <ChevronRight size={16} /></>
                                         )}
                                     </button>
                                 </div>
+                                
+                                {/* Customs Disclosure for International */}
+                                {shippingDetails?.country && !['india', 'in', 'bharat', 'ind'].includes(shippingDetails.country.toLowerCase().trim()) && (
+                                    <div className="mt-4 bg-amber-50 border border-amber-200 p-4 rounded-sm flex items-start gap-3">
+                                        <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                                        <div className="text-sm text-amber-800">
+                                            <strong>International Shipping Notice:</strong> Your country's customs office may impose import duties, taxes, or clearance fees. 
+                                            These charges are the buyer's responsibility and are not included in the checkout total.
+                                        </div>
+                                    </div>
+                                )}
                             </form>
                         </div>
 
@@ -608,7 +1035,8 @@ export default function PaymentPage() {
                                                 <p className="font-sans text-xs text-gray-500 mt-1">Qty: {item.quantity}</p>
                                             </div>
                                             <div className="shrink-0 flex items-center font-sans text-sm font-semibold text-gray-900">
-                                                ₹{(item.product.price * item.quantity).toLocaleString('en-IN')}
+                                                {formatPrice(item.product.price * item.quantity)}
+                                                {userCurrency === 'USD' && <span className="text-[10px] ml-0.5 opacity-60">*</span>}
                                             </div>
                                         </div>
                                     ))}
@@ -617,20 +1045,30 @@ export default function PaymentPage() {
                                 <div className="border-t border-silk pt-4 space-y-3 font-sans text-sm">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Subtotal</span>
-                                        <span>₹{cartTotal.toLocaleString('en-IN')}</span>
+                                        <span>{formatPrice(cartTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
                                         <span>Shipping</span>
                                         <span className={shippingCost === 0 ? 'text-green-700 font-medium' : 'text-gray-900'}>
-                                            {shippingCost === 0 ? 'Free' : `₹${shippingCost}`}
+                                            {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="border-t border-silk mt-4 pt-4 flex justify-between font-serif text-xl text-dark-red">
                                     <span>Total</span>
-                                    <span>₹{total.toLocaleString('en-IN')}</span>
+                                    <span>{formatPrice(total)}</span>
                                 </div>
+
+                                {userCurrency === 'USD' && (
+                                    <div className="mt-3 text-xs font-sans text-gray-500 bg-gray-50 p-3 rounded-sm border border-gray-100 leading-relaxed text-center">
+                                        You will be billed exactly <strong>₹{total.toLocaleString('en-IN')} INR</strong>.<br />
+                                        Your bank may apply a conversion fee.<br />
+                                        <span className="text-[10px] mt-1 block opacity-80">
+                                            *Note: Any future refunds will be issued in INR. Due to exchange rate fluctuations, the final USD amount credited back to you may vary slightly.
+                                        </span>
+                                    </div>
+                                )}
 
                                 <div className="mt-6 flex items-center justify-center gap-2 text-green-700 bg-green-50/50 p-2.5 rounded-sm border border-green-100">
                                     <ShieldCheck size={16} />

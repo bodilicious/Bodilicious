@@ -52,12 +52,14 @@ const shippingDetailsSchema = z.object({
 
   pincode: z
     .string({ required_error: "Pincode is required" })
-    .regex(/^[1-9][0-9]{5}$/, "Invalid Indian pincode"),
+    .min(3, "Pincode is too short")
+    .max(12, "Pincode is too long"),
 
   email: z
-    .string()
-    .email("Invalid email")
-    .optional(),
+    .string({ required_error: "Email is required" })
+    .email("Invalid email"),
+
+  country: z.string().optional(),
 });
 
 
@@ -85,9 +87,14 @@ export const createOrderSchema = z.object({
       .default("cod"),
 
     shippingDetails: shippingDetailsSchema,
+    
+    billingDetails: shippingDetailsSchema.optional().nullable(),
 
     // UTM / marketing attribution — optional, never fail on missing
     marketing: marketingSchema,
+    
+    // quoteId for Razorpay integration
+    quoteId: z.string().optional(),
   });
 
 
