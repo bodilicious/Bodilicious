@@ -64,19 +64,29 @@ const ProductHealthSection: React.FC<ProductHealthSectionProps> = ({
 }) => {
   const [activeCatIndex, setActiveCatIndex] = useState(0);
 
-  // Format top selling for horizontal bar chart
-  const topSellingData = topSelling.map(p => ({
-    name: p.productInfo?.name?.split(' ').slice(0, 3).join(' ') || 'Unknown',
-    units: p.totalSold,
-    revenue: p.revenue,
-  })).slice(0, 8);
+  const categoryRevenueMap = React.useMemo(() => {
+    const map = new Map();
+    categoryRevenue.forEach(c => map.set(c._id || 'Other', c.revenue));
+    return map;
+  }, [categoryRevenue]);
+
+  // Format top selling for data-dense table
+  const topSellingData = topSelling.map(p => {
+    const cat = p.productInfo?.category || 'Other';
+    const catRev = categoryRevenueMap.get(cat) || 1;
+    return {
+      name: p.productInfo?.name?.split(' ').slice(0, 3).join(' ') || 'Unknown',
+      category: cat,
+      units: p.totalSold,
+      revenue: p.revenue,
+      pctOfCategory: Math.min(100, (p.revenue / catRev) * 100)
+    };
+  });
 
   const categoryData = categoryRevenue.map(c => ({
     ...c,
     name: c._id || 'Other',
   }));
-
-  const maxUnits = Math.max(...topSellingData.map(p => p.units), 1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -141,36 +151,46 @@ const ProductHealthSection: React.FC<ProductHealthSectionProps> = ({
           )}
         </CardShell>
 
-        {/* Top Selling — Clean Horizontal Bars */}
+        {/* All Products — Data Dense Table */}
         <CardShell>
           <SectionHeader
-            icon={<Trophy size={18} color="#D97706" />}
-            title="Top Selling Products"
-            sub="Units sold in selected period"
+            icon={<TrendingUp size={18} color="#059669" />}
+            title="Product Revenue Performance"
+            sub="Revenue performance across all products within category"
           />
           {topSellingData.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* Table Header */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 100px', gap: 8, paddingBottom: 10, borderBottom: '1px solid #F3F4F6', marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Product / Category</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right' }}>Units</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right' }}>% of Category</span>
+              </div>
               {topSellingData.map((p, i) => {
-                const pct = (p.units / maxUnits) * 100;
                 return (
-                  <div key={p.name}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', maxWidth: '65%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                        <span style={{ fontSize: 10, fontWeight: 800, color: BRAND_PALETTE[i % BRAND_PALETTE.length], marginRight: 6 }}>#{i + 1}</span>
+                  <div key={p.name} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 100px', gap: 8, alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F9FAFB' }}>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontFamily: 'Fira Code, monospace' }}>
                         {p.name}
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: BRAND_PALETTE[i % BRAND_PALETTE.length] }}>{p.units} units</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2, fontWeight: 600 }}>{p.category}</div>
                     </div>
-                    <div style={{ height: 7, borderRadius: 8, background: '#F3F4F6', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${pct}%`,
-                        borderRadius: 8,
-                        background: `linear-gradient(90deg, ${BRAND_PALETTE[i % BRAND_PALETTE.length]}, ${BRAND_PALETTE[(i + 1) % BRAND_PALETTE.length]}80)`,
-                        transition: 'width 700ms cubic-bezier(0.34,1.56,0.64,1)'
-                      }} />
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#6B7280', textAlign: 'right' }}>{p.units}</div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: BRAND_PALETTE[i % BRAND_PALETTE.length] }}>{p.pctOfCategory.toFixed(1)}%</span>
+                        <span style={{ fontSize: 10, color: '#9CA3AF' }}>₹{p.revenue?.toLocaleString()}</span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 6, background: '#F3F4F6', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${p.pctOfCategory}%`,
+                          borderRadius: 6,
+                          background: BRAND_PALETTE[i % BRAND_PALETTE.length],
+                          transition: 'width 700ms cubic-bezier(0.34,1.56,0.64,1)'
+                        }} />
+                      </div>
                     </div>
-                    <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 3, fontWeight: 500 }}>Revenue: ₹{p.revenue?.toLocaleString()}</div>
                   </div>
                 );
               })}

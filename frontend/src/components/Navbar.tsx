@@ -55,6 +55,7 @@ const MEGA_MENU_DATA: Record<string, MegaMenuConfig> = {
 };
 
 const NAV_LINKS = [
+  { label: 'Home', page: '' as const },
   { label: 'Face', page: 'shop' as const, isMegaMenu: true, query: 'category=skin,lip,makeup' },
   { label: 'Hair', page: 'shop' as const, isMegaMenu: true, query: 'category=hair' },
   { label: 'Body', page: 'shop' as const, isMegaMenu: true, query: 'category=body,lip,makeup' },
@@ -268,7 +269,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo — drop-shadow when transparent so it pops over any slide image */}
-          <div className="flex-shrink-0 flex w-32 md:w-48 justify-start">
+          <div className="flex-1 flex justify-start">
             <Link
               to="/"
               onClick={() => setMenuOpen(false)}
@@ -278,7 +279,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden md:flex flex-1 justify-center items-center gap-8">
+          <div className="hidden md:flex justify-center items-center gap-8">
             {NAV_LINKS.map((link) => (
               <div
                 key={link.label}
@@ -353,7 +354,7 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4 w-auto md:w-48 justify-end">
+          <div className="flex-1 flex items-center justify-end gap-3 sm:gap-4">
             <button
               onClick={() => setSearchOpen(!searchOpen)}
               className={`flex transition-colors ${

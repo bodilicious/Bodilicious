@@ -121,7 +121,6 @@ export const getProductAnalytics = async (req, res) => {
           }
         },
         { $sort: { totalSold: -1 } },
-        { $limit: 10 },
         {
           $lookup: {
             from: "products",
@@ -521,17 +520,34 @@ export const getOrderAnalytics = async (req, res) => {
  */
 export const getBehavioralAnalytics = async (req, res) => {
   try {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const { startDate, endDate } = req.query;
+    
+    const query = {};
+    const auditQuery = {};
+    
+    if (startDate || endDate) {
+      query.createdAt = {};
+      auditQuery.timestamp_utc = {};
+      if (startDate) {
+        query.createdAt.$gte = new Date(startDate);
+        auditQuery.timestamp_utc.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        query.createdAt.$lte = new Date(endDate);
+        auditQuery.timestamp_utc.$lte = new Date(endDate);
+      }
+    }
 
-    // Peak order heatmap: { hour, dayOfWeek, orders }
+    // Peak order heatmap: { hour, dayOfWeek, dayOfMonth, month, orders }
     const peakOrders = await Order.aggregate([
-      { $match: { paymentStatus: { $in: ["paid", "refunded"] }, createdAt: { $gte: ninetyDaysAgo } } },
+      { $match: { ...query, paymentStatus: { $in: ["paid", "refunded"] } } },
       {
         $group: {
           _id: {
             hour: { $hour: "$createdAt" },
-            dayOfWeek: { $dayOfWeek: "$createdAt" } // 1=Sun, 7=Sat
+            dayOfWeek: { $dayOfWeek: "$createdAt" }, // 1=Sun, 7=Sat
+            dayOfMonth: { $dayOfMonth: "$createdAt" },
+            month: { $month: "$createdAt" }
           },
           orders: { $sum: 1 }
         }
@@ -541,20 +557,22 @@ export const getBehavioralAnalytics = async (req, res) => {
           _id: 0,
           hour: "$_id.hour",
           dayOfWeek: "$_id.dayOfWeek",
+          dayOfMonth: "$_id.dayOfMonth",
+          month: "$_id.month",
           orders: 1
         }
       },
-      { $sort: { dayOfWeek: 1, hour: 1 } }
+      { $sort: { month: 1, dayOfMonth: 1, dayOfWeek: 1, hour: 1 } }
     ]);
 
-    // Backend error rates by event_type (last 90 days)
+    // Backend error rates by event_type
     const backendErrors = await AuditLogV2.aggregate([
-      { $match: { severity: "ERROR", createdAt: { $gte: ninetyDaysAgo } } },
+      { $match: { ...auditQuery, severity: "ERROR" } },
       {
         $group: {
           _id: "$event_type",
           count: { $sum: 1 },
-          lastSeen: { $max: "$createdAt" }
+          lastSeen: { $max: "$timestamp_utc" }
         }
       },
       { $sort: { count: -1 } },
@@ -563,13 +581,10 @@ export const getBehavioralAnalytics = async (req, res) => {
     ]);
 
     // Checkout failures: orders that were created but payment failed or status is failed/pending old
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
     const checkoutFailures = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: thirtyDaysAgo },
+          ...query,
           paymentStatus: { $in: ["failed", "pending"] },
           orderStatus: { $in: ["pending", "payment_failed"] }
         }
@@ -585,6 +600,19 @@ export const getBehavioralAnalytics = async (req, res) => {
       { $project: { _id: 0, date: "$_id", count: 1, totalAmount: 1 } }
     ]);
 
+    // Gateway breakdown (AuditLog PAYMENT_FAILED)
+    const gatewayBreakdown = await AuditLogV2.aggregate([
+      { $match: { ...auditQuery, event_type: "PAYMENT_FAILED" } },
+      {
+        $group: {
+          _id: "$metadata.reason",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $project: { _id: 0, reason: { $ifNull: ["$_id", "unknown_error"] }, count: 1 } }
+    ]);
+
     const checkoutFailureTotal = checkoutFailures.reduce((s, d) => s + d.count, 0);
     const checkoutRevenueLost = checkoutFailures.reduce((s, d) => s + d.totalAmount, 0);
 
@@ -593,6 +621,12 @@ export const getBehavioralAnalytics = async (req, res) => {
       data: {
         peakOrders,
         backendErrors,
+        errorRates: {
+          checkoutFailures,
+          gatewayBreakdown,
+          backendErrors
+        },
+        // Kept for backward compatibility
         checkoutFailures,
         checkoutFailureTotal,
         checkoutRevenueLost

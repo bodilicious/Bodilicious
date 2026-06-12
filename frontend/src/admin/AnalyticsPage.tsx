@@ -99,7 +99,7 @@ const AnalyticsPage: React.FC = () => {
 
       const [
         salesRes, prodRes, invRes, custRes, opsRes, ritRes, behRes,
-        summaryRes, trendRes, cohortRes, funnelRes, stockRes, deepBehRes,
+        summaryRes, trendRes, cohortRes, funnelRes, stockRes,
         intellRes, atRiskRes, mktRes, searchRes, forecastRes
       ] = await Promise.allSettled([
         // Admin (chart-heavy)
@@ -109,14 +109,13 @@ const AnalyticsPage: React.FC = () => {
         fetch(`${API_URL}/api/v1/admin/analytics/customers?${qp}`,     { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/operations?${qp}`,    { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/ritual-finder?${qp}`, { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/behavioral`,          { headers }),
+        fetch(`${API_URL}/api/v1/admin/analytics/behavioral?${qp}`,    { headers }),
         // Deep ETL analytics
         fetch(`${API_URL}/api/v1/admin/analytics/executive-summary?days=${timeRange}`, { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/trending-products?days=${timeRange}`, { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/cohorts`,                             { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/product-funnel?days=${timeRange}`,    { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/low-stock`,                           { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/behavioral`,                          { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/product-intelligence`,                { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/customers-at-risk`,                   { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/marketing`,                           { headers }),
@@ -125,21 +124,21 @@ const AnalyticsPage: React.FC = () => {
       ]);
 
       const safeJson = async (res: PromiseSettledResult<Response>) => {
-        if (res.status === 'fulfilled' && res.value.ok) {
+        if (res && res.status === 'fulfilled' && res.value.ok) {
           try { return await res.value.json(); } catch { return null; }
         }
         return null;
       };
 
       const [
-        sData, pData, cData, oData, rData, bData,
+        sData, pData, invData, cData, oData, rData, bData,
         sumData, trData, coData, fuData, stData,
-        arData, mkData, seData, foData
+        intellData, arData, mkData, seData, foData
       ] = await Promise.all([
         safeJson(salesRes), safeJson(prodRes), safeJson(invRes), safeJson(custRes),
         safeJson(opsRes), safeJson(ritRes), safeJson(behRes),
         safeJson(summaryRes), safeJson(trendRes), safeJson(cohortRes), safeJson(funnelRes),
-        safeJson(stockRes), safeJson(deepBehRes), safeJson(intellRes), safeJson(atRiskRes),
+        safeJson(stockRes), safeJson(intellRes), safeJson(atRiskRes),
         safeJson(mktRes), safeJson(searchRes), safeJson(forecastRes),
       ]);
 

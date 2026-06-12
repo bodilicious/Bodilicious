@@ -118,33 +118,23 @@ const CustomerCRMSection: React.FC<CustomerCRMSectionProps> = ({
         <div style={{ height: 280 }}>
           {trendData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="gradNew" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3D0A05" stopOpacity={0.18} />
-                    <stop offset="95%" stopColor="#3D0A05" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradReturning" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#BE185D" stopOpacity={0.18} />
-                    <stop offset="95%" stopColor="#BE185D" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                 <XAxis
                   dataKey="date"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600 }}
+                  tick={{ fill: '#9CA3AF', fontSize: 11, fontWeight: 600, fontFamily: 'Fira Sans' }}
                   tickFormatter={(v) => {
                     const [y, m] = v.split('-');
                     return new Date(+y, +m - 1).toLocaleString('default', { month: 'short' });
                   }}
                 />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} width={32} />
-                <Tooltip content={<BuyerTooltip />} />
-                <Area type="monotone" dataKey="newBuyers" name="New" stroke="#3D0A05" strokeWidth={2.5} fill="url(#gradNew)" dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: '#3D0A05' }} />
-                <Area type="monotone" dataKey="returningBuyers" name="Returning" stroke="#BE185D" strokeWidth={2.5} fill="url(#gradReturning)" dot={false} activeDot={{ r: 5, strokeWidth: 0, fill: '#BE185D' }} />
-              </AreaChart>
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11, fontFamily: 'Fira Code' }} width={32} />
+                <Tooltip content={<BuyerTooltip />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
+                <Bar dataKey="returningBuyers" name="Returning" stackId="a" fill="#BE185D" radius={[0, 0, 4, 4]} />
+                <Bar dataKey="newBuyers" name="New" stackId="a" fill="#3D0A05" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           ) : (
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>

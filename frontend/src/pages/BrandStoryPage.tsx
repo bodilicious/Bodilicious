@@ -73,22 +73,17 @@ export default function BrandStoryPage() {
                     <section className="bg-white p-8 border border-silk shadow-sm rounded-sm hover:border-ruby-red/30 transition-colors text-center">
                         <h3 className="font-serif text-xl text-dark-red mb-6">Our Leadership</h3>
                         <p className="text-sm text-gray-600 leading-relaxed font-light mb-8">
-                            Today, the brand continues to grow under the leadership of its founders:
+                            Today, the brand continues to grow under the leadership of its founder:
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm text-gray-600 mb-8">
-                            <div>
+                        <div className="grid grid-cols-1 md:grid-cols-1 gap-8 text-sm text-gray-600 mb-8 justify-items-center">
+                            <div className="text-center">
                                 <h4 className="font-bold text-dark-red mb-1">Dr. Bhanuja Polani</h4>
                                 <p className="font-medium text-ruby-red mb-2">Founder</p>
                                 <p className="font-light">Biomedical Engineer, M.Tech Biotechnology</p>
                             </div>
-                            <div>
-                                <h4 className="font-bold text-dark-red mb-1">Dr. K J Prem Kumar</h4>
-                                <p className="font-medium text-ruby-red mb-2">Co-founder</p>
-                                <p className="font-light">MBBS, MD, DM – Interventional Cardiologist</p>
-                            </div>
                         </div>
                         <p className="text-sm text-gray-600 leading-relaxed font-light mb-4">
-                            Together, they bring a powerful combination of science, medical expertise, and passion for wellness, ensuring that every Bodilicious product reflects their vision of safe, effective, and luxurious skincare.
+                            She brings a powerful combination of science, medical expertise, and passion for wellness, ensuring that every Bodilicious product reflects her vision of safe, effective, and luxurious skincare.
                         </p>
                         <p className="text-sm text-ruby-red leading-relaxed font-medium mt-6 italic">
                             Bodilicious stands as a promise — a promise to care for your skin, support your journey to healthier beauty, and inspire confidence from within.

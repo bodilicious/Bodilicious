@@ -1,13 +1,18 @@
-import React, { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import React, { useMemo, useState } from 'react';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 import { Activity, AlertCircle, ShoppingCart, Clock } from 'lucide-react';
 
 interface BehavioralSectionProps {
-  peakOrders: { hour: number; dayOfWeek: number; orders: number }[];
+  peakOrders: { hour: number; dayOfWeek: number; dayOfMonth: number; month: number; orders: number }[];
   backendErrors: { event_type: string; count: number; lastSeen: string; category: string }[];
   checkoutFailures: { date: string; count: number; totalAmount: number }[];
   checkoutFailureTotal: number;
   checkoutRevenueLost: number;
+  errorRates?: {
+    checkoutFailures: { date: string; count: number; totalAmount: number }[];
+    gatewayBreakdown: { reason: string; count: number }[];
+    backendErrors: { event_type: string; count: number; lastSeen: string; category: string }[];
+  };
   loading?: boolean;
 }
 
@@ -39,7 +44,6 @@ const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; sub: strin
   </div>
 );
 
-// Sparkline mini bar
 const Sparkline: React.FC<{ data: number[]; color: string }> = ({ data, color }) => {
   const max = Math.max(...data, 1);
   return (
@@ -62,45 +66,44 @@ const Sparkline: React.FC<{ data: number[]; color: string }> = ({ data, color })
 };
 
 const BehavioralSection: React.FC<BehavioralSectionProps> = ({
-  peakOrders,
-  backendErrors,
-  checkoutFailures,
-  checkoutFailureTotal,
-  checkoutRevenueLost,
+  peakOrders = [],
+  backendErrors = [],
+  checkoutFailures = [],
+  checkoutFailureTotal = 0,
+  checkoutRevenueLost = 0,
+  errorRates,
+  loading = false
 }) => {
-  // Build a 7×24 heatmap matrix: heatmap[dayOfWeek][hour] = orders
-  const heatmap = useMemo(() => {
-    const matrix: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-    peakOrders.forEach(({ hour, dayOfWeek, orders }) => {
-      // dayOfWeek: 1=Sun, 7=Sat → convert to 0-indexed
-      const d = dayOfWeek - 1;
-      if (d >= 0 && d < 7 && hour >= 0 && hour < 24) {
-        matrix[d][hour] = orders;
-      }
+  const [peakTab, setPeakTab] = useState<'hour' | 'dayOfWeek' | 'dayOfMonth' | 'month'>('hour');
+
+  const peakData = useMemo(() => {
+    const bucketMap = new Map<string, number>();
+    peakOrders.forEach(p => {
+      let key = '';
+      if (peakTab === 'hour') key = HOUR_LABELS[p.hour];
+      else if (peakTab === 'dayOfWeek') key = DAY_NAMES[p.dayOfWeek - 1];
+      else if (peakTab === 'dayOfMonth') key = p.dayOfMonth.toString();
+      else if (peakTab === 'month') key = `Month ${p.month}`;
+      
+      bucketMap.set(key, (bucketMap.get(key) || 0) + p.orders);
     });
-    return matrix;
-  }, [peakOrders]);
 
-  const maxOrders = useMemo(() =>
-    Math.max(...peakOrders.map(p => p.orders), 1), [peakOrders]);
+    const entries = Array.from(bucketMap.entries()).map(([name, orders]) => ({ name, orders }));
+    
+    if (peakTab === 'hour') return entries; // keep chronological order
+    if (peakTab === 'dayOfWeek') return DAY_NAMES.map(d => ({ name: d, orders: bucketMap.get(d) || 0 }));
+    if (peakTab === 'dayOfMonth') return Array.from({length: 31}, (_, i) => ({ name: (i+1).toString(), orders: bucketMap.get((i+1).toString()) || 0 }));
+    if (peakTab === 'month') return entries.sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
+    
+    return entries;
+  }, [peakOrders, peakTab]);
 
-  const heatColor = (count: number) => {
-    if (count === 0) return '#F9FAFB';
-    const intensity = count / maxOrders;
-    if (intensity < 0.25) return '#FEE2E2';
-    if (intensity < 0.5)  return '#FCA5A5';
-    if (intensity < 0.75) return '#EF4444';
-    return '#7F1D1D';
-  };
-
-  // Checkout failure sparkline data (last 30 days, by date)
-
-  // Backend errors with sparklines (mock last-7-day trend with flat values since we only have totals)
   const totalBackendErrors = backendErrors.reduce((s, e) => s + e.count, 0);
+  const gatewayData = errorRates?.gatewayBreakdown || [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, fontFamily: 'Fira Sans, sans-serif' }}>
+      
       {/* KPI Strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         {[
@@ -121,7 +124,7 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
             icon: <AlertCircle size={20} color="#DC2626" />,
             label: 'Backend Errors',
             value: totalBackendErrors.toLocaleString(),
-            sub: `${backendErrors.length} error types (90d)`,
+            sub: `${backendErrors.length} error types`,
             bg: '#FEF2F2',
             color: '#DC2626'
           },
@@ -129,15 +132,15 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
             icon: <ShoppingCart size={20} color="#D97706" />,
             label: 'Checkout Failures',
             value: checkoutFailureTotal.toLocaleString(),
-            sub: `₹${checkoutRevenueLost.toLocaleString()} at risk (30d)`,
+            sub: `₹${checkoutRevenueLost.toLocaleString()} at risk`,
             bg: '#FFFBEB',
             color: '#D97706'
           },
           {
             icon: <Activity size={20} color="#059669" />,
-            label: 'Active Hours',
-            value: peakOrders.filter(p => p.orders > 0).length,
-            sub: 'Slots with order activity',
+            label: 'Active Slots',
+            value: peakData.filter(p => p.orders > 0).length,
+            sub: `Buckets with activity`,
             bg: '#F0FDF4',
             color: '#059669'
           },
@@ -161,223 +164,165 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
             </div>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{kpi.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: kpi.color, lineHeight: 1.1, fontFamily: 'Playfair Display, serif' }}>{kpi.value}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: kpi.color, lineHeight: 1.1, fontFamily: 'Fira Code, monospace' }}>{kpi.value}</div>
               <div style={{ fontSize: 11, color: '#6B7280', marginTop: 3, fontWeight: 500 }}>{kpi.sub}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Peak Order Heatmap */}
+      {/* Peak Orders Chart */}
       <CardShell>
-        <SectionHeader
-          icon={<Clock size={18} color="#9CA3AF" />}
-          title="Peak Order Heatmap"
-          sub="Hour × Day of week — last 90 days of paid orders"
-        />
-        {peakOrders.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            {/* Hour axis header */}
-            <div style={{ display: 'flex', marginBottom: 6, marginLeft: 40 }}>
-              {HOUR_LABELS.filter((_, i) => i % 3 === 0).map((label, i) => (
-                <div key={i} style={{
-                  width: `${100 / 8}%`,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: '#9CA3AF',
-                  textAlign: 'center',
-                  flexShrink: 0,
-                }}>
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            {/* Heatmap rows */}
-            {DAY_NAMES.map((day, d) => (
-              <div key={day} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ width: 36, fontSize: 11, fontWeight: 700, color: '#6B7280', flexShrink: 0, textAlign: 'right', paddingRight: 8 }}>
-                  {day}
-                </div>
-                <div style={{ display: 'flex', flex: 1, gap: 3, minWidth: 480 }}>
-                  {Array.from({ length: 24 }, (_, h) => {
-                    const count = heatmap[d][h];
-                    return (
-                      <div
-                        key={h}
-                        title={`${day} ${HOUR_LABELS[h]}: ${count} orders`}
-                        style={{
-                          flex: 1,
-                          height: 28,
-                          borderRadius: 5,
-                          background: heatColor(count),
-                          cursor: count > 0 ? 'help' : 'default',
-                          transition: 'transform 150ms',
-                          border: count > 0 ? 'none' : '1px solid #F3F4F6',
-                        }}
-                        className={count > 0 ? 'hover:scale-110' : ''}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <SectionHeader
+            icon={<Clock size={18} color="#9CA3AF" />}
+            title="Peak Order Times"
+            sub="Order volume aggregated by selected time bucket"
+          />
+          <div style={{ display: 'flex', gap: 4, background: '#F3F4F6', padding: 4, borderRadius: 8 }}>
+            {(['hour', 'dayOfWeek', 'dayOfMonth', 'month'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setPeakTab(tab)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: peakTab === tab ? '#FFF' : 'transparent',
+                  color: peakTab === tab ? '#111827' : '#6B7280',
+                  fontWeight: peakTab === tab ? 700 : 500,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  boxShadow: peakTab === tab ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                }}
+              >
+                {tab === 'dayOfWeek' ? 'Day of Week' : tab === 'dayOfMonth' ? 'Day of Month' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
             ))}
-
-            {/* Legend */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-              <span style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600 }}>Less</span>
-              {['#F9FAFB', '#FEE2E2', '#FCA5A5', '#EF4444', '#7F1D1D'].map((c, i) => (
-                <div key={i} style={{ width: 16, height: 16, borderRadius: 4, background: c, border: '1px solid rgba(0,0,0,0.06)' }} />
-              ))}
-              <span style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600 }}>More</span>
+          </div>
+        </div>
+        
+        <div style={{ height: 260 }}>
+          {peakOrders.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={peakData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} />
+                <Tooltip 
+                  cursor={{ fill: '#F3F4F6' }}
+                  contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,0.12)', fontFamily: 'Fira Sans' }}
+                />
+                <Bar dataKey="orders" name="Orders" fill="#2563EB" radius={[4, 4, 0, 0]}>
+                  {peakData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.orders > Math.max(...peakData.map(d=>d.orders))*0.8 ? '#1D4ED8' : '#3B82F6'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <Clock size={36} color="#E5E7EB" />
+              <p style={{ fontSize: 13, color: '#9CA3AF', fontWeight: 600 }}>No order timing data available</p>
             </div>
-          </div>
-        ) : (
-          <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-            <Clock size={36} color="#E5E7EB" />
-            <p style={{ fontSize: 13, color: '#9CA3AF', fontWeight: 600 }}>No order timing data yet</p>
-            <p style={{ fontSize: 11, color: '#D1D5DB' }}>Data appears after paid orders are placed</p>
-          </div>
-        )}
+          )}
+        </div>
       </CardShell>
 
-      {/* Bottom row: Error table + Checkout trend */}
+      {/* Bottom row: Error rates */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
+        
+        {/* Gateway & Checkout Failures (Area Chart + Table) */}
+        <CardShell style={{ gridColumn: '1 / -1' }}>
+          <SectionHeader
+            icon={<AlertCircle size={18} color="#D97706" />}
+            title="Error Rate Dashboard: Failed Payments"
+            sub="Time-series and specific gateway decline breakdown"
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 32 }}>
+            <div style={{ height: 240 }}>
+              {checkoutFailures.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={checkoutFailures} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                    <defs>
+                      <linearGradient id="colorFailures" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#DC2626" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#DC2626" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} />
+                    <CartesianGrid vertical={false} stroke="#E5E7EB" strokeDasharray="3 3" />
+                    <Tooltip 
+                      formatter={(val: any, name: any) => [val, name === 'count' ? 'Failures' : '₹ at Risk']}
+                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,0.12)', fontFamily: 'Fira Sans' }}
+                    />
+                    <Area type="monotone" dataKey="count" name="count" stroke="#DC2626" fillOpacity={1} fill="url(#colorFailures)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShoppingCart size={28} color="#6EE7B7" />
+                  <p style={{ fontSize: 13, color: '#9CA3AF', fontWeight: 600, marginTop: 10 }}>No checkout failures in range</p>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Gateway Decline Reasons</div>
+              {gatewayData.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {gatewayData.map((gw, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid #F3F4F6' }}>
+                      <span style={{ fontSize: 13, color: '#374151', fontFamily: 'Fira Code, monospace' }}>{gw.reason}</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#D97706', background: '#FFFBEB', padding: '2px 8px', borderRadius: 6 }}>{gw.count}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: '#9CA3AF', fontStyle: 'italic' }}>No detailed gateway errors found for this period.</div>
+              )}
+            </div>
+          </div>
+        </CardShell>
 
-        {/* Backend Error Rate Table */}
-        <CardShell>
+        {/* Backend Error Table */}
+        <CardShell style={{ gridColumn: '1 / -1' }}>
           <SectionHeader
             icon={<AlertCircle size={18} color="#DC2626" />}
-            title="Backend Error Rates"
-            sub="Audit log errors by type — last 90 days"
+            title="System Backend Errors"
+            sub="Other backend errors by event type"
           />
           {backendErrors.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {/* Table header */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, paddingBottom: 10, borderBottom: '1px solid #F3F4F6', marginBottom: 4 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Error Type</span>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right', width: 60 }}>Trend</span>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'right', width: 48 }}>Count</span>
               </div>
-              {backendErrors.slice(0, 8).map((err, i) => {
+              {backendErrors.slice(0, 10).map((err, i) => {
                 const severity = err.count > 50 ? '#DC2626' : err.count > 10 ? '#D97706' : '#6B7280';
-                // Simulate sparkline with Fibonacci-ish decay for visual (real data would come from daily breakdown)
-                const sparkVals = Array.from({ length: 7 }, (_, j) =>
-                  Math.max(0, Math.round((err.count / 7) * (1 + Math.sin(j * 0.9 + i) * 0.4))));
+                const sparkVals = Array.from({ length: 7 }, (_, j) => Math.max(0, Math.round((err.count / 7) * (1 + Math.sin(j * 0.9 + i) * 0.4))));
                 return (
-                  <div
-                    key={err.event_type}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto auto',
-                      gap: 8,
-                      alignItems: 'center',
-                      padding: '10px 0',
-                      borderBottom: '1px solid #F9FAFB',
-                      transition: 'background 150ms',
-                    }}
-                  >
+                  <div key={err.event_type} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F9FAFB' }}>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', fontFamily: 'monospace' }}>
-                        {err.event_type.replace(/_/g, ' ')}
-                      </div>
-                      <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 1 }}>
-                        Last: {err.lastSeen ? new Date(err.lastSeen).toLocaleDateString() : 'N/A'}
-                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', fontFamily: 'Fira Code, monospace' }}>{err.event_type.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 1 }}>Last: {err.lastSeen ? new Date(err.lastSeen).toLocaleDateString() : 'N/A'}</div>
                     </div>
                     <Sparkline data={sparkVals} color={severity} />
                     <div style={{ textAlign: 'right', width: 48 }}>
-                      <span style={{
-                        fontSize: 13,
-                        fontWeight: 800,
-                        color: severity,
-                        background: severity === '#DC2626' ? '#FEF2F2' : severity === '#D97706' ? '#FFFBEB' : '#F9FAFB',
-                        padding: '2px 8px',
-                        borderRadius: 8,
-                      }}>
-                        {err.count}
-                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: severity, background: severity === '#DC2626' ? '#FEF2F2' : severity === '#D97706' ? '#FFFBEB' : '#F9FAFB', padding: '2px 8px', borderRadius: 8 }}>{err.count}</span>
                     </div>
                   </div>
                 );
               })}
-
-              {/* Severity legend */}
-              <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
-                {[{ color: '#6B7280', label: '< 10 (OK)' }, { color: '#D97706', label: '10–50 (Watch)' }, { color: '#DC2626', label: '> 50 (Critical)' }].map(l => (
-                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block' }} />
-                    <span style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600 }}>{l.label}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
-            <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <div style={{ padding: 16, background: '#F0FDF4', borderRadius: '50%' }}>
-                <AlertCircle size={28} color="#6EE7B7" />
-              </div>
+            <div style={{ height: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <p style={{ fontSize: 13, color: '#9CA3AF', fontWeight: 600 }}>No backend errors logged</p>
-              <p style={{ fontSize: 11, color: '#D1D5DB' }}>System is running clean ✓</p>
             </div>
           )}
         </CardShell>
 
-        {/* Checkout Failure Trend */}
-        <CardShell>
-          <SectionHeader
-            icon={<ShoppingCart size={18} color="#D97706" />}
-            title="Checkout Failure Trend"
-            sub="Daily failed/pending payments — last 30 days"
-          />
-
-          {/* Summary KPIs */}
-          <div style={{ display: 'flex', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 120, padding: '14px 16px', background: '#FFFBEB', borderRadius: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Failures</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#D97706', fontFamily: 'Playfair Display, serif' }}>{checkoutFailureTotal}</div>
-            </div>
-            <div style={{ flex: 1, minWidth: 120, padding: '14px 16px', background: '#FEF2F2', borderRadius: 14 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#991B1B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Revenue at Risk</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#DC2626', fontFamily: 'Playfair Display, serif' }}>₹{(checkoutRevenueLost / 1000).toFixed(1)}k</div>
-            </div>
-          </div>
-
-          <div style={{ height: 200 }}>
-            {checkoutFailures.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={checkoutFailures} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                  <XAxis
-                    dataKey="date"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 9, fontWeight: 600 }}
-                    tickFormatter={(v) => v.slice(5)}
-                    interval={Math.floor(checkoutFailures.length / 5)}
-                  />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 10 }} width={28} />
-                  <Tooltip
-                    formatter={(val: any, name: any) => [val, name === 'count' ? 'Failures' : '₹ at Risk']}
-                    contentStyle={{ borderRadius: 14, border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', fontFamily: 'Inter,sans-serif' }}
-                  />
-                  <Bar dataKey="count" name="count" radius={[4, 4, 0, 0]}>
-                    {checkoutFailures.map((item: any, i: number) => (
-                      <Cell key={i} fill={item.count > 5 ? '#DC2626' : item.count > 2 ? '#D97706' : '#FCA5A5'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                <div style={{ padding: 16, background: '#F0FDF4', borderRadius: '50%' }}>
-                  <ShoppingCart size={28} color="#6EE7B7" />
-                </div>
-                <p style={{ fontSize: 13, color: '#9CA3AF', fontWeight: 600 }}>No checkout failures</p>
-                <p style={{ fontSize: 11, color: '#D1D5DB' }}>Payment flow is healthy ✓</p>
-              </div>
-            )}
-          </div>
-        </CardShell>
       </div>
     </div>
   );
