@@ -96,6 +96,7 @@ const couponUseSchema = new mongoose.Schema(
 );
 
 couponUseSchema.index({ coupon: 1, user: 1 });
+couponUseSchema.index({ user: 1, coupon: 1 }, { background: true });
 couponUseSchema.index({ createdAt: -1 });
 
 const Coupon = mongoose.models.Coupon || mongoose.model("Coupon", couponSchema);

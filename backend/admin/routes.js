@@ -73,10 +73,11 @@ router.get("/orders/export", adminCtrl.exportOrdersCSV);
 // Analytics
 router.get("/analytics/sales", analyticsCtrl.getSalesAnalytics);
 router.get("/analytics/products", analyticsCtrl.getProductAnalytics);
+router.get("/analytics/errors", analyticsCtrl.getErrorDashboardData);
 router.get("/analytics/inventory", analyticsCtrl.getInventoryAnalytics);
 router.get("/analytics/customers", analyticsCtrl.getCustomerAnalytics);
 router.get("/analytics/operations", analyticsCtrl.getOperationAnalytics);
-router.get("/analytics/ritual-finder", analyticsCtrl.getRitualAnalytics);
+// router.get("/analytics/ritual-finder", analyticsCtrl.getRitualAnalytics);
 router.get("/analytics/orders", analyticsCtrl.getOrderAnalytics);
 router.get("/analytics/behavioral", analyticsCtrl.getBehavioralAnalytics);
 

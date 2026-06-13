@@ -183,14 +183,26 @@ export const syncCart = async (req, res) => {
             update: {
               $push: {
                 cartHistory: {
-                  productId: pid,
-                  timesAdded: addedQty,
-                  lastAddedAt: new Date()
+                  $each: [{
+                    productId: pid,
+                    timesAdded: addedQty,
+                    lastAddedAt: new Date()
+                  }],
+                  $slice: -100
                 }
               }
             }
           }
         });
+
+        import("../analytics/interactionModel.js").then(({ default: UserInteractionLog }) => {
+          UserInteractionLog.create({
+            userId: user._id,
+            productId: pid,
+            eventType: "cart_add",
+            quantity: addedQty
+          }).catch(err => console.error(err));
+        }).catch(err => console.error(err));
 
         logAction(req, "cart_item_added", "product", pid, {
           quantity_added: addedQty,
@@ -215,14 +227,26 @@ export const syncCart = async (req, res) => {
             update: {
               $push: {
                 cartHistory: {
-                  productId: pid,
-                  timesRemoved: removedQty,
-                  lastRemovedAt: new Date()
+                  $each: [{
+                    productId: pid,
+                    timesRemoved: removedQty,
+                    lastRemovedAt: new Date()
+                  }],
+                  $slice: -100
                 }
               }
             }
           }
         });
+
+        import("../analytics/interactionModel.js").then(({ default: UserInteractionLog }) => {
+          UserInteractionLog.create({
+            userId: user._id,
+            productId: pid,
+            eventType: "cart_remove",
+            quantity: removedQty
+          }).catch(err => console.error(err));
+        }).catch(err => console.error(err));
 
         logAction(req, "cart_item_removed", "product", pid, {
           quantity_removed: removedQty,
@@ -250,14 +274,26 @@ export const syncCart = async (req, res) => {
             update: {
               $push: {
                 cartHistory: {
-                  productId: pid,
-                  timesRemoved: removedQty,
-                  lastRemovedAt: new Date()
+                  $each: [{
+                    productId: pid,
+                    timesRemoved: removedQty,
+                    lastRemovedAt: new Date()
+                  }],
+                  $slice: -100
                 }
               }
             }
           }
         });
+
+        import("../analytics/interactionModel.js").then(({ default: UserInteractionLog }) => {
+          UserInteractionLog.create({
+            userId: user._id,
+            productId: pid,
+            eventType: "cart_remove",
+            quantity: removedQty
+          }).catch(err => console.error(err));
+        }).catch(err => console.error(err));
 
         logAction(req, "cart_item_removed", "product", pid, {
           quantity_removed: removedQty,

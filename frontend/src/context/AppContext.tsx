@@ -129,7 +129,7 @@ interface AppContextType {
   setShopFilter: (f: 'all' | 'skin' | 'hair' | 'body' | 'lip' | 'makeup' | 'other') => void;
   fetchProducts: (query?: string) => Promise<void>;
 
-  addToCart: (product: Product, quantity?: number) => void;
+  addToCart: (product: Product, quantity?: number, skipRedirect?: boolean) => void;
   removeFromCart: (pid: string) => void;
   updateQuantity: (pid: string, qty: number) => void;
 
@@ -801,7 +801,7 @@ const triggerPasswordReset = async (email: string) => {
     syncCartToBackendRef.current = syncCartToBackend;
   }, [syncCartToBackend]);
 
-  const addToCart = (product: Product, quantity: number = 1) => {
+  const addToCart = (product: Product, quantity: number = 1, skipRedirect: boolean = false) => {
     if (!product) return;
 
     setCartItems(prev => {
@@ -846,6 +846,10 @@ const triggerPasswordReset = async (email: string) => {
         })
       }).catch(() => {});
     });
+
+    if (!skipRedirect) {
+      navigateTo('cart');
+    }
   };
 
   const removeFromCart = (pid: string) => {

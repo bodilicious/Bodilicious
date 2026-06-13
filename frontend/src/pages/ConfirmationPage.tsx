@@ -169,7 +169,7 @@ export default function ConfirmationPage() {
                         <div className="w-8 sm:w-16 h-[1px] bg-gray-300"></div>
                         <StepIndicator step={3} title="Payment" active={false} complete={true} />
                         <div className="w-8 sm:w-16 h-[1px] bg-gray-300"></div>
-                        <StepIndicator step={4} title="Confirmation" active={true} complete={false} />
+                        <StepIndicator step={4} title="Confirmation" active={false} complete={true} />
                     </div>
                 </div>
 

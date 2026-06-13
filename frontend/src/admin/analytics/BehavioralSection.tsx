@@ -78,7 +78,11 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
 
   const peakData = useMemo(() => {
     const bucketMap = new Map<string, number>();
-    peakOrders.forEach(p => {
+    
+    // Filter out any invalid data where date fields are null/undefined
+    const validOrders = peakOrders.filter(p => p.hour != null && p.dayOfMonth != null && p.dayOfWeek != null && p.month != null);
+    
+    validOrders.forEach(p => {
       let key = '';
       if (peakTab === 'hour') key = HOUR_LABELS[p.hour];
       else if (peakTab === 'dayOfWeek') key = DAY_NAMES[p.dayOfWeek - 1];
@@ -90,10 +94,21 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
 
     const entries = Array.from(bucketMap.entries()).map(([name, orders]) => ({ name, orders }));
     
-    if (peakTab === 'hour') return entries; // keep chronological order
+    if (peakTab === 'hour') {
+      return HOUR_LABELS.map(label => ({
+        name: label,
+        orders: bucketMap.get(label) || 0
+      }));
+    }
     if (peakTab === 'dayOfWeek') return DAY_NAMES.map(d => ({ name: d, orders: bucketMap.get(d) || 0 }));
     if (peakTab === 'dayOfMonth') return Array.from({length: 31}, (_, i) => ({ name: (i+1).toString(), orders: bucketMap.get((i+1).toString()) || 0 }));
-    if (peakTab === 'month') return entries.sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
+    if (peakTab === 'month') {
+      return Array.from({length: 12}, (_, i) => {
+        const m = (i + 1).toString();
+        const monthName = new Date(2000, i).toLocaleString('en-US', { month: 'short' });
+        return { name: monthName, orders: bucketMap.get(`Month ${m}`) || 0 };
+      });
+    }
     
     return entries;
   }, [peakOrders, peakTab]);
@@ -110,9 +125,10 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
           {
             icon: <Clock size={20} color="#3D0A05" />,
             label: 'Peak Analysis',
-            value: peakOrders.length > 0
+            value: peakOrders.filter(p => p.hour != null && p.dayOfWeek != null).length > 0
               ? (() => {
-                  const top = [...peakOrders].sort((a, b) => b.orders - a.orders)[0];
+                  const valid = peakOrders.filter(p => p.hour != null && p.dayOfWeek != null);
+                  const top = [...valid].sort((a, b) => b.orders - a.orders)[0];
                   return `${HOUR_LABELS[top.hour]} ${DAY_NAMES[top.dayOfWeek - 1]}`;
                 })()
               : 'No data',

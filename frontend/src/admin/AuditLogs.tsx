@@ -54,18 +54,13 @@ const AuditLogs: React.FC = () => {
     }
   }, [getAuthHeaders, API_URL, page, searchTerm, eventTypeFilter, severityFilter, isAnomalyFilter]);
 
-  // Use a debounced effect for searchTerm to avoid spamming the backend
+  // Use a debounced effect to fetch logs whenever dependencies change
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      setPage(1); // Reset page on filter change
       fetchLogs();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, eventTypeFilter, severityFilter, isAnomalyFilter, fetchLogs]);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [page, fetchLogs]);
+  }, [fetchLogs]);
 
   const getActionColor = (action: string) => {
     const act = (action || '').toUpperCase();
@@ -131,7 +126,7 @@ const AuditLogs: React.FC = () => {
               type="text"
               placeholder="Search events, IDs, or users..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-all shadow-sm"
             />
           </div>
@@ -148,7 +143,7 @@ const AuditLogs: React.FC = () => {
           <Select
             className="w-48"
             value={eventTypeFilter}
-            onChange={(val) => setEventTypeFilter(val as string)}
+            onChange={(val) => { setEventTypeFilter(val as string); setPage(1); }}
             options={[
               { value: '', label: 'All Events' },
               { value: 'ORDER_PLACED', label: 'Order Placed' },
@@ -163,7 +158,7 @@ const AuditLogs: React.FC = () => {
           <Select
             className="w-40"
             value={severityFilter}
-            onChange={(val) => setSeverityFilter(val as string)}
+            onChange={(val) => { setSeverityFilter(val as string); setPage(1); }}
             options={[
               { value: '', label: 'All Severities' },
               { value: 'INFO', label: 'INFO' },
@@ -175,7 +170,7 @@ const AuditLogs: React.FC = () => {
           <Select
             className="w-40"
             value={isAnomalyFilter}
-            onChange={(val) => setIsAnomalyFilter(val as string)}
+            onChange={(val) => { setIsAnomalyFilter(val as string); setPage(1); }}
             options={[
               { value: '', label: 'All Statuses' },
               { value: 'true', label: 'Anomalies Only' },

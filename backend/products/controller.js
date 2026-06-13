@@ -295,6 +295,14 @@ export const getProductByPid = async (req, res) => {
 
     // 🚀 NEW: Update UserProfile productViewCounts if user is logged in
     if (req.user && req.user._id) {
+      import("../analytics/interactionModel.js").then(({ default: UserInteractionLog }) => {
+         UserInteractionLog.create({
+            userId: req.user._id,
+            productId: product._id,
+            eventType: "view"
+         }).catch(err => console.error("Failed to log view interaction:", err));
+      }).catch(err => console.error("Failed to import UserInteractionLog:", err));
+
       // Dynamic import to avoid circular dependency if any, or just require it
       import("../profile/models.js").then(({ default: UserProfile }) => {
         const pidObj = product._id;
@@ -314,9 +322,12 @@ export const getProductByPid = async (req, res) => {
               update: {
                 $push: {
                   productViewCounts: {
-                    productId: pidObj,
-                    count: 1,
-                    lastViewedAt: new Date()
+                    $each: [{
+                      productId: pidObj,
+                      count: 1,
+                      lastViewedAt: new Date()
+                    }],
+                    $slice: -100
                   }
                 }
               }

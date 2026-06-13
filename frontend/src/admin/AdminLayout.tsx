@@ -16,7 +16,8 @@ import {
   Ticket,
   ShoppingBag,
   FilePlus,
-  Settings
+  Settings,
+  AlertOctagon
 } from 'lucide-react';
 
 
@@ -103,6 +104,7 @@ const AdminLayout: React.FC = () => {
       items: [
         { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
         { name: 'Analytics', path: '/admin/analytics', icon: BarChart2 },
+        { name: 'Error Rates', path: '/admin/errors', icon: AlertOctagon },
       ]
     },
     {

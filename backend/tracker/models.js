@@ -359,6 +359,12 @@ orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ "shippingDetails.phone": 1 });
 orderSchema.index({ "shippingDetails.email": 1 });
 
+// Added compound indexes for optimization
+orderSchema.index({ user: 1, createdAt: -1 }, { background: true });
+orderSchema.index({ razorpayOrderId: 1 }, { background: true });
+orderSchema.index({ razorpayPaymentId: 1 }, { background: true });
+orderSchema.index({ returnStatus: 1 }, { background: true });
+
 
 /* =========================================
    Automatically exclude deleted orders

@@ -164,17 +164,17 @@ export default function SavedAddressesSection({ user, addAddress, updateAddress,
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4 pt-4 border-t border-[#D8C7B8]/60 mt-auto">
+                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-4 border-t border-[#D8C7B8]/60 mt-auto">
                                 <button 
                                     onClick={() => openEdit(addr)} 
-                                    className="text-[#8B5E3C] hover:text-[#3E2C23] text-sm font-medium flex items-center gap-1.5 transition-colors focus:outline-none focus:underline"
+                                    className="text-[#8B5E3C] hover:text-[#3E2C23] text-sm font-medium flex items-center gap-1.5 transition-colors focus:outline-none focus:underline whitespace-nowrap"
                                     aria-label={`Edit address for ${addr.name}`}
                                 >
                                     <Edit2 size={14} /> Edit
                                 </button>
                                 <button 
                                     onClick={() => addr._id && handleDelete(addr._id)} 
-                                    className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1.5 transition-colors focus:outline-none focus:underline"
+                                    className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1.5 transition-colors focus:outline-none focus:underline whitespace-nowrap"
                                     aria-label={`Delete address for ${addr.name}`}
                                 >
                                     <Trash2 size={14} /> Delete
@@ -182,7 +182,7 @@ export default function SavedAddressesSection({ user, addAddress, updateAddress,
                                 {!addr.isDefault && addr._id && (
                                     <button 
                                         onClick={() => setDefaultAddress(addr._id!)} 
-                                        className="ml-auto text-xs font-medium text-[#3E2C23]/60 hover:text-[#8B5E3C] transition-colors focus:outline-none focus:underline"
+                                        className="ml-auto text-xs font-medium text-[#3E2C23]/60 hover:text-[#8B5E3C] transition-colors focus:outline-none focus:underline whitespace-nowrap"
                                     >
                                         Set Default
                                     </button>

@@ -266,7 +266,7 @@ export default function Navbar() {
           </m.div>
         )}
       </AnimatePresence>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-8 lg:px-12">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo — drop-shadow when transparent so it pops over any slide image */}
           <div className="flex-1 flex justify-start">
@@ -279,7 +279,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden md:flex justify-center items-center gap-8">
+          <div className="hidden lg:flex justify-center items-center gap-14">
             {NAV_LINKS.map((link) => (
               <div
                 key={link.label}
@@ -310,7 +310,7 @@ export default function Navbar() {
                 {/* Mega Menu Dropdown */}
                 {link.isMegaMenu && (
                   <div
-                    className={`absolute top-full left-1/2 -translate-x-1/2 w-screen max-w-7xl bg-white border-b border-silk transition-all duration-300 ease-in-out shadow-sm origin-top overflow-hidden ${activeMegaMenu === link.label ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'}`}
+                    className={`absolute top-full left-1/2 -translate-x-1/2 w-screen max-w-[100rem] bg-white border-b border-silk transition-all duration-300 ease-in-out shadow-sm origin-top overflow-hidden ${activeMegaMenu === link.label ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0 pointer-events-none'}`}
                     style={{ maxHeight: '600px' }}
                   >
                     <div className="mx-auto px-8 py-10 flex justify-center gap-16">

@@ -44,6 +44,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const AdminLayout = lazy(() => import('./admin/AdminLayout'));
 const AnalyticsDashboard = lazy(() => import('./admin/AnalyticsDashboard'));
 const AnalyticsPage = lazy(() => import('./admin/AnalyticsPage'));
+const ErrorDashboardPage = lazy(() => import('./admin/ErrorDashboardPage'));
 const ProductManagement = lazy(() => import('./admin/ProductManagement'));
 const ProductForm = lazy(() => import('./admin/ProductForm'));
 const OrderManagement = lazy(() => import('./admin/OrderManagement'));
@@ -161,6 +162,7 @@ function AppRoutes() {
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AnalyticsDashboard />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="errors" element={<ErrorDashboardPage />} />
                 <Route path="products" element={<ProductManagement />} />
                 <Route path="products/new" element={<ProductForm />} />
                 <Route path="products/:pid" element={<ProductForm />} />

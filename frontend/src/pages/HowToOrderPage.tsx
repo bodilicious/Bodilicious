@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AppContext } from '../context/AppContext';
+import { useCurrency } from '../hooks/useCurrency';
 import {
   Search,
   ShoppingBag,
@@ -36,7 +38,7 @@ const steps: Step[] = [
     title: 'Discover Your Ritual',
     subtitle: 'Find the perfect match for your skin',
     description:
-      'Browse our curated collection of clean, botanical formulations. Use the Ritual Finder to get recommendation profiles tailored to your specific skin concern, or explore by product category.',
+      'Browse our curated collection of clean, clinical formulations. Use the Ritual Finder to get recommendation profiles tailored to your specific skin concern, or explore by product category.',
     cta: { label: 'Explore Shop', path: '/shop' },
     highlight: 'Tip: Filter by skin concern (e.g. brightening, hydration) for faster discovery.',
   },
@@ -76,7 +78,7 @@ const steps: Step[] = [
     title: 'Secure Payment',
     subtitle: 'Fully encrypted transaction gateway',
     description:
-      'Complete your checkout securely via Razorpay. We support UPI, all major credit/debit cards, Net Banking, and popular mobile wallets. Your credentials are fully protected.',
+      'Complete your checkout securely via Razorpay. We support UPI, all major credit/debit cards, Net Banking, and popular mobile wallets. Cash on Delivery (COD) is also available for all orders within India. Your credentials are fully protected.',
     cta: null,
     highlight: 'Look for the lock icon in the address bar. SSL Secured.',
   },
@@ -99,6 +101,13 @@ export default function HowToOrderPage() {
       'An interactive, step-by-step walkthrough to placing an order on Bodilicious. Discover, select, check out, and track your package.',
     canonical: '/how-to-order',
   });
+
+  const appContext = useContext(AppContext);
+  const { formatPrice } = useCurrency();
+  
+  const displayProduct = appContext?.products && appContext.products.length > 0 
+    ? appContext.products[0] 
+    : { name: 'Brightening Serum', price: 1850, product_weight_ml: 50, item_form: 'Regular Pack', images: [] };
 
   const [activeStep, setActiveStep] = useState(0);
   const [direction, setDirection] = useState(0); // -1 for prev, 1 for next
@@ -183,12 +192,19 @@ export default function HowToOrderPage() {
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex gap-3">
-                  <div className="w-12 h-12 bg-rose-100 rounded-lg flex-shrink-0 flex items-center justify-center font-serif text-ruby-red text-sm font-semibold">B</div>
+                  {displayProduct.images && displayProduct.images.length > 0 ? (
+                    <img src={displayProduct.images[0]} alt={displayProduct.name} className="w-12 h-12 bg-rose-100 rounded-lg flex-shrink-0 object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 bg-rose-100 rounded-lg flex-shrink-0 flex items-center justify-center font-serif text-ruby-red text-sm font-semibold">B</div>
+                  )}
                   <div className="text-left flex-1 min-w-0">
-                    <h4 className="text-xs font-bold text-dark-red truncate">Brightening Serum</h4>
-                    <p className="text-[10px] text-grey-beige">50ml | Regular Pack</p>
+                    <h4 className="text-xs font-bold text-dark-red truncate">{displayProduct.name}</h4>
+                    <p className="text-[10px] text-grey-beige">
+                      {displayProduct.product_weight_ml ? `${displayProduct.product_weight_ml}ml | ` : ''}
+                      {displayProduct.item_form || 'Regular Pack'}
+                    </p>
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-xs font-bold text-dark-red">₹1,850</span>
+                      <span className="text-xs font-bold text-dark-red">{formatPrice(displayProduct.price || 1850)}</span>
                       <div className="flex items-center border border-silk rounded-md bg-neutral-50 text-xs">
                         <button className="px-2 py-0.5 text-grey-beige hover:text-dark-red">-</button>
                         <span className="px-2 text-dark-red font-bold">1</span>

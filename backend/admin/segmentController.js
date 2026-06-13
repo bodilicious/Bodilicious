@@ -29,8 +29,11 @@ export const computeSegmentsForUsers = async (userIds = null) => {
       {
         $match: {
           user: user._id,
-          paymentStatus: "paid",
-          orderStatus: { $ne: "cancelled" },
+          orderStatus: { $nin: ["cancelled", "returned", "return_requested", "abandoned"] },
+          $or: [
+            { paymentStatus: "paid" },
+            { orderStatus: "delivered" }
+          ]
         },
       },
       {
@@ -91,7 +94,13 @@ export const getSegmentStats = async (req, res) => {
 
     const [totalRevenueAgg, segmentAggs] = await Promise.all([
       Order.aggregate([
-        { $match: { paymentStatus: "paid", orderStatus: { $ne: "cancelled" } } },
+        { $match: { 
+            orderStatus: { $nin: ["cancelled", "returned", "return_requested", "abandoned"] },
+            $or: [
+              { paymentStatus: "paid" },
+              { orderStatus: "delivered" }
+            ]
+        } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
       ]),
       Promise.all(
@@ -103,8 +112,11 @@ export const getSegmentStats = async (req, res) => {
             {
               $match: {
                 user: { $in: userIds },
-                paymentStatus: "paid",
-                orderStatus: { $ne: "cancelled" },
+                orderStatus: { $nin: ["cancelled", "returned", "return_requested", "abandoned"] },
+                $or: [
+                  { paymentStatus: "paid" },
+                  { orderStatus: "delivered" }
+                ]
               },
             },
             {
@@ -199,7 +211,14 @@ export const getCustomerProfile = async (req, res) => {
         .lean(),
       Order.countDocuments({ user: user._id }),
       Order.aggregate([
-        { $match: { user: user._id, paymentStatus: "paid", orderStatus: { $ne: "cancelled" } } },
+        { $match: { 
+            user: user._id, 
+            orderStatus: { $nin: ["cancelled", "returned", "return_requested", "abandoned"] },
+            $or: [
+              { paymentStatus: "paid" },
+              { orderStatus: "delivered" }
+            ]
+        } },
         {
           $group: {
             _id: null,

@@ -354,7 +354,9 @@ export const getMyOrders = async (req, res) => {
       ]
     })
       .sort({ createdAt: -1 })
-      .populate("items.product");
+      .select("items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb isWelcomeOfferApplied")
+      .populate("items.product", "name images price pid slug")
+      .lean();
 
     return res.json({
       success: true,
@@ -383,7 +385,9 @@ export const getSingleOrder = async (req, res) => {
         { paymentMethod: { $ne: "razorpay" } },
         { paymentStatus: { $ne: "pending" } }
       ]
-    }).populate("items.product");
+    })
+      .populate("items.product")
+      .lean();
 
     if (!order) {
       return res.status(404).json({
@@ -547,6 +551,7 @@ export const shiprocketWebhook = async (req, res) => {
 
       if (isUpdated) {
         await order.save();
+        orderEvents.emit("order_status_updated", order);
       }
     }
 
@@ -737,6 +742,7 @@ export const cancelOrder = async (req, res) => {
     // BEFORE calling Shiprocket. If Node crashes during the Shiprocket call, the DB
     // is fully consistent and the webhook won't double-restore stock.
     await order.save();
+    orderEvents.emit("order_status_updated", order);
 
     /* =========================================================
        Cancel on Shiprocket if shipmentId/AWB exists
@@ -886,6 +892,7 @@ export const requestReturn = async (req, res) => {
     order.returnRequestedAt = new Date();
     order.orderStatus = "return_requested";
     await order.save();
+    orderEvents.emit("order_status_updated", order);
 
     // 🚀 Automate Shiprocket Return Creation (Blocking)
     const freshOrder = await Order.findById(order._id).populate("items.product");
@@ -948,6 +955,7 @@ export const updateOrderStatus = async (req, res) => {
 
     order.orderStatus = status;
     await order.save();
+    orderEvents.emit("order_status_updated", order);
 
     // 🔹 When delivered → mark welcome offer as used for this user
     if (status === "delivered" && order.isWelcomeOfferApplied) {

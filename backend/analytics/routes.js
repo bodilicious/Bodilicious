@@ -6,7 +6,6 @@ import {
   getCohorts, 
   getLowStock,
   trackEvent,
-  getBehavioralAnalytics,
   getCustomersAtRisk,
   getProductIntelligence,
   getMarketingAttribution,
@@ -29,7 +28,6 @@ router.get("/trending-products", getTrendingProducts);
 router.get("/product-funnel", getProductFunnel);
 router.get("/cohorts", getCohorts);
 router.get("/low-stock", getLowStock);
-router.get("/behavioral", getBehavioralAnalytics);
 router.get("/customers-at-risk", getCustomersAtRisk);
 router.get("/product-intelligence", getProductIntelligence);
 router.get("/marketing", getMarketingAttribution);

@@ -22,7 +22,6 @@ import SalesSection from './analytics/SalesSection';
 import ProductHealthSection from './analytics/ProductHealthSection';
 import CustomerCRMSection from './analytics/CustomerCRMSection';
 import OperationsSection from './analytics/OperationsSection';
-import RitualAnalyticsSection from './analytics/RitualAnalyticsSection';
 import BehavioralSection from './analytics/BehavioralSection';
 import DateRangePicker from './analytics/DateRangePicker';
 
@@ -32,8 +31,7 @@ type Section =
   | 'customers'
   | 'operations'
   | 'behavioral'
-  | 'intelligence'
-  | 'rituals';
+  | 'intelligence';
 
 type IntelSubTab = 'overview' | 'funnel' | 'cohorts' | 'at-risk' | 'marketing' | 'search' | 'stock';
 
@@ -44,7 +42,6 @@ const NAV_SECTIONS: { key: Section; label: string; sub: string; icon: React.Reac
   { key: 'operations',    label: 'Operations',             sub: 'Fulfillment time, SLA', icon: <Truck size={17} /> },
   { key: 'behavioral',    label: 'Behavioral Insights',    sub: 'Peak times heatmap, error rates', icon: <Activity size={17} /> },
   { key: 'intelligence',  label: 'Deep Intelligence',      sub: 'Funnel, cohorts, at-risk, forecasts', icon: <BrainCircuit size={17} /> },
-  { key: 'rituals',       label: 'Ritual Finder',          sub: 'Skin types, concerns, quiz funnel', icon: <Sparkles size={17} /> },
 ];
 
 const fmt = (val: number) =>
@@ -71,7 +68,6 @@ const AnalyticsPage: React.FC = () => {
   const [productData, setProductData] = useState<any>(null);
   const [customerData, setCustomerData] = useState<any>(null);
   const [operationData, setOperationData] = useState<any>(null);
-  const [ritualData, setRitualData] = useState<any>(null);
   const [behavioralData, setBehavioralData] = useState<any>(null);
 
   // === DEEP analytics (ETL-backed)
@@ -98,7 +94,7 @@ const AnalyticsPage: React.FC = () => {
       const qp = `startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
 
       const [
-        salesRes, prodRes, invRes, custRes, opsRes, ritRes, behRes,
+        salesRes, prodRes, invRes, custRes, opsRes, behRes,
         summaryRes, trendRes, cohortRes, funnelRes, stockRes,
         intellRes, atRiskRes, mktRes, searchRes, forecastRes
       ] = await Promise.allSettled([
@@ -108,7 +104,6 @@ const AnalyticsPage: React.FC = () => {
         fetch(`${API_URL}/api/v1/admin/analytics/inventory`,            { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/customers?${qp}`,     { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/operations?${qp}`,    { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/ritual-finder?${qp}`, { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/behavioral?${qp}`,    { headers }),
         // Deep ETL analytics
         fetch(`${API_URL}/api/v1/admin/analytics/executive-summary?days=${timeRange}`, { headers }),
@@ -131,12 +126,12 @@ const AnalyticsPage: React.FC = () => {
       };
 
       const [
-        sData, pData, invData, cData, oData, rData, bData,
+        sData, pData, invData, cData, oData, bData,
         sumData, trData, coData, fuData, stData,
         intellData, arData, mkData, seData, foData
       ] = await Promise.all([
         safeJson(salesRes), safeJson(prodRes), safeJson(invRes), safeJson(custRes),
-        safeJson(opsRes), safeJson(ritRes), safeJson(behRes),
+        safeJson(opsRes), safeJson(behRes),
         safeJson(summaryRes), safeJson(trendRes), safeJson(cohortRes), safeJson(funnelRes),
         safeJson(stockRes), safeJson(intellRes), safeJson(atRiskRes),
         safeJson(mktRes), safeJson(searchRes), safeJson(forecastRes),
@@ -146,7 +141,6 @@ const AnalyticsPage: React.FC = () => {
       if (pData?.success)   setProductData(pData.data);
       if (cData?.success)   setCustomerData(cData.data);
       if (oData?.success)   setOperationData(oData.data);
-      if (rData?.success)   setRitualData(rData.data);
       if (bData?.success)   setBehavioralData(bData.data);
       if (sumData?.success) setSummaryData(sumData.data);
       if (trData?.success)  setTrendingData(trData.data);
@@ -362,17 +356,10 @@ const AnalyticsPage: React.FC = () => {
                   checkoutFailures={behavioralData?.checkoutFailures || []}
                   checkoutFailureTotal={behavioralData?.checkoutFailureTotal || 0}
                   checkoutRevenueLost={behavioralData?.checkoutRevenueLost || 0}
+                  errorRates={behavioralData?.errorRates}
                 />
               )}
 
-              {/* ── RITUALS ── */}
-              {activeSection === 'rituals' && (
-                <RitualAnalyticsSection
-                  skinTypes={ritualData?.skinTypes || []}
-                  concerns={ritualData?.concerns || []}
-                  funnel={ritualData?.funnel || []}
-                />
-              )}
 
               {/* ── DEEP INTELLIGENCE ── */}
               {activeSection === 'intelligence' && (

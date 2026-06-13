@@ -1,47 +1,17 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { Package, ArrowLeft, AlertCircle, RefreshCw, Calendar, CreditCard, FileText, MessageSquare, Send } from 'lucide-react';
 import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 import { Order, TimelineEvent } from '../types';
 
-const confirmToast = (message: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-        toast.custom((t) => (
-            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
-                <div className="flex-1 w-0 p-4">
-                    <div className="flex items-start">
-                        <div className="ml-3 flex-1 flex flex-col justify-center">
-                            <p className="text-sm font-medium text-gray-900 mb-1">Confirmation Required</p>
-                            <p className="text-sm text-gray-500">{message}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex flex-col border-l border-gray-200">
-                    <button
-                        onClick={() => { toast.dismiss(t.id); resolve(true); }}
-                        className="w-full border border-transparent rounded-none rounded-tr-lg p-3 flex items-center justify-center text-sm font-medium text-dark-red hover:text-ruby-red focus:outline-none transition-colors"
-                    >
-                        Confirm
-                    </button>
-                    <button
-                        onClick={() => { toast.dismiss(t.id); resolve(false); }}
-                        className="w-full border-t border-gray-200 border-l-0 border-b-0 border-r-0 rounded-none rounded-br-lg p-3 flex items-center justify-center text-sm font-medium text-gray-600 hover:text-gray-500 focus:outline-none transition-colors"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        ), {
-            duration: Infinity,
-        });
-    });
-};
 
 export default function TrackingPage() {
     const { navigateTo, getAuthHeaders, orders, cancelOrder } = useApp();
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     
     const [trackingData, setTrackingData] = useState<{
         status: string;
@@ -182,11 +152,12 @@ export default function TrackingPage() {
         }
     };
 
-    const handleCancelOrder = async () => {
-        if (!selectedOrder) return;
-        const confirmed = await confirmToast("Are you sure you want to cancel this order? This action cannot be undone.");
-        if (!confirmed) return;
+    const handleCancelOrder = () => {
+        setIsCancelModalOpen(true);
+    };
 
+    const confirmCancelOrder = async () => {
+        if (!selectedOrder) return;
         setIsCancelling(true);
         try {
             await cancelOrder(selectedOrder._id);
@@ -194,6 +165,7 @@ export default function TrackingPage() {
             setSelectedOrder(prev => prev ? { ...prev, orderStatus: 'cancelled' } : null);
             setTrackingData(prev => prev ? { ...prev, status: 'Cancelled' } : null);
             toast.success('Order cancelled successfully');
+            setIsCancelModalOpen(false);
         } catch (err: any) {
             toast.error(err.message || 'Failed to cancel order');
         } finally {
@@ -312,7 +284,7 @@ export default function TrackingPage() {
                     {selectedOrder ? (
                         <div className="border border-gray-200 rounded-lg p-6 sm:p-8 bg-white h-auto sm:h-full relative shadow-sm">
                             {/* Header Status Phase */}
-                            <div className="mb-6 flex justify-between items-start">
+                            <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div>
                                     <h2 className={`font-sans font-bold text-2xl mb-1 ${trackingData?.status.toLowerCase() === 'cancelled' ? 'text-red-600' : 'text-[#e77600]'}`}>
                                         {trackingData?.status || "Processing"}
@@ -321,7 +293,7 @@ export default function TrackingPage() {
                                         Expected delivery: <span className="font-semibold text-green-700">{trackingData?.expectedDelivery || 'Pending'}</span>
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                                     <button
                                         onClick={() => navigateTo('order-details', undefined, selectedOrder._id)}
                                         className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-md transition-colors shadow-sm"
@@ -332,7 +304,7 @@ export default function TrackingPage() {
                                         <button
                                             onClick={handleCancelOrder}
                                             disabled={isCancelling}
-                                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 border border-red-200 rounded-md transition-colors"
+                                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 border border-red-200 rounded-md transition-colors w-full sm:w-auto justify-center"
                                         >
                                             <AlertCircle size={16} /> {isCancelling ? 'Cancelling...' : 'Cancel Order'}
                                         </button>
@@ -511,6 +483,34 @@ export default function TrackingPage() {
                 </div>
 
             </div>
+
+            {/* Cancel Modal */}
+            {isCancelModalOpen && selectedOrder && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 print:hidden backdrop-blur-sm">
+                    <div className="bg-white rounded p-6 max-w-sm w-full shadow-xl">
+                        <h3 className="text-xl font-serif text-dark-red mb-3">Cancel Order</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Are you sure you want to cancel this order? This action cannot be undone.
+                        </p>
+                        {selectedOrder.paymentStatus === 'paid' && selectedOrder.paymentMethod === 'razorpay' && (
+                            <div className="mb-4 bg-purple-50 p-3 text-purple-800 text-xs border border-purple-100 rounded">
+                                A refund of <strong>₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</strong> will be initiated immediately to your original payment method. It may take 5-7 business days to reflect in your account.
+                            </div>
+                        )}
+                        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-2">
+                            <button onClick={() => setIsCancelModalOpen(false)} disabled={isCancelling} className="w-full sm:w-auto px-4 py-2 text-xs font-sans tracking-widest uppercase text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
+                                Close
+                            </button>
+                            <button onClick={confirmCancelOrder} disabled={isCancelling} className="w-full sm:w-auto px-4 py-2 text-xs font-sans tracking-widest uppercase text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isCancelling && <RefreshCw className="animate-spin w-3 h-3" />}
+                                Confirm Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
             <Footer />
         </div>
     );

@@ -10,8 +10,22 @@ class OrderEmitter extends EventEmitter {}
 const orderEvents = new OrderEmitter();
 
 // Handle successful order placements (both COD and Razorpay)
+// Compute segments dynamically
+const updateSegments = async (order) => {
+    if (order && order.user) {
+        try {
+            const { computeSegmentsForUsers } = await import("../admin/segmentController.js");
+            await computeSegmentsForUsers([order.user]);
+        } catch (err) {
+            console.error("[Order Events] Failed to compute segments:", err.message);
+        }
+    }
+};
+
 orderEvents.on("order_placed", async (order) => {
     try {
+        await updateSegments(order);
+
         // 1. PostHog Tracking
         const isIndiaOrder = !order.shippingDetails?.country || 
             ['india', 'in', 'bharat', 'ind'].includes((order.shippingDetails.country || '').toLowerCase().trim());
@@ -69,6 +83,11 @@ orderEvents.on("order_placed", async (order) => {
     } catch (err) {
         console.error("[Order Events] Unhandled error in order_placed event:", err);
     }
+});
+
+// Update segments on status change
+orderEvents.on("order_status_updated", async (order) => {
+    await updateSegments(order);
 });
 
 export default orderEvents;

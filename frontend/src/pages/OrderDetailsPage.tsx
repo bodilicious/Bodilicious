@@ -1,5 +1,6 @@
  
 import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Order } from '../types';
@@ -359,9 +360,9 @@ export default function OrderDetailsPage() {
                                     </div>
                                 )}
                             </div>
-                            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-start sm:justify-end mt-4 sm:mt-0">
                                 {(order.orderStatus === 'pending' || order.orderStatus === 'processing') && (
-                                    <button onClick={() => setIsCancelModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-red-600 bg-white border border-red-200 hover:bg-red-50 transition-colors shadow-sm">
+                                    <button onClick={() => setIsCancelModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-red-600 bg-white border border-red-200 hover:bg-red-50 transition-colors shadow-sm w-full sm:w-auto justify-center">
                                         Cancel Order
                                     </button>
                                 )}
@@ -372,11 +373,11 @@ export default function OrderDetailsPage() {
                                     const daysSinceDelivery = (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24);
                                     return daysSinceDelivery <= 7;
                                 })() && (
-                                    <button onClick={() => setIsReturnModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-orange-600 bg-white border border-orange-200 hover:bg-orange-50 transition-colors shadow-sm">
+                                    <button onClick={() => setIsReturnModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-orange-600 bg-white border border-orange-200 hover:bg-orange-50 transition-colors shadow-sm w-full sm:w-auto justify-center">
                                         Return Order
                                     </button>
                                 )}
-                                <button onClick={handlePrintInvoice} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-dark-red bg-white border border-dark-red hover:bg-neutral-50 transition-colors shadow-sm">
+                                <button onClick={handlePrintInvoice} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-dark-red bg-white border border-dark-red hover:bg-neutral-50 transition-colors shadow-sm w-full sm:w-auto justify-center">
                                     <Printer size={16} /> Print Invoice
                                 </button>
                             </div>
@@ -666,8 +667,8 @@ export default function OrderDetailsPage() {
             </div>
 
             {/* Cancel Modal */}
-            {isCancelModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 print:hidden backdrop-blur-sm">
+            {isCancelModalOpen && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 print:hidden backdrop-blur-sm">
                     <div className="bg-white rounded p-6 max-w-sm w-full shadow-xl">
                         <h3 className="text-xl font-serif text-dark-red mb-3">Cancel Order</h3>
                         <p className="text-sm text-gray-600 mb-4">
@@ -678,22 +679,23 @@ export default function OrderDetailsPage() {
                                 A refund of <strong>₹{order.totalAmount.toLocaleString('en-IN')}</strong> will be initiated immediately to your original payment method. It may take 5-7 business days to reflect in your account.
                             </div>
                         )}
-                        <div className="flex gap-3 justify-end">
-                            <button onClick={() => setIsCancelModalOpen(false)} disabled={isProcessingAction} className="px-4 py-2 text-xs font-sans tracking-widest uppercase text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
+                        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-2">
+                            <button onClick={() => setIsCancelModalOpen(false)} disabled={isProcessingAction} className="w-full sm:w-auto px-4 py-2 text-xs font-sans tracking-widest uppercase text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
                                 Close
                             </button>
-                            <button onClick={handleCancelOrder} disabled={isProcessingAction} className="px-4 py-2 text-xs font-sans tracking-widest uppercase text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                            <button onClick={handleCancelOrder} disabled={isProcessingAction} className="w-full sm:w-auto px-4 py-2 text-xs font-sans tracking-widest uppercase text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                                 {isProcessingAction && <RefreshCw className="animate-spin w-3 h-3" />}
                                 Confirm Cancel
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Return Modal */}
-            {isReturnModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 print:hidden backdrop-blur-sm">
+            {isReturnModalOpen && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 print:hidden backdrop-blur-sm">
                     <div className="bg-white rounded p-6 max-w-md w-full shadow-xl">
                         <h3 className="text-xl font-serif text-dark-red mb-3">Return Order</h3>
                         <p className="text-sm text-gray-600 mb-4">
@@ -714,17 +716,18 @@ export default function OrderDetailsPage() {
                                 Upon successful return processing, a refund of <strong>₹{order.totalAmount.toLocaleString('en-IN')}</strong> will be initiated to your original payment method.
                             </div>
                         )}
-                        <div className="flex gap-3 justify-end">
-                            <button onClick={() => setIsReturnModalOpen(false)} disabled={isProcessingAction} className="px-4 py-2 text-xs font-sans tracking-widest uppercase text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
+                        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-2">
+                            <button onClick={() => setIsReturnModalOpen(false)} disabled={isProcessingAction} className="w-full sm:w-auto px-4 py-2 text-xs font-sans tracking-widest uppercase text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
                                 Cancel
                             </button>
-                            <button onClick={handleRequestReturn} disabled={isProcessingAction} className="px-4 py-2 text-xs font-sans tracking-widest uppercase text-white bg-dark-red hover:bg-ruby-red transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                            <button onClick={handleRequestReturn} disabled={isProcessingAction} className="w-full sm:w-auto px-4 py-2 text-xs font-sans tracking-widest uppercase text-white bg-dark-red hover:bg-ruby-red transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
                                 {isProcessingAction && <RefreshCw className="animate-spin w-3 h-3" />}
                                 Submit Return Request
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             <Footer />

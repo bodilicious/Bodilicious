@@ -172,6 +172,7 @@ const userProfileSchema = new mongoose.Schema(
 );
 
 userProfileSchema.index({ email: 1 });
+userProfileSchema.index({ phone: 1 }, { background: true });
 userProfileSchema.index({ createdAt: -1 });
 userProfileSchema.index({ role: 1 });
 userProfileSchema.index({ lifetimeSpend: -1 });

@@ -447,50 +447,6 @@ export const getOperationAnalytics = async (req, res) => {
     res.status(500).json({ success: false, message: "Error fetching operation analytics" });
   }
 };
-
-/**
- * GET /api/v1/admin/analytics/ritual-finder
- */
-export const getRitualAnalytics = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const query = {};
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
-    }
-
-    const [skinTypes, concerns, funnel] = await Promise.all([
-      // Skin Type Distribution
-      RitualResponse.aggregate([
-        { $match: { ...query, skinType: { $ne: null } } },
-        { $group: { _id: "$skinType", count: { $sum: 1 } } }
-      ]),
-      // Top Concerns
-      RitualResponse.aggregate([
-        { $match: { ...query, concerns: { $ne: [] } } },
-        { $unwind: "$concerns" },
-        { $group: { _id: "$concerns", count: { $sum: 1 } } },
-        { $sort: { count: -1 } }
-      ]),
-      // Funnel
-      RitualResponse.aggregate([
-        { $match: query },
-        { $group: { _id: "$status", count: { $sum: 1 } } }
-      ])
-    ]);
-
-    res.json({
-      success: true,
-      data: { skinTypes, concerns, funnel }
-    });
-  } catch (err) {
-    console.error("Ritual Analytics Error:", err);
-    res.status(500).json({ success: false, message: "Error fetching ritual analytics" });
-  }
-};
-
 /**
  * GET /api/v1/admin/analytics/orders
  */
@@ -540,7 +496,7 @@ export const getBehavioralAnalytics = async (req, res) => {
 
     // Peak order heatmap: { hour, dayOfWeek, dayOfMonth, month, orders }
     const peakOrders = await Order.aggregate([
-      { $match: { ...query, paymentStatus: { $in: ["paid", "refunded"] } } },
+      { $match: { ...query, orderStatus: { $nin: ["abandoned", "cancelled"] } } },
       {
         $group: {
           _id: {
@@ -635,5 +591,155 @@ export const getBehavioralAnalytics = async (req, res) => {
   } catch (error) {
     console.error("[Analytics] Error in getBehavioralAnalytics:", error);
     res.status(500).json({ success: false, message: "Failed to fetch behavioral analytics" });
+  }
+};
+
+export const getErrorDashboardData = async (req, res) => {
+  try {
+    const { from, to, page = 1, limit = 50 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    let startDate, endDate;
+    if (from && to) {
+      startDate = new Date(from);
+      endDate = new Date(to);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+    }
+
+    const auditQuery = {
+      timestamp_utc: { $gte: startDate, $lte: endDate }
+    };
+    
+    const query = {
+      createdAt: { $gte: startDate, $lte: endDate }
+    };
+
+    const checkoutFailures = await Order.aggregate([
+      {
+        $match: {
+          ...query,
+          paymentStatus: { $in: ["failed", "pending"] },
+          orderStatus: { $in: ["pending", "payment_failed"] }
+        }
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$totalAmount" }
+        }
+      },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, date: "$_id", count: 1, totalAmount: 1 } }
+    ]);
+
+    let gatewayBreakdown = await AuditLogV2.aggregate([
+      { $match: { ...auditQuery, event_type: "PAYMENT_FAILED" } },
+      {
+        $group: {
+          _id: "$metadata.reason",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $project: { _id: 0, reason: { $ifNull: ["$_id", "unknown_error"] }, count: 1 } }
+    ]);
+
+    if (gatewayBreakdown.length === 0) {
+      gatewayBreakdown = await Order.aggregate([
+        {
+          $match: {
+            ...query,
+            paymentStatus: { $in: ["failed", "pending"] },
+            orderStatus: { $in: ["pending", "payment_failed"] }
+          }
+        },
+        {
+          $group: {
+            _id: "$paymentStatus",
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } },
+        {
+          $project: {
+            _id: 0,
+            reason: {
+              $cond: { if: { $eq: ["$_id", "failed"] }, then: "Payment Gateway Rejected", else: "Abandoned Checkout / Pending Payment" }
+            },
+            count: 1
+          }
+        }
+      ]);
+    }
+
+    let paymentFailureRows = await AuditLogV2.find({ ...auditQuery, event_type: "PAYMENT_FAILED" })
+      .populate("user_id", "name email")
+      .sort({ timestamp_utc: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    let paymentFailureTotal = await AuditLogV2.countDocuments({ ...auditQuery, event_type: "PAYMENT_FAILED" });
+
+    // Fallback: If AuditLogV2 has no records, use Order collection so the details table isn't empty
+    if (paymentFailureRows.length === 0) {
+      const failedOrders = await Order.find({
+        ...query,
+        paymentStatus: { $in: ["failed", "pending"] },
+        orderStatus: { $in: ["pending", "payment_failed"] }
+      })
+        .populate("user", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean();
+
+      paymentFailureRows = failedOrders.map(order => ({
+        _id: order._id,
+        timestamp_utc: order.createdAt,
+        user_id: order.user,
+        metadata: {
+          reason: order.paymentStatus === "failed" ? "Payment Gateway Rejected" : "Abandoned Checkout / Pending Payment",
+          email: order.shippingAddress?.email || "",
+          amount: order.totalAmount
+        }
+      }));
+
+      paymentFailureTotal = await Order.countDocuments({
+        ...query,
+        paymentStatus: { $in: ["failed", "pending"] },
+        orderStatus: { $in: ["pending", "payment_failed"] }
+      });
+    }
+
+    const systemErrorRows = await AuditLogV2.find({ ...auditQuery, severity: "ERROR" })
+      .sort({ timestamp_utc: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    const systemErrorTotal = await AuditLogV2.countDocuments({ ...auditQuery, severity: "ERROR" });
+
+    res.json({
+      success: true,
+      data: {
+        checkoutFailures,
+        gatewayBreakdown,
+        paymentFailureRows,
+        systemErrorRows,
+        paymentFailureTotal,
+        systemErrorTotal
+      }
+    });
+  } catch (error) {
+    console.error("[Analytics] Error in getErrorDashboardData:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch error dashboard data" });
   }
 };

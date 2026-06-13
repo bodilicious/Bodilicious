@@ -37,6 +37,8 @@ auditLogV2Schema.index({ user_id: 1, timestamp_utc: -1 });
 auditLogV2Schema.index({ correlation_id: 1, timestamp_utc: -1 });
 auditLogV2Schema.index({ event_type: 1, "flags.is_anomaly": 1, timestamp_utc: -1 });
 auditLogV2Schema.index({ environment: 1, timestamp_utc: -1 });
+auditLogV2Schema.index({ event_type: 1, timestamp_utc: -1 });
+auditLogV2Schema.index({ severity: 1, timestamp_utc: -1 });
 
 // TTL Index for 90-day retention
 auditLogV2Schema.index({ timestamp_utc: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
