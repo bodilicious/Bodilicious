@@ -46,7 +46,7 @@ orderEvents.on("order_placed", async (order) => {
 
         // 2. Shiprocket Pushing (Only for India)
         if (isIndiaOrder) {
-            pushOrderToShiprocket(order._id).catch(err => {
+            pushOrderToShiprocket(order).catch(err => {
                 console.error("[Order Events] Shiprocket push failed:", err.message);
             });
         }
