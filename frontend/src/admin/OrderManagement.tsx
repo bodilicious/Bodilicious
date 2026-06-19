@@ -336,7 +336,7 @@ const OrderManagement: React.FC = () => {
                     </button>
                   </td>
                   <td className="px-4 py-4">
-                    <span className="font-bold text-dark-red text-sm">#{order._id.slice(-6).toUpperCase()}</span>
+                    <span className="font-bold text-dark-red text-sm">#{order._id.slice(-8).toUpperCase()}</span>
                   </td>
                   <td className="px-4 py-4">
                     <div>

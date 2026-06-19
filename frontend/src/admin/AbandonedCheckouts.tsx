@@ -105,7 +105,7 @@ const AbandonedCheckouts: React.FC = () => {
                         {order.items?.length} items
                       </div>
                       <div className="text-xs text-gray-500 font-mono mt-0.5">
-                        ID: {order._id.slice(-6).toUpperCase()}
+                        ID: {order._id.slice(-8).toUpperCase()}
                       </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-dark-red">

@@ -336,7 +336,7 @@ export default function OrderDetailsPage() {
                         <div className="mb-8 flex flex-col sm:flex-row sm:items-start justify-between gap-4 print:hidden">
                             <div>
                                 <div className="flex items-center gap-3 mb-2">
-                                    <h1 className="text-3xl font-serif text-dark-red">Order #{order._id.substring(order._id.length - 6).toUpperCase()}</h1>
+                                    <h1 className="text-3xl font-serif text-dark-red">Order #{order._id.substring(order._id.length - 8).toUpperCase()}</h1>
                                     <span className={`px-3 py-1 text-xs font-sans tracking-widest uppercase border border-opacity-50 ${getPaymentBadge(order.paymentStatus)}`}>
                                         {order.paymentStatus.replace('_', ' ')}
                                     </span>
