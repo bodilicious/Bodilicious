@@ -12,6 +12,8 @@ import { initExchangeRateCron } from "./cron/exchangeRates.js";
 import { initDraftOrderCleanupCron } from "./cron/draftOrders.js";
 import { runSettingsMigration } from "./settings/migration.js";
 import { flushBuffer as flushAuditBuffer } from "./audit/logger.js";
+import Order from "./tracker/models.js";
+import NotificationService from "./procurement/notificationService.js";
 
 const gracefulShutdown = async (signal) => {
   console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
@@ -80,6 +82,36 @@ mongoose
     initPaymentReconciliationCron(); // Recover payments captured but never verified
     initExchangeRateCron(); // Fetch exchange rates periodically
     initDraftOrderCleanupCron(); // Delete abandoned draft orders
+
+    // ── Startup: alert on stuck manual-review orders ─────────────────────────
+    // Orders with needsManualReview: true have captured money but were never
+    // fully processed (all 3 verify retries + webhook both failed). Fire one
+    // notification per stuck order so ops can action them immediately after a
+    // server restart instead of finding them hours later via manual DB query.
+    // Runs after 5 seconds to avoid racing the payment reconciliation warmup.
+    setTimeout(async () => {
+      try {
+        const stuckOrders = await Order.find({ needsManualReview: true })
+          .select("_id totalAmount currency razorpayPaymentId reviewReason createdAt")
+          .lean();
+
+        if (stuckOrders.length > 0) {
+          console.warn(`[Startup] ⚠️  ${stuckOrders.length} order(s) need manual review.`);
+          for (const o of stuckOrders) {
+            await NotificationService.emit({
+              title: `⚠️ Manual Review Required — Order ${o._id.toString().slice(-6).toUpperCase()}`,
+              body: `Order ${o._id} (${o.currency} ${o.totalAmount}) was paid (payment: ${o.razorpayPaymentId || "unknown"}) but was never fully processed. Reason: ${o.reviewReason || "unknown"}. Created: ${new Date(o.createdAt).toISOString()}`,
+              type: "critical",
+              sourceModule: "orders",
+              sourceModel: "Order",
+              sourceId: o._id.toString()
+            }).catch(e => console.error("[Startup] Failed to emit manual review alert:", e.message));
+          }
+        }
+      } catch (err) {
+        console.error("[Startup] Failed to check needsManualReview orders:", err.message);
+      }
+    }, 5_000); // 5 seconds — after DB is warm, before the 15s reconciliation run
 
     const PORT = process.env.PORT || 5000;
     app.listen(PORT, () => {

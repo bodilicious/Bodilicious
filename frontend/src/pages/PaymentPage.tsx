@@ -410,7 +410,7 @@ export default function PaymentPage() {
                 setOverlay('cod_processing');
                 try {
                     const { order } = await checkout(shippingDetails, finalBillingDetails as any);
-                    navigate('/confirmation', { state: { orderId: (order as any)._id, status: 'success' }, replace: true });
+                    navigate('/confirmation', { state: { orderId: order._id, status: 'success' }, replace: true });
                 } finally {
                     // Always reset guard so user can retry if navigation or confirmation throws
                     submittingRef.current = false;
@@ -478,7 +478,7 @@ export default function PaymentPage() {
                             // Short success flash then navigate
                             setTimeout(() => {
                                 navigate('/confirmation', {
-                                    state: { orderId: (order as any)._id, status: 'success' },
+                                    state: { orderId: order._id, status: 'success' },
                                     replace: true
                                 });
                             }, 800);

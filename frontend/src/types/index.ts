@@ -94,6 +94,7 @@ export interface User {
   skinConcerns?: string[];
   preferredRoutine?: 'Morning Routine' | 'Night Routine' | 'Both';
   addresses?: Address[];
+  welcomeOfferUsed?: boolean;
   welcomeOffer?: {
     eligible: boolean;
     type: string;
@@ -120,12 +121,23 @@ export interface Order {
   awb: string | null;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
-  razorpaySignature?: string;
   totalAmount: number;
+  originalAmount?: number;
+  shippingCost?: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  currency?: string;
+  exchangeRate?: number;
   orderStatus: string;
   paymentMethod: string;
   paymentStatus: string;
   createdAt: string;
+  updatedAt?: string;
+  invoiceNumber?: string | null;
+  invoiceGenerated?: boolean;
+  isWelcomeOfferApplied?: boolean;
+  couponCode?: string | null;
+  couponDiscount?: number;
   shippingDetails: {
     name: string;
     phone: string;
@@ -148,13 +160,21 @@ export interface Order {
   refundStatus?: 'pending' | 'processed' | 'failed' | null;
   refundAmount?: number | null;
   
-  // Real-time EDD
+  // Real-time EDD & Fulfillment
   estimatedDeliveryDate?: string | null;
   estimatedDeliveryDays?: number | null;
   estimatedCourierName?: string | null;
   eddCalculatedAt?: string | null;
+  deliveredAt?: string | null;
 
-  // Admin Timeline
+  customerComments?: {
+    text: string;
+    createdAt: string;
+  }[];
+}
+
+export interface AdminOrder extends Order {
+  razorpaySignature?: string;
   statusHistory?: {
     status: string;
     changedBy?: string | any;
@@ -162,4 +182,28 @@ export interface Order {
     note?: string;
   }[];
   adminNote?: string;
+  needsManualReview?: boolean;
+  reviewReason?: string | null;
+  paymentClaimedAt?: string | null;
+  lastClaimFailedAt?: string | null;
+  paymentLinkId?: string | null;
+  paymentLink?: string | null;
+  paymentLinkExpiresAt?: string | null;
+  billingDetails?: any;
+  returnConditionNotes?: string | null;
+  returnPhotoUrls?: string[];
+  returnRefundMethod?: string | null;
+  isStockRestored?: boolean;
+  physicalReceived?: boolean;
+  returnResolvedAt?: string | null;
+  returnShiprocketOrderId?: string | null;
+  returnShipmentId?: number | null;
+  returnAwb?: string | null;
+  shiprocketOrderId?: string | null;
+  shipmentId?: number | null;
+  marketing?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+  };
 }

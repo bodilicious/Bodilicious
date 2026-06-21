@@ -14,7 +14,106 @@ import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
 import orderEvents from "../events/orderEvents.js";
+import { toRazorpayMinorUnits } from "../utils/currencies.js";
+import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
 
+
+/* =========================================================
+   HANDLE ORDER CANCELLATION SIDE EFFECTS
+========================================================= */
+export const handleOrderCancellationSideEffects = async (order) => {
+    // Prevent double refunds
+    if (order.refundStatus === "processed" || order.refundStatus === "pending") {
+        return null;
+    }
+
+    /* =========================================================
+       Razorpay Refund — only if paid online
+    ========================================================= */
+    let refundResult = null;
+    if (order.paymentStatus === "paid" && order.razorpayPaymentId) {
+      try {
+        const razorpayInstance = new Razorpay({
+          key_id: process.env.RAZORPAY_KEY_ID,
+          key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+
+        const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+          amount: toRazorpayMinorUnits(order.totalAmount, order.currency || "INR"),
+          speed: "normal",
+          notes: { reason: "Order cancelled" },
+        });
+
+        order.refundId = refund.id;
+        order.refundStatus = "pending";
+        order.refundAmount = order.totalAmount;
+        order.paymentStatus = "refunded";
+        refundResult = refund;
+      } catch (refundErr) {
+        console.error("Razorpay refund failed (cancel side-effects):", refundErr.message);
+        order.refundStatus = "failed";
+        order.refundAmount = order.totalAmount;
+      }
+    }
+
+    // Restore stock
+    if (!order.isStockRestored && order.items && order.items.length > 0) {
+      const claimedOrder = await Order.findOneAndUpdate(
+        { _id: order._id, isStockRestored: false },
+        { $set: { isStockRestored: true } }
+      );
+      if (claimedOrder) {
+        try {
+          const bulkOps = order.items.map(item => ({
+            updateOne: {
+              filter: { _id: item.product },
+              update: { $inc: { stock: item.quantity } },
+            },
+          }));
+          await Product.bulkWrite(bulkOps);
+          order.isStockRestored = true;
+        } catch (stockErr) {
+          console.error("Failed to restore stock after cancellation:", stockErr.message);
+          await NotificationService.emit({
+              title: "CRITICAL: Stock Restoration Failed in DB",
+              body: `Order ${order._id.toString().slice(-6).toUpperCase()} was claimed for stock restore, but bulkWrite failed: ${stockErr.message}. Manual inventory fix required!`,
+              type: "error",
+              sourceModule: "orders",
+              sourceModel: "Order",
+              sourceId: order._id.toString()
+          }).catch(e => console.error("Notification Service failed:", e));
+        }
+      }
+    }
+
+    /* =========================================================
+       Cancel on Shiprocket if shipmentId/AWB exists
+    ========================================================= */
+    if (order.awb || order.shiprocketOrderId) {
+      try {
+        if (process.env.SHIPROCKET_EMAIL) {
+          const token = await getShiprocketToken();
+          if (order.awb) {
+            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ awbs: [order.awb] })
+            });
+          } else if (order.shiprocketOrderId) {
+            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ ids: [order.shiprocketOrderId] })
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to cancel on Shiprocket:", err.message);
+      }
+    }
+
+    return refundResult;
+};
 
 /* =========================================================
    CREATE ORDER (Transaction + Shiprocket/Razorpay Integration)
@@ -66,16 +165,12 @@ export const createOrder = async (req, res) => {
     let totalWeightGrams = 0; // For Shiprocket EDD
     const orderItems = [];
 
+    // 🔹 Batch-fetch all products in one round-trip (avoids N sequential DB calls inside the transaction)
+    const { mapById: codMapById, mapByPid: codMapByPid } = await fetchProductMaps(mergedItems, { session });
+
     // 🔹 Validate stock + calculate total
     for (const item of mergedItems) {
-      let product;
-      if (mongoose.Types.ObjectId.isValid(item.productId)) {
-        product = await Product.findById(item.productId).session(session);
-      }
-      if (!product) {
-        const searchPid = item.pid || item.productId;
-        product = await Product.findOne({ pid: searchPid }).session(session);
-      }
+      const product = resolveProduct(item, codMapById, codMapByPid);
 
       if (!product) throw new Error("Product not found");
 
@@ -84,7 +179,7 @@ export const createOrder = async (req, res) => {
       }
 
       totalAmount += product.price * item.quantity;
-      
+
       const itemWeightG = product.product_weight_g || (product.product_weight_ml ? product.product_weight_ml * 1.05 : 200); // Base estimate if no weight is found
       totalWeightGrams += itemWeightG * item.quantity;
 
@@ -93,26 +188,52 @@ export const createOrder = async (req, res) => {
         quantity: item.quantity,
         priceAtPurchase: product.price,
       });
-
-      product.stock -= item.quantity;
-      await product.save({ session });
     }
 
     const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
     const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
     // 🔹 Verify Welcome Offer Eligibility
     // Only eligible if there are no past orders in an active/successful state
-    const existingOrdersCount = await Order.countDocuments({
-      user: userId,
-      orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
-      $or: [
-        { paymentMethod: "cod" },
-        { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
-      ]
-    }).session(session);
+    const userProfile = await UserProfile.findById(userId).select("welcomeOfferUsed").session(session);
+    let existingOrdersCount = 0;
+    if (userProfile?.welcomeOfferUsed) {
+        existingOrdersCount = 1;
+    } else {
+        existingOrdersCount = await Order.countDocuments({
+            user: userId,
+            orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
+            $or: [
+                { paymentMethod: "cod" },
+                { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
+            ]
+        }).session(session);
+    }
 
     const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
     const { finalAmount, discountAmount, originalAmount, isWelcomeOfferApplied } = pricing;
+
+    if (isWelcomeOfferApplied) {
+        const profileClaim = await UserProfile.findOneAndUpdate(
+            { _id: userId, welcomeOfferUsed: { $ne: true } },
+            { $set: { welcomeOfferUsed: true } },
+            { session, new: true }
+        );
+        if (!profileClaim) {
+            throw new Error("Welcome offer no longer valid. Please refresh your checkout.");
+        }
+    }
+
+    // Deduct stock atomically to prevent overselling
+    const bulkOps = orderItems.map(item => ({
+        updateOne: {
+            filter: { _id: item.product, stock: { $gte: item.quantity } },
+            update: { $inc: { stock: -item.quantity } }
+        }
+    }));
+    const bulkResult = await Product.bulkWrite(bulkOps, { session });
+    if (bulkResult.modifiedCount !== orderItems.length) {
+        throw new Error("Insufficient stock for one or more items. Another customer may have just purchased the last unit.");
+    }
 
     const finalPaymentMethod = paymentMethod || "cod";
     
@@ -175,23 +296,33 @@ export const createOrder = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // ── Generate Invoice ──────────────────────────────────────────────
-    let invoiceNumber = null;
-    try {
-      invoiceNumber = `INV-${Date.now()}-${order._id.toString().slice(-4).toUpperCase()}`;
-      await Order.findByIdAndUpdate(order._id, {
-        invoiceNumber,
-        invoiceGenerated: true
-      });
-      console.log(`🧾 Invoice generated for order ${order._id}: ${invoiceNumber}`);
-    } catch (invErr) {
-      console.error("❌ Invoice generation failed:", invErr.message);
-    }
-
     // ── Third Party Events (Decoupled) ────────────────────────────────
     let populatedOrder;
     try {
         populatedOrder = await Order.findById(order._id).populate("items.product");
+
+        // ── Generate Invoice ──────────────────────────────────────────────
+        try {
+          const invoiceNumber = `INV-${populatedOrder._id.toString().toUpperCase()}`;
+          await Order.findByIdAndUpdate(populatedOrder._id, {
+            invoiceNumber,
+            invoiceGenerated: true
+          });
+          populatedOrder.invoiceNumber = invoiceNumber;
+          populatedOrder.invoiceGenerated = true;
+          console.log(`🧾 Invoice generated for order ${populatedOrder._id}: ${invoiceNumber}`);
+        } catch (invErr) {
+          console.error("❌ Invoice generation failed:", invErr.message);
+          await NotificationService.emit({
+              title: "CRITICAL: COD Invoice Generation Failed",
+              body: `Failed to generate invoice for COD order ${populatedOrder._id}: ${invErr.message}`,
+              type: "error",
+              sourceModule: "orders",
+              sourceModel: "Order",
+              sourceId: populatedOrder._id.toString()
+          }).catch(e => console.error("Notification Service failed:", e));
+        }
+
         orderEvents.emit("order_placed", populatedOrder);
     } catch (eventErr) {
         console.error("❌ Failed to emit order events:", eventErr);
@@ -348,13 +479,13 @@ export const getMyOrders = async (req, res) => {
     const orders = await Order.find({
       user: req.user._id,
       orderStatus: { $ne: "abandoned" },
-      $or: [
-        { paymentMethod: { $ne: "razorpay" } },
-        { paymentStatus: { $ne: "pending" } }
+      $nor: [
+        { paymentMethod: "razorpay", paymentStatus: { $in: ["pending", "failed"] } },
+        { paymentMethod: "razorpay", paymentStatus: "paid", invoiceGenerated: { $ne: true } }
       ]
     })
       .sort({ createdAt: -1 })
-      .select("items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb isWelcomeOfferApplied")
+      .select("items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb isWelcomeOfferApplied shippingCost discountAmount originalAmount currency exchangeRate deliveredAt taxAmount")
       .populate("items.product", "name images price pid slug")
       .lean();
 
@@ -381,11 +512,12 @@ export const getSingleOrder = async (req, res) => {
       _id: req.params.orderId,
       user: req.user._id,
       orderStatus: { $ne: "abandoned" },
-      $or: [
-        { paymentMethod: { $ne: "razorpay" } },
-        { paymentStatus: { $ne: "pending" } }
+      $nor: [
+        { paymentMethod: "razorpay", paymentStatus: { $in: ["pending", "failed"] } },
+        { paymentMethod: "razorpay", paymentStatus: "paid", invoiceGenerated: { $ne: true } }
       ]
     })
+      .select("-adminNote -statusHistory -needsManualReview -reviewReason -razorpaySignature -paymentClaimedAt -lastClaimFailedAt -paymentLinkId -paymentLink")
       .populate("items.product")
       .lean();
 
@@ -422,7 +554,7 @@ export const shiprocketWebhook = async (req, res) => {
     //   POST /api/v1/orders/webhook/shipping?token=<SHIPROCKET_WEBHOOK_TOKEN>
     // Shiprocket also supports sending it as X-Webhook-Token header.
     const expectedToken = process.env.SHIPROCKET_WEBHOOK_TOKEN;
-    const providedToken = req.query.token || req.headers["x-webhook-token"];
+    const providedToken = req.headers["x-webhook-token"];
 
     if (!expectedToken || providedToken !== expectedToken) {
       console.warn("[Shiprocket Webhook] Blocked unauthorized request — IP:", req.ip);
@@ -472,7 +604,7 @@ export const shiprocketWebhook = async (req, res) => {
       let isUpdated = false;
 
       // Check if this webhook is for a forward shipment or a return shipment
-      const isReturn = (order.returnShiprocketOrderId == order_id) || (order.returnAwb === awb);
+      const isReturn = (String(order.returnShiprocketOrderId) === String(order_id)) || (order.returnAwb === awb);
 
       // Auto-save the AWB depending on whether it's forwarding or returning
       if (!isReturn && !order.awb && awb && !shiprocketStatus.includes("rto") && !shiprocketStatus.includes("return")) {
@@ -495,11 +627,17 @@ export const shiprocketWebhook = async (req, res) => {
           order.orderStatus = internalStatus;
           isUpdated = true;
           
-          // Delivered special handling
-          if (internalStatus === "delivered" && order.isWelcomeOfferApplied) {
-             await UserProfile.findByIdAndUpdate(order.user, {
-                $set: { welcomeOfferUsed: true },
-             });
+          // Delivered: mark COD orders as paid — payment is collected at the door,
+          // so Shiprocket's delivery confirmation is the correct trigger to set paymentStatus.
+          if (internalStatus === "delivered" && order.paymentMethod === "cod" && order.paymentStatus !== "paid") {
+              order.paymentStatus = "paid";
+              isUpdated = true;
+          }
+
+          // Stamp deliveredAt exactly once — used by the return window enforcement
+          if (internalStatus === "delivered" && !order.deliveredAt) {
+              order.deliveredAt = new Date();
+              isUpdated = true;
           }
 
           console.log(`[Shiprocket Webhook] Order ${order._id} updated to ${internalStatus}`);
@@ -529,19 +667,25 @@ export const shiprocketWebhook = async (req, res) => {
              
              if ((internalStatus === "cancelled" || shiprocketStatus === "rto delivered") && !order.isStockRestored) {
                if (order.items && order.items.length > 0) {
-                 try {
-                   const bulkOps = order.items.map(item => ({
-                     updateOne: {
-                       filter: { _id: item.product },
-                       update: { $inc: { stock: item.quantity } },
-                     },
-                   }));
-                   await Product.bulkWrite(bulkOps);
-                   order.isStockRestored = true;
-                   isUpdated = true;
-                   console.log(`[Shiprocket Webhook] Restored stock for order ${order._id}`);
-                 } catch (stockErr) {
-                   console.error("Failed to restore stock on webhook:", stockErr.message);
+                 const claimedOrder = await Order.findOneAndUpdate(
+                   { _id: order._id, isStockRestored: false },
+                   { $set: { isStockRestored: true } }
+                 );
+                 if (claimedOrder) {
+                   try {
+                     const bulkOps = order.items.map(item => ({
+                       updateOne: {
+                         filter: { _id: item.product },
+                         update: { $inc: { stock: item.quantity } },
+                       },
+                     }));
+                     await Product.bulkWrite(bulkOps);
+                     order.isStockRestored = true;
+                     isUpdated = true;
+                     console.log(`[Shiprocket Webhook] Restored stock for order ${order._id}`);
+                   } catch (stockErr) {
+                     console.error("Failed to restore stock on webhook:", stockErr.message);
+                   }
                  }
                }
              }
@@ -645,13 +789,23 @@ export const updateShippingAddress = async (req, res) => {
         if (!shipRes.ok) {
           const errText = await shipRes.text();
           console.error("Failed to update Shiprocket address:", errText);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to sync new address with our shipping partner. Please try again."
+          });
         }
       } catch (shipErr) {
         console.error("Shiprocket update address error:", shipErr.message);
+        return res.status(500).json({
+          success: false,
+          message: "Internal error syncing address with shipping partner."
+        });
       }
     }
 
-    await order.save();
+    await Order.findByIdAndUpdate(order._id, {
+      $set: { shippingDetails: order.shippingDetails }
+    });
     const populatedOrder = await Order.findById(order._id).populate("items.product");
 
     return res.json({
@@ -671,110 +825,76 @@ export const updateShippingAddress = async (req, res) => {
 ========================================================= */
 export const cancelOrder = async (req, res) => {
   try {
-    const order = await Order.findOneAndUpdate(
+    const oldOrder = await Order.findOneAndUpdate(
       {
         _id: req.params.orderId,
         user: req.user._id,
         orderStatus: { $in: ["processing", "pending"] },
       },
-      { $set: { orderStatus: "cancelled" } },
-      { new: true }
+      { $set: { orderStatus: "cancelled" } }
     );
 
-    if (!order) {
+    if (!oldOrder) {
       return res.status(400).json({
         success: false,
         message: "Order cannot be cancelled or not found",
       });
     }
 
-    /* =========================================================
-       Razorpay Refund — only if paid online
-    ========================================================= */
-    let refundResult = null;
-    if (order.paymentStatus === "paid" && order.razorpayPaymentId) {
-      try {
-        const razorpayInstance = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID,
-          key_secret: process.env.RAZORPAY_KEY_SECRET,
-        });
-
-        const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
-          amount: Math.round(order.totalAmount * 100), // paise
-          speed: "normal",
-          notes: { reason: "Order cancelled by customer" },
-        });
-
-        order.refundId = refund.id;
-        order.refundStatus = "pending";
-        order.refundAmount = order.totalAmount;
-        order.paymentStatus = "refunded";
-        refundResult = refund;
-      } catch (refundErr) {
-        console.error("Razorpay refund failed (cancel):", refundErr.message);
-        // Don't block cancellation if refund call fails
-        order.refundStatus = "failed";
-        order.refundAmount = order.totalAmount;
-      }
-    }
-
-    // Restore stock for all cancelled items ONLY if they were actually deducted
-    // (COD orders deduct immediately, Razorpay only deducts on success)
-    const shouldRestoreStock = order.paymentMethod === "cod" || order.paymentStatus === "paid" || order.paymentStatus === "refunded";
-
-    if (shouldRestoreStock && order.items && order.items.length > 0 && !order.isStockRestored) {
-      try {
-        const bulkOps = order.items.map(item => ({
-          updateOne: {
-            filter: { _id: item.product },
-            update: { $inc: { stock: item.quantity } },
-          },
-        }));
-        await Product.bulkWrite(bulkOps);
-        order.isStockRestored = true;
-      } catch (stockErr) {
-        // Non-fatal: log but don't block the cancellation response
-        console.error("Failed to restore stock after cancellation:", stockErr.message);
-      }
-    }
-
-    // 🚀 CRITICAL: Save all DB state (refund status, stock restored flag) atomically 
-    // BEFORE calling Shiprocket. If Node crashes during the Shiprocket call, the DB
-    // is fully consistent and the webhook won't double-restore stock.
-    await order.save();
-    orderEvents.emit("order_status_updated", order);
-
-    /* =========================================================
-       Cancel on Shiprocket if shipmentId/AWB exists
-    ========================================================= */
-    if (order.awb || order.shiprocketOrderId) {
-      try {
-        if (process.env.SHIPROCKET_EMAIL) {
-          const token = await getShiprocketToken();
-
-          if (order.awb) {
-            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ awbs: [order.awb] })
-            });
-          } else if (order.shiprocketOrderId) {
-            await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ ids: [order.shiprocketOrderId] })
-            });
+    const previousStatus = oldOrder.orderStatus;
+    
+    // Add history entry in a separate update since we couldn't do it dynamically inside findOneAndUpdate without complex aggregations
+    await Order.updateOne(
+      { _id: oldOrder._id },
+      {
+        $push: {
+          statusHistory: {
+            fromStatus: previousStatus,
+            toStatus: "cancelled",
+            status: "cancelled",
+            changedBy: req.user._id,
+            source: "user",
+            changedAt: new Date()  // `changedAt` matches schema — `timestamp` was silently ignored
           }
         }
-      } catch (err) {
-        console.error("Failed to cancel on Shiprocket:", err.message);
       }
+    );
+
+    const order = await Order.findById(oldOrder._id);
+
+    orderEvents.emit("order_status_updated", order);
+
+    if (order.isWelcomeOfferApplied) {
+        const userHasPaidOrder = await Order.exists({
+            user: order.user,
+            orderStatus: { $nin: ["abandoned", "cancelled"] },
+            _id: { $ne: order._id },
+            $or: [
+                { paymentMethod: "cod" },
+                { paymentStatus: { $in: ["paid", "refunded"] } }
+            ]
+        });
+        if (!userHasPaidOrder) {
+            await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
+        }
+    }
+
+    let refundResult = null;
+    try {
+        refundResult = await handleOrderCancellationSideEffects(order);
+    } catch (err) {
+        console.error("Side effects failed:", err.message);
+    } finally {
+        const setPayload = {
+            refundId: order.refundId ?? null,
+            refundStatus: order.refundStatus ?? null,
+            refundAmount: order.refundAmount ?? null,
+            paymentStatus: order.paymentStatus
+        };
+        if (order.isStockRestored) {
+            setPayload.isStockRestored = true;
+        }
+        await Order.updateOne({ _id: order._id }, { $set: setPayload });
     }
 
     // 🚀 Audit Order Cancellation
@@ -784,7 +904,7 @@ export const cancelOrder = async (req, res) => {
 
     await NotificationService.emit({
         title: "Order Cancelled",
-        body: `Order ${order._id.toString().slice(-6).toUpperCase()} was cancelled. Reason: ${req.body.reason || 'Not provided'}.`,
+        body: `Order ${order._id.toString().slice(-6).toUpperCase()} was cancelled. Reason: ${req.body?.reason || 'Not provided'}.`,
         type: "warning",
         sourceModule: "orders",
         sourceModel: "Order",
@@ -793,7 +913,7 @@ export const cancelOrder = async (req, res) => {
 
     return res.json({
       success: true,
-      data: order,
+      data: { _id: order._id, orderStatus: order.orderStatus },
       refund: refundResult
         ? { id: refundResult.id, status: refundResult.status, amount: order.totalAmount }
         : null,
@@ -813,19 +933,24 @@ export const cancelOrder = async (req, res) => {
 ========================================================= */
 export const deleteOrder = async (req, res) => {
   try {
+    // Only allow soft-deleting orders in a terminal state (delivered, cancelled,
+    // returned, abandoned). Deleting active orders (processing / shipped) would
+    // make them invisible in the DB while still live in Shiprocket, causing
+    // admin confusion and blocking return requests after delivery.
     const order = await Order.findOneAndUpdate(
       {
         _id: req.params.orderId,
         user: req.user._id,
+        orderStatus: { $in: ["delivered", "cancelled", "returned", "abandoned"] },
       },
       { isDeleted: true },
       { new: true }
     );
 
     if (!order) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "Order not found",
+        message: "Order cannot be deleted. Only delivered, cancelled, or returned orders can be removed.",
       });
     }
 
@@ -879,6 +1004,20 @@ export const requestReturn = async (req, res) => {
       });
     }
 
+    // Enforce configurable return window (StoreSettings.returnWindowDays, default 7)
+    // Use deliveredAt if available; fall back to updatedAt for orders delivered before
+    // this field was added (avoids permanently blocking returns on legacy orders).
+    const settings = await getSettings();
+    const returnWindowDays = settings?.returnWindowDays ?? 7;
+    const deliveryTimestamp = order.deliveredAt || order.updatedAt;
+    const windowMs = returnWindowDays * 24 * 60 * 60 * 1000;
+    if (deliveryTimestamp && Date.now() - new Date(deliveryTimestamp).getTime() > windowMs) {
+      return res.status(400).json({
+        success: false,
+        message: `Return window has closed. Returns must be requested within ${returnWindowDays} days of delivery.`,
+      });
+    }
+
     // Block duplicate requests
     if (order.returnStatus && order.returnStatus !== "none" && order.returnStatus !== "rejected") {
       return res.status(400).json({
@@ -890,17 +1029,27 @@ export const requestReturn = async (req, res) => {
     order.returnStatus = "requested";
     order.returnReason = reason.trim();
     order.returnRequestedAt = new Date();
+    
+    const previousStatus = order.orderStatus;
     order.orderStatus = "return_requested";
+
+    order.statusHistory.push({
+      fromStatus: previousStatus,
+      toStatus: "return_requested",
+      status: "return_requested",
+      changedBy: req.user._id,
+      source: "user",
+      changedAt: new Date()  // `changedAt` matches schema — `timestamp` was silently ignored
+    });
+
     await order.save();
     orderEvents.emit("order_status_updated", order);
 
-    // 🚀 Automate Shiprocket Return Creation (Blocking)
+    // 🚀 Automate Shiprocket Return Creation (Non-Blocking)
     const freshOrder = await Order.findById(order._id).populate("items.product");
-    try {
-      await createShiprocketReturn(freshOrder, reason.trim());
-    } catch (err) {
+    createShiprocketReturn(freshOrder, reason.trim()).catch(err => {
       console.error("Delayed Shiprocket return error:", err.message);
-    }
+    });
 
     await NotificationService.emit({
         title: "Return Requested",
@@ -953,15 +1102,52 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = order.orderStatus;
     order.orderStatus = status;
+
+    order.statusHistory.push({
+      fromStatus: previousStatus,
+      toStatus: status,
+      status: status,
+      changedBy: req.user._id,
+      source: "admin",
+      changedAt: new Date()  // `changedAt` matches schema — `timestamp` was silently ignored
+    });
+
     await order.save();
     orderEvents.emit("order_status_updated", order);
 
-    // 🔹 When delivered → mark welcome offer as used for this user
-    if (status === "delivered" && order.isWelcomeOfferApplied) {
-      await UserProfile.findByIdAndUpdate(order.user, {
-        $set: { welcomeOfferUsed: true },
-      });
+    if (status === "cancelled" && previousStatus !== "cancelled") {
+        if (order.isWelcomeOfferApplied) {
+            const userHasPaidOrder = await Order.exists({
+                user: order.user,
+                orderStatus: { $nin: ["abandoned", "cancelled"] },
+                _id: { $ne: order._id },
+                $or: [
+                    { paymentMethod: "cod" },
+                    { paymentStatus: { $in: ["paid", "refunded"] } }
+                ]
+            });
+            if (!userHasPaidOrder) {
+                await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
+            }
+        }
+        try {
+            await handleOrderCancellationSideEffects(order);
+        } catch (err) {
+            console.error("Side effects failed:", err.message);
+        } finally {
+            const setPayload = {
+                refundId: order.refundId ?? null,
+                refundStatus: order.refundStatus ?? null,
+                refundAmount: order.refundAmount ?? null,
+                paymentStatus: order.paymentStatus
+            };
+            if (order.isStockRestored) {
+                setPayload.isStockRestored = true;
+            }
+            await Order.updateOne({ _id: order._id }, { $set: setPayload });
+        }
     }
 
     return res.json({

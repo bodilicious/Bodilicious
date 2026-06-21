@@ -364,7 +364,13 @@ const fetchUserProfileAndSync = useCallback(async () => {
         skinConcerns: data?.skinConcerns,
         preferredRoutine: data?.preferredRoutine,
         addresses: data?.addresses ?? [],
-        welcomeOffer: data?.welcomeOffer,
+        welcomeOfferUsed: data?.welcomeOfferUsed,
+        welcomeOffer: {
+          eligible: !data?.welcomeOfferUsed,
+          type: "first_order",
+          value: 10,
+          message: "Welcome Offer: Get 10% off on your first order!"
+        },
         address: data?.address,
         city: data?.city,
         state: data?.state,
@@ -1054,7 +1060,10 @@ const triggerPasswordReset = async (email: string) => {
     // Only remove purchased items from local cart to match backend $pull logic
     const purchasedProductIds = new Set(order.items.map((i: any) => i.product._id || i.product));
     setCartItems(prev => {
-      const newCart = prev.filter(item => !purchasedProductIds.has(item.product._id));
+      const newCart = prev.filter(item => {
+        const id = (item.product as any)?._id || (item.product as any)?.pid || (typeof item.product === 'string' ? item.product : null);
+        return !purchasedProductIds.has(id);
+      });
       if (newCart.length === 0) {
         localStorage.removeItem(CART_STORAGE_KEY);
       } else {
@@ -1066,10 +1075,9 @@ const triggerPasswordReset = async (email: string) => {
     // Deduplicate: only prepend if this order is not already in state
     // (prevents double-entry when verifyPayment returns an already-processed order)
     setOrders(prev => {
-      const alreadyExists = prev.some(o => (o as any)._id === (order as any)._id);
+      const alreadyExists = prev.some(o => o._id === order._id);
       if (alreadyExists) {
-        // Update in place with latest data
-        return prev.map(o => (o as any)._id === (order as any)._id ? order : o);
+        return prev.map(o => o._id === order._id ? order : o);
       }
       return [order, ...prev];
     });
@@ -1093,7 +1101,7 @@ const triggerPasswordReset = async (email: string) => {
     if (!res.ok) throw new Error('Failed to cancel order');
 
     setOrders(prev =>
-      prev.map(o => (o as any)._id === orderId ? { ...(o as any), orderStatus: 'cancelled' } : o)
+      prev.map(o => o._id === orderId ? { ...o, orderStatus: 'cancelled' } : o)
     );
     };
 
@@ -1114,7 +1122,7 @@ const triggerPasswordReset = async (email: string) => {
         }
 
         const { data } = await res.json();
-        setOrders(prev => prev.map(o => ((o as any)._id === orderId ? data : o)));
+        setOrders(prev => prev.map(o => (o._id === orderId ? data : o)));
         return data;
     };
 
@@ -1127,7 +1135,7 @@ const triggerPasswordReset = async (email: string) => {
     });
     if (!res.ok) throw new Error('Failed to delete order');
 
-    setOrders(prev => prev.filter(o => (o as any)._id !== orderId));
+    setOrders(prev => prev.filter(o => o._id !== orderId));
   };
 
 
@@ -1151,7 +1159,7 @@ const triggerPasswordReset = async (email: string) => {
     }
 
     const { data } = await res.json();
-    setOrders(prev => prev.map(o => ((o as any)._id === orderId ? data : o)));
+    setOrders(prev => prev.map(o => (o._id === orderId ? data : o)));
     return data;
   };
 

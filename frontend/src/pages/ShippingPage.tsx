@@ -989,7 +989,7 @@ export default function ShippingPage() {
                                                             }
                                                         }}
                                                         onFocus={() => {
-                                                            if (isIndiaCountry(form.country) && form.pincode.length === 6 && pincodeCache[form.pincode]?.areas?.length) {
+                                                            if (isIndiaCountry(form.country) && form.pincode.length === 6 && pincodeCache[`in_${form.pincode}`]?.areas?.length) {
                                                                 setIsAreaDropdownOpen(true);
                                                                 setAreaSearchQuery('');
                                                             }
@@ -1014,10 +1014,10 @@ export default function ShippingPage() {
                                                 </div>
                                                 {errors.area && <p className="text-xs text-red-500 mt-1">{errors.area}</p>}
                                                 
-                                                {isAreaDropdownOpen && pincodeCache[form.pincode]?.areas && (
+                                                {isAreaDropdownOpen && pincodeCache[`in_${form.pincode}`]?.areas && (
                                                     <div className="absolute z-30 w-full mt-1 bg-white border border-silk shadow-2xl rounded-sm max-h-60 overflow-y-auto">
                                                         <ul id="area-listbox" role="listbox">
-                                                            {pincodeCache[form.pincode].areas
+                                                            {pincodeCache[`in_${form.pincode}`].areas
                                                                 .filter(a => a.toLowerCase().includes(areaSearchQuery.toLowerCase()))
                                                                 .map(area => (
                                                                     <li
@@ -1035,7 +1035,7 @@ export default function ShippingPage() {
                                                                         {area}
                                                                     </li>
                                                                 ))}
-                                                            {pincodeCache[form.pincode].areas
+                                                            {pincodeCache[`in_${form.pincode}`].areas
                                                                 .filter(a => a.toLowerCase().includes(areaSearchQuery.toLowerCase()))
                                                                 .length === 0 && (
                                                                     <li 

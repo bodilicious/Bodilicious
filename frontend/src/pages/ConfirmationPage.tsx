@@ -33,7 +33,7 @@ export default function ConfirmationPage() {
 
     // ── Order found in context? ──────────────────────────────────────────────
      
-    const order = resolvedState ? orders.find(o => (o as any)._id === resolvedState.orderId) : undefined;
+    const order = resolvedState ? orders.find(o => o._id === resolvedState.orderId) : undefined;
     const orderLoaded = !!order;
 
     // ── beforeunload guard while the order hasn't appeared yet ──────────────
@@ -266,31 +266,50 @@ export default function ConfirmationPage() {
                             </div>
 
                             <div className="border-t border-silk pt-4 space-y-2">
-                                <div className="flex justify-between font-sans text-sm text-gray-600">
-                                    <span>Subtotal</span>
-                                    <span>₹{order.items.reduce((sum: number, item: any) => sum + (item.priceAtPurchase * item.quantity), 0).toLocaleString('en-IN')}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-2">
-                                    <span className="text-gray-500 text-sm font-sans">Shipping</span>
-                                    <span className="text-sm font-sans text-gray-600">
-                                        {(() => {
-                                            const shippingPaid = (order as any).shippingCost || 0;
-                                            if (shippingPaid <= 0) return 'Free';
-                                            const cur = (order as any).currency || 'INR';
-                                            return cur === 'INR' ? `₹${shippingPaid.toLocaleString('en-IN')}` : `${cur} ${shippingPaid}`;
-                                        })()}
-                                    </span>
-                                </div>
-                                {(order as any).discountAmount > 0 && (
-                                    <div className="flex justify-between items-center py-1">
-                                        <span className="text-gray-500 text-sm font-sans">Discount {(order as any).isWelcomeOfferApplied ? '(Welcome Offer)' : ''}</span>
-                                        <span className="text-sm font-sans text-green-700">-₹{(order as any).discountAmount.toLocaleString('en-IN')}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between font-serif text-xl text-dark-red mt-4 pt-4 border-t border-silk">
-                                    <span>Total Amount</span>
-                                    <span>₹{order.totalAmount.toLocaleString('en-IN')}</span>
-                                </div>
+                                {(() => {
+                                    const rawShippingCost = order.shippingCost ?? 0;
+                                    const rawDiscountAmount = order.discountAmount ?? 0;
+                                    const rawTaxAmount = order.taxAmount ?? 0;
+                                    const rawTotalAmount = order.totalAmount ?? 0;
+                                    const rawSubtotal = (order.originalAmount ?? rawTotalAmount) - rawShippingCost;
+                                    
+                                    const formatCurrency = (amount: number) => {
+                                        return new Intl.NumberFormat('en-IN', {
+                                            style: 'currency',
+                                            currency: order.currency || 'INR',
+                                            minimumFractionDigits: 0
+                                        }).format(amount);
+                                    };
+
+                                    return (
+                                        <>
+                                            <div className="flex justify-between font-sans text-sm text-gray-600">
+                                                <span>Subtotal</span>
+                                                <span>{formatCurrency(rawSubtotal)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2">
+                                                <span className="text-gray-500 text-sm font-sans">Shipping</span>
+                                                <span className="text-sm font-sans text-gray-600">
+                                                    {rawShippingCost <= 0 ? 'Free' : formatCurrency(rawShippingCost)}
+                                                </span>
+                                            </div>
+                                            {rawDiscountAmount > 0 && (
+                                                <div className="flex justify-between items-center py-1">
+                                                    <span className="text-gray-500 text-sm font-sans">Discount {order.isWelcomeOfferApplied ? '(Welcome Offer)' : ''}</span>
+                                                    <span className="text-sm font-sans text-green-700">-{formatCurrency(rawDiscountAmount)}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between items-center py-1">
+                                                <span className="text-gray-500 text-sm font-sans">Tax (Inclusive)</span>
+                                                <span className="text-sm font-sans text-gray-600">{formatCurrency(rawTaxAmount)}</span>
+                                            </div>
+                                            <div className="flex justify-between font-serif text-xl text-dark-red mt-4 pt-4 border-t border-silk">
+                                                <span>Total Amount</span>
+                                                <span>{formatCurrency(rawTotalAmount)}</span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

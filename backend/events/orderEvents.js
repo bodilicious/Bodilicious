@@ -64,18 +64,10 @@ orderEvents.on("order_placed", async (order) => {
 
         // 4. WhatsApp Queueing
         try {
-            const customerPhone = order.shippingDetails?.phone;
-            if (customerPhone) {
-                // Ensure international format (assuming Indian numbers if length is 10)
-                const formattedPhone = customerPhone.replace(/\D/g, "");
-                const waPhone = formattedPhone.length === 10 ? `91${formattedPhone}` : formattedPhone;
-
-                await enqueueWhatsApp(waPhone, "order_confirmation", {
-                    order_id: order._id.toString(),
-                    total_amount: order.totalAmount.toString(),
-                    customer_name: order.shippingDetails?.name || "Customer"
-                });
-            }
+            await enqueueWhatsApp("order_placed", {
+                userId: order.user.toString(),
+                orderId: order._id.toString()
+            });
         } catch (err) {
             console.error("[Order Events] WhatsApp enqueue failed:", err.message);
         }

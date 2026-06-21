@@ -17,9 +17,17 @@
 
 import cron from "node-cron";
 import Razorpay from "razorpay";
+import mongoose from "mongoose";
 import Order from "../tracker/models.js";
 import { processPaidOrder } from "./controller.js";
 import { logAction } from "../admin/controller.js";
+
+const systemLockSchema = new mongoose.Schema({
+  _id: String,
+  lockedAt: Date
+});
+systemLockSchema.index({ lockedAt: 1 }, { expireAfterSeconds: 600 });
+const SystemLock = mongoose.models.SystemLock || mongoose.model("SystemLock", systemLockSchema);
 
 // How old a pending order must be before we check it (avoid racing the verify call)
 const MIN_AGE_MINUTES = 3;
@@ -28,17 +36,30 @@ const MAX_AGE_HOURS = 24;
 // Safety: never process more than this many orders per cron tick
 const MAX_ORDERS_PER_RUN = 20;
 
-let isReconciling = false; // prevent overlapping runs
-
 /**
  * Core reconciliation logic — exported for manual triggering from admin routes.
  */
 export async function runPaymentReconciliation() {
-    if (isReconciling) {
+    const staleThreshold = new Date(Date.now() - 5 * 60 * 1000);
+    let lock;
+    try {
+        lock = await SystemLock.findOneAndUpdate(
+            { _id: "reconciliation", $or: [{ lockedAt: null }, { lockedAt: { $lt: staleThreshold } }] },
+            { $set: { lockedAt: new Date() } },
+            { upsert: true, returnDocument: "after" }
+        );
+    } catch (err) {
+        if (err.code === 11000) {
+            console.log("[Reconcile] Lock contention — another process is running.");
+            return { skipped: true };
+        }
+        throw err;
+    }
+    
+    if (!lock) {
         console.log("[Reconcile] Previous run still in progress — skipping.");
         return { skipped: true };
     }
-    isReconciling = true;
 
     const startedAt = Date.now();
     let checked = 0;
@@ -51,14 +72,23 @@ export async function runPaymentReconciliation() {
         const maxAge = new Date(now.getTime() - MAX_AGE_HOURS * 60 * 60 * 1000);
 
         // Find pending or failed Razorpay orders created within the recoverable window
+        // Find pending or failed Razorpay orders created within the recoverable window
+        // Including lastClaimFailedAt ensures we pick up reverted claims too.
         const stalePendingOrders = await Order.find({
-            paymentStatus: { $in: ["pending", "failed"] },
+            $or: [
+                {
+                    paymentStatus: { $in: ["pending", "failed"] },
+                    createdAt: { $lte: minAge, $gte: maxAge }
+                },
+                {
+                    paymentStatus: "paid",
+                    invoiceGenerated: { $ne: true },
+                    createdAt: { $lte: minAge }
+                }
+            ],
+            orderStatus: { $ne: "abandoned" },
             paymentMethod: "razorpay",
-            razorpayOrderId: { $exists: true, $ne: null },
-            createdAt: {
-                $lte: minAge,  // at least 3 min old
-                $gte: maxAge,  // no older than 24h
-            },
+            razorpayOrderId: { $exists: true, $ne: null }
         })
             .select("_id razorpayOrderId user createdAt")
             .limit(MAX_ORDERS_PER_RUN)
@@ -81,9 +111,12 @@ export async function runPaymentReconciliation() {
                 // Fetch all payments associated with this Razorpay order
                 const payments = await razorpay.orders.fetchPayments(order.razorpayOrderId);
 
-                // Find any captured or authorized payment
+                // Find a fully captured payment — "authorized" is intentionally excluded:
+                // authorized payments have not yet been settled to the merchant account.
+                // Calling processPaidOrder on them would mark the order as paid before
+                // Razorpay actually transfers the funds. Only "captured" is safe to process.
                 const capturedPayment = (payments.items || []).find(
-                    (p) => p.status === "captured" || p.status === "authorized"
+                    (p) => p.status === "captured"
                 );
 
                 if (!capturedPayment) {
@@ -97,17 +130,26 @@ export async function runPaymentReconciliation() {
                 );
 
                 // processPaidOrder has atomic idempotency — safe to call even if webhook already ran
+                const syntheticReq = {
+                    user: { _id: null, email: "system@reconciliation" },
+                    ip: "127.0.0.1",
+                    headers: {},
+                    body: {}
+                };
                 await processPaidOrder(
                     order._id,
                     capturedPayment.id,
                     null, // no signature when coming from reconciliation
-                    {}   // dummy req object — audit log will mark source as "reconciliation"
+                    syntheticReq
                 );
+
+                // Clear the manual review flag if it was set during a failed verifyPayment attempt
+                await Order.updateOne({ _id: order._id }, { $set: { needsManualReview: false } });
 
                 recovered++;
 
                 await logAction(
-                    {},
+                    syntheticReq,
                     "payment_reconciled",
                     "order",
                     order._id.toString(),
@@ -138,7 +180,7 @@ export async function runPaymentReconciliation() {
         console.error("[Reconcile] Fatal error in reconciliation run:", err.message);
         return { checked, recovered, errors: errors + 1, durationMs: Date.now() - startedAt };
     } finally {
-        isReconciling = false;
+        await SystemLock.updateOne({ _id: "reconciliation" }, { $set: { lockedAt: null } }).catch(err => console.error("[Reconcile] Failed to release lock:", err.message));
     }
 }
 

@@ -9,13 +9,13 @@ import Razorpay from "razorpay";
 import { COUNTRIES } from "../utils/countries.js";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
-import StoreSettings from "../settings/models.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
 import { calculateDiscount } from "../utils/pricing.js";
 import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits } from "../utils/currencies.js";
 import orderEvents from "../events/orderEvents.js";
+import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
 
 /* =========================================================
    PROCESS PAID ORDER (Helper)
@@ -28,16 +28,25 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
     session.startTransaction();
 
     let populatedOrder;
-    try {
-        // ── Atomic claim inside transaction ──
-        // This ensures that if the transaction rolls back, the "paid" status is safely reverted.
-        const order = await Order.findOneAndUpdate(
-            { _id: orderId, paymentStatus: { $in: ["pending", "failed"] } },
-            { $set: { paymentStatus: "paid", razorpayPaymentId: paymentId, paymentClaimedAt: new Date() } },
-            { new: true, session }
-        ).populate("items.product");
 
-        if (!order) {
+    // ── Atomic claim outside transaction ──
+    // This ensures that if the transaction rolls back, the "paid" lock persists so we can retry or manually review.
+    const priorDoc = await Order.findOneAndUpdate(
+        { 
+            _id: orderId, 
+            $or: [
+                { paymentStatus: { $in: ["pending", "failed"] } },
+                { paymentStatus: "paid", invoiceGenerated: { $ne: true }, paymentClaimedAt: { $lt: new Date(Date.now() - 2 * 60 * 1000) } }
+            ]
+        },
+        { $set: { paymentStatus: "paid", razorpayPaymentId: paymentId, paymentClaimedAt: new Date() } },
+        { returnDocument: "before" }
+    );
+    const priorPaymentStatus = priorDoc?.paymentStatus ?? "pending";
+    const priorPaymentId = priorDoc?.razorpayPaymentId ?? null;
+
+    try {
+        if (!priorDoc) {
             // Already processed or not found
             const existingOrder = await Order.findById(orderId).populate("items.product").session(session);
             if (!existingOrder) throw new Error("Order not found");
@@ -46,19 +55,68 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             return { success: true, message: "Already processed", order: existingOrder };
         }
 
-        if (order.orderStatus === "cancelled") {
-            order.orderStatus = "pending"; // un-cancel it since it's now paid
+        const order = await Order.findById(orderId).session(session);
+
+        if (order.orderStatus === "cancelled" || order.orderStatus === "abandoned") {
+            const wasAbandoned = order.orderStatus === "abandoned";
+            const previousOrderStatus = order.orderStatus;
+            order.orderStatus = "pending"; // un-cancel/un-abandon it since it's now paid
+
+            // Record the status resurrection in history so ops can audit it
+            order.statusHistory = order.statusHistory || [];
+            order.statusHistory.push({
+                fromStatus: previousOrderStatus,
+                toStatus: "pending",
+                status: "pending",
+                changedBy: null,
+                source: "system",
+                changedAt: new Date(),
+                note: "Order resurrected by payment capture after being " + previousOrderStatus
+            });
+
+            // Re-lock the welcome offer if it was an abandoned order and used it,
+            // since the draft cleanup cron might have released it.
+            if (wasAbandoned && order.isWelcomeOfferApplied) {
+                await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: true } }, { session });
+            }
         }
 
-        let totalWeightGrams = 0;
+        // ── Re-deduct stock if it was restored by a previous failed payment ──
+        if (order.isStockRestored) {
+            const bulkOps = order.items.map(item => ({
+                updateOne: {
+                    filter: { _id: item.product, stock: { $gte: item.quantity } },
+                    update: { $inc: { stock: -item.quantity } }
+                }
+            }));
+            const bulkResult = await Product.bulkWrite(bulkOps, { session });
+            if (bulkResult.modifiedCount !== order.items.length) {
+                await NotificationService.emit({
+                    title: "CRITICAL: Stock Missing for Paid Order",
+                    body: `Order ${order._id.toString().slice(-6).toUpperCase()} was paid after a retry, but stock is no longer available. Immediate manual refund or inventory adjustment required.`,
+                    type: "error",
+                    sourceModule: "orders",
+                    sourceModel: "Order",
+                    sourceId: order._id.toString()
+                });
+                throw new Error("Insufficient stock to process retried payment.");
+            }
+            order.isStockRestored = false;
+        }
 
-        // Stock was already reserved in initRazorpayOrder
-        for (const orderItem of order.items) {
-            const product = await Product.findById(orderItem.product._id).session(session);
-            if (!product) continue;
-            
-            const itemWeightG = product.product_weight_g || (product.product_weight_ml ? product.product_weight_ml * 1.05 : 200);
-            totalWeightGrams += itemWeightG * orderItem.quantity;
+        // ── Weight calculation (read-only, no writes) — runs BEFORE the transaction ──
+        // Moved outside the session to avoid holding a transaction lock during product reads.
+        // The weight is only used for EDD; it does not affect stock or payment amounts.
+        let totalWeightGrams = 0;
+        {
+            const productIds = order.items.map(i => i.product);
+            const weightProducts = await Product.find({ _id: { $in: productIds } }).select("product_weight_g product_weight_ml").lean();
+            const weightMap = Object.fromEntries(weightProducts.map(p => [p._id.toString(), p]));
+            for (const orderItem of order.items) {
+                const p = weightMap[orderItem.product.toString()];
+                const itemWeightG = p?.product_weight_g || (p?.product_weight_ml ? p.product_weight_ml * 1.05 : 200);
+                totalWeightGrams += itemWeightG * orderItem.quantity;
+            }
         }
 
         // EDD — only applicable for India orders (Shiprocket only covers Indian pincodes)
@@ -81,18 +139,30 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
         }
 
         // paymentStatus and razorpayPaymentId were already set atomically before
-        // starting the session — only update signature here
+        // starting the session — only update signature and other mutated fields here
+        const updateFields = {
+            orderStatus: order.orderStatus,
+            isStockRestored: order.isStockRestored,
+            invoiceNumber: `INV-${orderId.toString().toUpperCase()}`,
+            invoiceGenerated: true
+        };
+        if (order.estimatedDeliveryDate) {
+            updateFields.estimatedDeliveryDate = order.estimatedDeliveryDate;
+            updateFields.estimatedDeliveryDays = order.estimatedDeliveryDays;
+            updateFields.estimatedCourierName = order.estimatedCourierName;
+            updateFields.eddCalculatedAt = order.eddCalculatedAt;
+        }
         if (signature) {
-            order.razorpaySignature = signature;
+            updateFields.razorpaySignature = signature;
         }
 
-        await order.save({ session });
+        await Order.updateOne({ _id: orderId }, { $set: updateFields }, { session });
 
-        const productIdsToRemove = order.items.map(i => i.product._id);
+        const productIdsToRemove = order.items.map(i => i.product);
         await UserProfile.findByIdAndUpdate(order.user, { 
             $addToSet: { orders: order._id }, 
             $pull: { cart: { product: { $in: productIdsToRemove } } } 
-        }, { session });
+        }).session(session);
 
         // 🚀 Audit Order Placed / Payment Captured
         await logAction(req, "payment_captured", "order", order._id.toString(), {
@@ -110,42 +180,104 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             sourceId: order._id.toString()
         });
 
-        // 🚀 PostHog Server-Side Tracking, Shiprocket, Emails, WhatsApp moved to orderEvents
-        orderEvents.emit("order_placed", order);
-
         await session.commitTransaction();
         session.endSession();
 
         populatedOrder = await Order.findById(order._id).populate("items.product");
 
+        populatedOrder.invoiceNumber = `INV-${populatedOrder._id.toString().toUpperCase()}`;
+        populatedOrder.invoiceGenerated = true;
+
+        // 🚀 PostHog Server-Side Tracking, Shiprocket, Emails, WhatsApp moved to orderEvents
+        orderEvents.emit("order_placed", populatedOrder);
+
     } catch (txErr) {
         if (session.inTransaction()) await session.abortTransaction();
         session.endSession();
-        
+
+        if (txErr.message === "Insufficient stock to process retried payment.") {
+            console.error(`[processPaidOrder] CRITICAL: Stock permanently unavailable for order ${orderId}. Auto-refunding.`);
+            try {
+                const razorpayInstance = new Razorpay({
+                    key_id: process.env.RAZORPAY_KEY_ID,
+                    key_secret: process.env.RAZORPAY_KEY_SECRET,
+                });
+                const paymentFetch = await razorpayInstance.payments.fetch(paymentId);
+                
+                if (paymentFetch.status === "captured" && paymentFetch.amount_refunded === 0) {
+                    const refund = await razorpayInstance.payments.refund(paymentId, {
+                        amount: paymentFetch.amount,
+                        notes: { reason: "Out of stock on payment retry" }
+                    });
+                    
+                    await Order.updateOne(
+                        { _id: orderId },
+                        { 
+                            $set: { 
+                                orderStatus: "cancelled", 
+                                paymentStatus: "refunded",
+                                refundStatus: "processed",
+                                refundId: refund.id,
+                                refundAmount: refund.amount / 100,
+                                paymentClaimedAt: null 
+                            },
+                            $push: {
+                                statusHistory: {
+                                    fromStatus: priorPaymentStatus === "paid" ? "processing" : "pending",
+                                    toStatus: "cancelled",
+                                    status: "cancelled",
+                                    changedBy: "system",
+                                    source: "system",
+                                    // `changedAt` matches the schema field — `timestamp` was silently ignored
+                                    changedAt: new Date()
+                                }
+                            }
+                        }
+                    );
+                    
+                    // Use PermanentError so withRetry skips backoff instantly
+                    throw new PermanentError("order cancelled and auto-refunded due to insufficient stock");
+                }
+            } catch (refundErr) {
+                if (refundErr.isPermanent || refundErr.message === "order cancelled and auto-refunded due to insufficient stock") {
+                    throw refundErr; // Rethrow terminal error
+                }
+                console.error(`[processPaidOrder] Failed to auto-refund out-of-stock order ${orderId}:`, refundErr);
+            }
+        }
+
+        // ── Revert the atomic "paid" claim ─────────────────────────────────────
+        // The claim ran outside the transaction so it is NOT rolled back automatically.
+        // We must restore to the EXACT pre-claim state so:
+        //   1. withRetry attempt 2 sees the correct pre-state and re-claims cleanly.
+        //   2. The reconciliation cron (which queries paymentStatus: "pending"|"failed")
+        //      picks this order up if all retries are exhausted.
+        // Condition { paymentStatus: "paid" } prevents a double-revert if another
+        // concurrent path already cleaned this up.
+        const revertErr = await Order.updateOne(
+            { _id: orderId, paymentStatus: "paid", razorpayPaymentId: paymentId },
+            { $set: { paymentStatus: priorPaymentStatus, razorpayPaymentId: priorPaymentId, paymentClaimedAt: null, lastClaimFailedAt: new Date() } }
+        ).catch(e => e);
+        if (revertErr instanceof Error) {
+            console.error("[processPaidOrder] CRITICAL: Failed to revert payment claim:", revertErr.message);
+            await Order.updateOne({ _id: orderId }, { $set: { needsManualReview: true } }).catch(e => e);
+            await NotificationService.emit({
+                title: "CRITICAL: Payment Claim Revert Failed",
+                body: `Order ${orderId.toString().slice(-6).toUpperCase()} failed to revert payment claim after order creation failed. Order is stuck in paid state but not fully processed. Manual intervention required.`,
+                type: "error",
+                sourceModule: "orders",
+                sourceModel: "Order",
+                sourceId: orderId.toString()
+            }).catch(e => e);
+        }
+
         await logAction(req, "order_creation_failed", "order", orderId.toString(), {
-            error: txErr.message
+            error: txErr.message,
+            revertedTo: priorPaymentStatus,
+            action: "Atomic claim reverted — reconciliation cron will retry if all withRetry exhausted"
         }, { severity: "ERROR" }).catch(err => console.error("Order Creation Failed Audit Failed:", err));
 
-        // Revert the atomic claim so the order can be retried properly
-        await Order.updateOne(
-            { _id: orderId },
-            { $set: { paymentStatus: claimed.paymentStatus, razorpayPaymentId: claimed.razorpayPaymentId } }
-        );
-
         throw txErr;
-    }
-
-    // ── Generate Invoice ──────────────────────────────────────────────
-    let invoiceNumber = null;
-    try {
-        invoiceNumber = `INV-${Date.now()}-${populatedOrder._id.toString().slice(-4).toUpperCase()}`;
-        await Order.findByIdAndUpdate(populatedOrder._id, {
-            invoiceNumber,
-            invoiceGenerated: true
-        });
-        console.log(`🧾 Invoice generated for order ${populatedOrder._id}: ${invoiceNumber}`);
-    } catch (invErr) {
-        console.error("❌ Invoice generation failed:", invErr.message);
     }
 
     return { success: true, message: "Payment verified and order created successfully", order: populatedOrder };
@@ -158,6 +290,11 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
 ========================================================= */
 export const getOrderQuote = async (req, res) => {
     try {
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            console.error("CRITICAL: RAZORPAY_KEY_SECRET is not configured");
+            return res.status(500).json({ success: false, message: "Payment configuration error" });
+        }
+
         const { items, shippingDetails } = req.body;
         const userId = req.user?._id;
 
@@ -183,7 +320,8 @@ export const getOrderQuote = async (req, res) => {
             return res.status(400).json({ success: false, message: "Shipping country required" });
         }
 
-        const settings = await StoreSettings.findOne() || { 
+        // Use the in-memory settings cache — avoids an extra DB round-trip per quote request
+        const settings = (await getSettings()) || { 
             shippingThreshold: 999, shippingCost: 99,
             internationalShippingEnabled: false, internationalShippingCost: 2000, internationalShippingThreshold: 10000,
             supportedCountries: COUNTRIES
@@ -204,16 +342,12 @@ export const getOrderQuote = async (req, res) => {
             }
         }
 
+        // Batch fetch all products in one round-trip — avoids N sequential DB calls
+        const { mapById: productMapById, mapByPid: productMapByPid } = await fetchProductMaps(mergedItems);
+
         let totalAmount = 0;
         for (const item of mergedItems) {
-            let product;
-            if (mongoose.Types.ObjectId.isValid(item.productId)) {
-                product = await Product.findById(item.productId);
-            }
-            if (!product) {
-                const searchPid = item.pid || item.productId;
-                product = await Product.findOne({ pid: searchPid });
-            }
+            const product = resolveProduct(item, productMapById, productMapByPid);
             if (!product) {
                 return res.status(400).json({ success: false, message: "Product not found" });
             }
@@ -232,14 +366,19 @@ export const getOrderQuote = async (req, res) => {
 
         let existingOrdersCount = 1; // Default to 1 for guests (no welcome offer)
         if (userId) {
-            existingOrdersCount = await Order.countDocuments({
-                user: userId,
-                orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
-                $or: [
-                    { paymentMethod: "cod" },
-                    { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
-                ]
-            });
+            const userProfile = await UserProfile.findById(userId).select("welcomeOfferUsed");
+            if (userProfile?.welcomeOfferUsed) {
+                existingOrdersCount = 1; // Force ineligible
+            } else {
+                existingOrdersCount = await Order.countDocuments({
+                    user: userId,
+                    orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
+                    $or: [
+                        { paymentMethod: "cod" },
+                        { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
+                    ]
+                });
+            }
         }
 
         const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
@@ -300,7 +439,7 @@ export const getOrderQuote = async (req, res) => {
         };
 
         const signature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "fallback_secret")
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
             .update(JSON.stringify(quotePayload))
             .digest("hex");
 
@@ -349,8 +488,13 @@ export const initRazorpayOrder = async (req, res) => {
         const { payload, signature } = decodedQuote;
         if (!payload || !signature) return res.status(400).json({ success: false, message: "Invalid quote structure" });
 
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            console.error("[initRazorpayOrder] CRITICAL: Missing RAZORPAY_KEY_SECRET");
+            return res.status(500).json({ success: false, message: "Payment configuration error" });
+        }
+
         const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "fallback_secret")
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
             .update(JSON.stringify(payload))
             .digest("hex");
 
@@ -366,23 +510,6 @@ export const initRazorpayOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid quote for this user. Please refresh checkout." });
         }
 
-        // Fix BUG 15: Re-verify welcome offer eligibility to prevent multi-tab exploits
-        if (payload.isWelcomeOfferApplied) {
-            const existingOrdersCount = await Order.countDocuments({
-                user: userId,
-                orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
-                $or: [
-                    { paymentMethod: "cod" },
-                    { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
-                ]
-            });
-            if (existingOrdersCount > 0) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: "Welcome offer no longer valid because a previous order was completed. Please refresh your checkout." 
-                });
-            }
-        }
 
         if (payload.country !== shippingDetails?.country?.trim()) {
             return res.status(400).json({ success: false, message: "Shipping country changed. Please recalculate quote." });
@@ -414,15 +541,11 @@ export const initRazorpayOrder = async (req, res) => {
         let subtotal = 0;
         const orderItems = [];
 
+        // Batch fetch all products in one round-trip — avoids N sequential DB calls
+        const { mapById: initMapById, mapByPid: initMapByPid } = await fetchProductMaps(mergedItems);
+
         for (const item of mergedItems) {
-            let product;
-            if (mongoose.Types.ObjectId.isValid(item.productId)) {
-                product = await Product.findById(item.productId);
-            }
-            if (!product) {
-                const searchPid = item.pid || item.productId;
-                product = await Product.findOne({ pid: searchPid });
-            }
+            const product = resolveProduct(item, initMapById, initMapByPid);
             if (!product) {
                 console.error("Product not found for item:", item);
                 return res.status(400).json({ success: false, message: "Product not found" });
@@ -439,16 +562,48 @@ export const initRazorpayOrder = async (req, res) => {
             });
         }
 
-        if (subtotal !== payload.subtotal) {
-            // Re-derive the INR subtotal converted to the quote's currency for comparison
-            const convertedRecalculated = roundForCurrency(subtotal * (payload.exchangeRate || 1), payload.currency || "INR");
-            if (Math.abs(convertedRecalculated - payload.subtotal) > 0.05) {
-                return res.status(400).json({ success: false, message: "Cart contents changed. Please refresh quote." });
+        // Full Pricing Re-validation (Fix for #1)
+        const isIndia = !shippingDetails?.country?.trim() || ["india", "in", "bharat", "ind"].includes(shippingDetails.country.toLowerCase().trim());
+        // Use the in-memory settings cache — avoids an extra DB round-trip per init request
+        const settings = (await getSettings()) || { shippingThreshold: 999, shippingCost: 99, internationalShippingCost: 2000, internationalShippingThreshold: 10000 };
+        
+        let shippingCost = isIndia 
+            ? (subtotal >= settings.shippingThreshold ? 0 : settings.shippingCost)
+            : (subtotal >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost);
+
+        let existingOrdersCount = 1;
+        if (userId) {
+            const userProfile = await UserProfile.findById(userId).select("welcomeOfferUsed");
+            if (!userProfile?.welcomeOfferUsed) {
+                existingOrdersCount = await Order.countDocuments({
+                    user: userId,
+                    orderStatus: { $in: ["pending", "processing", "shipped", "delivered"] },
+                    $or: [
+                        { paymentMethod: "cod" },
+                        { paymentMethod: "razorpay", paymentStatus: { $in: ["paid", "refunded"] } }
+                    ]
+                });
             }
+        }
+
+        const pricing = calculateDiscount(subtotal, shippingCost, { existingOrdersCount });
+        const applyConversion = (val) => roundForCurrency(val * (payload.exchangeRate || 1), payload.currency || "INR");
+        const convertedFinalAmount = applyConversion(pricing.finalAmount);
+
+        if (Math.abs(convertedFinalAmount - payload.finalAmount) > Math.max(1, convertedFinalAmount * 0.001)) {
+            return res.status(400).json({ success: false, message: "Cart contents or pricing changed. Please refresh quote." });
         }
 
         const finalAmount = payload.finalAmount;
         const targetCurrency = payload.currency || "INR";
+
+        // Pre-flight check for welcome offer to avoid orphaning Razorpay orders
+        if (payload.isWelcomeOfferApplied) {
+            const profile = await UserProfile.findById(userId).select("welcomeOfferUsed");
+            if (profile?.welcomeOfferUsed) {
+                return res.status(400).json({ success: false, message: "Welcome offer has already been used. Please refresh quote." });
+            }
+        }
 
         // Create Razorpay order
         const razorpayInstance = new Razorpay({
@@ -472,14 +627,28 @@ export const initRazorpayOrder = async (req, res) => {
         const session = await mongoose.startSession();
         session.startTransaction();
         try {
+            if (payload.isWelcomeOfferApplied) {
+                const profileClaim = await UserProfile.findOneAndUpdate(
+                    { _id: userId, welcomeOfferUsed: { $ne: true } },
+                    { $set: { welcomeOfferUsed: true } },
+                    { session, new: true }
+                );
+                if (!profileClaim) {
+                    throw new Error("Welcome offer could not be applied. Please retry checkout.");
+                }
+            }
+
             // Deduct stock immediately
             const bulkOps = orderItems.map(item => ({
                 updateOne: {
-                    filter: { _id: item.product },
+                    filter: { _id: item.product, stock: { $gte: item.quantity } },
                     update: { $inc: { stock: -item.quantity } }
                 }
             }));
-            await Product.bulkWrite(bulkOps, { session });
+            const bulkResult = await Product.bulkWrite(bulkOps, { session });
+            if (bulkResult.modifiedCount !== orderItems.length) {
+                throw new Error("Insufficient stock for one or more items. Another customer may have just purchased the last unit.");
+            }
 
             // 🚀 CREATE DB ORDER AS PENDING (Draft Order)
             const [newOrder] = await Order.create([{
@@ -516,6 +685,7 @@ export const initRazorpayOrder = async (req, res) => {
                 data: {
                     razorpayOrder,
                     calculatedAmount: finalAmount,
+                    dbOrderId: newOrder._id,
                 },
             });
         } catch (dbErr) {
@@ -550,11 +720,28 @@ export const initRazorpayOrder = async (req, res) => {
  * immediately without waiting for backoff, to avoid making the customer
  * wait 3+ seconds for a retry that cannot possibly help.
  */
+/**
+ * PermanentError — throw this for errors where retrying is guaranteed to fail.
+ * withRetry detects `.isPermanent` and short-circuits immediately without backoff,
+ * avoiding making the customer wait 3+ seconds for a retry that cannot possibly help.
+ * Prefer this over adding to PERMANENT_ERRORS for new code.
+ */
+class PermanentError extends Error {
+    constructor(message) {
+        super(message);
+        this.isPermanent = true;
+        this.name = "PermanentError";
+    }
+}
+
+// Legacy substring fallback for permanent errors that pre-date PermanentError.
+// Keep entries specific — substring matching is inherently fragile.
+// For new permanent-failure throws, use `new PermanentError(...)` instead.
 const PERMANENT_ERRORS = [
     "order not found",
     "invalid payment signature",
-    "invalid product",
     "product not found",
+    "order cancelled and auto-refunded due to insufficient stock",
 ];
 
 const withRetry = async (fn, attempts = 3, backoffMs = 500) => {
@@ -564,8 +751,13 @@ const withRetry = async (fn, attempts = 3, backoffMs = 500) => {
             return await fn();
         } catch (err) {
             lastErr = err;
+            // PermanentError takes priority — avoids fragile substring matching
+            if (err.isPermanent) {
+                console.error(`[withRetry] Permanent error on attempt ${i + 1}, not retrying:`, err.message);
+                throw err;
+            }
             const errMsg = (err.message || "").toLowerCase();
-            // Don't retry if this is a permanent failure — retrying won't help
+            // Legacy check for permanent errors that pre-date PermanentError class
             if (PERMANENT_ERRORS.some(pe => errMsg.includes(pe))) {
                 console.error(`[withRetry] Permanent error on attempt ${i + 1}, not retrying:`, err.message);
                 throw err;
@@ -587,12 +779,19 @@ export const verifyPayment = async (req, res) => {
             return res.status(400).json({ success: false, message: "Missing Razorpay details" });
         }
 
-        const existingOrder = await Order.findOne({ razorpayOrderId: razorpay_order_id });
+        const existingOrder = await Order.findOne({ 
+            razorpayOrderId: razorpay_order_id,
+            user: req.user._id
+        });
         if (!existingOrder) {
-            return res.status(400).json({ success: false, message: "Draft order not found" });
+            return res.status(400).json({ success: false, message: "Draft order not found or unauthorized" });
         }
 
-        if (existingOrder.paymentStatus === "paid") {
+        if (existingOrder.paymentStatus === "paid" && existingOrder.invoiceGenerated) {
+            // Only short-circuit if the order is fully finalised (invoice generated).
+            // If invoiceGenerated is false the atomic claim fired but the Mongoose
+            // transaction aborted (stale lock). Fall through so processPaidOrder
+            // can reprocess via the webhook stale-lock path or withRetry.
             const populatedExisting = await Order.findById(existingOrder._id).populate("items.product");
             return res.status(200).json({
                 success: true,
@@ -602,9 +801,15 @@ export const verifyPayment = async (req, res) => {
         }
 
         // ── Verify Razorpay signature ─────────────────────────────────────────
+        // Fail loudly if secret is missing — a fallback string would silently
+        // reject ALL real payments with a cryptic "Invalid signature" error.
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+            console.error("[verifyPayment] CRITICAL: RAZORPAY_KEY_SECRET is not set");
+            return res.status(500).json({ success: false, message: "Payment configuration error" });
+        }
         const body = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "fallback_secret")
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
             .update(body.toString())
             .digest("hex");
 
@@ -663,7 +868,7 @@ export const verifyPayment = async (req, res) => {
                 } else {
                     // Atomic claim fired but session transaction aborted.
                     // The cart was NOT cleared. Force-clear the specific items now.
-                    const productIdsToRemove = existingOrder.items.map(i => i.product._id || i.product);
+                    const productIdsToRemove = existingOrder.items.map(i => i.product);
                     await UserProfile.findByIdAndUpdate(existingOrder.user, {
                         $pull: { cart: { product: { $in: productIdsToRemove } } }
                     }).catch(e => console.error("[verifyPayment] Failed to clear cart on partial failure:", e.message));
@@ -677,6 +882,9 @@ export const verifyPayment = async (req, res) => {
                         message: "Your payment was received but order confirmation is delayed. Your order will appear in My Account within a few minutes.",
                         razorpay_payment_id,
                         orderId: existingOrder._id.toString(),
+                        // /order-status returns the order in any paymentStatus state (unlike
+                        // /api/orders/:id which hides pending/draft orders with a 404)
+                        pollUrl: `/api/v1/payment/order-status/${existingOrder._id}`
                     });
                 }
             } else {
@@ -692,6 +900,17 @@ export const verifyPayment = async (req, res) => {
                 attempts: 3
             }, { severity: "CRITICAL" }).catch(err => console.error("Retry exhausted audit failed:", err));
 
+            // ── Stamp the order as needing ops review ────────────────────────────
+            // Log alone is easy to miss. Setting a persisted flag makes the stuck
+            // order queryable: Order.find({ needsManualReview: true })
+            await Order.updateOne(
+                { _id: existingOrder._id },
+                { $set: {
+                    needsManualReview: true,
+                    reviewReason: `processPaidOrder failed after 3 retries: ${processErr.message}`
+                }}
+            ).catch(e => console.error("[verifyPayment] Failed to set needsManualReview flag:", e.message));
+
             // 202 = "we received it, still working on it".
             // The Razorpay webhook (payment.captured event) will retry processPaidOrder
             // asynchronously — the order WILL be created eventually.
@@ -701,6 +920,9 @@ export const verifyPayment = async (req, res) => {
                 message: "Your payment was received but order confirmation is delayed. Your order will appear in My Account within a few minutes.",
                 razorpay_payment_id,
                 orderId: existingOrder._id.toString(),
+                // /order-status returns the order in any paymentStatus state (unlike
+                // /api/orders/:id which hides pending/draft orders with a 404)
+                pollUrl: `/api/v1/payment/order-status/${existingOrder._id}`
             });
         }
 
@@ -723,6 +945,15 @@ export const verifyPayment = async (req, res) => {
 export const razorpayWebhook = async (req, res) => {
     try {
         const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        if (!webhookSecret) {
+            console.error("[Webhook] Missing RAZORPAY_WEBHOOK_SECRET in environment");
+            return res.status(500).json({ success: false, message: "Webhook configuration error" });
+        }
+        if (!req.rawBody) {
+            console.error("[Webhook] Missing req.rawBody - raw body parser not configured correctly");
+            return res.status(400).json({ success: false, message: "Missing raw body" });
+        }
+
         const signature = req.headers["x-razorpay-signature"];
 
         const expectedSignature = crypto
@@ -750,7 +981,16 @@ export const razorpayWebhook = async (req, res) => {
             }
             
             if (existing) {
-                if (existing.orderStatus === "cancelled") {
+                // Guard: if the order is cancelled AND the refund is already
+                // in-flight (pending/processed), this webhook is a duplicate — skip.
+                // This prevents the double-Shiprocket-cancel scenario where
+                // handleOrderCancellationSideEffects already ran AND this webhook fires.
+                if (existing.orderStatus === "cancelled" && ["processed", "pending"].includes(existing.refundStatus)) {
+                     console.log(`[Webhook] Duplicate refund event for order ${existing._id}. Skipping.`);
+                     return res.status(200).json({ success: true, message: "Duplicate event" });
+                }
+
+                if (existing.orderStatus === "cancelled" && !["processed", "pending"].includes(existing.refundStatus)) {
                     console.warn(`[Webhook] Order ${existing._id} was cancelled, but payment was captured. Initiating auto-refund.`);
                     try {
                         const razorpayInstance = new Razorpay({
@@ -807,11 +1047,34 @@ export const razorpayWebhook = async (req, res) => {
                     amount: payment.amount / 100
                 }, { source: "razorpay-webhook", severity: "CRITICAL" }).catch(err => console.error("Payment Success No Order Audit:", err));
                 
+                let refundSuccess = false;
+                try {
+                    const razorpayInstance = new Razorpay({
+                        key_id: process.env.RAZORPAY_KEY_ID,
+                        key_secret: process.env.RAZORPAY_KEY_SECRET,
+                    });
+                    const paymentFetch = await razorpayInstance.payments.fetch(payment.id);
+                    if (paymentFetch.status === "captured" && paymentFetch.amount_refunded === 0) {
+                        await razorpayInstance.payments.refund(payment.id, {
+                            amount: paymentFetch.amount,
+                            notes: { reason: "Orphaned payment (no order found). Auto-refunded." }
+                        });
+                        console.log(`[Webhook] Auto-refunded orphaned payment ${payment.id}`);
+                        refundSuccess = true;
+                    } else if (paymentFetch.amount_refunded > 0) {
+                        refundSuccess = true;
+                    }
+                } catch (err) {
+                    console.error(`[Webhook] Failed to auto-refund orphaned payment ${payment.id}:`, err);
+                }
+
+                // If sendAdminPaymentSuccessNoOrderAlert doesn't take 4 arguments, it'll just ignore the 4th,
+                // but the ops alert will still trigger from NotificationService.
                 sendAdminPaymentSuccessNoOrderAlert(payment.id, payment.order_id, payment.amount / 100);
 
                 await NotificationService.emit({
-                    title: "Orphaned Payment Received",
-                    body: `Payment of ₹${payment.amount / 100} was captured via Razorpay, but the corresponding order was not found in our database.`,
+                    title: `Orphaned Payment Received ${refundSuccess ? '(Auto-Refunded)' : '(Action Required)'}`,
+                    body: `Payment of ₹${payment.amount / 100} was captured via Razorpay, but the corresponding order was not found in our database. ${refundSuccess ? 'It has been automatically refunded.' : 'Auto-refund FAILED. Please refund manually in Razorpay.'}`,
                     type: "critical",
                     sourceModule: "payment",
                     sourceId: payment.id
@@ -819,10 +1082,33 @@ export const razorpayWebhook = async (req, res) => {
             }
         } else if (event === "payment.failed") {
             const payment = payload.payment.entity;
-            await Order.findOneAndUpdate(
-                { razorpayOrderId: payment.order_id, paymentStatus: "pending" },
-                { paymentStatus: "failed" }
+
+            // ── Update status + restore stock atomically ──────────────────────────
+            // Razorpay retries webhook delivery on non-200 responses, so this handler
+            // can fire more than once for the same event. We gate BOTH the status update
+            // and the stock restoration on isStockRestored to prevent double-restore.
+            // { new: true } returns the POST-update doc so isStockRestored reflects
+            // whether WE just set it (true) or it was already set by a prior delivery (false).
+            // Fix: include "failed" in the filter so a second webhook delivery (Razorpay retries
+            // on non-200 responses) can still restore stock if the first delivery set
+            // paymentStatus→"failed" but then crashed before completing the bulkWrite.
+            const failedOrder = await Order.findOneAndUpdate(
+                { razorpayOrderId: payment.order_id, paymentStatus: { $in: ["pending", "failed"] }, isStockRestored: false },
+                { $set: { paymentStatus: "failed", isStockRestored: true } },
+                { new: true }
             );
+
+            if (failedOrder && failedOrder.items?.length > 0) {
+                try {
+                    const restoreOps = failedOrder.items.map(item => ({
+                        updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } }
+                    }));
+                    await Product.bulkWrite(restoreOps);
+                    console.log(`[Webhook] Restored stock for payment.failed order ${failedOrder._id}`);
+                } catch (stockErr) {
+                    console.error("[Webhook] Failed to restore stock on payment.failed:", stockErr.message);
+                }
+            }
 
             await logAction(req, "payment_failed", "order", payment.order_id, {
                 paymentId: payment.id,
@@ -855,55 +1141,98 @@ export const razorpayWebhook = async (req, res) => {
                 
                 // CRITICAL: If an admin refunded this directly on Razorpay, we MUST cancel the order
                 // so we don't accidentally ship it for free.
+                // Snapshot the status BEFORE mutating so the Shiprocket cancel guard
+                // below can check whether the order was already cancelled prior to
+                // this webhook (i.e. handleOrderCancellationSideEffects already ran).
+                const statusBeforeRefundWebhook = order.orderStatus;
                 if (order.orderStatus !== "cancelled" && order.orderStatus !== "returned") {
+                    const previousStatus = order.orderStatus;
                     order.orderStatus = "cancelled";
                     order.statusHistory = order.statusHistory || [];
                     order.statusHistory.push({
+                        fromStatus: previousStatus,
+                        toStatus: "cancelled",
                         status: "cancelled",
                         source: "razorpay-webhook",
                         note: "Order auto-cancelled because a refund was processed on Razorpay"
                     });
-                    
-                    // 1. Shiprocket Cancel
-                    if (order.awb || order.shiprocketOrderId) {
-                        try {
-                            if (process.env.SHIPROCKET_EMAIL) {
-                                const { getShiprocketToken } = await import("../tracker/shiprocketservice.js");
-                                const token = await getShiprocketToken();
-                                if (order.awb) {
-                                    await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                                        body: JSON.stringify({ awbs: [order.awb] })
-                                    });
-                                } else if (order.shiprocketOrderId) {
-                                    await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                                        body: JSON.stringify({ ids: [order.shiprocketOrderId] })
-                                    });
-                                }
+                }
+
+                try {
+                    // 1. Shiprocket Cancel — only if not already cancelled BEFORE this webhook
+                    // fired (i.e. handleOrderCancellationSideEffects hadn't already run).
+                    // We use the pre-mutation snapshot so that setting order.orderStatus = "cancelled"
+                    // above doesn't make this condition evaluate to false (the original bug).
+                    if ((order.awb || order.shiprocketOrderId) && statusBeforeRefundWebhook !== "cancelled") {
+                        if (process.env.SHIPROCKET_EMAIL) {
+                            const { getShiprocketToken } = await import("../tracker/shiprocketservice.js");
+                            const token = await getShiprocketToken();
+                            let shipCancelRes;
+                            if (order.awb) {
+                                shipCancelRes = await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                    body: JSON.stringify({ awbs: [order.awb] })
+                                });
+                            } else if (order.shiprocketOrderId) {
+                                shipCancelRes = await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                                    body: JSON.stringify({ ids: [order.shiprocketOrderId] })
+                                });
                             }
-                        } catch (err) {
-                            console.error("Webhook cancel: Failed to cancel on Shiprocket:", err.message);
+                            // Guard: a silent Shiprocket failure here means the order stays
+                            // active in Shiprocket even though our DB marks it cancelled,
+                            // risking accidental shipment. Log loudly so ops can act.
+                            if (shipCancelRes && !shipCancelRes.ok) {
+                                const errText = await shipCancelRes.text().catch(() => "(unreadable)");
+                                console.error(`[Webhook] Shiprocket cancel FAILED for order ${order._id} (status ${shipCancelRes.status}): ${errText}. Order may still be active in Shiprocket — manual cancel required.`);
+                            }
                         }
                     }
 
                     // 2. Restore Stock
                     if (!order.isStockRestored && order.items && order.items.length > 0) {
-                        try {
-                            const bulkOps = order.items.map(item => ({
-                                updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
-                            }));
-                            await Product.bulkWrite(bulkOps);
-                            order.isStockRestored = true;
-                        } catch (stockErr) {
-                            console.error("Webhook cancel: Failed to restore stock:", stockErr.message);
+                        const claimedOrder = await Order.findOneAndUpdate(
+                            { _id: order._id, isStockRestored: false },
+                            { $set: { isStockRestored: true } }
+                        );
+
+                        if (claimedOrder) {
+                            try {
+                                const bulkOps = order.items.map(item => ({
+                                    updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
+                                }));
+                                await Product.bulkWrite(bulkOps);
+                                order.isStockRestored = true;
+                            } catch (stockErr) {
+                                console.error("Webhook cancel: Failed to restore stock:", stockErr.message);
+                                await NotificationService.emit({
+                                    title: "CRITICAL: Stock Restoration Failed in DB",
+                                    body: `Order ${order._id.toString().slice(-6).toUpperCase()} was claimed for stock restore, but bulkWrite failed: ${stockErr.message}. Manual inventory fix required!`,
+                                    type: "error",
+                                    sourceModule: "orders",
+                                    sourceModel: "Order",
+                                    sourceId: order._id.toString()
+                                }).catch(e => console.error("Notification Service failed:", e));
+                            }
                         }
                     }
+                } catch (err) {
+                    console.error("Webhook side effects failed:", err.message);
+                } finally {
+                    await Order.updateOne({ _id: order._id }, {
+                        $set: {
+                            orderStatus: order.orderStatus,
+                            statusHistory: order.statusHistory,
+                            paymentStatus: order.paymentStatus,
+                            refundStatus: order.refundStatus,
+                            refundId: refund.id || order.refundId || null,
+                            refundAmount: order.refundAmount ?? null,
+                            isStockRestored: order.isStockRestored
+                        }
+                    });
                 }
-
-                await order.save();
                 
                 await logAction(req, "refund_confirmed", "order", order._id.toString(), {
                     refundId: refund.id,
@@ -934,20 +1263,31 @@ export const generatePaymentLink = async (req, res) => {
             return res.status(400).json({ success: false, message: "Order is already paid" });
         }
 
-        if (order.paymentLink) {
-            return res.status(200).json({ success: true, data: { paymentLink: order.paymentLink } });
-        }
-
         const razorpayInstance = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID,
             key_secret: process.env.RAZORPAY_KEY_SECRET,
         });
 
+        if (order.paymentLink && order.paymentLinkExpiresAt && new Date() < order.paymentLinkExpiresAt) {
+            // Verify link status via Razorpay
+            if (order.paymentLinkId) {
+                try {
+                    const link = await razorpayInstance.paymentLink.fetch(order.paymentLinkId);
+                    if (link.status === "paid") {
+                        return res.status(400).json({ success: false, message: "Order is already paid via Razorpay link" });
+                    }
+                } catch (err) {
+                    console.error("Failed to verify payment link status:", err.message);
+                }
+            }
+            return res.status(200).json({ success: true, data: { paymentLink: order.paymentLink } });
+        }
+
         // Expiry time: 24 hours from now
         const expireBy = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
 
         const paymentLinkReq = {
-            amount: Math.round(order.totalAmount * 100),
+            amount: toRazorpayMinorUnits(order.totalAmount, order.currency || "INR"),
             currency: order.currency || "INR",
             accept_partial: false,
             description: `Payment for Bodilicious Order ${order._id}`,
@@ -969,9 +1309,13 @@ export const generatePaymentLink = async (req, res) => {
 
         const paymentLinkRes = await razorpayInstance.paymentLink.create(paymentLinkReq);
 
-        order.paymentLinkId = paymentLinkRes.id;
-        order.paymentLink = paymentLinkRes.short_url;
-        await order.save();
+        await Order.findByIdAndUpdate(order._id, {
+            $set: {
+                paymentLinkId: paymentLinkRes.id,
+                paymentLink: paymentLinkRes.short_url,
+                paymentLinkExpiresAt: new Date(expireBy * 1000)
+            }
+        });
 
         logAction(req, "PAYMENT_LINK_GENERATED", "order", order._id.toString(), {
             paymentLink: paymentLinkRes.short_url

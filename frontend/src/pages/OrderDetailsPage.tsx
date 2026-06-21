@@ -272,11 +272,19 @@ export default function OrderDetailsPage() {
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     };
 
-    const subtotal = order.totalAmount;
-    const taxes = Math.round(subtotal * 0.18); // Example GST
-    const basePrice = subtotal - taxes;
-    const shipping = 0;
-    const total = subtotal + shipping;
+    const rawShippingCost = order.shippingCost ?? 0;
+    const rawDiscountAmount = order.discountAmount ?? 0;
+    const rawTaxAmount = order.taxAmount ?? 0;
+    const rawTotalAmount = order.totalAmount ?? 0;
+    const rawSubtotal = (order.originalAmount ?? rawTotalAmount) - rawShippingCost;
+    
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: order.currency || 'INR',
+            minimumFractionDigits: 0
+        }).format(amount);
+    };
 
     const HorizontalTimeline = ({ timeline, status }: { timeline: TimelineEvent[], status: string }) => {
         const isErrorState = status.toLowerCase() === 'cancelled' || status.toLowerCase().includes('fail');
@@ -368,7 +376,7 @@ export default function OrderDetailsPage() {
                                 )}
                                 {(() => {
                                     if (order.orderStatus !== 'delivered' || order.returnStatus !== 'none') return false;
-                                    const deliveryDateStr = (order as any).updatedAt || order.estimatedDeliveryDate;
+                                    const deliveryDateStr = order.updatedAt || order.estimatedDeliveryDate;
                                     const deliveryDate = deliveryDateStr ? new Date(deliveryDateStr) : new Date(order.createdAt);
                                     const daysSinceDelivery = (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24);
                                     return daysSinceDelivery <= 7;
@@ -471,25 +479,25 @@ export default function OrderDetailsPage() {
                                     <div className="p-4">
                                         <div className="flex justify-between items-center py-2 text-sm text-gray-600">
                                             <span>Subtotal ({order.items.length} item{order.items.length > 1 ? 's' : ''})</span>
-                                            <span className="text-gray-900">₹{basePrice.toLocaleString('en-IN')}</span>
+                                            <span className="text-gray-900">{formatCurrency(rawSubtotal)}</span>
                                         </div>
                                         <div className="flex justify-between items-center py-2 text-sm text-gray-600">
-                                            <span>CGST / SGST (18% approx)</span>
-                                            <span className="text-gray-900">₹{taxes.toLocaleString('en-IN')}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 text-sm text-gray-600">
-                                            <span>Discount</span>
-                                            <span className="text-gray-900">₹0</span>
+                                            <span>Discount {order.isWelcomeOfferApplied && <span className="text-xs text-green-600">(Welcome Offer)</span>}</span>
+                                            <span className="text-gray-900">-{formatCurrency(rawDiscountAmount)}</span>
                                         </div>
                                         <div className="flex justify-between items-center py-2 text-sm text-gray-600">
                                             <span>Shipping</span>
-                                            <span className="text-gray-900">Free</span>
+                                            <span className="text-gray-900">{rawShippingCost === 0 ? 'Free' : formatCurrency(rawShippingCost)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-2 text-sm text-gray-600">
+                                            <span>Tax (Inclusive)</span>
+                                            <span className="text-gray-900">{formatCurrency(rawTaxAmount)}</span>
                                         </div>
                                         <div className="flex justify-between items-center py-4 mt-2 border-t border-gray-100 text-base font-serif text-dark-red">
                                             <span>Total</span>
                                             <div className="text-right">
-                                                <span className="text-grey-beige font-sans text-xs tracking-widest uppercase mr-2 font-normal">INR</span>
-                                                <span className="text-xl">₹{total.toLocaleString('en-IN')}</span>
+                                                <span className="text-grey-beige font-sans text-xs tracking-widest uppercase mr-2 font-normal">{order.currency || 'INR'}</span>
+                                                <span className="text-xl">{formatCurrency(rawTotalAmount)}</span>
                                             </div>
                                         </div>
                                     </div>

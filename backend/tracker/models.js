@@ -33,7 +33,16 @@ const shippingDetailsSchema = new mongoose.Schema(
     state: { type: String, required: true },
     pincode: { type: String, required: true },
     country: { type: String, default: "India" },
-    email: { type: String, trim: true, lowercase: true, default: "" },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+      validate: {
+        validator: v => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: "Invalid email address"
+      }
+    },
   },
   { _id: false }
 );
@@ -119,9 +128,14 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
+    lastClaimFailedAt: {
+      type: Date,
+      default: null,
+    },
+
     orderStatus: {
       type: String,
-      enum: ["pending", "processing", "shipped", "delivered", "cancelled", "return_requested", "returned"],
+      enum: ["pending", "processing", "shipped", "delivered", "cancelled", "return_requested", "returned", "abandoned"],
       default: "pending",
     },
 
@@ -132,6 +146,8 @@ const orderSchema = new mongoose.Schema(
     razorpayOrderId: {
       type: String,
       default: null,
+      unique: true,
+      sparse: true,
     },
 
     razorpayPaymentId: {
@@ -151,6 +167,14 @@ const orderSchema = new mongoose.Schema(
 
     paymentLink: {
       type: String,
+      default: null,
+    },
+
+    // Explicit expiry timestamp — set when the link is generated.
+    // Do NOT use updatedAt as a proxy: any write to the order (webhook, admin note)
+    // would move updatedAt and break expiry math.
+    paymentLinkExpiresAt: {
+      type: Date,
       default: null,
     },
 
@@ -206,6 +230,14 @@ const orderSchema = new mongoose.Schema(
     eddCalculatedAt: {
       type: Date,
       default: null,
+    },
+
+    // Set by the Shiprocket webhook when orderStatus transitions to "delivered".
+    // Used to enforce the configurable return window (StoreSettings.returnWindowDays).
+    deliveredAt: {
+      type: Date,
+      default: null,
+      index: true,
     },
 
     /* =========================================
@@ -323,12 +355,14 @@ const orderSchema = new mongoose.Schema(
     ========================================= */
     statusHistory: [
       {
+        fromStatus: { type: String, default: null },
+        toStatus: { type: String, default: null },
         status: { type: String, required: true },
         changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile", default: null },
         changedAt: { type: Date, default: Date.now },
         source: {
           type: String,
-          enum: ["admin", "system", "payment_gateway", "shiprocket"],
+          enum: ["admin", "system", "payment_gateway", "shiprocket", "razorpay-webhook", "reconciliation", "user"],
           default: "system"
         },
         note: { type: String, default: "" },
@@ -338,6 +372,22 @@ const orderSchema = new mongoose.Schema(
     adminNote: {
       type: String,
       default: "",
+    },
+
+    /* =========================================
+       Manual Review Flag
+       Set when processPaidOrder exhausts all retries with money captured.
+       Enables ops query: Order.find({ needsManualReview: true })
+    ========================================= */
+    needsManualReview: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    reviewReason: {
+      type: String,
+      default: null,
     },
 
     /* =========================================
