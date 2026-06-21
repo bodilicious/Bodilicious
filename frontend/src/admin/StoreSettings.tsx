@@ -341,16 +341,26 @@ export default function StoreSettings() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Settings className="text-dark-red" size={28} />
           <h2 className="text-2xl font-serif font-bold text-dark-red">Settings</h2>
         </div>
-        {isDirty && (
-          <div className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2">
-            <AlertTriangle size={16} /> Unsaved Changes
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          {isDirty && (
+            <div className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2">
+              <AlertTriangle size={16} /> Unsaved Changes
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={(e: any) => handleSave(e)}
+            disabled={saving || !isDirty}
+            className="flex items-center gap-2 bg-dark-red text-white px-6 py-2 rounded-xl font-bold hover:bg-ruby-red transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving...' : <><Save size={18} /> Save Settings</>}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -886,16 +896,6 @@ export default function StoreSettings() {
               </div>
             )}
 
-            {/* Save Button */}
-            <div className="flex justify-end pt-4 border-t border-silk-light">
-              <button
-                type="submit"
-                disabled={saving || !isDirty}
-                className="flex items-center gap-2 bg-dark-red text-white px-8 py-3 rounded-xl font-bold hover:bg-ruby-red transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : <><Save size={18} /> Save Settings</>}
-              </button>
-            </div>
           </form>
         </div>
       </div>

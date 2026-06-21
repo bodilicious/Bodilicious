@@ -131,7 +131,7 @@ export const pushOrderToShiprocket = async (order) => {
     const payload = {
       order_id: order._id.toString(),
       order_date: new Date().toISOString().split("T")[0],
-      pickup_location: "Home",
+      pickup_location: "Primary",
       billing_customer_name: firstName,
       billing_last_name: lastName,
       billing_address: shippingDetails.address || "No Address Provided",
