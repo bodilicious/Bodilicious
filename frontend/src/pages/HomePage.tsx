@@ -326,7 +326,6 @@ export default function HomePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {!showSplash && (
           <m.div
             initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -659,7 +658,6 @@ export default function HomePage() {
 
       <Footer />
       </m.div>
-        )}
       </AnimatePresence>
     </div>
   );
