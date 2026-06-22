@@ -7,6 +7,117 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     routes:
+      - type: redirect
+        source: /pages/about-us
+        destination: /about
+      - type: redirect
+        source: /pages/brand-story
+        destination: /brand-story
+      - type: redirect
+        source: /pages/contact-us
+        destination: /contact
+      - type: redirect
+        source: /pages/privacy-policy
+        destination: /privacy
+      - type: redirect
+        source: /pages/shipping-and-refund-policy
+        destination: /shipping-refund
+      - type: redirect
+        source: /pages/terms-and-conditions
+        destination: /terms
+      - type: redirect
+        source: /products/matt-liquid-lipstick
+        destination: /product/BD-LIP-MATT
+      - type: redirect
+        source: /products/smooth-hair-banana-shampoo
+        destination: /product/BD-SHAM-BANANA
+      - type: redirect
+        source: /products/spf50-physical-sunscreen
+        destination: /product/BD-SUN-PHYS-SPF50
+      - type: redirect
+        source: /products/beetroot-lip-balm
+        destination: /product/BD-LIP-BEET
+      - type: redirect
+        source: /products/neem-green-tea-extracts-rich-salicylic-acid-serum
+        destination: /product/BD-SER-SAL
+      - type: redirect
+        source: /products/organic-goat-milk-soap
+        destination: /product/BD-SOAP-GOAT
+      - type: redirect
+        source: /products/tnw-antiacne-face-wash
+        destination: /product/BD-CLE-ACNE
+      - type: redirect
+        source: /products/ultimate-uv-defense-sunscreen-lip-balm
+        destination: /product/BD-LIP-SUN
+      - type: redirect
+        source: /products/avobenzone-rich-liquid-sunscreen
+        destination: /product/BD-SUN-LIQ
+      - type: redirect
+        source: /products/azelaic-acid-serum-for-face
+        destination: /product/BD-SER-AZE
+      - type: redirect
+        source: /products/best-organic-herbal-hair-oil-for-hair-growth
+        destination: /product/BD-HAIR-OIL-HERB
+      - type: redirect
+        source: /products/bodilicious-niacinamide-serum
+        destination: /product/BD-SER-NIA-SPF30
+      - type: redirect
+        source: /products/bodilicious-oats-protein-moisturizer
+        destination: /product/BD-MOIST-OATS
+      - type: redirect
+        source: /products/bodilicious-saf-gel
+        destination: /product/BD-GEL-SAF
+      - type: redirect
+        source: /products/carrot-lip-balm
+        destination: /product/BD-LIP-CARROT
+      - type: redirect
+        source: /products/collagen-booster-retinol-night-repair-serum
+        destination: /product/BD-SER-RET
+      - type: redirect
+        source: /products/hair-scalp-growth-promoter
+        destination: /product/BD-HAIR-GROWTH
+      - type: redirect
+        source: /products/hair-serum-for-women-hair-growth
+        destination: /product/BD-HAIR-SER
+      - type: redirect
+        source: /products/keratin-conditioner
+        destination: /product/BD-COND-KERATIN
+      - type: redirect
+        source: /products/ketoconazole-antidandruff-shampoo
+        destination: /product/BD-SHAM-DAND
+      - type: redirect
+        source: /products/kojic-glycolic-infused-facewash
+        destination: /product/BD-CLE-KOJIC-GLY
+      - type: redirect
+        source: /products/organic-olive-oil-soap
+        destination: /product/BD-SOAP-OLIVE
+      - type: redirect
+        source: /products/peptide-ceramide-collagen-complex-moisturizer
+        destination: /product/BD-MOIST-PEP
+      - type: redirect
+        source: /products/rose-face-and-body-wash
+        destination: /product/BD-CLE-ROSE
+      - type: redirect
+        source: /products/scalp-nourishing-baby-hair-growth-serum
+        destination: /product/BD-HAIR-BABY
+      - type: redirect
+        source: /products/skin-brightening-vitamin-c-serum
+        destination: /product/BD-SER-VITC
+      - type: redirect
+        source: /products/strawberry-face-and-body-wash
+        destination: /product/BD-CLE-STRAW
+      - type: redirect
+        source: /collections/*
+        destination: /shop
+      - type: redirect
+        source: /products/*
+        destination: /shop
+      - type: redirect
+        source: /pages/*
+        destination: /
+      - type: redirect
+        source: /blogs/*
+        destination: /
       - type: rewrite
         source: /*
         destination: /index.html
