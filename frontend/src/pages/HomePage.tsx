@@ -228,13 +228,33 @@ export default function HomePage() {
     [products]
   );
 
-  // Website reviews: pulled from product review data
-  const websiteReviews = useMemo(() =>
-    products
-      .flatMap(p => p.reviews.map(r => ({ ...r, productName: p.name })))
-      .slice(0, 3),
-    [products]
-  );
+  // Website reviews: one review per product, deduplicated by comment text,
+  // sorted by rating desc so the best reviews always surface first.
+  const websiteReviews = useMemo(() => {
+    const seenComments = new Set<string>();
+    const seenProducts = new Set<string>();
+    const unique: Array<(typeof products)[0]['reviews'][0] & { productName: string }> = [];
+
+    // Sort products by rating desc so we pull from the best-rated ones first
+    const sorted = [...products].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+
+    for (const p of sorted) {
+      if (unique.length >= 6) break; // collect up to 6 candidates
+      if (seenProducts.has(p.name)) continue;
+
+      for (const r of p.reviews) {
+        const key = r.comment.trim().toLowerCase();
+        if (seenComments.has(key)) continue;
+        seenComments.add(key);
+        seenProducts.add(p.name);
+        unique.push({ ...r, productName: p.name });
+        break; // one review per product
+      }
+    }
+
+    // Return the top 3 with the highest ratings
+    return unique.sort((a, b) => b.rating - a.rating).slice(0, 3);
+  }, [products]);
 
   // Only show the standard loader if there is an error but the splash wasn't shown
   // Or if it's currently loading, but we decided NOT to show the splash (e.g. reload and splash has already been seen)
