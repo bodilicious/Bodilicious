@@ -1,22 +1,25 @@
 import { nanoid } from 'nanoid';
-
-// In-memory fallback
-import { processAuditBatch } from './worker.js'; 
+import { Queue } from 'bullmq';
+import Redis from 'ioredis';
 import { emitLiveEvent } from '../analytics/live.js'; 
 
-let buffer = [];
-let timer = null;
+const redisUrl = process.env.REDIS_URL || null;
+let auditQueue = null;
 
-export const flushBuffer = async () => {
-  if (buffer.length === 0) return;
-  const eventsToProcess = [...buffer];
-  buffer = [];
-  try {
-    await processAuditBatch(eventsToProcess);
-  } catch(err) {
-    console.error('Background batch flush failed:', err);
-  }
-};
+if (redisUrl) {
+  const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
+  auditQueue = new Queue('auditQueue', {
+    connection,
+    defaultJobOptions: {
+      removeOnComplete: { count: 500 },
+      removeOnFail: { count: 2000 },
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 }
+    }
+  });
+} else {
+  console.warn("⚠️ REDIS_URL not set. Audit logger will not queue events.");
+}
 
 /**
  * Mask PII from payloads before enqueuing
@@ -71,19 +74,12 @@ export async function logAuditEvent(event) {
     // Emit live event for real-time dashboard
     emitLiveEvent(payload.event_type, payload.metadata);
 
-    // In-memory batching without Redis
-    buffer.push(payload);
-    if (buffer.length >= 100) {
-      if (timer) clearTimeout(timer);
-      timer = null;
-      flushBuffer();
-    } else if (!timer) {
-      timer = setTimeout(() => {
-        timer = null;
-        flushBuffer();
-      }, 500);
+    // Enqueue job via BullMQ
+    if (auditQueue) {
+      await auditQueue.add('audit-event', payload);
     }
   } catch (err) {
     console.error('CRITICAL: Audit logger failed completely', err);
   }
 }
+

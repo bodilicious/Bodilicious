@@ -1,6 +1,6 @@
  
 import { motion } from 'framer-motion';
-import { Gift, ChevronRight, Sparkles, Truck, Tag } from 'lucide-react';
+import { Gift, ChevronRight, Sparkles, Truck } from 'lucide-react';
 import { User } from '../../types';
 
 interface Props {
@@ -29,14 +29,6 @@ export default function OffersSection({ user, navigateTo }: Props) {
             tag: 'Always Active',
             icon: Truck,
             color: 'text-indigo-600 bg-indigo-50 border-indigo-200'
-        },
-        {
-            id: 'bundle',
-            title: 'Routine Savings: 10% OFF',
-            benefit: 'Save when you buy a full ritual bundle',
-            tag: 'Member Exclusive',
-            icon: Tag,
-            color: 'text-amber-700 bg-amber-50 border-amber-200'
         }
     ];
 

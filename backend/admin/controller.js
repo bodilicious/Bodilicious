@@ -130,6 +130,8 @@ export const getDashboardSummary = async (req, res) => {
  */
 export const getNotificationCounts = async (req, res) => {
   try {
+    const { lastViewedOrders, lastViewedReturns } = req.query;
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -169,12 +171,24 @@ export const getNotificationCounts = async (req, res) => {
 
     const usersCount = usersReqAttention[0]?.count || 0;
 
-    const [tickets, logs] = await Promise.all([
+    const ordersQuery = { orderStatus: "pending" };
+    if (lastViewedOrders && !isNaN(Number(lastViewedOrders))) {
+      ordersQuery.createdAt = { $gt: new Date(Number(lastViewedOrders)) };
+    }
+
+    const returnsQuery = { orderStatus: "return_requested" };
+    if (lastViewedReturns && !isNaN(Number(lastViewedReturns))) {
+      returnsQuery.updatedAt = { $gt: new Date(Number(lastViewedReturns)) };
+    }
+
+    const [tickets, logs, orders, returns] = await Promise.all([
       Ticket.countDocuments({ status: "open" }),
       AuditLogV2.countDocuments({ 
         event_type: "PAYMENT_FAILED", 
         timestamp_utc: { $gte: sevenDaysAgo } 
-      })
+      }),
+      Order.countDocuments(ordersQuery),
+      Order.countDocuments(returnsQuery)
     ]);
 
     res.json({
@@ -182,7 +196,9 @@ export const getNotificationCounts = async (req, res) => {
       data: {
         tickets,
         users: usersCount,
-        logs
+        logs,
+        orders,
+        returns
       }
     });
   } catch (err) {
@@ -393,7 +409,8 @@ const autoSyncOrdersWithShiprocket = async (orders) => {
         if (!srOrder) return;
 
         const updates = {};
-        if (!order.awb && srOrder.awb_code) updates.awb = srOrder.awb_code;
+        const fetchedAwb = srOrder.awb_data?.awb || srOrder.shipments?.awb;
+        if (!order.awb && fetchedAwb) updates.awb = fetchedAwb;
         if (srOrder.courier_name) updates.estimatedCourierName = srOrder.courier_name;
         if (srOrder.etd) {
           const edd = new Date(srOrder.etd);
@@ -1635,3 +1652,122 @@ export const createDraftOrder = async (req, res) => {
   }
 };
 
+import HomepageContent from "../settings/homepageModel.js";
+
+export const getImages = async (req, res) => {
+  try {
+    const { nextCursor, maxResults = 30 } = req.query;
+    
+    cloudinary.config({ 
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+      api_key: process.env.CLOUDINARY_API_KEY, 
+      api_secret: process.env.CLOUDINARY_API_SECRET 
+    });
+
+    const tenantFolder = "bodilicious_products";
+
+    const result = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: `${tenantFolder}/`,
+      max_results: Math.min(Number(maxResults) || 30, 500),
+      next_cursor: nextCursor,
+      direction: 'desc'
+    });
+
+    const images = result.resources.map(res => ({
+      publicId: res.public_id,
+      url: res.secure_url,
+      width: res.width,
+      height: res.height,
+      format: res.format,
+      bytes: res.bytes,
+      createdAt: res.created_at,
+      tags: res.tags || []
+    }));
+
+    res.json({
+      success: true,
+      images,
+      nextCursor: result.next_cursor || null
+    });
+  } catch (err) {
+    console.error("GetImages Error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch images" });
+  }
+};
+
+export const deleteImages = async (req, res) => {
+  try {
+    const { publicIds } = req.body;
+    if (!Array.isArray(publicIds) || publicIds.length === 0) {
+      return res.status(400).json({ success: false, message: "No publicIds provided" });
+    }
+
+    const tenantFolder = "bodilicious_products";
+    for (const id of publicIds) {
+      if (!id.startsWith(`${tenantFolder}/`)) {
+        return res.status(403).json({ success: false, message: `Access denied to delete image: ${id}` });
+      }
+    }
+
+    cloudinary.config({ 
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+      api_key: process.env.CLOUDINARY_API_KEY, 
+      api_secret: process.env.CLOUDINARY_API_SECRET 
+    });
+
+    const result = await cloudinary.api.delete_resources(publicIds, { invalidate: true });
+    
+    if (req.user) {
+      await logAction(req, "IMAGES_DELETED", "settings", "media_library", { publicIds });
+    }
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error("DeleteImages Error:", err);
+    res.status(500).json({ success: false, message: "Failed to delete images" });
+  }
+};
+
+export const getImageUsage = async (req, res) => {
+  try {
+    const { publicId } = req.query;
+    if (!publicId) return res.status(400).json({ success: false, message: "publicId is required" });
+
+    const searchString = publicId;
+    const usage = [];
+    
+    // Check Products
+    const products = await Product.find({ 
+      $or: [
+        { images: { $regex: searchString, $options: 'i' } }
+      ]
+    });
+    if (products.length > 0) {
+      usage.push(...products.map(p => ({ type: 'Product', name: p.name, id: p._id })));
+    }
+
+    // Check Homepage Content
+    const homepage = await HomepageContent.findOne();
+    if (homepage) {
+      const checkContent = (content, versionStr) => {
+        if (!content) return;
+        const slides = content.heroSlides || [];
+        if (slides.some(s => s.imageUrl && s.imageUrl.includes(searchString))) {
+          usage.push({ type: 'Homepage Slide', name: `Hero Carousel (${versionStr})` });
+        }
+        const categories = content.categories || [];
+        if (categories.some(c => c.imageUrl && c.imageUrl.includes(searchString))) {
+          usage.push({ type: 'Homepage Category', name: `Category Banner (${versionStr})` });
+        }
+      };
+      checkContent(homepage.draft, 'Draft');
+      checkContent(homepage.published, 'Published');
+    }
+
+    res.json({ success: true, usage });
+  } catch (err) {
+    console.error("GetImageUsage Error:", err);
+    res.status(500).json({ success: false, message: "Failed to check image usage" });
+  }
+};

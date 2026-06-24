@@ -1,0 +1,4913 @@
+[{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b05"
+  },
+  "pid": "BD-EYE-NIGHT",
+  "name": "Bodilicious Night Care Eye Cream",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/night-eye-0.webp?v=1782049737687",
+    "/products/night-eye-1.webp?v=1782049737687",
+    "/products/night-eye-2.webp?v=1782049737687",
+    "/products/night-eye-3.webp?v=1782049737687"
+  ],
+  "description": "Night eye cream formulated to repair and rejuvenate tired eyes overnight.",
+  "category": "skin",
+  "sub_category": "eye_care",
+  "product_type": "Eye cream",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Reduces dark circles",
+    "Repairs overnight"
+  ],
+  "concerns_targeted": [
+    "dark_circles",
+    "fatigue"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "daily",
+    "routine_step": "eye care"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b10"
+      },
+      "rating": 4,
+      "comment": "So hydrating and doesn't feel heavy at all.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd5"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.455Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.455Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 4,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd6"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.460Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.460Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b40"
+      },
+      "rating": 4,
+      "comment": "Helped my acne so much. Truly a lifesaver.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd7"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.461Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.461Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b25"
+      },
+      "rating": 4,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd8"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.461Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.461Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.064Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b11"
+  },
+  "pid": "BD-LIP-CARROT",
+  "name": "Bodilicious Carrot Lip Balm",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/carrot-0.webp?v=1782049737687",
+    "/products/carrot-1.webp?v=1782049737687",
+    "/products/carrot-2.webp?v=1782049737687",
+    "/products/carrot-3.webp?v=1782049737687"
+  ],
+  "description": "Lip balm enriched with carrot extract to reduce lip pigmentation.",
+  "category": "lip",
+  "sub_category": "lip_balm",
+  "product_type": "Lip balm",
+  "item_form": "Balm",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Carrot Extract"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Reduces pigmentation",
+    "Hydrates lips"
+  ],
+  "concerns_targeted": [
+    "lip_pigmentation",
+    "dry_lips"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "as needed",
+    "routine_step": "lip care"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "Gentle, effective, and smells great.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3011"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b0d"
+      },
+      "rating": 4,
+      "comment": "Love the brand and its commitment to quality.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3012"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 4,
+      "comment": "The results speak for themselves. Simply amazing.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3013"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5b"
+      },
+      "rating": 5,
+      "comment": "Love the brand and its commitment to quality.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3014"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.846Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4af8"
+  },
+  "pid": "BD-SER-NIA-SPF30",
+  "name": "Bodilicious Niacinamide Serum with SPF 30",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/niacinamide-serum-0.webp?v=1782049737687",
+    "/products/niacinamide-serum-1.webp?v=1782049737687",
+    "/products/niacinamide-serum-2.webp?v=1782049737687",
+    "/products/niacinamide-serum-3.webp?v=1782049737687"
+  ],
+  "description": "Daily-use lightweight serum formulated with 5% niacinamide and mineral UV filters to reduce pigmentation, control oil and protect skin from sun damage.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Face serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Niacinamide 5%",
+      "Titanium Dioxide",
+      "Zinc Oxide"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Reduces dark spots",
+    "Controls excess oil",
+    "Strengthens skin barrier",
+    "Prevents sun damage"
+  ],
+  "concerns_targeted": [
+    "pigmentation",
+    "dark_spots",
+    "uneven_tone",
+    "oil_control"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 349,
+  "price_inr": 349,
+  "stock": 94,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 4,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f94"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.285Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.285Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b61"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f95"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.346Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.346Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b2e"
+      },
+      "rating": 4,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f96"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.347Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.347Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1c"
+      },
+      "rating": 4,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f97"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.347Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.347Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1476,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.060Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b01"
+  },
+  "pid": "BD-SUN-LIQ",
+  "name": "Bodilicious Liquid Sunscreen",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/liq-sun-0.webp?v=1782049737687",
+    "/products/liq-sun-1.webp?v=1782049737687",
+    "/products/liq-sun-2.webp?v=1782049737687",
+    "/products/liq-sun-3.webp?v=1782049737687"
+  ],
+  "description": "Lightweight liquid sunscreen suitable for daily use, including acne-prone skin.",
+  "category": "skin",
+  "sub_category": "sunscreen",
+  "product_type": "Liquid sunscreen",
+  "item_form": "Liquid",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "UV protection",
+    "Non-greasy",
+    "Lightweight"
+  ],
+  "concerns_targeted": [
+    "sun_damage"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "daily",
+    "routine_step": "sunscreen"
+  },
+  "price": 249,
+  "price_inr": 249,
+  "stock": 95,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b34"
+      },
+      "rating": 5,
+      "comment": "So hydrating and doesn't feel heavy at all.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc1"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 5,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc2"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b25"
+      },
+      "rating": 4,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc3"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5b"
+      },
+      "rating": 4,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc4"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.643Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4afa"
+  },
+  "pid": "BD-SER-VITC",
+  "name": "Bodilicious Vitamin C Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/vitamin-c-0.webp?v=1782049737687",
+    "/products/vitamin-c-1.webp?v=1782049737687",
+    "/products/vitamin-c-2.webp?v=1782049737687",
+    "/products/vitamin-c-3.webp?v=1782049737687"
+  ],
+  "description": "Antioxidant vitamin C serum to brighten skin, reduce pigmentation and protect against environmental damage.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Face serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Ethyl Ascorbic Acid",
+      "Alpha Arbutin",
+      "Hyaluronic Acid"
+    ],
+    "botanical_extracts": [
+      "Aloe Vera",
+      "Rice Water"
+    ],
+    "others": [
+      "Panthenol"
+    ]
+  },
+  "benefits": [
+    "Brightens complexion",
+    "Reduces dark spots",
+    "Improves radiance",
+    "Supports collagen"
+  ],
+  "concerns_targeted": [
+    "pigmentation",
+    "dullness",
+    "uneven_tone"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 349,
+  "price_inr": 349,
+  "stock": 96,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5e"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f9e"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.547Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.547Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 4,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f9f"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.547Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.547Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 5,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa0"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.548Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.548Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b25"
+      },
+      "rating": 5,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa1"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.548Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.548Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1476,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.062Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b07"
+  },
+  "pid": "BD-LIP-MATT",
+  "name": "Bodilicious Matt Liquid Lipstick",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/matt-lip-copper.webp?v=1782049737687",
+    "/products/matt-lip-party-pink.webp?v=1782049737687",
+    "/products/matt-lip-pink.webp?v=1782049737687",
+    "/products/matt-lip-red-matte.webp?v=1782049737687"
+  ],
+  "description": "Transfer-proof matte liquid lipstick with long-lasting color.",
+  "category": "makeup",
+  "sub_category": "lipstick",
+  "product_type": "Liquid lipstick",
+  "item_form": "Liquid",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Long lasting",
+    "Smudge-proof",
+    "Matte finish"
+  ],
+  "concerns_targeted": [],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "as needed",
+    "routine_step": "makeup"
+  },
+  "price": 199,
+  "price_inr": 199,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1f"
+      },
+      "rating": 4,
+      "comment": "Gentle, effective, and smells great.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fdf"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 4,
+      "comment": "Love the brand and its commitment to quality.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fe0"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "High quality product with great results.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fe1"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b0d"
+      },
+      "rating": 5,
+      "comment": "The packaging is beautiful and the product is even better.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fe2"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.693Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.064Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45,
+  "product_weight_g": 0,
+  "product_weight_ml": 0,
+  "texture": ""
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b14"
+  },
+  "pid": "BD-SHAM-DAND",
+  "name": "Bodilicious Anti-Dandruff Shampoo",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/anti-dan-0.webp?v=1782049737687",
+    "/products/anti-dan-1.webp?v=1782049737687",
+    "/products/anti-dan-2.webp?v=1782049737687",
+    "/products/anti-dan-3.webp?v=1782049737687"
+  ],
+  "description": "Anti-dandruff shampoo formulated to reduce flakes and soothe scalp.",
+  "category": "hair",
+  "sub_category": "shampoo",
+  "product_type": "Shampoo",
+  "item_form": "Liquid",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Reduces dandruff",
+    "Soothes scalp"
+  ],
+  "concerns_targeted": [
+    "dandruff"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "2-3 times a week",
+    "routine_step": "shampoo"
+  },
+  "price": 369,
+  "price_inr": 369,
+  "stock": 97,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.75,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 5,
+      "comment": "Love the natural ingredients. Will buy again.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3020"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.134Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 5,
+      "comment": "Best shampoo for frizz-prone hair. Works like magic.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3021"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.135Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.135Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b22"
+      },
+      "rating": 5,
+      "comment": "Love the natural ingredients. Will buy again.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3022"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.135Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.135Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b34"
+      },
+      "rating": 4,
+      "comment": "Reduced my hair fall significantly. Great product!",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3023"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.135Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.135Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4aff"
+  },
+  "pid": "BD-SOAP-GOAT",
+  "name": "Bodilicious Organic Goat Milk Soap",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/goat-milk-0.webp?v=1782049737687",
+    "/products/goat-milk-1.webp?v=1782049737687",
+    "/products/goat-milk-2.webp?v=1782049737687",
+    "/products/goat-milk-3.webp?v=1782049737687"
+  ],
+  "description": "Mild cleansing soap enriched with goat milk to nourish and protect skin barrier.",
+  "category": "body",
+  "sub_category": "soap",
+  "product_type": "Soap bar",
+  "item_form": "Solid bar",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Goat Milk"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Gentle cleansing",
+    "Nourishes skin",
+    "Supports barrier"
+  ],
+  "concerns_targeted": [
+    "dryness",
+    "sensitivity"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "cleanser"
+  },
+  "price": 200,
+  "price_inr": 200,
+  "stock": 99,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b13"
+      },
+      "rating": 4,
+      "comment": "A must-have body wash for daily use.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fb7"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.073Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.073Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b22"
+      },
+      "rating": 4,
+      "comment": "Really helps with dry patches on my arms.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fb8"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.073Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.073Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b4f"
+      },
+      "rating": 5,
+      "comment": "Gentle on skin yet very effective.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fb9"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.074Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.074Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b46"
+      },
+      "rating": 5,
+      "comment": "Feels like a spa experience every morning.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fba"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.074Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.074Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b00"
+  },
+  "pid": "BD-LIP-BEET",
+  "name": "Bodilicious Beetroot Lip Balm",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/beet-lip-0.webp?v=1782049737687",
+    "/products/beet-lip-1.webp?v=1782049737687",
+    "/products/beet-lip-2.webp?v=1782049737687",
+    "/products/beet-lip-3.webp?v=1782049737687"
+  ],
+  "description": "Tinted lip balm enriched with beetroot extract for moisturized, naturally pink lips.",
+  "category": "lip",
+  "sub_category": "lip_balm",
+  "product_type": "Tinted lip balm",
+  "item_form": "Balm",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Beetroot Extract"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Hydrates lips",
+    "Adds natural tint"
+  ],
+  "concerns_targeted": [
+    "dry_lips",
+    "lip_pigmentation"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "as needed",
+    "routine_step": "lip care"
+  },
+  "price": 99,
+  "price_inr": 99,
+  "stock": 97,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1f"
+      },
+      "rating": 4,
+      "comment": "I've tried many products, but this is the best one.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fbc"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b2b"
+      },
+      "rating": 4,
+      "comment": "Highly recommend to all my friends and family.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fbd"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b28"
+      },
+      "rating": 4,
+      "comment": "Gentle, effective, and smells great.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fbe"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b37"
+      },
+      "rating": 4,
+      "comment": "Perfect addition to my beauty routine.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fbf"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.167Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b03"
+  },
+  "pid": "BD-CLE-ACNE",
+  "name": "Bodilicious No Acne Face Wash",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/no-ac-0.webp?v=1782049737687",
+    "/products/no-ac-1.webp?v=1782049737687",
+    "/products/no-ac-2.webp?v=1782049737687",
+    "/products/no-ac-3.webp?v=1782049737687"
+  ],
+  "description": "Acne-control face wash formulated to unclog pores and reduce excess oil.",
+  "category": "skin",
+  "sub_category": "cleanser",
+  "product_type": "Face wash",
+  "item_form": "Gel cleanser",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Reduces acne",
+    "Controls oil",
+    "Cleanses pores"
+  ],
+  "concerns_targeted": [
+    "acne",
+    "oil_control"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "cleanser"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "Feels very luxury on the skin. Love the texture.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fcb"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b61"
+      },
+      "rating": 4,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fcc"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 4,
+      "comment": "Highly recommend for anyone with oily skin.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fcd"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b10"
+      },
+      "rating": 4,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fce"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.117Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.064Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b0f"
+  },
+  "pid": "BD-SER-HA",
+  "name": "Bodilicious Hyaluronic Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/hyaluronic-serum-0.webp?v=1782049737687",
+    "/products/hyaluronic-serum-1.webp?v=1782049737687",
+    "/products/hyaluronic-serum-2.webp?v=1782049737687",
+    "/products/hyaluronic-serum-3.webp?v=1782049737687"
+  ],
+  "description": "Hydrating hyaluronic acid serum to plump skin and reduce dehydration lines.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Hydrating serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Hyaluronic Acid"
+    ],
+    "botanical_extracts": [],
+    "others": [
+      "Glycerin",
+      "Panthenol",
+      "Squalane"
+    ]
+  },
+  "benefits": [
+    "Deep hydration",
+    "Plumps skin"
+  ],
+  "concerns_targeted": [
+    "dehydration",
+    "dryness"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b37"
+      },
+      "rating": 4,
+      "comment": "Highly recommend for anyone with oily skin.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3007"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b0d"
+      },
+      "rating": 4,
+      "comment": "Perfect for my sensitive skin. No irritation at all.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3008"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5b"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3009"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b2b"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf300a"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.533Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b18"
+  },
+  "pid": "BD-RET-CREAM",
+  "name": "Bodilicious Retinol Night Cream",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/retinol-night-c-0.webp?v=1782049737687",
+    "/products/retinol-night-c-1.webp?v=1782049737687",
+    "/products/retinol-night-c-2.webp?v=1782049737687",
+    "/products/retinol-night-c-3.webp?v=1782049737687"
+  ],
+  "description": "Retinol-based night cream to reduce visible signs of aging.",
+  "category": "skin",
+  "sub_category": "night_cream",
+  "product_type": "Night cream",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "Retinol"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Reduces fine lines",
+    "Improves firmness"
+  ],
+  "concerns_targeted": [
+    "aging"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "alternate days",
+    "routine_step": "moisturizer"
+  },
+  "price": 3999,
+  "price_inr": 499,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5e"
+      },
+      "rating": 4,
+      "comment": "Helped my acne so much. Truly a lifesaver.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3034"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 4,
+      "comment": "Perfect for my sensitive skin. No irritation at all.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3035"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 5,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3036"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1f"
+      },
+      "rating": 4,
+      "comment": "Amazing glow! My skin has never looked better.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3037"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.732Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "product_weight_g": 0,
+  "product_weight_ml": 0,
+  "texture": ""
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b04"
+  },
+  "pid": "BD-EYE-DAY",
+  "name": "Bodilicious Day Care Eye Cream",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/day-eye-0.webp?v=1782049737687",
+    "/products/day-eye-1.webp?v=1782049737687",
+    "/products/day-eye-2.webp?v=1782049737687",
+    "/products/day-eye-3.webp?v=1782049737687"
+  ],
+  "description": "Day eye cream to hydrate under-eye area and reduce puffiness and dark circles.",
+  "category": "skin",
+  "sub_category": "eye_care",
+  "product_type": "Eye cream",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "Argireline"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Hydrates under-eye",
+    "Reduces puffiness",
+    "Softens fine lines"
+  ],
+  "concerns_targeted": [
+    "dark_circles",
+    "puffiness",
+    "fine_lines"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "daily",
+    "routine_step": "eye care"
+  },
+  "price": 399,
+  "price_inr": 399,
+  "stock": 98,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1f"
+      },
+      "rating": 4,
+      "comment": "Helped my acne so much. Truly a lifesaver.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd0"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b16"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd1"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b46"
+      },
+      "rating": 5,
+      "comment": "Helped my acne so much. Truly a lifesaver.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd2"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1c"
+      },
+      "rating": 5,
+      "comment": "So hydrating and doesn't feel heavy at all.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fd3"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.360Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.064Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b0a"
+  },
+  "pid": "BD-HAIR-SER",
+  "name": "Bodilicious Hair Serum (Frizz Control)",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/hair-serum-0.webp?v=1782049737687",
+    "/products/hair-serum-1.webp?v=1782049737687",
+    "/products/hair-serum-2.webp?v=1782049737687",
+    "/products/hair-serum-3.webp?v=1782049737687"
+  ],
+  "description": "Lightweight hair serum to reduce frizz and add shine.",
+  "category": "hair",
+  "sub_category": "hair_serum",
+  "product_type": "Hair serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Controls frizz",
+    "Adds shine"
+  ],
+  "concerns_targeted": [
+    "frizz"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "as needed",
+    "routine_step": "hair styling"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b4c"
+      },
+      "rating": 4,
+      "comment": "Scalp feels so clean and refreshed after every wash.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2fee"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b2b"
+      },
+      "rating": 4,
+      "comment": "The best hair treatment I've tried in a long time.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2fef"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b43"
+      },
+      "rating": 4,
+      "comment": "Noticeable shine after just a few uses.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff0"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b25"
+      },
+      "rating": 4,
+      "comment": "Scalp feels so clean and refreshed after every wash.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff1"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.087Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1467,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.066Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b0e"
+  },
+  "pid": "BD-SER-AZE",
+  "name": "Bodilicious Azelaic Acid Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/aze-0.webp?v=1782049737687",
+    "/products/aze-1.webp?v=1782049737687",
+    "/products/aze-2.webp?v=1782049737687",
+    "/products/aze-3.webp?v=1782049737687"
+  ],
+  "description": "Azelaic acid serum to improve skin tone, control oil and reduce blemishes.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Face serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Azelaic Acid"
+    ],
+    "botanical_extracts": [],
+    "others": [
+      "Panthenol"
+    ]
+  },
+  "benefits": [
+    "Brightens skin",
+    "Controls oil",
+    "Improves tone"
+  ],
+  "concerns_targeted": [
+    "pigmentation",
+    "oil_control",
+    "blemishes"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 349,
+  "price_inr": 349,
+  "stock": 98,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.75,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 5,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3002"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.452Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.452Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 5,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3003"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.453Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.453Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b28"
+      },
+      "rating": 5,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3004"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.453Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.453Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b52"
+      },
+      "rating": 4,
+      "comment": "Amazing glow! My skin has never looked better.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3005"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.453Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.453Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b15"
+  },
+  "pid": "BD-HAIR-GROWTH",
+  "name": "Bodilicious Hair Scalp Growth Promoter",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/scalp-0.webp?v=1782049737687",
+    "/products/scalp-1.webp?v=1782049737687",
+    "/products/scalp-2.webp?v=1782049737687",
+    "/products/scalp-3.webp?v=1782049737687"
+  ],
+  "description": "Scalp serum formulated to strengthen roots and promote healthy hair growth.",
+  "category": "hair",
+  "sub_category": "scalp_treatment",
+  "product_type": "Scalp serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Strengthens roots",
+    "Supports hair growth"
+  ],
+  "concerns_targeted": [
+    "hair_fall"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "daily",
+    "routine_step": "scalp care"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b4c"
+      },
+      "rating": 4,
+      "comment": "Love the natural ingredients. Will buy again.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3025"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5e"
+      },
+      "rating": 5,
+      "comment": "Noticeable shine after just a few uses.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3026"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 4,
+      "comment": "Noticeable shine after just a few uses.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3027"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b61"
+      },
+      "rating": 4,
+      "comment": "The best hair treatment I've tried in a long time.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf3028"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.202Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b0b"
+  },
+  "pid": "BD-HAIR-OIL-HERB",
+  "name": "Bodilicious Organic Herbal Hair Oil",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/herbal-hair-0.webp?v=1782049737687",
+    "/products/herbal-hair-1.webp?v=1782049737687",
+    "/products/herbal-hair-2.webp?v=1782049737687",
+    "/products/herbal-hair-3.webp?v=1782049737687"
+  ],
+  "description": "Herbal hair oil blend formulated to nourish scalp and reduce hair fall.",
+  "category": "hair",
+  "sub_category": "hair_oil",
+  "product_type": "Hair oil",
+  "item_form": "Oil",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Bhringraj",
+      "Amla",
+      "Hibiscus"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Reduces hair fall",
+    "Nourishes scalp",
+    "Strengthens roots"
+  ],
+  "concerns_targeted": [
+    "hair_fall",
+    "weak_roots"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "2-3 times a week",
+    "routine_step": "hair oil"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5e"
+      },
+      "rating": 4,
+      "comment": "Great for dry and damaged hair. Very nourishing.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff3"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 4,
+      "comment": "Noticeable shine after just a few uses.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff4"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b1c"
+      },
+      "rating": 5,
+      "comment": "Reduced my hair fall significantly. Great product!",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff5"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 5,
+      "comment": "Smells wonderful! Lon-lasting fragrance.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff6"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.181Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1425,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.066Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b0c"
+  },
+  "pid": "BD-SHAM-BAR",
+  "name": "Bodilicious Ashwagandha & Shikakai Shampoo Bar",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/ash-0.webp?v=1782049737687",
+    "/products/ash-1.webp?v=1782049737687",
+    "/products/ash-2.webp?v=1782049737687",
+    "/products/ash-3.webp?v=1782049737687"
+  ],
+  "description": "Herbal shampoo bar formulated with shikakai to gently cleanse hair and improve scalp health.",
+  "category": "hair",
+  "sub_category": "shampoo",
+  "product_type": "Shampoo bar",
+  "item_form": "Solid bar",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Ashwagandha",
+      "Shikakai"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Gentle cleansing",
+    "Adds shine",
+    "Supports scalp health"
+  ],
+  "concerns_targeted": [
+    "dull_hair"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "2-3 times a week",
+    "routine_step": "shampoo"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 97,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b4f"
+      },
+      "rating": 4,
+      "comment": "My hair feels so strong and healthy.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff8"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b16"
+      },
+      "rating": 4,
+      "comment": "Love the natural ingredients. Will buy again.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ff9"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b37"
+      },
+      "rating": 4,
+      "comment": "Noticeable shine after just a few uses.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ffa"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b3a"
+      },
+      "rating": 4,
+      "comment": "Love the natural ingredients. Will buy again.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ffb"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.271Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1404,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4afc"
+  },
+  "pid": "BD-MOIST-PEP",
+  "name": "Bodilicious Peptide Ceramide Collagen Complex Moisturizer",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/peptide-moisturizer-0.webp?v=1782049737687",
+    "/products/peptide-moisturizer-1.webp?v=1782049737687",
+    "/products/peptide-moisturizer-2.webp?v=1782049737687",
+    "/products/peptide-moisturizer-3.webp?v=1782049737687"
+  ],
+  "description": "The Bodilicious Peptide Ceramide Collagen Complex Moisturizer is a luxurious anti-aging serum-moisturizer formulated to deeply hydrate, strengthen, and rejuvenate the skin barrier. Packed with a potent blend of peptides, ceramides, and collagen, this moisturizer helps to reduce fine lines, improve elasticity, and restore a youthful, plump complexion.",
+  "category": "skin",
+  "sub_category": "moisturizer",
+  "product_type": "Face moisturizer",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "Peptides",
+      "Ceramides",
+      "Collagen",
+      "Hyaluronic Acid"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Firms and smooths the skin",
+    "Strengthens and repairs skin barrier",
+    "Boosts elasticity and suppleness",
+    "Deeply hydrates and locks in moisture"
+  ],
+  "concerns_targeted": [
+    "fine_lines_and_wrinkles",
+    "loss_of_firmness",
+    "dehydration",
+    "weakened_skin_barrier"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "moisturizer"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 99,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b4c"
+      },
+      "rating": 4,
+      "comment": "Highly recommend for anyone with oily skin.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa8"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.730Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.730Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 5,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa9"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.731Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.731Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b40"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2faa"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.731Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.731Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b10"
+      },
+      "rating": 4,
+      "comment": "So hydrating and doesn't feel heavy at all.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fab"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.731Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.731Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1475,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b16"
+  },
+  "pid": "BD-HAIR-BABY",
+  "name": "Bodilicious Baby Hair Growth Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/b-hair-0.webp?v=1782049737687",
+    "/products/b-hair-1.webp?v=1782049737687",
+    "/products/b-hair-2.webp?v=1782049737687",
+    "/products/b-hair-3.webp?v=1782049737687"
+  ],
+  "description": "Gentle scalp serum to support baby hair growth.",
+  "category": "hair",
+  "sub_category": "scalp_treatment",
+  "product_type": "Hair serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Supports new hair growth"
+  ],
+  "concerns_targeted": [
+    "baby_hair"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "daily",
+    "routine_step": "scalp care"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 97,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.75,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b43"
+      },
+      "rating": 5,
+      "comment": "Great for dry and damaged hair. Very nourishing.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf302a"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.556Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.556Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b22"
+      },
+      "rating": 4,
+      "comment": "My hair feels so strong and healthy.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf302b"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.557Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.557Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 5,
+      "comment": "Best shampoo for frizz-prone hair. Works like magic.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf302c"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.557Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.557Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 5,
+      "comment": "Makes my hair so soft and manageable.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf302d"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.557Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.557Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4af9"
+  },
+  "pid": "BD-SER-RET",
+  "name": "Bodilicious Retinol Night Repair Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/retinol-serum-0.webp?v=1782049737687",
+    "/products/retinol-serum-1.webp?v=1782049737687",
+    "/products/retinol-serum-2.webp?v=1782049737687",
+    "/products/retinol-serum-3.webp?v=1782049737687"
+  ],
+  "description": "Night-time retinol serum designed to improve skin texture, reduce fine lines, acne marks and uneven tone.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Night serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Retinol"
+    ],
+    "botanical_extracts": [
+      "Rice Water"
+    ],
+    "others": [
+      "Panthenol"
+    ]
+  },
+  "benefits": [
+    "Improves skin texture",
+    "Reduces fine lines",
+    "Fades acne marks",
+    "Boosts collagen"
+  ],
+  "concerns_targeted": [
+    "aging",
+    "acne_marks",
+    "uneven_texture",
+    "pigmentation"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "alternate days",
+    "routine_step": "serum"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 97,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b46"
+      },
+      "rating": 5,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f99"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 4,
+      "comment": "Amazing glow! My skin has never looked better.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f9a"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b52"
+      },
+      "rating": 5,
+      "comment": "Amazing glow! My skin has never looked better.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f9b"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b61"
+      },
+      "rating": 4,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2f9c"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.457Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1476,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.062Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4afb"
+  },
+  "pid": "BD-SER-SAL",
+  "name": "Bodilicious Salicylic Acid Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/saly-0.webp?v=1782049737687",
+    "/products/saly-1.webp?v=1782049737687",
+    "/products/saly-2.webp?v=1782049737687",
+    "/products/saly-3.webp?v=1782049737687"
+  ],
+  "description": "Oil-controlling salicylic acid serum designed to treat acne, blackheads and clogged pores.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Face serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Salicylic Acid"
+    ],
+    "botanical_extracts": [
+      "Neem",
+      "Green Tea"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Reduces acne",
+    "Unclogs pores",
+    "Controls excess oil"
+  ],
+  "concerns_targeted": [
+    "acne",
+    "blackheads",
+    "oil_control"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 349,
+  "price_inr": 349,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b25"
+      },
+      "rating": 4,
+      "comment": "So hydrating and doesn't feel heavy at all.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa3"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b4c"
+      },
+      "rating": 5,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa4"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 4,
+      "comment": "Feels very luxury on the skin. Love the texture.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa5"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b61"
+      },
+      "rating": 4,
+      "comment": "Highly recommend for anyone with oily skin.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fa6"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.648Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1476,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b0d"
+  },
+  "pid": "BD-SER-AHA-BHA",
+  "name": "Bodilicious AHA & BHA Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/aha-bha-0.webp?v=1782049737687",
+    "/products/aha-bha-1.webp?v=1782049737687",
+    "/products/aha-bha-2.webp?v=1782049737687",
+    "/products/aha-bha-3.webp?v=1782049737687"
+  ],
+  "description": "Chemical exfoliating serum with AHA and BHA to remove dead skin cells and improve skin texture.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Exfoliating serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Glycolic Acid",
+      "Salicylic Acid"
+    ],
+    "botanical_extracts": [
+      "Aloe Vera",
+      "Centella Asiatica"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Exfoliates skin",
+    "Improves texture",
+    "Brightens complexion"
+  ],
+  "concerns_targeted": [
+    "dullness",
+    "uneven_texture",
+    "clogged_pores"
+  ],
+  "usage": {
+    "time": "PM",
+    "frequency": "once a week",
+    "routine_step": "serum"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b43"
+      },
+      "rating": 4,
+      "comment": "Helped my acne so much. Truly a lifesaver.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ffd"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b2b"
+      },
+      "rating": 4,
+      "comment": "Highly recommend for anyone with oily skin.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2ffe"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf2fff"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 4,
+      "comment": "Feels very luxury on the skin. Love the texture.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf3000"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.349Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4afd"
+  },
+  "pid": "BD-CLE-ROSE",
+  "name": "Bodilicious Rose Face and Body Wash",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/rose-0.webp?v=1782049737687",
+    "/products/rose-1.webp?v=1782049737687",
+    "/products/rose-2.webp?v=1782049737687",
+    "/products/rose-3.webp?v=1782049737687"
+  ],
+  "description": "Gentle soap-free cleanser infused with rose extract to cleanse without stripping moisture.",
+  "category": "body",
+  "sub_category": "face_body_wash",
+  "product_type": "Face & body wash",
+  "item_form": "Gel cleanser",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Rose Extract"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Gentle cleansing",
+    "Maintains hydration",
+    "Softens skin"
+  ],
+  "concerns_targeted": [
+    "dryness",
+    "sensitivity"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "cleanser"
+  },
+  "price": 369,
+  "price_inr": 369,
+  "stock": 96,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "Amazing glow! My skin has never looked better.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fad"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.823Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.823Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 5,
+      "comment": "My skin feels so soft and supple after using this.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fae"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.823Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.823Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 5,
+      "comment": "Visible results in just a week! I'm impressed.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2faf"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.824Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.824Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b13"
+      },
+      "rating": 4,
+      "comment": "Feels very luxury on the skin. Love the texture.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fb0"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.824Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.824Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4afe"
+  },
+  "pid": "BD-GEL-SAF",
+  "name": "Bodilicious SAF Gel For Glowing Skin",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/saf-0.webp?v=1782049737687",
+    "/products/saf-1.webp?v=1782049737687",
+    "/products/saf-2.webp?v=1782049737687",
+    "/products/saf-3.webp?v=1782049737687"
+  ],
+  "description": "Cooling gel with aloe vera, cucumber and saffron to calm irritation and hydrate skin.",
+  "category": "skin",
+  "sub_category": "soothing_gel",
+  "product_type": "Hydrating gel",
+  "item_form": "Gel",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Aloe Vera",
+      "Cucumber",
+      "Saffron"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Calms redness",
+    "Hydrates skin",
+    "Soothes sunburn"
+  ],
+  "concerns_targeted": [
+    "sunburn",
+    "redness",
+    "dehydration"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "treatment"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b13"
+      },
+      "rating": 4,
+      "comment": "So hydrating and doesn't feel heavy at all.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fb2"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.953Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.953Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b10"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fb3"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.954Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.954Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b3d"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fb4"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.955Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.955Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b2b"
+      },
+      "rating": 4,
+      "comment": "Amazing glow! My skin has never looked better.",
+      "_id": {
+        "$oid": "69b325469cc50263f8bf2fb5"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:46.955Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:46.955Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b10"
+  },
+  "pid": "BD-SOAP-OLIVE",
+  "name": "Bodilicious Organic Olive Oil Soap",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/olive-soap-0.webp?v=1782049737687",
+    "/products/olive-soap-1.webp?v=1782049737687",
+    "/products/olive-soap-2.webp?v=1782049737687",
+    "/products/olive-soap-3.webp?v=1782049737687"
+  ],
+  "description": "Handcrafted olive oil soap for gentle daily cleansing.",
+  "category": "body",
+  "sub_category": "soap",
+  "product_type": "Soap bar",
+  "item_form": "Solid bar",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Olive Oil"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Gentle cleansing",
+    "Maintains moisture"
+  ],
+  "concerns_targeted": [
+    "dryness"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "cleanser"
+  },
+  "price": 150,
+  "price_inr": 150,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b28"
+      },
+      "rating": 4,
+      "comment": "A must-have body wash for daily use.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf300c"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b0d"
+      },
+      "rating": 4,
+      "comment": "Feels like a spa experience every morning.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf300d"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 4,
+      "comment": "The fragrance is just divine. Highly recommend.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf300e"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b4c"
+      },
+      "rating": 5,
+      "comment": "Love the fragrance! It's so soothing.",
+      "_id": {
+        "$oid": "69b325499cc50263f8bf300f"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:49.650Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "product_weight_g": 0,
+  "product_weight_ml": 0,
+  "texture": ""
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b06"
+  },
+  "pid": "BD-FOUND-FRESH",
+  "name": "Bodilicious Fresh Look Foundation",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/fresh-0.webp?v=1782049737687",
+    "/products/fresh-1.webp?v=1782049737687",
+    "/products/fresh-2.webp?v=1782049737687",
+    "/products/fresh-3.webp?v=1782049737687"
+  ],
+  "description": "Lightweight foundation offering even coverage with a natural finish.",
+  "category": "makeup",
+  "sub_category": "foundation",
+  "product_type": "Liquid foundation",
+  "item_form": "Liquid",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [
+      "Ashwagandha"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Even coverage",
+    "Hydrating",
+    "Natural finish"
+  ],
+  "concerns_targeted": [
+    "uneven_tone"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "as needed",
+    "routine_step": "makeup"
+  },
+  "price": 499,
+  "price_inr": 499,
+  "stock": 98,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.2,
+  "ratingCount": 5,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b40"
+      },
+      "rating": 4,
+      "comment": "Love the brand and its commitment to quality.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fda"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.602Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.602Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cadbcc244343fec8b22"
+      },
+      "rating": 4,
+      "comment": "The results speak for themselves. Simply amazing.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fdb"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.602Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.602Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "The results speak for themselves. Simply amazing.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fdc"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.602Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.602Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b5b"
+      },
+      "rating": 4,
+      "comment": "High quality product with great results.",
+      "_id": {
+        "$oid": "69b325489cc50263f8bf2fdd"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:48.603Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:48.603Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69fdaef322f86b10996bf780"
+      },
+      "rating": 5,
+      "comment": "Awesome results, love the products.",
+      "isVerified": false,
+      "_id": {
+        "$oid": "6a3243ee5bdc8bf43bc4170b"
+      },
+      "createdAt": {
+        "$date": "2026-06-17T06:51:26.315Z"
+      },
+      "updatedAt": {
+        "$date": "2026-06-17T06:51:26.315Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1474,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.064Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b02"
+  },
+  "pid": "BD-LIP-SUN",
+  "name": "Bodilicious Sunscreen Lip Balm",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/sun-lip-0.webp?v=1782049737687",
+    "/products/sun-lip-1.webp?v=1782049737687",
+    "/products/sun-lip-2.webp?v=1782049737687",
+    "/products/sun-lip-3.webp?v=1782049737687"
+  ],
+  "description": "Nourishing lip balm with UV protection to prevent sun-induced lip darkening.",
+  "category": "lip",
+  "sub_category": "lip_balm",
+  "product_type": "Lip balm with SPF",
+  "item_form": "Balm",
+  "ingredients": {
+    "key_actives": [],
+    "botanical_extracts": [],
+    "others": [
+      "Shea Butter",
+      "Kokum Butter"
+    ]
+  },
+  "benefits": [
+    "Protects lips from UV",
+    "Prevents dryness",
+    "Softens lips"
+  ],
+  "concerns_targeted": [
+    "dry_lips",
+    "lip_pigmentation"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "as needed",
+    "routine_step": "lip care"
+  },
+  "price": 99,
+  "price_inr": 99,
+  "stock": 98,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4.25,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b31"
+      },
+      "rating": 4,
+      "comment": "A bit pricey but totally worth every penny.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc6"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.829Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.829Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cafbcc244343fec8b49"
+      },
+      "rating": 5,
+      "comment": "Gentle, effective, and smells great.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc7"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.964Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.964Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b16"
+      },
+      "rating": 4,
+      "comment": "Love the brand and its commitment to quality.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc8"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.964Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.964Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b08"
+      },
+      "rating": 4,
+      "comment": "The results speak for themselves. Simply amazing.",
+      "_id": {
+        "$oid": "69b325479cc50263f8bf2fc9"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:47.964Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:47.964Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1473,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.063Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b31ea329d12b6b5c8c4b13"
+  },
+  "pid": "BD-CLAY-KAOLIN",
+  "name": "Bodilicious Kaolin Clay Cleanser",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/kaolin-0.webp?v=1782049737687",
+    "/products/kaolin-1.webp?v=1782049737687",
+    "/products/kaolin-2.webp?v=1782049737687",
+    "/products/kaolin-3.webp?v=1782049737687"
+  ],
+  "description": "Kaolin clay-based cleanser to absorb excess oil and impurities.",
+  "category": "skin",
+  "sub_category": "cleanser",
+  "product_type": "Clay cleanser",
+  "item_form": "Powder",
+  "ingredients": {
+    "key_actives": [
+      "Kaolin Clay"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Controls oil",
+    "Cleanses pores"
+  ],
+  "concerns_targeted": [
+    "oil_control"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "2-3 times a week",
+    "routine_step": "cleanser"
+  },
+  "price": 299,
+  "price_inr": 299,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [],
+  "tips": [],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 4,
+  "ratingCount": 4,
+  "reviews": [
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b61"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf301b"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cb0bcc244343fec8b52"
+      },
+      "rating": 4,
+      "comment": "The ingredients are top-notch. Can feel the quality.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf301c"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31caebcc244343fec8b34"
+      },
+      "rating": 4,
+      "comment": "Best serum I've used so far. Highly recommended.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf301d"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      }
+    },
+    {
+      "user": {
+        "$oid": "69b31cacbcc244343fec8b19"
+      },
+      "rating": 4,
+      "comment": "Feels very luxury on the skin. Love the texture.",
+      "_id": {
+        "$oid": "69b3254a9cc50263f8bf301e"
+      },
+      "createdAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      },
+      "updatedAt": {
+        "$date": "2026-03-12T20:42:50.023Z"
+      }
+    }
+  ],
+  "isActive": true,
+  "__v": 1402,
+  "createdAt": {
+    "$date": "2026-03-12T20:14:27.067Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b3299f96bd9e53ef072645"
+  },
+  "pid": "BD-SER-COQ10",
+  "name": "Bodilicious Coenzyme Q10 Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/coq-0.webp?v=1782049737687",
+    "/products/coq-1.webp?v=1782049737687",
+    "/products/coq-2.webp?v=1782049737687",
+    "/products/coq-3.webp?v=1782049737687"
+  ],
+  "description": "Anti-aging serum formulated with Coenzyme Q10, antioxidants and hydrating actives to reduce fine lines, support collagen production and improve overall skin tone.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Anti-aging serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Coenzyme Q10",
+      "Hyaluronic Acid",
+      "Vitamin B5",
+      "Vitamin B3",
+      "Glutathione",
+      "Alpha Arbutin"
+    ],
+    "botanical_extracts": [],
+    "others": [
+      "Epidermal Growth Factor",
+      "Antioxidants"
+    ]
+  },
+  "benefits": [
+    "Helps skin look younger",
+    "Reduces fine lines and wrinkles",
+    "Supports collagen and elastin production",
+    "Replenishes skin cells",
+    "Helps reduce free radical damage",
+    "Evens skin tone"
+  ],
+  "concerns_targeted": [
+    "fine_lines_and_wrinkles",
+    "aging",
+    "uneven_tone",
+    "dullness",
+    "free_radical_damage"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 999,
+  "stock": 27,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "all_skin_types"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Add 1 to 2 drops on cleansed face and neck",
+    "Dab until absorbed",
+    "Follow in both AM and PM routines for good results"
+  ],
+  "tips": [
+    "For dry skin, apply in sandwich method",
+    "Apply moisturizer, then Coenzyme Q10 serum, then re-apply moisturizer"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "For external use only"
+  ],
+  "is_active_based": false,
+  "rating": 5,
+  "ratingCount": 3,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 999,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b329b696bd9e53ef072647"
+  },
+  "pid": "BD-CLE-STRAW",
+  "name": "Bodilicious Strawberry Face and Body Wash",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/strawberry-0.webp?v=1782049737687",
+    "/products/strawberry-1.webp?v=1782049737687",
+    "/products/strawberry-2.webp?v=1782049737687",
+    "/products/strawberry-3.webp?v=1782049737687"
+  ],
+  "description": "Refreshing face and body wash formulated to cleanse, control excess oil, improve skin tone, and leave skin soft, supple, and glowing.",
+  "category": "body",
+  "sub_category": "face_body_wash",
+  "product_type": "Face & body wash",
+  "item_form": "Gel cleanser",
+  "ingredients": {
+    "key_actives": [
+      "Strawberry Extract"
+    ],
+    "botanical_extracts": [
+      "Strawberry"
+    ],
+    "others": []
+  },
+  "benefits": [
+    "Helps eliminate excessive oil",
+    "Improves skin tone",
+    "Brightens complexion",
+    "Helps reduce sun damage",
+    "Gives a soft and supple appearance"
+  ],
+  "concerns_targeted": [
+    "oil_control",
+    "pigmentation",
+    "uneven_tone",
+    "sun_damage",
+    "dullness"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "cleanser"
+  },
+  "price": 369,
+  "stock": 200,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "all_skin_types"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Wet your face with water",
+    "Take a small amount of face wash in your palm",
+    "Gently massage your face in a circular motion for 30 seconds",
+    "Rinse thoroughly with water",
+    "Pat dry with a clean towel"
+  ],
+  "tips": [
+    "Can be used on both face and body",
+    "Use daily for best results"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "For external use only"
+  ],
+  "is_active_based": false,
+  "rating": 1,
+  "ratingCount": 1,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 369,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b329c996bd9e53ef072649"
+  },
+  "pid": "BD-MOIST-OATS",
+  "name": "Bodilicious Oats Protein Moisturizer",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/oats-protein-0.webp?v=1782049737687",
+    "/products/oats-protein-1.webp?v=1782049737687",
+    "/products/oats-protein-2.webp?v=1782049737687",
+    "/products/oats-protein-3.webp?v=1782049737687"
+  ],
+  "description": "Oats protein moisturizer enriched to moisturize, soothe and nourish dry skin, leaving skin balanced, hydrated, plump and youthful throughout the day.",
+  "category": "skin",
+  "sub_category": "moisturizer",
+  "product_type": "skincare",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "Oats Extract",
+      "Panthenol"
+    ],
+    "botanical_extracts": [
+      "Aloe Vera Extract",
+      "Centella Asiatica"
+    ],
+    "others": [
+      "Cetyl Alcohol"
+    ]
+  },
+  "benefits": [
+    "Nourishes skin cells",
+    "Supports skin healing and regeneration",
+    "Keeps skin moisturized for 16 hours",
+    "Soothes dry skin",
+    "Leaves skin plump and youthful"
+  ],
+  "concerns_targeted": [
+    "dryness",
+    "dehydration",
+    "weakened_skin_barrier"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "moisturizer"
+  },
+  "price": 349,
+  "stock": 499,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "dry",
+    "normal",
+    "combination"
+  ],
+  "skin_type_not_suitable": [
+    "acne_prone"
+  ],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Take a little bit of moisturizer and apply it all over the face and neck in circular motions",
+    "Use it on a regular basis to get better results"
+  ],
+  "tips": [
+    "Apply moisturizer after the serum"
+  ],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 1,
+  "ratingCount": 1,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 349,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b329e696bd9e53ef07264b"
+  },
+  "pid": "BD-MOIST-SILICA-OATS",
+  "name": "Bodilicious Squalene Silica Oats Moisturizer",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/silica-oats-0.webp?v=1782049737687",
+    "/products/silica-oats-1.webp?v=1782049737687",
+    "/products/silica-oats-2.webp?v=1782049737687",
+    "/products/silica-oats-3.webp?v=1782049737687"
+  ],
+  "description": "Lightweight, non-comedogenic moisturizer formulated to soothe, strengthen, and visibly refine skin while delivering gentle hydration and barrier support.",
+  "category": "skin",
+  "sub_category": "moisturizer",
+  "product_type": "Skin care",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "CICA Squalene",
+      "Silica",
+      "Oats Protein"
+    ],
+    "botanical_extracts": [],
+    "others": [
+      "Rich Protein Complex",
+      "Glycerin",
+      "Propanediol",
+      "Capric Triglyceride",
+      "Panthenol"
+    ]
+  },
+  "benefits": [
+    "Soothes redness and inflammation",
+    "Supports the skin barrier",
+    "Blurs pores and mattifies",
+    "Locks in hydration",
+    "Lightweight and non-greasy"
+  ],
+  "concerns_targeted": [
+    "redness",
+    "dehydration",
+    "weakened_skin_barrier",
+    "oil_control",
+    "acne_prone_skin"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "moisturizer"
+  },
+  "price": 499,
+  "stock": 527,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "oily",
+    "acne_prone",
+    "redness_prone",
+    "sensitive"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Apply to clean skin as the final step of your skincare routine",
+    "Use evenly over face and neck",
+    "Follow with sunscreen in the morning"
+  ],
+  "tips": [
+    "Works well under SPF or makeup",
+    "Use daily for best barrier-supporting results"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "Patch test before first use"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 499,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5
+},
+{
+  "_id": {
+    "$oid": "69b329f896bd9e53ef07264d"
+  },
+  "pid": "BD-SER-GLOW",
+  "name": "Bodilicious Glow Boost Serum",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/glow-boost-0.webp?v=1782049737687",
+    "/products/glow-boost-1.webp?v=1782049737687",
+    "/products/glow-boost-2.webp?v=1782049737687",
+    "/products/glow-boost-3.webp?v=1782049737687"
+  ],
+  "description": "Soothing and barrier repair serum designed to protect the skin barrier, brighten the complexion and support healthy glowing skin.",
+  "category": "skin",
+  "sub_category": "serum",
+  "product_type": "Barrier repair serum",
+  "item_form": "Serum",
+  "ingredients": {
+    "key_actives": [
+      "Peptides",
+      "Antioxidants",
+      "Vitamins"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Protects skin barrier",
+    "Soothes irritated skin",
+    "Boosts skin glow",
+    "Reduces fine lines and wrinkles",
+    "Improves skin hydration"
+  ],
+  "concerns_targeted": [
+    "dullness",
+    "fine_lines_and_wrinkles",
+    "skin_barrier_damage",
+    "dehydration"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "serum"
+  },
+  "price": 499,
+  "stock": 199,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "all_skin_types"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Take 3 to 4 drops of serum",
+    "Apply evenly over the face",
+    "Gently dab until absorbed",
+    "Follow with moisturizer and sunscreen"
+  ],
+  "tips": [
+    "Use daily in both AM and PM routine for best results"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "For external use only"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 499,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b32a0f96bd9e53ef07264f"
+  },
+  "pid": "BD-SHAM-BANANA",
+  "name": "Bodilicious Banana Shampoo",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/banana-0.webp?v=1782049737687",
+    "/products/banana-1.webp?v=1782049737687",
+    "/products/banana-2.webp?v=1782049737687",
+    "/products/banana-3.webp?v=1782049737687"
+  ],
+  "description": "Nourishing banana shampoo formulated to gently cleanse hair, reduce frizz and deeply nourish dry hair from root to tip.",
+  "category": "hair",
+  "sub_category": "shampoo",
+  "product_type": "Hair shampoo",
+  "item_form": "Liquid",
+  "ingredients": {
+    "key_actives": [
+      "Organic Banana Puree",
+      "Vegan Silk Protein"
+    ],
+    "botanical_extracts": [
+      "Banana Extract"
+    ],
+    "others": [
+      "Natural Cleansing Agents",
+      "Conditioning Base"
+    ]
+  },
+  "benefits": [
+    "Gently cleanses hair",
+    "Reduces frizz",
+    "Nourishes dry hair",
+    "Improves hair smoothness",
+    "Leaves hair soft and healthy"
+  ],
+  "concerns_targeted": [
+    "dry_hair",
+    "frizz",
+    "damaged_hair"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "2-3 times a week",
+    "routine_step": "shampoo"
+  },
+  "price": 499,
+  "stock": 126,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [
+    "dry_hair",
+    "frizzy_hair",
+    "damaged_hair"
+  ],
+  "how_to_use": [
+    "Apply shampoo to wet hair",
+    "Massage gently into scalp and hair",
+    "Rinse thoroughly with water",
+    "Repeat if necessary"
+  ],
+  "tips": [
+    "Use with Bodilicious conditioner for better results"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "For external use only"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 499,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b32a2b96bd9e53ef072651"
+  },
+  "pid": "BD-COND-KERATIN",
+  "name": "Bodilicious Keratin Enriched Hair Conditioner",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/keratine-0.webp?v=1782049737687",
+    "/products/keratine-1.webp?v=1782049737687",
+    "/products/keratine-2.webp?v=1782049737687",
+    "/products/keratine-3.webp?v=1782049737687"
+  ],
+  "description": "Keratin enriched hair conditioner designed to reduce frizz, repair damage and deeply condition hair while restoring lost moisture and shine.",
+  "category": "hair",
+  "sub_category": "conditioner",
+  "product_type": "Hair conditioner",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "Keratin Protein",
+      "Silk Proteins"
+    ],
+    "botanical_extracts": [
+      "Argan Oil",
+      "Rapeseed Oil"
+    ],
+    "others": [
+      "Cyclopentasilicone",
+      "Centrimonium Chloride",
+      "Behentrimonium Methosulfate",
+      "Panthenol"
+    ]
+  },
+  "benefits": [
+    "Reduces hair breakage",
+    "Controls frizz",
+    "Deeply conditions damaged hair",
+    "Restores moisture after shampoo",
+    "Improves hair smoothness and shine"
+  ],
+  "concerns_targeted": [
+    "frizz",
+    "dry_hair",
+    "damaged_hair",
+    "hair_breakage"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "2-3 times a week",
+    "routine_step": "conditioner"
+  },
+  "price": 349,
+  "stock": 526,
+  "availability": "In Stock",
+  "skin_type_suitable": [],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [
+    "dry_hair",
+    "frizzy_hair",
+    "damaged_hair"
+  ],
+  "how_to_use": [
+    "Apply after shampoo on wet hair",
+    "Spread evenly from mid-length to ends",
+    "Leave for 5-10 minutes",
+    "Rinse thoroughly with water"
+  ],
+  "tips": [
+    "Use with Bodilicious shampoo for best results",
+    "Apply hair serum after drying to lock moisture"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "For external use only"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "__v": 1401,
+  "price_inr": 349,
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b32ac296bd9e53ef072653"
+  },
+  "pid": "BD-CLE-KOJIC-GLY",
+  "name": "Bodilicious Kojic Glycolic Infused Facewash",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/kojic-glycolic-0.webp?v=1782049737687",
+    "/products/kojic-glycolic-1.webp?v=1782049737687",
+    "/products/kojic-glycolic-2.webp?v=1782049737687",
+    "/products/kojic-glycolic-3.webp?v=1782049737687"
+  ],
+  "description": "Skin brightening facewash formulated with kojic acid and glycolic acid to exfoliate dead skin cells, reduce dark spots and improve skin radiance.",
+  "category": "body",
+  "sub_category": "face_body_wash",
+  "product_type": "Face wash",
+  "item_form": "Gel cleanser",
+  "ingredients": {
+    "key_actives": [
+      "Kojic Acid",
+      "Glycolic Acid"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Reduces dullness",
+    "Fades dark spots",
+    "Removes tan",
+    "Exfoliates dead skin cells",
+    "Reveals brighter skin"
+  ],
+  "concerns_targeted": [
+    "pigmentation",
+    "dark_spots",
+    "dullness",
+    "uneven_tone",
+    "acne_marks"
+  ],
+  "usage": {
+    "time": "AM & PM",
+    "frequency": "daily",
+    "routine_step": "cleanser"
+  },
+  "price": 349,
+  "stock": 524,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "normal",
+    "acne_prone",
+    "tanned_skin",
+    "uneven_skin"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Take a coin-sized amount into your palm",
+    "Massage gently on damp face",
+    "Rinse thoroughly with water",
+    "Use twice daily for best results"
+  ],
+  "tips": [
+    "Use sunscreen during the day when using exfoliating products"
+  ],
+  "warnings": [
+    "Avoid contact with eyes",
+    "Perform a patch test before use"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "__v": 1401,
+  "price_inr": 349,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69b32ae796bd9e53ef072655"
+  },
+  "pid": "BD-SUN-PHYS-SPF50",
+  "name": "Bodilicious Physical Sunscreen with SPF 50",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/p-sunscreen-0.webp?v=1782049737687",
+    "/products/p-sunscreen-1.webp?v=1782049737687",
+    "/products/p-sunscreen-2.webp?v=1782049737687",
+    "/products/p-sunscreen-3.webp?v=1782049737687"
+  ],
+  "description": "Physical sunscreen with SPF 50 that provides daily sun protection while also offering moisturizing benefits. Helps prevent sunburn, tanning, and premature aging while maintaining even skin tone.",
+  "category": "skin",
+  "sub_category": "sunscreen",
+  "product_type": "Skin care",
+  "item_form": "Cream",
+  "ingredients": {
+    "key_actives": [
+      "Titanium Dioxide",
+      "Zinc Oxide"
+    ],
+    "botanical_extracts": [],
+    "others": []
+  },
+  "benefits": [
+    "Helps prevent sunburn",
+    "Helps prevent premature aging",
+    "Protects skin from tanning",
+    "Maintains even skin tone",
+    "Provides moisturizing benefits"
+  ],
+  "concerns_targeted": [
+    "sun_damage",
+    "tanning",
+    "uneven_tone",
+    "premature_aging"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "daily",
+    "routine_step": "sunscreen"
+  },
+  "price": 349,
+  "stock": 478,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "dry",
+    "normal",
+    "combination"
+  ],
+  "skin_type_not_suitable": [
+    "acne_prone"
+  ],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Gently wash your face and pat dry",
+    "Apply liberally to exposed areas of skin",
+    "Use 20 minutes before going out"
+  ],
+  "tips": [
+    "Re-apply every 3 hours"
+  ],
+  "warnings": [],
+  "is_active_based": false,
+  "rating": 5,
+  "ratingCount": 5,
+  "reviews": [],
+  "isActive": true,
+  "updatedAt": {
+    "$date": "2026-06-21T13:51:08.781Z"
+  },
+  "__v": 1401,
+  "price_inr": 349,
+  "lowStockThreshold": 5,
+  "expectedLifespanDays": 45
+},
+{
+  "_id": {
+    "$oid": "69c52d3451875888bf062007"
+  },
+  "pid": "BD-SUN-HYD-SPF50-SPRAY",
+  "name": "Bodilicious Hydrating Sunscreen Spray SPF 50++++",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/sunscreen-spray-0.webp?v=1782049737687",
+    "/products/sunscreen-spray-1.webp?v=1782049737687",
+    "/products/sunscreen-spray-2.webp?v=1782049737687",
+    "/products/sunscreen-spray-3.webp?v=1782049737687"
+  ],
+  "description": "Hydrating sunscreen spray with SPF 50++++ that helps protect against UVA, UVB, and blue light while delivering a cooling and calming sensation. Formulated to be lightweight, non-greasy, and leave no white cast.",
+  "category": "skin",
+  "sub_category": "sunscreen",
+  "product_type": "Sunscreen spray",
+  "item_form": "Spray",
+  "ingredients": {
+    "key_actives": [
+      "UV Hybrid Filters PROSUN",
+      "Tremella Fusiformis",
+      "Alpha Arbutin",
+      "Hyaluronic Acid"
+    ],
+    "botanical_extracts": [
+      "Aloe Barbadensis Miller Extract"
+    ],
+    "others": [
+      "Aqua",
+      "Propanediol",
+      "Glycerine"
+    ]
+  },
+  "benefits": [
+    "Clinically certified SPF",
+    "Research and developed product",
+    "Hybrid sunscreen",
+    "Cooling sensation",
+    "Calming effect",
+    "No white cast",
+    "No greasiness",
+    "Pure and safe",
+    "Eco-friendly",
+    "Blue light protection"
+  ],
+  "concerns_targeted": [
+    "sun_protection",
+    "uva_uvb_protection",
+    "blue_light_protection",
+    "dryness",
+    "skin_heat",
+    "greasiness"
+  ],
+  "usage": {
+    "time": "AM",
+    "frequency": "every_3_hours",
+    "routine_step": "sunscreen"
+  },
+  "price": 399,
+  "price_inr": 399,
+  "stock": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "all_skin_types"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Shake well before use.",
+    "Spray evenly on exposed skin.",
+    "Use as the final step of your morning routine.",
+    "Reapply every 3 hours for complete defence against UV rays."
+  ],
+  "tips": [
+    "Store in normal temperature.",
+    "Use before sun exposure.",
+    "Reapply after sweating or wiping the skin."
+  ],
+  "warnings": [
+    "If irritation occurs, discontinue use.",
+    "For external use only."
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "lowStockThreshold": 5,
+  "__v": 1275,
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "69ce7be43ff475e60e01d9d9"
+  },
+  "pid": "BD-SOAP-RED-SANDAL-100G",
+  "name": "Bodilicious Red Sandalwood Bath Soap",
+  "slug": "red-sandalwood-bath-soap",
+  "brand": "Bodilicious",
+  "images": [
+    "https://res.cloudinary.com/diannamdd/image/upload/v1775142243/bodilicious_products/BD-NEW-1775142239468-948932973-red_sandal_0.webp.png?v=1782049737687",
+    "/products/red_sandal_1.webp?v=1782049737687",
+    "/products/red_sandal_2.webp?v=1782049737687",
+    "/products/red_sandal_3.webp?v=1782049737687"
+  ],
+  "description": "A natural herbal bath soap enriched with Red Sandalwood, Tulsi, and Turmeric for deep cleansing and radiant skin.",
+  "category": "skin",
+  "sub_category": "soap",
+  "product_type": "cleansing bar",
+  "item_form": "bar",
+  "ingredients": {
+    "key_actives": [
+      "Red Sandalwood",
+      "Tulsi Extract",
+      "Turmeric"
+    ],
+    "botanical_extracts": [
+      "Lotus Extract"
+    ],
+    "others": [
+      "Coconut Oil",
+      "Castor Oil",
+      "Palm Oil",
+      "Olive Oil",
+      "Herbal Blend",
+      "Natural Fragrance",
+      "Purified Water",
+      "Sodium Hydroxide"
+    ]
+  },
+  "benefits": [
+    "Deep cleanses skin",
+    "Helps improve skin tone",
+    "Enhances natural glow",
+    "Maintains skin hydration"
+  ],
+  "concerns_targeted": [
+    "dull skin",
+    "pigmentation",
+    "uneven skin tone"
+  ],
+  "usage": {
+    "time": "Morning and Evening",
+    "frequency": "Daily",
+    "routine_step": "cleanser"
+  },
+  "price": 199,
+  "price_inr": 199,
+  "stock": 50,
+  "product_weight_g": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "dry",
+    "oily",
+    "combination",
+    "normal"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Wet the soap and lather with water",
+    "Gently massage onto body and face",
+    "Rinse thoroughly with water"
+  ],
+  "tips": [
+    "Store in a dry place after use",
+    "Use a soap dish to increase longevity"
+  ],
+  "texture": "Smooth solid bar",
+  "warnings": [
+    "Do a patch test before use",
+    "Discontinue if irritation occurs"
+  ],
+  "is_active_based": false,
+  "rating": 4.5,
+  "ratingCount": 2,
+  "reviews": [
+    {
+      "user": "64f1c2b8e1a2b3c4d5e6f789",
+      "rating": 5,
+      "comment": "Very refreshing and natural!",
+      "isVerified": true,
+      "createdAt": "2026-04-01T10:00:00.000Z",
+      "updatedAt": "2026-04-01T10:00:00.000Z"
+    },
+    {
+      "user": "64f1c2b8e1a2b3c4d5e6f790",
+      "rating": 4,
+      "comment": "Good soap, mild fragrance.",
+      "isVerified": false,
+      "createdAt": "2026-04-01T12:00:00.000Z",
+      "updatedAt": "2026-04-01T12:00:00.000Z"
+    }
+  ],
+  "isActive": true,
+  "lowStockThreshold": 5,
+  "createdAt": "2026-04-01T09:00:00.000Z",
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "product_weight_ml": 0,
+  "__v": 1090
+},
+{
+  "_id": {
+    "$oid": "69ce7bef3ff475e60e01d9db"
+  },
+  "pid": "BD-SOAP-TEMPLE-100G",
+  "name": "Bodilicious Temple Bath Soap",
+  "slug": "temple-bath-soap",
+  "brand": "Bodilicious",
+  "images": [
+    "https://res.cloudinary.com/diannamdd/image/upload/v1775143451/bodilicious_products/BD-NEW-1775143450191-19708683-temple_soap_0.webp.png?v=1782049737687",
+    "/products/temple_soap_1.webp?v=1782049737687",
+    "/products/temple_soap_2.webp?v=1782049737687",
+    "/products/temple_soap_3.webp?v=1782049737687"
+  ],
+  "description": "A premium herbal bath soap inspired by temple traditions, infused with Frankincense, Tulsi, Turmeric, and Sandalwood for deep cleansing and rejuvenated skin.",
+  "category": "skin",
+  "sub_category": "soap",
+  "product_type": "cleansing bar",
+  "item_form": "bar",
+  "ingredients": {
+    "key_actives": [
+      "Frankincense",
+      "Tulsi Extract",
+      "Turmeric",
+      "Sandalwood"
+    ],
+    "botanical_extracts": [
+      "Lotus Extract"
+    ],
+    "others": [
+      "Coconut Oil",
+      "Castor Oil",
+      "Olive Oil",
+      "Herbal Blend",
+      "Natural Fragrance",
+      "Purified Water",
+      "Sodium Hydroxide"
+    ]
+  },
+  "benefits": [
+    "Deep cleanses and purifies skin",
+    "Helps improve skin texture",
+    "Provides a refreshing and calming bathing experience",
+    "Supports healthy and glowing skin"
+  ],
+  "concerns_targeted": [
+    "dull skin",
+    "impurities",
+    "uneven skin tone"
+  ],
+  "usage": {
+    "time": "Morning and Evening",
+    "frequency": "Daily",
+    "routine_step": "cleanser"
+  },
+  "price": 99,
+  "price_inr": 99,
+  "stock": 40,
+  "product_weight_g": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "dry",
+    "oily",
+    "combination",
+    "normal"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Wet the soap and lather with water",
+    "Gently massage onto body and face",
+    "Rinse thoroughly with water"
+  ],
+  "tips": [
+    "Store in a dry soap case",
+    "Keep away from excess water to extend life"
+  ],
+  "texture": "Smooth solid bar",
+  "warnings": [
+    "Do a patch test before use",
+    "Discontinue if irritation persists"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "lowStockThreshold": 5,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "__v": 1090,
+  "product_weight_ml": 0
+},
+{
+  "_id": {
+    "$oid": "69f9c39fbae8a4f243738299"
+  },
+  "pid": "BD-SOAP-FRANKINCENSE-100G",
+  "name": "Bodilicious Frankincense Herbal Soap",
+  "slug": "frankincense-herbal-soap",
+  "brand": "Bodilicious",
+  "images": [
+    "/products/frankin-0.webp?v=1782049737687",
+    "/products/frankin-1.webp?v=1782049737687",
+    "/products/frankin-2.webp?v=1782049737687",
+    "/products/frankin-3.webp?v=1782049737687"
+  ],
+  "description": "A premium herbal soap infused with Frankincense, Tulsi, Turmeric, and Sandalwood for deep cleansing and rejuvenated skin.",
+  "category": "skin",
+  "sub_category": "soap",
+  "product_type": "cleansing bar",
+  "item_form": "bar",
+  "ingredients": {
+    "key_actives": [
+      "Frankincense",
+      "Tulsi Extract",
+      "Turmeric",
+      "Sandalwood"
+    ],
+    "botanical_extracts": [
+      "Lotus Extract"
+    ],
+    "others": [
+      "Coconut Oil",
+      "Castor Oil",
+      "Olive Oil",
+      "Herbal Blend",
+      "Natural Fragrance",
+      "Purified Water",
+      "Sodium Hydroxide"
+    ]
+  },
+  "benefits": [
+    "Deep cleanses and purifies skin",
+    "Helps improve skin texture",
+    "Provides a refreshing bathing experience",
+    "Supports healthy and glowing skin"
+  ],
+  "concerns_targeted": [
+    "dull skin",
+    "impurities",
+    "uneven skin tone"
+  ],
+  "usage": {
+    "time": "Morning and Evening",
+    "frequency": "Daily",
+    "routine_step": "cleanser"
+  },
+  "price": 99,
+  "price_inr": 99,
+  "stock": 40,
+  "product_weight_g": 100,
+  "availability": "In Stock",
+  "skin_type_suitable": [
+    "dry",
+    "oily",
+    "combination",
+    "normal"
+  ],
+  "skin_type_not_suitable": [],
+  "hair_type_suitable": [],
+  "how_to_use": [
+    "Wet the soap and lather with water",
+    "Gently massage onto body and face",
+    "Rinse thoroughly with water"
+  ],
+  "tips": [
+    "Store in a dry soap case",
+    "Keep away from excess water to extend life"
+  ],
+  "texture": "Smooth solid bar",
+  "warnings": [
+    "Do a patch test before use",
+    "Discontinue if irritation persists"
+  ],
+  "is_active_based": false,
+  "rating": 0,
+  "ratingCount": 0,
+  "reviews": [],
+  "isActive": true,
+  "lowStockThreshold": 5,
+  "createdAt": "2026-04-02T10:00:00.000Z",
+  "updatedAt": {
+    "$date": "2026-06-21T13:48:58.463Z"
+  },
+  "__v": 429,
+  "product_weight_ml": 0
+}]

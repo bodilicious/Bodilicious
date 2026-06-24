@@ -4,8 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, m } from 'framer-motion';
 import Logo from './Logo';
 import { useApp } from '../context/AppContext';
-import { useCurrency } from '../hooks/useCurrency';
-import { CHECKOUT_CURRENCIES, CURRENCY_LABELS } from '../utils/currencies';
+
 
 type ShopFilter = 'all' | 'skin' | 'hair' | 'body' | 'lip' | 'makeup';
 
@@ -65,32 +64,9 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
-  const { cartCount, wishlist, currentPage, authStatus, user, setShopFilter, products, navigateTo, storeSettings, setUserCurrency } = useApp();
-  const { userCurrency } = useCurrency();
+  const { cartCount, wishlist, currentPage, authStatus, user, setShopFilter, products, navigateTo, storeSettings } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
-  const [currencySearch, setCurrencySearch] = useState('');
-
-  // Build full display currency list from exchangeRates (160+), sorted: INR first, then checkout-supported, then rest
-  const allDisplayCurrencies = useMemo(() => {
-    const rates = storeSettings?.exchangeRates || {};
-    const keys = Object.keys(rates).filter(c => c !== 'INR');
-    const checkoutFirst = keys.filter(c => CHECKOUT_CURRENCIES.has(c)).sort();
-    const rest = keys.filter(c => !CHECKOUT_CURRENCIES.has(c)).sort();
-    return ['INR', ...checkoutFirst, ...rest];
-  }, [storeSettings?.exchangeRates]);
-
-  const filteredCurrencies = useMemo(() => {
-    if (!currencySearch.trim()) return allDisplayCurrencies;
-    const q = currencySearch.toUpperCase();
-    return allDisplayCurrencies.filter(c =>
-      c.includes(q) || (CURRENCY_LABELS[c] || '').toUpperCase().includes(q)
-    );
-  }, [allDisplayCurrencies, currencySearch]);
-
-  // If exchangeRates not yet loaded, fall back to checkout list for the dropdown
-  const displayList = allDisplayCurrencies.length > 1 ? filteredCurrencies
-    : (currencySearch ? [...CHECKOUT_CURRENCIES].filter(c => c.includes(currencySearch.toUpperCase())) : [...CHECKOUT_CURRENCIES]);
 
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -279,7 +255,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden lg:flex justify-center items-center gap-14">
+          <div className="hidden lg:flex justify-center items-center gap-6 xl:gap-10 2xl:gap-14">
             {NAV_LINKS.map((link) => (
               <div
                 key={link.label}
@@ -290,7 +266,7 @@ export default function Navbar() {
                 <Link
                   to={`/${link.page}${link.query ? '?' + link.query : ''}`}
                   onClick={() => handleNav(undefined)}
-                  className={`flex items-center gap-1 text-sm font-sans tracking-widest uppercase transition-colors duration-200 py-6 ${
+                  className={`flex items-center gap-1 text-xs xl:text-sm font-sans tracking-widest uppercase whitespace-nowrap transition-colors duration-200 py-6 ${
                     isTransparent
                       ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]'
                       : currentPage === link.page && (!link.query || location.search.includes(link.query))
@@ -364,56 +340,6 @@ export default function Navbar() {
               <Search size={18} className={searchOpen ? 'scale-110 transition-transform' : 'transition-transform'} />
             </button>
 
-            {storeSettings.autoCurrencySwitchingEnabled !== false && (
-              <div className="relative group/currency" onMouseLeave={() => setCurrencySearch('')}>
-                <button
-                  className={`hidden sm:flex items-center gap-1 text-[10px] font-bold font-sans tracking-widest px-1.5 py-0.5 border rounded transition-colors ${
-                    isTransparent
-                      ? 'text-white/95 border-white/40 hover:bg-white/10 hover:border-white/80 [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]'
-                      : 'text-dark-red/60 border-dark-red/20 hover:text-dark-red hover:border-dark-red/50'
-                  }`}
-                >
-                  {userCurrency} <ChevronDown size={10} />
-                </button>
-                <div className="absolute top-full right-0 mt-1 w-52 bg-white shadow-xl rounded-lg border border-silk opacity-0 pointer-events-none group-hover/currency:opacity-100 group-hover/currency:pointer-events-auto transition-all duration-200 origin-top-right z-50 flex flex-col overflow-hidden">
-                  {/* Search */}
-                  <div className="p-2 border-b border-silk">
-                    <input
-                      type="text"
-                      value={currencySearch}
-                      onChange={e => setCurrencySearch(e.target.value)}
-                      placeholder="Search currency…"
-                      className="w-full text-xs font-sans px-2 py-1.5 border border-silk rounded bg-neutral-50 focus:outline-none focus:border-dark-red/40 text-dark-red placeholder:text-gray-400"
-                    />
-                  </div>
-                  {/* List */}
-                  <div className="overflow-y-auto max-h-56 flex flex-col">
-                    {displayList.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => { setUserCurrency(c); setCurrencySearch(''); }}
-                        title={CURRENCY_LABELS[c] || c}
-                        className={`flex items-center justify-between px-3 py-1.5 text-xs font-sans hover:bg-neutral-50 transition-colors ${
-                          userCurrency === c ? 'text-ruby-red font-bold bg-ruby-red/5' : 'text-dark-red/80'
-                        }`}
-                      >
-                        <span>{CURRENCY_LABELS[c] ? CURRENCY_LABELS[c].split(' – ')[0] : c}</span>
-                        <span className="text-[10px] text-gray-400 truncate max-w-[110px] text-right">
-                          {CURRENCY_LABELS[c] ? CURRENCY_LABELS[c].split(' – ')[1] : ''}
-                          {CHECKOUT_CURRENCIES.has(c) && <span className="ml-1 text-emerald-500">✓</span>}
-                        </span>
-                      </button>
-                    ))}
-                    {displayList.length === 0 && (
-                      <p className="text-xs text-gray-400 px-3 py-2 font-sans">No match found</p>
-                    )}
-                  </div>
-                  <div className="px-3 py-1.5 border-t border-silk bg-neutral-50">
-                    <p className="text-[10px] text-gray-400 font-sans"><span className="text-emerald-500">✓</span> = available at checkout</p>
-                  </div>
-                </div>
-              </div>
-            )}
 
 
 
@@ -613,40 +539,6 @@ export default function Navbar() {
                 )}
               </div>
             ))}
-
-            {storeSettings.autoCurrencySwitchingEnabled !== false && (
-              <div className="border-b border-silk-light py-2 space-y-2 mb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-sans font-medium tracking-widest uppercase text-dark-red py-2 block">Currency</span>
-                  <span className="text-[10px] text-gray-400 font-sans"><span className="text-emerald-500">✓</span> = checkout</span>
-                </div>
-                {/* Mobile search */}
-                <input
-                  type="text"
-                  value={currencySearch}
-                  onChange={e => setCurrencySearch(e.target.value)}
-                  placeholder="Search…"
-                  className="w-full text-xs font-sans px-3 py-1.5 border border-silk rounded bg-neutral-50 focus:outline-none focus:border-dark-red/40 text-dark-red placeholder:text-gray-400 mb-1"
-                />
-                <div className="flex flex-wrap gap-2 px-1 pb-2 max-h-40 overflow-y-auto">
-                  {displayList.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => { setUserCurrency(c); setCurrencySearch(''); setMenuOpen(false); }}
-                      title={CURRENCY_LABELS[c] || c}
-                      className={`px-2.5 py-1 text-xs font-sans tracking-widest rounded border transition-colors relative ${
-                        userCurrency === c ? 'bg-ruby-red text-white border-ruby-red font-bold' : 'bg-transparent text-dark-red/80 border-silk'
-                      }`}
-                    >
-                      {c}{CHECKOUT_CURRENCIES.has(c) && <span className="ml-0.5 text-[8px] text-emerald-400">✓</span>}
-                    </button>
-                  ))}
-                  {displayList.length === 0 && (
-                    <p className="text-xs text-gray-400 font-sans px-1">No match</p>
-                  )}
-                </div>
-              </div>
-            )}
 
             {authStatus === 'authenticated' && (user?.role === 'admin' || user?.role === 'primary_admin') && (
               <div className="mt-6 pt-6 border-t border-silk">

@@ -352,10 +352,20 @@ const OrderManagement: React.FC = () => {
                     {new Date(order.createdAt).toLocaleDateString('en-IN')}
                   </td>
                   <td className="px-4 py-4 font-bold text-dark-red">
-                    ₹{Number(order.totalAmount || 0).toFixed(0)}
+                    <div className="flex flex-col items-start">
+                      <span>₹{Number(order.totalAmount || 0).toFixed(0)}</span>
+                      {order.refundAmount > 0 && <span className="text-[10px] text-purple-600 font-medium">Refund: ₹{order.refundAmount.toLocaleString('en-IN')}</span>}
+                    </div>
                   </td>
                   <td className="px-4 py-4">
-                    {getStatusBadge(order.orderStatus)}
+                    <div className="flex flex-col items-start gap-1.5">
+                      {getStatusBadge(order.orderStatus)}
+                      {order.refundStatus && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${order.refundStatus === 'processed' ? 'bg-purple-50 text-purple-700 border-purple-200' : order.refundStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                          Refund: {order.refundStatus}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     {order.awb ? (

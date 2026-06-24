@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import { useState, useEffect, useMemo } from 'react';
 
 export default function CartPage() {
-  const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings, fetchShippingQuote } = useApp();
+  const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings, fetchShippingQuote, appliedCoupon, setAppliedCoupon } = useApp();
   const { formatPrice, userCurrency } = useCurrency();
   const navigate = useNavigate();
 
@@ -17,12 +17,23 @@ export default function CartPage() {
   );
 
   // 2. Call all hooks BEFORE any conditional returns (Rules of Hooks)
-  const [quoteData, setQuoteData] = useState<{ shippingCost: number; discountAmount: number; total: number; threshold: number }>({
+  const [quoteData, setQuoteData] = useState<{ 
+    shippingCost: number; 
+    discountAmount: number; 
+    total: number; 
+    threshold: number;
+    isWelcomeOfferApplied?: boolean;
+    isFreeShippingCouponApplied?: boolean;
+  }>({
     shippingCost: storeSettings.shippingCost,
     discountAmount: 0,
     total: cartTotal + storeSettings.shippingCost,
     threshold: storeSettings.shippingThreshold
   });
+
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   useEffect(() => {
     if (validCartItems.length === 0) return;
@@ -39,23 +50,69 @@ export default function CartPage() {
       quantity: item.quantity,
     }));
 
-    fetchShippingQuote(itemsForQuote, { country: guessCountry })
+    fetchShippingQuote(itemsForQuote, { country: guessCountry }, appliedCoupon || undefined)
       .then(data => {
         if (isMounted) {
           setQuoteData({
             shippingCost: data.shippingCost,
             discountAmount: data.discountAmount,
             total: data.totalAmount,
-            threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold
+            threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold,
+            isWelcomeOfferApplied: data.isWelcomeOfferApplied,
+            isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
           });
+          // Also set the applied coupon code from backend (in case it got invalidated e.g. min order value not met)
+          if (appliedCoupon && !data.couponCode) {
+             setAppliedCoupon(null);
+             setCouponError("Coupon is no longer valid for this cart.");
+          }
         }
       })
-      .catch(err => console.error("Quote fetch failed:", err));
+      .catch(err => {
+         if (err.isRateLimit) {
+            console.error("Rate limit hit");
+         } else if (isMounted) {
+            setAppliedCoupon(null);
+            setCouponError(err.message || "Invalid coupon");
+            // Re-fetch without the invalid coupon
+            fetchShippingQuote(itemsForQuote, { country: guessCountry }).then(d => {
+              if (isMounted) setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
+            }).catch(e => console.error("Fallback quote failed:", e));
+         }
+      });
       
     return () => { isMounted = false; };
-  // remove storeSettings from dependencies to prevent unnecessary fetches
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [validCartItems, userCurrency, fetchShippingQuote]);
+  }, [validCartItems, userCurrency, fetchShippingQuote, appliedCoupon, storeSettings.shippingThreshold, storeSettings.internationalShippingThreshold]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setIsApplyingCoupon(true);
+    setCouponError(null);
+    try {
+      const itemsForQuote = validCartItems.map((item: any) => ({
+        productId: item.product?._id || item.product,
+        pid: item.product?.pid,
+        quantity: item.quantity,
+      }));
+      const guessCountry = userCurrency === 'USD' ? 'US' : 'IN';
+      
+      const data = await fetchShippingQuote(itemsForQuote, { country: guessCountry }, couponInput.trim());
+      setQuoteData({
+        shippingCost: data.shippingCost,
+        discountAmount: data.discountAmount,
+        total: data.totalAmount,
+        threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold,
+        isWelcomeOfferApplied: data.isWelcomeOfferApplied,
+        isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
+      });
+      setAppliedCoupon(data.couponCode);
+      setCouponInput('');
+    } catch (err: any) {
+      setCouponError(err.message || 'Invalid coupon code');
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
 
   // 3. Early return can now safely happen after all hooks
   if (validCartItems.length === 0) {
@@ -184,17 +241,17 @@ export default function CartPage() {
                     {shipping === 0 ? 'Free' : formatPrice(shipping)}
                   </span>
                 </div>
-                {shipping > 0 && (
+                {shipping > 0 && !quoteData.isFreeShippingCouponApplied && (
                   <p className="text-xs font-sans mt-2 text-dark-red/80 flex items-center gap-1.5 justify-center">
                     <Truck size={14} /> 
                     Free shipping on orders above {formatPrice(currentThreshold)}
                   </p>
                 )}
 
-                {discountAmount > 0 && (
+                {(discountAmount > 0 || quoteData.isFreeShippingCouponApplied) && (
                   <div className="flex justify-between text-sm font-sans text-emerald-600">
-                    <span>Welcome Offer (10%)</span>
-                    <span>-{formatPrice(discountAmount)}</span>
+                    <span>{quoteData.isWelcomeOfferApplied ? 'Welcome Offer (10%)' : quoteData.isFreeShippingCouponApplied && discountAmount === 0 ? 'Free Shipping Coupon' : 'Coupon Applied'}</span>
+                    <span>{discountAmount > 0 ? `-${formatPrice(discountAmount)}` : 'Applied'}</span>
                   </div>
                 )}
 
@@ -204,6 +261,47 @@ export default function CartPage() {
                     {formatPrice(total)}
                     {userCurrency === 'USD' && <span className="text-xs ml-1 opacity-60">*</span>}
                   </span>
+                </div>
+
+                <div className="pt-4 border-t border-silk">
+                  {!appliedCoupon ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          placeholder="Promo code"
+                          className="flex-1 bg-transparent border border-silk px-3 py-2 text-sm font-sans text-dark-red placeholder:text-grey-beige focus:outline-none focus:border-dark-red"
+                        />
+                        <button
+                          onClick={handleApplyCoupon}
+                          disabled={isApplyingCoupon || !couponInput.trim()}
+                          className="bg-dark-red text-silk px-4 py-2 font-sans text-xs tracking-widest uppercase hover:bg-ruby-red transition-colors disabled:opacity-50"
+                        >
+                          {isApplyingCoupon ? '...' : 'Apply'}
+                        </button>
+                      </div>
+                      {couponError && <p className="text-xs text-ruby-red font-sans">{couponError}</p>}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2 text-emerald-700 font-sans font-medium">
+                        <span className="opacity-60">🏷️</span>
+                        {appliedCoupon}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAppliedCoupon(null);
+                          setCouponInput('');
+                          setCouponError(null);
+                        }}
+                        className="text-xs text-grey-beige hover:text-ruby-red font-sans"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

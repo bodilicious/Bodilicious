@@ -12,6 +12,9 @@
     "security-check": "npm audit"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@supabase/supabase-js": "^2.57.4",
     "@types/papaparse": "^5.5.2",
     "animate.css": "^4.1.1",
@@ -31,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/aria-query": "^5.0.4",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

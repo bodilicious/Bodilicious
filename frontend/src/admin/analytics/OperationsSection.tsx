@@ -50,7 +50,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
             Fulfillment SLA Performance
           </h3>
           <div className="h-[250px]">
-            {slaData.length > 0 ? (
+            {totalDelivered > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={slaData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />

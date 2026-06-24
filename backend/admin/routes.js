@@ -65,6 +65,11 @@ router.get("/sidebar-badges", adminCtrl.getNotificationCounts);
 // Uploads (magic-byte validated)
 router.post("/upload", upload.single("image"), verifyFileType, adminCtrl.uploadImage);
 
+// Media Library
+router.get("/images", adminCtrl.getImages);
+router.post("/images/delete", adminCtrl.deleteImages);
+router.get("/images/usage", adminCtrl.getImageUsage);
+
 // Logs & Exports
 router.get("/logs/export", adminCtrl.exportLogsCSV);
 router.get("/logs", enforcePagination, adminCtrl.getLogsAdmin);

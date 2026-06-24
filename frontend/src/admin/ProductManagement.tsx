@@ -326,7 +326,7 @@ const ProductManagement: React.FC = () => {
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-silk-light/50 overflow-hidden border border-silk-light flex-shrink-0">
-                      <img src={product.images?.[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover mix-blend-multiply" />
+                      <img src={product.images?.[0]?.startsWith('assets/') ? `/${product.images[0]}` : product.images?.[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover mix-blend-multiply" />
                     </div>
                     <div>
                       <button

@@ -74,9 +74,11 @@ export interface Address {
   name: string;
   phone: string;
   addressLine: string;
+  area?: string;
   city: string;
   state: string;
   pincode: string;
+  country?: string;
 }
 
 export interface User {

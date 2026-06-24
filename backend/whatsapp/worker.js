@@ -261,6 +261,7 @@ const processJob = async (job) => {
 export const startWhatsAppWorker = () => {
   const worker = new Worker("whatsappQueue", processJob, { 
     connection,
+    concurrency: 5,
     drainDelay: 300000, // 5 minutes: delay before re-polling when queue is empty
     stalledInterval: 300000, // 5 minutes: check for stalled jobs less often
     metrics: { maxDataPoints: 0 } // Disable metrics writes to save commands
@@ -275,4 +276,5 @@ export const startWhatsAppWorker = () => {
   });
 
   console.log("[WhatsApp Worker] Started listening to whatsappQueue...");
+  return worker;
 };

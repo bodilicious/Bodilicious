@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { Address } from '../types';
 import {
     Check, ChevronRight, MapPin, Loader2, AlertCircle,
-    Search, User, Mail, Phone, Map, Building, CheckCircle2, Globe, ChevronDown, Clock
+    Search, User, Mail, Phone, Map, Building, CheckCircle2, Globe, ChevronDown
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import RequireAuth from '../components/RequireAuth';
@@ -45,9 +45,14 @@ function isIndiaCountry(c: string) {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 export default function ShippingPage() {
-    const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings, fetchShippingQuote } = useApp();
+    const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings, fetchShippingQuote, appliedCoupon, setAppliedCoupon } = useApp();
     const { formatPrice, userCurrency } = useCurrency();
     const navigate = useNavigate();
+
+    // ── Coupon state ─────────────────────────────────────────────────────────────
+    const [couponInput, setCouponInput] = useState('');
+    const [couponError, setCouponError] = useState<string | null>(null);
+    const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
     // ── Form state ───────────────────────────────────────────────────────────────
     const [form, setForm] = useState<ShippingForm>({
@@ -155,10 +160,14 @@ export default function ShippingPage() {
 
     // Dynamic Quote State
     const [quoteError, setQuoteError] = useState<string | null>(null);
-    // Rate-limit countdown: seconds remaining until retry is allowed (null = not rate-limited)
-    const [rateLimitSecs, setRateLimitSecs] = useState<number | null>(null);
-    const rateLimitTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const [quoteData, setQuoteData] = useState<{ shippingCost: number; total: number; threshold: number }>({
+    const [quoteData, setQuoteData] = useState<{ 
+        shippingCost: number; 
+        total: number; 
+        threshold: number;
+        discountAmount?: number;
+        isWelcomeOfferApplied?: boolean;
+        isFreeShippingCouponApplied?: boolean;
+    }>({
         shippingCost: storeSettings.shippingCost,
         total: cartTotal + storeSettings.shippingCost,
         threshold: storeSettings.shippingThreshold
@@ -176,53 +185,75 @@ export default function ShippingPage() {
             quantity: item.quantity,
         }));
 
-        fetchShippingQuote(itemsForQuote, { country: form.country })
+        fetchShippingQuote(itemsForQuote, { country: form.country }, appliedCoupon || undefined)
             .then(data => {
                 if (isMounted) {
-                    setRateLimitSecs(null);
-                    if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
                     setQuoteData({
                         shippingCost: data.shippingCost,
                         total: data.totalAmount,
                         threshold: isIndiaCountry(form.country)
                             ? storeSettings.shippingThreshold
-                            : storeSettings.internationalShippingThreshold
+                            : storeSettings.internationalShippingThreshold,
+                        discountAmount: data.discountAmount,
+                        isWelcomeOfferApplied: data.isWelcomeOfferApplied,
+                        isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
                     });
+
+                    if (appliedCoupon && !data.couponCode) {
+                        setAppliedCoupon(null);
+                        setCouponError("Coupon is no longer valid for this cart.");
+                    } else if (!appliedCoupon && data.couponCode) {
+                        setAppliedCoupon(data.couponCode);
+                    }
                 }
             })
             .catch(err => {
                 console.error("Quote fetch failed:", err);
                 if (!isMounted) return;
-                if (err.isRateLimit) {
-                    // Show countdown and auto-retry when it hits zero
-                    const totalSecs = Math.ceil((err.retryAfterMs || 60000) / 1000);
-                    setRateLimitSecs(totalSecs);
-                    setQuoteError(null);
-                    if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
-                    rateLimitTickRef.current = setInterval(() => {
-                        setRateLimitSecs(prev => {
-                            if (prev === null || prev <= 1) {
-                                clearInterval(rateLimitTickRef.current!);
-                                // Re-trigger the quote by briefly clearing to force effect rerun
-                                // We do this via a dummy state flip handled below
-                                return null;
-                            }
-                            return prev - 1;
-                        });
-                    }, 1000);
-                } else {
-                    setQuoteError(err.message || "Failed to fetch shipping quote.");
-                }
+                setQuoteError(err.message || "Failed to fetch shipping quote.");
             });
 
         return () => {
             isMounted = false;
-            if (rateLimitTickRef.current) clearInterval(rateLimitTickRef.current);
         };
     // storeSettings deliberately omitted — changes there don't need to re-fetch the quote.
     // fetchShippingQuote is a stable useCallback from AppContext so safe to include.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [validCartItems, form.country, fetchShippingQuote]);
+    }, [validCartItems, form.country, fetchShippingQuote, appliedCoupon]);
+
+    const handleApplyCoupon = async () => {
+        if (!couponInput.trim()) return;
+        setIsApplyingCoupon(true);
+        setCouponError(null);
+
+        try {
+            const itemsForQuote = validCartItems.map((item: any) => ({
+                productId: item.product?._id || item.product,
+                pid: item.product?.pid,
+                quantity: item.quantity,
+            }));
+
+            const data = await fetchShippingQuote(itemsForQuote, { country: form.country }, couponInput.trim().toUpperCase());
+            
+            setQuoteData(prev => ({
+                ...prev,
+                shippingCost: data.shippingCost,
+                total: data.totalAmount,
+                discountAmount: data.discountAmount,
+                isWelcomeOfferApplied: data.isWelcomeOfferApplied,
+                isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
+            }));
+
+            setAppliedCoupon(data.couponCode);
+            setCouponInput('');
+        } catch (err: any) {
+            console.error("Coupon application failed:", err);
+            setCouponError(err.message || 'Invalid coupon code');
+            setAppliedCoupon(null);
+        } finally {
+            setIsApplyingCoupon(false);
+        }
+    };
 
     const shippingCost = quoteData.shippingCost;
     const total = quoteData.total;
@@ -1186,6 +1217,14 @@ export default function ShippingPage() {
                                             {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
                                         </span>
                                     </div>
+                                    {(quoteData.discountAmount! > 0 || quoteData.isFreeShippingCouponApplied) && (
+                                        <div className="flex justify-between text-emerald-600">
+                                            <span>
+                                                {quoteData.isWelcomeOfferApplied ? 'Welcome Offer (10%)' : quoteData.isFreeShippingCouponApplied && quoteData.discountAmount === 0 ? 'Free Shipping Coupon' : 'Coupon Applied'}
+                                            </span>
+                                            <span>{quoteData.discountAmount! > 0 ? `-${formatPrice(quoteData.discountAmount!)}` : 'Applied'}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="border-t border-silk mt-4 pt-4 flex justify-between font-serif text-xl text-dark-red">
@@ -1194,6 +1233,49 @@ export default function ShippingPage() {
                                         {formatPrice(total)}
                                         {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
                                     </span>
+                                </div>
+
+                                <div className="pt-6">
+                                    {!appliedCoupon ? (
+                                        <div className="space-y-2">
+                                            <div className="flex relative">
+                                                <input
+                                                    type="text"
+                                                    value={couponInput}
+                                                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                                    placeholder="Promo code"
+                                                    className="w-full bg-neutral-50 border border-silk pl-4 pr-24 py-3 text-sm font-sans text-dark-red placeholder:text-gray-400 focus:outline-none focus:border-dark-red focus:ring-1 focus:ring-dark-red/20 rounded-sm transition-all uppercase"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleApplyCoupon}
+                                                    disabled={isApplyingCoupon || !couponInput.trim()}
+                                                    className="absolute right-1 top-1 bottom-1 px-4 bg-dark-red text-white font-sans text-xs tracking-widest uppercase hover:bg-rose-900 transition-colors disabled:bg-gray-200 disabled:text-gray-400 rounded-sm cursor-pointer"
+                                                >
+                                                    {isApplyingCoupon ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Apply'}
+                                                </button>
+                                            </div>
+                                            {couponError && <p className="text-xs text-red-500 font-sans flex items-center gap-1"><AlertCircle size={12} /> {couponError}</p>}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 px-4 py-3 rounded-sm transition-all">
+                                            <div className="flex items-center gap-2 text-emerald-700 font-sans font-medium text-sm">
+                                                <CheckCircle2 size={16} />
+                                                <span className="tracking-wide uppercase text-xs">{appliedCoupon} Applied</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAppliedCoupon(null);
+                                                    setCouponInput('');
+                                                    setCouponError(null);
+                                                }}
+                                                className="text-xs text-gray-400 hover:text-red-500 font-sans uppercase tracking-widest transition-colors cursor-pointer"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-6">

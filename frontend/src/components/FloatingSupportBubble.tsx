@@ -36,7 +36,7 @@ export default function FloatingSupportBubble() {
             const messages = t.messages || [];
             if (messages.length === 0) return false;
             const lastMsg = messages[messages.length - 1];
-            return lastMsg.authorRole === 'admin';
+            return lastMsg.authorRole === 'admin' || (lastMsg.authorRole === 'system' && lastMsg.visibleToCustomer !== false);
           }).length;
           setUnreadTicketsCount(count);
         }

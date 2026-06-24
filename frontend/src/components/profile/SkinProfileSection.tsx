@@ -231,12 +231,6 @@ export default function SkinProfileSection({ user, onSave, navigateTo }: Props) 
                                 Try the Ritual Finder <ArrowRight size={12} />
                             </button>
                         </div>
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="shrink-0 bg-dark text-white px-6 py-3 rounded-xl font-sans text-xs tracking-widest uppercase hover:bg-ruby-red transition-all shadow-sm"
-                        >
-                            Fill Skin Profile
-                        </button>
                     </motion.div>
                 )}
             </AnimatePresence>

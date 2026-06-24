@@ -8,6 +8,7 @@ interface StarRatingProps {
 }
 
 export default memo(function StarRating({ rating, count, size = 14 }: StarRatingProps) {
+  const safeRating = isNaN(Number(rating)) ? 0 : Number(rating);
   return (
     <div className="flex items-center gap-1.5">
       <div className="flex items-center">
@@ -16,7 +17,7 @@ export default memo(function StarRating({ rating, count, size = 14 }: StarRating
             key={star}
             size={size}
             className={
-              star <= Math.round(rating)
+              star <= Math.round(safeRating)
                 ? 'text-ruby-red fill-ruby-red'
                 : 'text-silk-dark fill-transparent'
             }
@@ -24,7 +25,7 @@ export default memo(function StarRating({ rating, count, size = 14 }: StarRating
         ))}
       </div>
       <span className="text-sm font-sans text-grey-beige">
-        {rating.toFixed(1)}
+        {safeRating.toFixed(1)}
         {count !== undefined && <span className="ml-1">({count})</span>}
       </span>
     </div>

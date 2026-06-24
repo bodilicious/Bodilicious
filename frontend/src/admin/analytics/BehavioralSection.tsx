@@ -13,7 +13,6 @@ interface BehavioralSectionProps {
     gatewayBreakdown: { reason: string; count: number }[];
     backendErrors: { event_type: string; count: number; lastSeen: string; category: string }[];
   };
-  loading?: boolean;
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -71,8 +70,7 @@ const BehavioralSection: React.FC<BehavioralSectionProps> = ({
   checkoutFailures = [],
   checkoutFailureTotal = 0,
   checkoutRevenueLost = 0,
-  errorRates,
-  loading = false
+  errorRates
 }) => {
   const [peakTab, setPeakTab] = useState<'hour' | 'dayOfWeek' | 'dayOfMonth' | 'month'>('hour');
 

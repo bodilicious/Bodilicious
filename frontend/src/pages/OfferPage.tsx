@@ -1,6 +1,6 @@
  
 import { useApp } from '../context/AppContext';
-import { Sparkles, ShoppingBag, Gift, CheckCircle, XCircle, Clock, ChevronRight } from 'lucide-react';
+import { Sparkles, ShoppingBag, Gift, CheckCircle, XCircle, Clock, ChevronRight, Instagram, Facebook, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Footer from '../components/Footer';
 
@@ -140,7 +140,7 @@ export default function OfferPage() {
               icon: '✦',
               step: '02',
               title: 'Seamless Blessing',
-              desc: 'Your welcome gift follows you to checkout. No codes, just grace.',
+              desc: 'Your welcome gift follows you to checkout.',
             },
             {
               icon: '✦',
@@ -192,7 +192,50 @@ export default function OfferPage() {
           </div>
         </motion.div>
       </section>
-      
+      {/* Social Media CTA */}
+      <section className="max-w-4xl mx-auto w-full px-6 pb-24">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="bg-gradient-to-r from-rose-50 to-[#FFF1F2] border border-rose-100 rounded-3xl p-8 md:p-10 group hover:shadow-luxury transition-all duration-500 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-rose-200/30 rounded-full blur-3xl -mr-32 -mt-32 transition-transform duration-700 group-hover:scale-150" />
+          
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
+            <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm group-hover:scale-110 group-hover:-rotate-6 transition-all duration-300 flex-shrink-0">
+                <Heart size={32} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h2 className="font-serif text-3xl text-rose-900 mb-2">Follow Our Social Media</h2>
+                <p className="font-sans text-rose-700/80 text-sm leading-relaxed max-w-md">Join our community for further offers, early access to new collections, and skincare rituals.</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto flex-shrink-0">
+              <a 
+                href="https://www.instagram.com/bodilicious.in/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 bg-white border border-rose-100 text-rose-600 px-6 py-4 md:py-3 rounded-xl font-sans text-xs font-bold uppercase tracking-widest shadow-sm hover:bg-gradient-to-r hover:from-rose-500 hover:to-pink-600 hover:text-white hover:border-transparent transition-all duration-300 w-full sm:w-auto"
+              >
+                <Instagram size={16} />
+                <span>Instagram</span>
+              </a>
+              <a 
+                href="https://www.facebook.com/bodilicious.in/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 bg-white border border-blue-100 text-blue-600 px-6 py-4 md:py-3 rounded-xl font-sans text-xs font-bold uppercase tracking-widest shadow-sm hover:bg-blue-600 hover:text-white hover:border-transparent transition-all duration-300 w-full sm:w-auto"
+              >
+                <Facebook size={16} />
+                <span>Facebook</span>
+              </a>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
       <Footer />
     </main>
   );

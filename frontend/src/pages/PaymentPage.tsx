@@ -59,7 +59,7 @@ const VERIFY_TIMEOUT_MS = 25_000;
 type OverlayState = 'none' | 'init' | 'verifying' | 'success' | 'timeout' | 'captured_failed' | 'cod_processing';
 
 export default function PaymentPage() {
-    const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings, cartLoading, fetchShippingQuote } = useApp();
+    const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings, cartLoading, fetchShippingQuote, appliedCoupon } = useApp();
     const { formatPrice, userCurrency } = useCurrency();
     const location = useLocation();
     const navigate = useNavigate();
@@ -234,7 +234,7 @@ export default function PaymentPage() {
             try {
                 // Use buildItemsPayload to properly resolve product IDs using the products list
                 const itemsForQuote = buildItemsPayload();
-                const data = await fetchShippingQuote(itemsForQuote, shippingDetails);
+                const data = await fetchShippingQuote(itemsForQuote, shippingDetails, appliedCoupon || undefined);
                 
                 if (isMounted) {
                     setRateLimitSecs(null);
@@ -305,7 +305,7 @@ export default function PaymentPage() {
         
     // isLocked intentionally excluded — use isLockedRef inside instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [shippingDetails, navigate, cartLoading, validCartItems.length, fetchShippingQuote, buildItemsPayload, userCurrency]);
+    }, [shippingDetails, navigate, cartLoading, validCartItems.length, fetchShippingQuote, buildItemsPayload, userCurrency, appliedCoupon]);
 
     // ── Pre-load Razorpay on mount ────────────────────────────────────────────
     useEffect(() => {
@@ -434,7 +434,7 @@ export default function PaymentPage() {
                 }
 
                 setOverlay('init');
-                const { razorpayOrder } = await initRazorpayOrder(items, shippingDetails, finalBillingDetails as any, quoteData?.quoteId);
+                const { razorpayOrder } = await initRazorpayOrder(items, shippingDetails, finalBillingDetails as any, quoteData?.quoteId, appliedCoupon || undefined);
                 setIsProcessing(false); // spinner → overlay takes over
 
                 const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;

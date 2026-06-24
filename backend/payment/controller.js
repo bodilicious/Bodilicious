@@ -16,6 +16,8 @@ import { calculateDiscount } from "../utils/pricing.js";
 import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits } from "../utils/currencies.js";
 import orderEvents from "../events/orderEvents.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
+import { validateCouponAtCheckout } from "../coupons/controller.js";
+import { Coupon, CouponUse } from "../coupons/models.js";
 
 /* =========================================================
    PROCESS PAID ORDER (Helper)
@@ -154,6 +156,39 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
         }
         if (signature) {
             updateFields.razorpaySignature = signature;
+        }
+
+        if (order.appliedCoupon) {
+            const existingUse = await CouponUse.findOne({ order: order._id }).session(session);
+            if (!existingUse) {
+                const couponToUpdate = await Coupon.findById(order.appliedCoupon).session(session);
+                if (couponToUpdate) {
+                    const hasLimit = couponToUpdate.totalCap !== null;
+                    const query = { _id: order.appliedCoupon };
+                    if (hasLimit) {
+                        query.usageCount = { $lt: couponToUpdate.totalCap };
+                    }
+                    
+                    const incrementedCoupon = await Coupon.findOneAndUpdate(
+                        query,
+                        { $inc: { usageCount: 1 } },
+                        { session, new: true }
+                    );
+
+                    if (!incrementedCoupon && hasLimit) {
+                        console.warn(`[processPaidOrder] Coupon ${couponToUpdate.code} limit reached after order creation. Honoring discount for order ${order._id} but not recording CouponUse.`);
+                        updateFields.adminNote = ((order.adminNote || "") + `\n[System] Coupon ${couponToUpdate.code} limit reached but honored for paid order.`).trim();
+                    } else {
+                        await CouponUse.create([{
+                            coupon: order.appliedCoupon,
+                            order: order._id,
+                            user: order.user,
+                            discountApplied: order.couponDiscount || order.discountAmount,
+                            orderTotal: order.totalAmount
+                        }], { session });
+                    }
+                }
+            }
         }
 
         await Order.updateOne({ _id: orderId }, { $set: updateFields }, { session });
@@ -295,7 +330,7 @@ export const getOrderQuote = async (req, res) => {
             return res.status(500).json({ success: false, message: "Payment configuration error" });
         }
 
-        const { items, shippingDetails } = req.body;
+        const { items, shippingDetails, couponCode } = req.body;
         const userId = req.user?._id;
 
         if (!items || items.length === 0) {
@@ -381,7 +416,19 @@ export const getOrderQuote = async (req, res) => {
             }
         }
 
-        const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
+        let coupon = null;
+        if (couponCode && typeof couponCode === 'string' && userId) {
+            const couponValidationResult = await validateCouponAtCheckout(couponCode, totalAmount, userId, []);
+            if (couponValidationResult.valid) {
+                coupon = couponValidationResult.coupon;
+            } else {
+                return res.status(400).json({ success: false, message: couponValidationResult.error, invalidCoupon: true });
+            }
+        } else if (couponCode && !userId) {
+            return res.status(400).json({ success: false, message: "Please log in to apply a coupon.", invalidCoupon: true });
+        }
+
+        const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount }, coupon);
 
         // ── Currency selection ────────────────────────────────────────────────
         // Display currency = what the user selected (any of 160+)
@@ -430,6 +477,8 @@ export const getOrderQuote = async (req, res) => {
             finalAmount: convertedFinalAmount,
             originalAmount: convertedOriginalAmount,
             isWelcomeOfferApplied: pricing.isWelcomeOfferApplied,
+            isFreeShippingCouponApplied: pricing.isFreeShippingCouponApplied,
+            couponCode: coupon ? coupon.code : null,
             expiry,
             country: shippingDetails.country.trim(),
             currency: checkoutCurrency,
@@ -455,6 +504,8 @@ export const getOrderQuote = async (req, res) => {
                 discountAmount: convertedDiscountAmount,
                 totalAmount: convertedFinalAmount,
                 deliveryEstimate,
+                couponCode: coupon ? coupon.code : null,
+                isFreeShippingCouponApplied: pricing.isFreeShippingCouponApplied,
                 currency: checkoutCurrency,
                 isFallback,               // frontend shows toast if true
                 requestedCurrency
@@ -586,7 +637,17 @@ export const initRazorpayOrder = async (req, res) => {
             }
         }
 
-        const pricing = calculateDiscount(subtotal, shippingCost, { existingOrdersCount });
+        let coupon = null;
+        if (payload.couponCode) {
+            const couponValidationResult = await validateCouponAtCheckout(payload.couponCode, subtotal, userId, []);
+            if (couponValidationResult.valid) {
+                coupon = couponValidationResult.coupon;
+            } else {
+                return res.status(400).json({ success: false, message: "Coupon is no longer valid: " + couponValidationResult.error });
+            }
+        }
+
+        const pricing = calculateDiscount(subtotal, shippingCost, { existingOrdersCount }, coupon);
         const applyConversion = (val) => roundForCurrency(val * (payload.exchangeRate || 1), payload.currency || "INR");
         const convertedFinalAmount = applyConversion(pricing.finalAmount);
 
@@ -658,6 +719,9 @@ export const initRazorpayOrder = async (req, res) => {
                 shippingCost: payload.shippingCost,
                 discountAmount: payload.discountAmount,
                 isWelcomeOfferApplied: payload.isWelcomeOfferApplied,
+                couponCode: payload.couponCode || null,
+                appliedCoupon: coupon ? coupon._id : undefined,
+                couponDiscount: payload.couponCode ? payload.discountAmount : 0,
                 originalAmount: payload.originalAmount,
                 paymentMethod: "razorpay",
                 paymentStatus: "pending",
@@ -1145,7 +1209,7 @@ export const razorpayWebhook = async (req, res) => {
                 // below can check whether the order was already cancelled prior to
                 // this webhook (i.e. handleOrderCancellationSideEffects already ran).
                 const statusBeforeRefundWebhook = order.orderStatus;
-                if (order.orderStatus !== "cancelled" && order.orderStatus !== "returned") {
+                if (!["cancelled", "returned", "return_requested", "delivered"].includes(order.orderStatus)) {
                     const previousStatus = order.orderStatus;
                     order.orderStatus = "cancelled";
                     order.statusHistory = order.statusHistory || [];
@@ -1160,10 +1224,8 @@ export const razorpayWebhook = async (req, res) => {
 
                 try {
                     // 1. Shiprocket Cancel — only if not already cancelled BEFORE this webhook
-                    // fired (i.e. handleOrderCancellationSideEffects hadn't already run).
-                    // We use the pre-mutation snapshot so that setting order.orderStatus = "cancelled"
-                    // above doesn't make this condition evaluate to false (the original bug).
-                    if ((order.awb || order.shiprocketOrderId) && statusBeforeRefundWebhook !== "cancelled") {
+                    // fired AND if this webhook is actually cancelling the order.
+                    if ((order.awb || order.shiprocketOrderId) && statusBeforeRefundWebhook !== "cancelled" && order.orderStatus === "cancelled") {
                         if (process.env.SHIPROCKET_EMAIL) {
                             const { getShiprocketToken } = await import("../tracker/shiprocketservice.js");
                             const token = await getShiprocketToken();
@@ -1181,9 +1243,6 @@ export const razorpayWebhook = async (req, res) => {
                                     body: JSON.stringify({ ids: [order.shiprocketOrderId] })
                                 });
                             }
-                            // Guard: a silent Shiprocket failure here means the order stays
-                            // active in Shiprocket even though our DB marks it cancelled,
-                            // risking accidental shipment. Log loudly so ops can act.
                             if (shipCancelRes && !shipCancelRes.ok) {
                                 const errText = await shipCancelRes.text().catch(() => "(unreadable)");
                                 console.error(`[Webhook] Shiprocket cancel FAILED for order ${order._id} (status ${shipCancelRes.status}): ${errText}. Order may still be active in Shiprocket — manual cancel required.`);
@@ -1191,8 +1250,8 @@ export const razorpayWebhook = async (req, res) => {
                         }
                     }
 
-                    // 2. Restore Stock
-                    if (!order.isStockRestored && order.items && order.items.length > 0) {
+                    // 2. Restore Stock - only if the order was cancelled by this webhook
+                    if (!order.isStockRestored && order.items && order.items.length > 0 && order.orderStatus === "cancelled") {
                         const claimedOrder = await Order.findOneAndUpdate(
                             { _id: order._id, isStockRestored: false },
                             { $set: { isStockRestored: true } }

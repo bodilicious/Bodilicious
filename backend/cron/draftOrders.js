@@ -88,7 +88,7 @@ export const initDraftOrderCleanupCron = () => {
                 if (order.isWelcomeOfferApplied) {
                     const userHasPaidOrder = await Order.exists({
                         user: order.user,
-                        orderStatus: { $ne: "abandoned" },
+                        orderStatus: { $nin: ["abandoned", "cancelled", "returned"] },
                         _id: { $ne: order._id },
                         $or: [
                             { paymentMethod: "cod" },

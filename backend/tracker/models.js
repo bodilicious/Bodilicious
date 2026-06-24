@@ -97,6 +97,12 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
+    appliedCoupon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      required: false,
+    },
+
     couponDiscount: {
       type: Number,
       default: 0,
@@ -292,7 +298,7 @@ const orderSchema = new mongoose.Schema(
 
     returnRefundMethod: {
       type: String,
-      enum: [null, "original_payment", "store_credit", "replacement"],
+      enum: [null, "original_payment", "replacement"],
       default: null,
     },
 

@@ -58,6 +58,9 @@ const AbandonedCheckouts = lazy(() => import('./admin/AbandonedCheckouts'));
 const DraftOrders = lazy(() => import('./admin/DraftOrders'));
 const StoreSettings = lazy(() => import('./admin/StoreSettings'));
 const TicketManagement = lazy(() => import('./admin/TicketManagement'));
+const VisualHomepageEditor = lazy(() => import('./admin/VisualHomepageEditor'));
+const MediaLibraryPage = lazy(() => import('./admin/MediaLibraryPage'));
+const HomepagePreviewFrame = lazy(() => import('./admin/HomepagePreviewFrame'));
 
 // Simple loading fallback with a full-screen transparent block to prevent clicks during lazy loading transitions
 const PageLoader = () => (
@@ -176,9 +179,14 @@ function AppRoutes() {
                 <Route path="users/:id" element={<CustomerDetails />} />
                 <Route path="tickets" element={<TicketManagement />} />
                 <Route path="settings" element={<StoreSettings />} />
+                <Route path="homepage-editor" element={<VisualHomepageEditor />} />
+                <Route path="media" element={<MediaLibraryPage />} />
                 <Route path="logs" element={<AuditLogs />} />
               </Route>
             </Route>
+
+            {/* Internal tools/sandboxes */}
+            <Route path="/internal/homepage-preview" element={<HomepagePreviewFrame />} />
 
             {/* /students route is defined above — duplicate removed */}
             <Route path="*" element={<PageTransition><NotFoundPage /></PageTransition>} />

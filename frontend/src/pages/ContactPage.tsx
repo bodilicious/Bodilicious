@@ -372,7 +372,7 @@ export default function ContactPage() {
                                     name="orderId"
                                     value={queryForm.orderId}
                                     onChange={handleQueryChange}
-                                    placeholder="e.g. ORD-abc123"
+                                    placeholder="e.g. #abc123 (Please enter in the correct format)"
                                     className="w-full px-4 py-3 bg-silk-light/50 border border-silk-dark/50 rounded-lg text-dark-red focus:outline-none focus:ring-2 focus:ring-ruby-red/20 focus:border-ruby-red transition-all duration-300 placeholder:text-grey-beige/40"
                                 />
                             </div>

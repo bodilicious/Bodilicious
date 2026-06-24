@@ -665,6 +665,22 @@ export const shiprocketWebhook = async (req, res) => {
           } else if (internalStatus === "returned" || shiprocketStatus.includes("rto") || shiprocketStatus.includes("failed")) {
              await logAction(req, "delivery_failed", "order", order._id.toString(), { awb, reason: shiprocketStatus }, { source: "shiprocket-webhook", severity: "WARNING" }).catch(err => console.error("Fulfillment Audit Failed:", err));
              
+             // Release welcome offer for returned/failed deliveries
+             if (order.isWelcomeOfferApplied && (internalStatus === "returned" || shiprocketStatus.includes("rto"))) {
+                 const userHasPaidOrder = await Order.exists({
+                     user: order.user,
+                     orderStatus: { $nin: ["abandoned", "cancelled", "returned"] },
+                     _id: { $ne: order._id },
+                     $or: [
+                         { paymentMethod: "cod" },
+                         { paymentStatus: { $in: ["paid", "refunded"] } }
+                     ]
+                 });
+                 if (!userHasPaidOrder) {
+                     await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
+                 }
+             }
+
              if ((internalStatus === "cancelled" || shiprocketStatus === "rto delivered") && !order.isStockRestored) {
                if (order.items && order.items.length > 0) {
                  const claimedOrder = await Order.findOneAndUpdate(
@@ -867,7 +883,7 @@ export const cancelOrder = async (req, res) => {
     if (order.isWelcomeOfferApplied) {
         const userHasPaidOrder = await Order.exists({
             user: order.user,
-            orderStatus: { $nin: ["abandoned", "cancelled"] },
+            orderStatus: { $nin: ["abandoned", "cancelled", "returned"] },
             _id: { $ne: order._id },
             $or: [
                 { paymentMethod: "cod" },
@@ -1117,21 +1133,22 @@ export const updateOrderStatus = async (req, res) => {
     await order.save();
     orderEvents.emit("order_status_updated", order);
 
-    if (status === "cancelled" && previousStatus !== "cancelled") {
-        if (order.isWelcomeOfferApplied) {
-            const userHasPaidOrder = await Order.exists({
-                user: order.user,
-                orderStatus: { $nin: ["abandoned", "cancelled"] },
-                _id: { $ne: order._id },
-                $or: [
-                    { paymentMethod: "cod" },
-                    { paymentStatus: { $in: ["paid", "refunded"] } }
-                ]
-            });
-            if (!userHasPaidOrder) {
-                await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
-            }
+    if (((status === "cancelled" && previousStatus !== "cancelled") || (status === "returned" && previousStatus !== "returned")) && order.isWelcomeOfferApplied) {
+        const userHasPaidOrder = await Order.exists({
+            user: order.user,
+            orderStatus: { $nin: ["abandoned", "cancelled", "returned"] },
+            _id: { $ne: order._id },
+            $or: [
+                { paymentMethod: "cod" },
+                { paymentStatus: { $in: ["paid", "refunded"] } }
+            ]
+        });
+        if (!userHasPaidOrder) {
+            await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
         }
+    }
+    
+    if (status === "cancelled" && previousStatus !== "cancelled") {
         try {
             await handleOrderCancellationSideEffects(order);
         } catch (err) {

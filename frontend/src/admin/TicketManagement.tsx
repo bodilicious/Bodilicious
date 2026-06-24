@@ -11,6 +11,8 @@ import {
   User,
   Headphones,
   Paperclip,
+  Bot,
+  Package,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -20,7 +22,9 @@ import { useLocation } from 'react-router-dom';
 interface Message {
   _id: string;
   text: string;
-  authorRole: 'admin' | 'customer';
+  authorRole: 'admin' | 'customer' | 'system';
+  isAutomated?: boolean;
+  visibleToCustomer?: boolean;
   createdAt: string;
   attachments?: string[];
 }
@@ -35,6 +39,7 @@ interface SupportTicket {
   createdAt: string;
   resolvedAt: string | null;
   messages: Message[];
+  orderId?: string;
   userId: {
     _id: string;
     name: string;
@@ -75,6 +80,7 @@ const TicketManagement: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<Array<{ url: string; publicId: string; uploading?: boolean }>>([]);
+  const [selectedTicketOrder, setSelectedTicketOrder] = useState<any>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -136,6 +142,30 @@ const TicketManagement: React.FC = () => {
     const interval = setInterval(silentRefetch, 6000);
     return () => clearInterval(interval);
   }, [selectedTicket, silentRefetch]);
+
+  // Fetch brief order details when a ticket with an orderId is opened
+  useEffect(() => {
+    if (selectedTicket?.orderId) {
+      const fetchOrder = async () => {
+        try {
+          const headers = await getAuthHeaders();
+          const res = await fetch(`${API_URL}/api/v1/support/tickets/${selectedTicket._id}/order`, { headers });
+          const data = await res.json();
+          if (data.success) {
+            setSelectedTicketOrder(data.order);
+          } else {
+            setSelectedTicketOrder(null);
+          }
+        } catch (e) {
+          console.error(e);
+          setSelectedTicketOrder(null);
+        }
+      };
+      fetchOrder();
+    } else {
+      setSelectedTicketOrder(null);
+    }
+  }, [selectedTicket?._id, selectedTicket?.orderId, getAuthHeaders, API_URL]);
 
 
   // Scroll to bottom of thread when messages change
@@ -514,32 +544,64 @@ const TicketManagement: React.FC = () => {
               </button>
             </div>
 
+            {/* Brief Order Info */}
+            {selectedTicket.orderId && (
+              <div className="px-6 py-3 bg-silk-light/10 border-b border-silk-light flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-ruby-red/10 rounded-lg text-ruby-red">
+                    <Package size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-grey-beige font-medium">Linked Order</p>
+                    <p className="text-sm font-bold text-dark-red">#{selectedTicket.orderId.replace(/^#|^ORD-/i, "").trim().toUpperCase().slice(-8)}</p>
+                  </div>
+                </div>
+                {selectedTicketOrder ? (
+                  <div className="flex items-center gap-4 text-right">
+                    <div>
+                      <p className="text-xs text-grey-beige font-medium">Total</p>
+                      <p className="text-sm font-bold text-dark-red">₹{selectedTicketOrder.totalAmount}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-grey-beige font-medium">Status</p>
+                      <p className="text-[10px] uppercase font-bold text-dark-red bg-silk-light/50 px-2 py-0.5 rounded border border-silk-dark/30 mt-0.5">
+                        {selectedTicketOrder.orderStatus}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-grey-beige animate-pulse">Loading order...</div>
+                )}
+              </div>
+            )}
+
             {/* Thread */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-silk-light/20">
               {drawerMessages.map((msg) => {
                 const isAdminMsg = msg.authorRole === 'admin';
+                const isSystemMsg = msg.authorRole === 'system';
                 return (
                   <div
                     key={msg._id}
                     className={`border border-silk rounded-xl p-4 space-y-3 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.01)] ${
                       msg._id.startsWith('temp-') ? 'opacity-60' : ''
-                    }`}
+                    } ${isSystemMsg && msg.visibleToCustomer === false ? 'bg-slate-50 border-slate-200' : ''}`}
                   >
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-silk/40 pb-2 flex-wrap gap-2">
                       <div className="flex items-center gap-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${
-                          isAdminMsg ? 'bg-dark-red' : 'bg-[#8B5E3C]'
+                          isAdminMsg ? 'bg-dark-red' : isSystemMsg ? 'bg-slate-600' : 'bg-[#8B5E3C]'
                         }`}>
-                          {isAdminMsg ? <Headphones size={11} /> : <User size={11} />}
+                          {isAdminMsg ? <Headphones size={11} /> : isSystemMsg ? <Bot size={11} /> : <User size={11} />}
                         </div>
                         <span className="text-xs font-bold text-dark-red">
-                          {isAdminMsg ? 'Bodilicious Support' : selectedTicket.userId?.name || 'Customer'}
+                          {isAdminMsg ? 'Bodilicious Support' : isSystemMsg ? 'System Note' : selectedTicket.userId?.name || 'Customer'}
                         </span>
                         <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                          isAdminMsg ? 'bg-rose-50 text-ruby-red border-rose-100' : 'bg-amber-50 text-amber-800 border-amber-100'
+                          isAdminMsg ? 'bg-rose-50 text-ruby-red border-rose-100' : isSystemMsg ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-amber-50 text-amber-800 border-amber-100'
                         }`}>
-                          {isAdminMsg ? 'Staff' : 'Customer'}
+                          {isAdminMsg ? 'Staff' : isSystemMsg ? (msg.visibleToCustomer === false ? 'Internal Only' : 'Automated') : 'Customer'}
                         </span>
                       </div>
                       <span className="text-[10px] text-grey-beige/70 font-medium">

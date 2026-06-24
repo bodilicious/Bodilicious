@@ -418,8 +418,7 @@ const DraftOrders: React.FC = () => {
                         options={[
                           { value: 'razorpay', label: 'Razorpay (Send Link)' },
                           { value: 'cash_on_delivery', label: 'Cash on Delivery (COD)' },
-                          { value: 'bank_transfer', label: 'Bank Transfer / UPI' },
-                          { value: 'store_credit', label: 'Store Credit' }
+                          { value: 'bank_transfer', label: 'Bank Transfer / UPI' }
                         ]}
                       />
                     )}

@@ -1,4 +1,5 @@
 import Product from "./models.js";
+import UserProfile from "../profile/models.js";
 import Order from "../tracker/models.js";
 import escapeStringRegexp from "escape-string-regexp";
 import { logAuditEvent } from "../audit/logger.js";

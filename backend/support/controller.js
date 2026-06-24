@@ -1,4 +1,7 @@
 import { Ticket, FAQ } from "./models.js";
+import Order from "../tracker/models.js";
+import mongoose from "mongoose";
+import { enqueueTicketLookup } from "./queue.js";
 import {
   sendTicketAcknowledgementEmail,
   sendTicketReplyEmail,
@@ -17,7 +20,7 @@ const redis = redisUrl ? new Redis(redisUrl) : { incr: () => {} };
 // POST /api/v1/support/tickets
 export const createTicket = async (req, res) => {
   try {
-    const { type, description, attachments } = req.body;
+    const { type, description, attachments, orderId } = req.body;
 
     if (!type || !description) {
       return res.status(400).json({ success: false, message: "Type and description are required" });
@@ -39,6 +42,7 @@ export const createTicket = async (req, res) => {
           attachments: attachments || [],
         },
       ],
+      orderId: orderId || undefined,
     });
 
     await ticket.save();
@@ -69,6 +73,10 @@ export const createTicket = async (req, res) => {
       sourceModel: "Ticket",
       sourceId: ticket._id.toString(),
     });
+
+    if (orderId && (type === "shipping" || type === "payment")) {
+      await enqueueTicketLookup(ticket._id.toString(), type, orderId);
+    }
 
     return res.status(201).json({ success: true, ticket });
   } catch (error) {
@@ -259,7 +267,50 @@ export const updateTicketStatus = async (req, res) => {
 
     return res.status(200).json({ success: true, ticket });
   } catch (error) {
-    console.error("Error updating ticket:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// GET /api/v1/support/tickets/:id/order (admin - fetch brief order info for ticket)
+export const getTicketOrder = async (req, res) => {
+  try {
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket || !ticket.orderId) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(ticket.orderId)) {
+      order = await Order.findById(ticket.orderId);
+    } else {
+      const cleanId = ticket.orderId.replace(/^#|^ORD-/i, "").trim().toLowerCase();
+      const userOrders = await Order.find({ user: ticket.userId });
+      order = userOrders.find(o => o._id.toString().toLowerCase().endsWith(cleanId));
+    }
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    const orderInfo = {
+      _id: order._id,
+      shortId: order._id.toString().slice(-8).toUpperCase(),
+      totalAmount: order.totalAmount,
+      paymentStatus: order.paymentStatus,
+      orderStatus: order.orderStatus,
+      createdAt: order.createdAt,
+      itemsCount: order.items?.length || 0,
+      awb: order.awb || null,
+    };
+
+    return res.status(200).json({ success: true, order: orderInfo });
+  } catch (error) {
+    console.error("Error fetching ticket order:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

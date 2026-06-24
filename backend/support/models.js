@@ -5,7 +5,9 @@ const messageSchema = new mongoose.Schema(
   {
     text: { type: String, required: true },
     authorId: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile" },
-    authorRole: { type: String, enum: ["admin", "customer"], required: true },
+    authorRole: { type: String, enum: ["admin", "customer", "system"], required: true },
+    isAutomated: { type: Boolean, default: false },
+    visibleToCustomer: { type: Boolean, default: true },
     attachments: [{ type: String }],
   },
   { timestamps: true }
@@ -29,6 +31,10 @@ const ticketSchema = new mongoose.Schema(
       type: String,
       enum: ["shipping", "payment", "other"],
       required: true,
+    },
+    orderId: {
+      type: String,
+      required: false,
     },
     status: {
       type: String,

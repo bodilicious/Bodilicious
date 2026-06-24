@@ -353,7 +353,7 @@ export const getRecentlyBought = async (req, res) => {
 */
 export const addAddress = async (req, res) => {
   try {
-    const { name, phone, houseNumber, addressLine, city, state, country, pincode, isDefault } = req.body;
+    const { name, phone, houseNumber, addressLine, area, city, state, country, pincode, isDefault } = req.body;
     const user = await UserProfile.findById(req.user._id);
 
     // If it's the first address, or isDefault is true, make it default
@@ -364,7 +364,7 @@ export const addAddress = async (req, res) => {
     }
 
     user.addresses.push({
-      name, phone, houseNumber, addressLine, city, state, country, pincode, isDefault: makeDefault
+      name, phone, houseNumber, addressLine, area, city, state, country, pincode, isDefault: makeDefault
     });
 
     await user.save();
@@ -377,7 +377,7 @@ export const addAddress = async (req, res) => {
 export const updateAddress = async (req, res) => {
   try {
     const { addressId } = req.params;
-    const { name, phone, houseNumber, addressLine, city, state, country, pincode, isDefault } = req.body;
+    const { name, phone, houseNumber, addressLine, area, city, state, country, pincode, isDefault } = req.body;
 
     const user = await UserProfile.findById(req.user._id);
     const address = user.addresses.id(addressId);
@@ -395,6 +395,7 @@ export const updateAddress = async (req, res) => {
     if (phone) address.phone = phone;
     if (houseNumber !== undefined) address.houseNumber = houseNumber;
     if (addressLine) address.addressLine = addressLine;
+    if (area !== undefined) address.area = area;
     if (city) address.city = city;
     if (state) address.state = state;
     if (country) address.country = country;

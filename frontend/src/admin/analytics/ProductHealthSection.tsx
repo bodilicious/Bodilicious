@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Sector
 } from 'recharts';
-import { Package, RefreshCw, Trophy, TrendingUp } from 'lucide-react';
+import { Package, RefreshCw, TrendingUp } from 'lucide-react';
 
 interface ProductHealthSectionProps {
   topSelling: any[];

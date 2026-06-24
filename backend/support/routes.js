@@ -11,7 +11,8 @@ import {
   getAllTickets,
   addMessage,
   uploadSupportAttachment,
-  deleteSupportAttachment
+  deleteSupportAttachment,
+  getTicketOrder
 } from "./controller.js";
 
 const router = Router();
@@ -79,6 +80,9 @@ router.patch("/tickets/:id", protect, updateTicketStatus);
 
 // Both: post a message to a ticket thread
 router.post("/tickets/:id/messages", protect, addMessage);
+
+// Admin: fetch ticket's brief order info
+router.get("/tickets/:id/order", protect, adminOnly, getTicketOrder);
 
 // Upload and delete attachments (for both customers and admins)
 router.post("/upload", protect, uploadLimiter, upload.single("file"), verifyFileType, uploadSupportAttachment);

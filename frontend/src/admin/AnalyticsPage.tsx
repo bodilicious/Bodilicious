@@ -4,7 +4,7 @@ import {
   Activity, Package, RefreshCw, TrendingDown,
   Bell, Eye, MousePointerClick, CreditCard, AlertTriangle,
   BarChart3, Download, BrainCircuit, AlertOctagon,
-  Truck, Sparkles, ChevronRight
+  Truck, ChevronRight
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { useApp } from '../context/AppContext';
@@ -126,9 +126,9 @@ const AnalyticsPage: React.FC = () => {
       };
 
       const [
-        sData, pData, invData, cData, oData, bData,
+        sData, pData, _invData, cData, oData, bData,
         sumData, trData, coData, fuData, stData,
-        intellData, arData, mkData, seData, foData
+        _intellData, arData, mkData, seData, foData
       ] = await Promise.all([
         safeJson(salesRes), safeJson(prodRes), safeJson(invRes), safeJson(custRes),
         safeJson(opsRes), safeJson(behRes),

@@ -99,7 +99,7 @@ const storeSettingsSchema = new mongoose.Schema(
     requirePhotoForReturn: { type: Boolean, default: true },
     adverseReactionReturnEnabled: { type: Boolean, default: true },
     adverseReactionWindowDays: { type: Number, default: 14 },
-    refundMethod: { type: String, default: "original", enum: ["original", "store_credit", "both"] },
+    refundMethod: { type: String, default: "original", enum: ["original", "both"] },
     returnReasonTags: {
       type: [String],
       default: [

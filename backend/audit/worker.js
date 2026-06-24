@@ -3,10 +3,13 @@ import Redis from 'ioredis';
 import AuditLogV2 from './models.js';
 import { checkAnomaly } from './anomalyEngine.js';
 
-
 const redisUrl = process.env.REDIS_URL || null;
 
+let batchBuffer = [];
+let flushTimer = null;
+
 export async function processAuditBatch(events) {
+  if (events.length === 0) return;
   try {
     // 1. Evaluate Anomalies
     for (const event of events) {
@@ -17,16 +20,59 @@ export async function processAuditBatch(events) {
     }
 
     // 2. Insert Batch
-    if (events.length > 0) {
-      console.log('Inserting audit batch:', events.length, 'events');
-      // Use insertMany to efficiently batch writes to MongoDB
-      const res = await AuditLogV2.insertMany(events, { ordered: false });
-      console.log('InsertMany result:', res ? res.length : 'none');
-    }
+    console.log('[Audit Worker] Inserting audit batch:', events.length, 'events');
+    const res = await AuditLogV2.insertMany(events, { ordered: false });
+    console.log('[Audit Worker] InsertMany result:', res ? res.length : 'none');
   } catch (err) {
-    console.error('Audit Batch Insert Failed:', err);
-    throw err; // Re-throw to trigger BullMQ retries or DLQ
+    console.error('[Audit Worker] Batch Insert Failed:', err);
+    // If it fails here, jobs are already completed in BullMQ.
+    // Given 'eventually consistent' is acceptable, we log and drop to avoid stalling.
   }
 }
 
-// BullMQ and Redis removed to save Redis quotas. Using in-memory batching from logger.js instead.
+function flushBatch() {
+  if (batchBuffer.length === 0) return;
+  const eventsToProcess = [...batchBuffer];
+  batchBuffer = [];
+  processAuditBatch(eventsToProcess).catch(e => console.error(e));
+}
+
+export function initAuditWorker() {
+  if (!redisUrl) {
+    console.warn("⚠️ REDIS_URL not set. Audit worker not started.");
+    return null;
+  }
+
+  // Dedicated connection per user instructions
+  const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
+
+  const worker = new Worker('auditQueue', async (job) => {
+    try {
+      const payload = job.data;
+      batchBuffer.push(payload);
+
+      if (batchBuffer.length >= 100) {
+        if (flushTimer) clearTimeout(flushTimer);
+        flushTimer = null;
+        flushBatch();
+      } else if (!flushTimer) {
+        flushTimer = setTimeout(() => {
+          flushTimer = null;
+          flushBatch();
+        }, 5000); // 5 seconds window
+      }
+
+      return { status: "buffered" };
+    } catch (err) {
+      console.error(`[Audit Worker] Job ${job.id} failed:`, err);
+      throw err;
+    }
+  }, { connection });
+
+  worker.on('failed', (job, err) => {
+    console.error(`[Audit Worker] Job ${job?.id} failed in queue: ${err.message}`);
+  });
+
+  console.log("[Audit Worker] Started successfully.");
+  return worker;
+}

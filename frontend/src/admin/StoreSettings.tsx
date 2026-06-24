@@ -1,902 +1,473 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Settings, Save, AlertCircle, AlertTriangle, Info, X, Plus } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { COUNTRIES } from '../utils/countries';
 import toast from 'react-hot-toast';
-import Select from '../components/Select';
+import {
+  Save, Loader2, Store, Truck, Bell, CreditCard,
+  RotateCcw, Star, Shield, AlertTriangle, Settings2, CheckCircle2
+} from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// ─── Reusable Toggle Row ─────────────────────────────────────────────────────
-function ToggleRow({
-  label, description, checked, onChange, danger = false
-}: { label: string; description?: string; checked: boolean; onChange: (v: boolean) => void; danger?: boolean }) {
+type Tab = 'general' | 'storefront' | 'shipping' | 'payments' | 'notifications' | 'returns' | 'reviews' | 'system';
+
+const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+  { id: 'general', label: 'General', icon: Store },
+  { id: 'storefront', label: 'Storefront', icon: Settings2 },
+  { id: 'shipping', label: 'Shipping', icon: Truck },
+  { id: 'payments', label: 'Payments', icon: CreditCard },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'returns', label: 'Returns', icon: RotateCcw },
+  { id: 'reviews', label: 'Reviews', icon: Star },
+  { id: 'system', label: 'System', icon: Shield },
+];
+
+/* --- UI Components --- */
+
+function Toggle({ checked, onChange, label, description }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string }) {
   return (
-    <div className="flex items-center justify-between p-4 border border-silk-light rounded-xl bg-gray-50">
-      <div className="flex-1 pr-4">
-        <h4 className={`font-bold ${danger ? 'text-red-700' : 'text-gray-800'}`}>{label}</h4>
-        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+    <div className="flex items-start justify-between gap-4 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors -mx-4 px-4 sm:mx-0 sm:px-0 rounded-lg">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-800">{label}</p>
+        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
       </div>
-      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-        <input type="checkbox" className="sr-only peer" checked={checked} onChange={e => onChange(e.target.checked)} />
-        <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${danger ? 'peer-checked:bg-red-600' : 'peer-checked:bg-dark-red'}`}></div>
-      </label>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-red/30 focus-visible:ring-offset-2 ${checked ? 'bg-dark-red' : 'bg-slate-200'}`}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ease-out ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+      </button>
     </div>
   );
 }
 
-// ─── Tag Input ───────────────────────────────────────────────────────────────
-function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
-  const [input, setInput] = useState('');
-
-  const addTag = useCallback(() => {
-    const trimmed = input.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      onChange([...tags, trimmed]);
-      setInput('');
-    }
-  }, [input, tags, onChange]);
-
-  const removeTag = (tag: string) => onChange(tags.filter(t => t !== tag));
-
+function Field({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="flex flex-wrap gap-2 mb-2 min-h-[36px]">
-        {tags.map(tag => (
-          <span key={tag} className="flex items-center gap-1 bg-dark-red/10 text-dark-red text-xs font-bold px-2.5 py-1 rounded-full">
-            {tag}
-            <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-700 transition-colors">
-              <X size={11} />
-            </button>
-          </span>
-        ))}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-start py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors -mx-4 px-4 sm:mx-0 sm:px-0 rounded-lg">
+      <div>
+        <label className="text-sm font-medium text-slate-800 block">{label}</label>
+        {description && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{description}</p>}
       </div>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-          placeholder="Type a reason and press Enter..."
-          className="flex-1 p-2.5 bg-gray-50 border border-silk-light rounded-xl outline-none text-sm"
-        />
-        <button type="button" onClick={addTag} className="px-3 py-2 bg-dark-red text-white rounded-xl hover:bg-ruby-red transition-colors">
-          <Plus size={16} />
+      <div className="sm:col-span-2">{children}</div>
+    </div>
+  );
+}
+
+function Input({ value, onChange, type = 'text', placeholder = '', className = '', ...props }: any) {
+  return (
+    <input
+      type={type}
+      value={value ?? ''}
+      onChange={e => onChange(type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)}
+      placeholder={placeholder}
+      className={`w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white transition-shadow ${className}`}
+      {...props}
+    />
+  );
+}
+
+function SettingsCard({ id, title, description, children }: { id: string; title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 md:p-8 scroll-mt-36">
+      <div className="mb-6 pb-4 border-b border-slate-100">
+        <h3 className="text-lg font-serif text-dark-red">{title}</h3>
+        {description && <p className="text-sm text-slate-500 mt-1">{description}</p>}
+      </div>
+      <div className="space-y-0">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function SettingsHeader({ isDirty, isSaving, isPrimaryAdmin, onSave }: any) {
+  return (
+    <div className="sticky top-0 z-40 flex items-center justify-between px-6 py-4 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm -mx-4 sm:mx-0 sm:rounded-t-xl">
+      <div>
+        <h2 className="text-xl font-serif text-dark-red hidden sm:block">Store Settings</h2>
+        <h2 className="text-lg font-serif text-dark-red sm:hidden">Settings</h2>
+      </div>
+      <div className="flex items-center gap-3">
+        {!isPrimaryAdmin && (
+          <span className="hidden sm:flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+            <AlertTriangle size={12} /> View-only
+          </span>
+        )}
+        
+        {isPrimaryAdmin && (
+          <div className="text-xs font-medium mr-2 hidden sm:block">
+            {isSaving ? (
+              <span className="text-slate-500 flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Saving...</span>
+            ) : isDirty ? (
+              <span className="text-amber-600 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Unsaved changes</span>
+            ) : (
+              <span className="text-emerald-600 flex items-center gap-1"><CheckCircle2 size={12}/> All changes saved</span>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={onSave}
+          disabled={!isDirty || isSaving || !isPrimaryAdmin}
+          className="flex items-center gap-2 px-5 py-2 bg-dark-red text-white text-xs font-sans font-medium uppercase tracking-widest rounded-lg hover:bg-ruby-red disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+        >
+          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          <span className="hidden sm:inline">{isSaving ? 'Saving' : 'Save'}</span>
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Callout ─────────────────────────────────────────────────────────────────
-function Callout({ type, children }: { type: 'warning' | 'info' | 'danger'; children: React.ReactNode }) {
-  const styles = {
-    warning: 'bg-amber-50 border-amber-200 text-amber-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-    danger: 'bg-red-50 border-red-200 text-red-800',
-  };
-  const Icon = type === 'warning' ? AlertTriangle : type === 'danger' ? AlertCircle : Info;
+function SettingsSidebar({ tabs, activeSection, onSelect }: any) {
   return (
-    <div className={`flex items-start gap-3 border p-4 rounded-xl text-sm ${styles[type]}`}>
-      <Icon size={18} className="shrink-0 mt-0.5" />
-      <p>{children}</p>
-    </div>
+    <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-y-auto no-scrollbar pb-2 md:pb-0">
+      {tabs.map((tab: any) => {
+        const Icon = tab.icon;
+        const isActive = activeSection === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onSelect(tab.id)}
+            className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap md:whitespace-normal rounded-lg md:rounded-none md:border-l-2 ${
+              isActive
+                ? 'bg-red-50/50 text-dark-red md:border-dark-red md:bg-red-50/30'
+                : 'text-slate-600 border-transparent hover:bg-slate-50 hover:text-slate-900 md:border-transparent'
+            }`}
+          >
+            <Icon size={16} className={isActive ? 'text-dark-red' : 'text-slate-400'} />
+            {tab.label}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
-// ─── Card wrapper ─────────────────────────────────────────────────────────────
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white p-6 sm:p-8 rounded-3xl border border-silk-light shadow-sm">
-      <h3 className="font-bold text-lg text-dark-red mb-6 border-b border-silk-light pb-4">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-// ─── Field ────────────────────────────────────────────────────────────────────
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-bold text-grey-beige uppercase tracking-wider mb-2">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-const inputCls = "w-full p-3 bg-gray-50 border border-silk-light rounded-xl outline-none focus:border-dark-red/40 transition-colors";
-
-// ─── Default Form State ───────────────────────────────────────────────────────
-const defaultForm = {
-  // 1. General
-  storeName: 'Bodilicious', supportEmail: 'bodiliciousnaturalproducts@gmail.com', supportPhone: '+91 9894451947', storeAddress: '',
-  currency: 'INR', timezone: 'Asia/Kolkata',
-  // Notifications (Master Switches)
-  waAllEnabled: true, emailAllEnabled: true,
-  // Notifications (WhatsApp)
-  waOrderPlacedEnabled: true, waStaleCartEnabled: true, waOutForDeliveryEnabled: true,
-  waTicketRaisedEnabled: true, waTicketResolvedEnabled: true, waTrendingProductsEnabled: true,
-  waReEngagementEnabled: true, waPaymentFailureEnabled: true,
-  // Notifications (Email)
-  notifyAdminOnOrder: true, sendOrderConfirmationToCustomer: true,
-  emailReturnApproved: true, emailReturnRejected: true, emailTicketRaised: true,
-  emailTicketReply: true, emailTicketResolved: true, emailTicketCancelled: true,
-
-  // System
-  maintenanceMode: false, maintenanceMessage: 'We are currently updating our store. Please check back soon!',
-  maintenanceBypassSecret: '', lastUpdatedBy: null as string | null, lastUpdatedAt: null as string | null,
-  usdExchangeRate: 83.5, usdExchangeRateLastUpdated: null as string | null,
-
-  // 2. Orders & Invoicing
-  invoicePrefix: 'BOD-', orderIdStartFrom: 1000, gstNumber: '', panNumber: '', businessType: 'Sole Proprietor',
-  codEnabled: true, codExtraCharge: 0, minOrderValueForCOD: 0,
-  lowStockThreshold: 10,
-
-  // 3. Shipping
-  shippingThreshold: 999, shippingCost: 99, taxRatePercent: 18,
-  // Cold Chain
-  fragilePackagingSurchargeEnabled: false, fragilePackagingSurcharge: 0,
-  showEstimatedDeliveryDate: true, averageDeliveryDays: 5,
-  pincodeCheckEnabled: false, pincodeServiceabilitySource: 'manual',
-  temperatureSensitiveWarningEnabled: true,
-  // International
-  internationalShippingEnabled: false,
-  internationalCheckoutEnabled: false,
-  autoCurrencySwitchingEnabled: true,
-  internationalShippingCost: 2000,
-  internationalShippingThreshold: 10000,
-  supportedCountries: COUNTRIES as string[],
-
-  // 4. Returns & Refunds
-  returnWindowDays: 7,
-  allowReturnOpened: false, allowReturnUnopened: true,
-  requirePhotoForReturn: true,
-  adverseReactionReturnEnabled: true, adverseReactionWindowDays: 14,
-  refundMethod: 'original' as 'original' | 'store_credit' | 'both',
-  returnReasonTags: [
-    'Wrong Product', 'Adverse Reaction', 'Damaged in Transit',
-    'Product Not as Described', 'Changed Mind', 'Expired / Near Expiry', 'Packaging Defect'
-  ] as string[],
-
-  // 5. Best Sellers
-  bestSellerPids: [] as string[],
-
-  // 6. Customer Experience
-  // Skin Profile
-  skinQuizEnabled: true, routineBuilderEnabled: false,
-  productCompatibilityWarningsEnabled: true, storeSkinProfileOnAccount: true,
-  // Reviews
-  reviewSkinTypeTaggingEnabled: true, reviewBeforeAfterPhotosEnabled: true,
-  reviewVerifiedBadgeEnabled: true, reviewModerationEnabled: true,
-  reviewIncentiveEnabled: false, reviewIncentiveDiscountPercent: 10,
-
-  // 7. Storefront
-  announcementBar: { text: '', isActive: false, link: '' },
-  launchModal: { isActive: false, badge: '', title: '', description: '', ctaLabel: '', ctaLink: '', image: '' },
-  socialLinks: { instagram: '', facebook: '', twitter: '', youtube: '' },
-  seoMeta: { title: 'Bodilicious', description: 'Premium skincare and wellness products', ogImage: '' },
-};
-
-type FormState = typeof defaultForm;
-
-const tabs = [
-  { id: 'general', label: 'General' },
-  { id: 'orders', label: 'Orders & Invoicing' },
-  { id: 'shipping', label: 'Shipping' },
-  { id: 'returns', label: 'Returns & Refunds' },
-  { id: 'bestsellers', label: 'Best Sellers' },
-  { id: 'experience', label: 'Customer Experience' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'storefront', label: 'Storefront' },
-];
+/* --- Main Page Component --- */
 
 export default function StoreSettings() {
-  const { getAuthHeaders } = useApp();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('general');
-  const [isDirty, setIsDirty] = useState(false);
-  const [form, setForm] = useState<FormState>(defaultForm);
+  const { getAuthHeaders, isPrimaryAdmin } = useApp();
+  
+  const [originalState, setOriginalState] = useState<any>(null);
+  const [formState, setFormState] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  
+  const [activeSection, setActiveSection] = useState<Tab>('general');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Best sellers product search state
-  const [allProducts, setAllProducts] = useState<{ pid: string; name: string; images?: string[] }[]>([]);
-  const [productSearch, setProductSearch] = useState('');
-  const [productsLoading, setProductsLoading] = useState(false);
+  const fetchSettings = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/api/v1/settings/`, { headers });
+      const data = await res.json();
+      if (data.success) {
+        setOriginalState(data.data);
+        setFormState(JSON.parse(JSON.stringify(data.data)));
+      } else {
+        toast.error('Failed to load settings');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error loading settings');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAuthHeaders]);
 
   useEffect(() => {
     fetchSettings();
-    fetchAllProducts();
-    // eslint-disable-next-line
-  }, []);
+  }, [fetchSettings]);
 
-  const fetchSettings = async () => {
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch(`${API_URL}/api/v1/settings`, { headers });
-      const data = await res.json();
-      if (data.success && data.data) {
-        const d = data.data;
-        const merged: FormState = {
-          ...defaultForm,
-          ...d,
-          announcementBar: { ...defaultForm.announcementBar, ...(d.announcementBar || {}) },
-          launchModal: { ...defaultForm.launchModal, ...(d.launchModal || {}) },
-          socialLinks: { ...defaultForm.socialLinks, ...(d.socialLinks || {}) },
-          seoMeta: { ...defaultForm.seoMeta, ...(d.seoMeta || {}) },
-          returnReasonTags: Array.isArray(d.returnReasonTags) ? d.returnReasonTags : defaultForm.returnReasonTags,
-          bestSellerPids: Array.isArray(d.bestSellerPids) ? d.bestSellerPids : [],
-          supportedCountries: Array.isArray(d.supportedCountries) && d.supportedCountries.length > 0 ? d.supportedCountries : COUNTRIES,
-        };
-        setForm(merged);
-        setIsDirty(false);
+  // Setup ScrollSpy for Active Section
+  useEffect(() => {
+    if (isLoading || !formState) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      // Find the first intersecting entry
+      const visible = entries.find(e => e.isIntersecting);
+      if (visible) {
+        setActiveSection(visible.target.id as Tab);
       }
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to load settings');
-    } finally {
-      setLoading(false);
+    }, { 
+      root: null,
+      rootMargin: '-100px 0px -60% 0px' 
+    });
+
+    TABS.forEach(tab => {
+      const el = document.getElementById(tab.id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [isLoading, formState]);
+
+  const isDirty = formState && originalState ? JSON.stringify(formState) !== JSON.stringify(originalState) : false;
+
+  const handleSave = async () => {
+    if (!isPrimaryAdmin) {
+      toast.error('Only the primary admin can save settings.');
+      return;
     }
-  };
-
-  const fetchAllProducts = async () => {
-    setProductsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/v1/products?limit=500`);
-      const json = await res.json();
-      if (json.data) setAllProducts(json.data);
-    } catch (err) {
-      console.error('Failed to fetch products for best sellers picker');
-    } finally {
-      setProductsLoading(false);
-    }
-  };
-
-  const set = (field: keyof FormState, value: any) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-    setIsDirty(true);
-  };
-
-  const setNested = (parent: keyof FormState, field: string, value: any) => {
-    setForm(prev => ({ ...prev, [parent]: { ...(prev[parent] as any), [field]: value } }));
-    setIsDirty(true);
-  };
-
-  const handleTabChange = (tabId: string) => {
-    if (isDirty) {
-      if (!window.confirm('You have unsaved changes. They will be preserved across tabs until you save or refresh. Continue?')) return;
-    }
-    setActiveTab(tabId);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+    setSaveStatus('saving');
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`${API_URL}/api/v1/settings`, { method: 'PUT', headers, body: JSON.stringify(form) });
+      const res = await fetch(`${API_URL}/api/v1/settings/`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(formState),
+      });
       const data = await res.json();
       if (data.success) {
-        toast.success('Settings saved!');
-        setIsDirty(false);
-        fetchSettings();
+        toast.success('Settings saved successfully!');
+        setOriginalState(data.data);
+        setFormState(JSON.parse(JSON.stringify(data.data)));
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         toast.error(data.message || 'Failed to save settings');
+        setSaveStatus('error');
       }
-    } catch (err) {
-      toast.error('An error occurred while saving.');
-    } finally {
-      setSaving(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving settings');
+      setSaveStatus('error');
     }
   };
 
-  const handleLaunchModalImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
-    const file = e.target.files[0];
-    const uploadToast = toast.loading('Uploading image...');
-    try {
-      const headers = await getAuthHeaders();
-      delete (headers as any)['Content-Type']; 
-      const payload = new FormData();
-      payload.append('image', file);
-      const res = await fetch(`${API_URL}/api/v1/admin/upload`, { method: 'POST', headers, body: payload });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setNested('launchModal', 'image', data.path);
-        toast.success(`Image uploaded successfully`, { id: uploadToast });
-      } else {
-        toast.error('Error uploading image', { id: uploadToast });
+  const update = (path: string, value: any) => {
+    setFormState((prev: any) => {
+      const keys = path.split('.');
+      const next = JSON.parse(JSON.stringify(prev));
+      let curr = next;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!curr[keys[i]]) curr[keys[i]] = {};
+        curr = curr[keys[i]];
       }
-    } catch (err) {
-      toast.error('Error uploading image', { id: uploadToast });
+      curr[keys[keys.length - 1]] = value;
+      return next;
+    });
+  };
+
+  const scrollToSection = (id: string) => {
+    setActiveSection(id as Tab);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const handleOGImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
-    const file = e.target.files[0];
-    const uploadToast = toast.loading('Uploading OG Image...');
-    try {
-      const headers = await getAuthHeaders();
-      delete (headers as any)['Content-Type']; 
-      const payload = new FormData();
-      payload.append('image', file);
-      const res = await fetch(`${API_URL}/api/v1/admin/upload`, { method: 'POST', headers, body: payload });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setNested('seoMeta', 'ogImage', data.path);
-        toast.success(`OG Image uploaded successfully`, { id: uploadToast });
-      } else {
-        toast.error('Error uploading image', { id: uploadToast });
-      }
-    } catch (err) {
-      toast.error('Error uploading image', { id: uploadToast });
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <Loader2 className="animate-spin text-dark-red" size={28} />
+      </div>
+    );
+  }
 
-  if (loading) return (
-    <div className="flex justify-center items-center h-64">
-      <span className="text-gray-500 font-sans tracking-wider uppercase text-sm">Loading Settings...</span>
-    </div>
-  );
+  if (!formState) return null;
+
+  const s = formState;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Settings className="text-dark-red" size={28} />
-          <h2 className="text-2xl font-serif font-bold text-dark-red">Settings</h2>
-        </div>
-        <div className="flex items-center gap-4">
-          {isDirty && (
-            <div className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2">
-              <AlertTriangle size={16} /> Unsaved Changes
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={(e: any) => handleSave(e)}
-            disabled={saving || !isDirty}
-            className="flex items-center gap-2 bg-dark-red text-white px-6 py-2 rounded-xl font-bold hover:bg-ruby-red transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving...' : <><Save size={18} /> Save Settings</>}
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col -m-3 sm:-m-6 lg:-m-8">
+      <SettingsHeader 
+        isDirty={isDirty} 
+        isSaving={saveStatus === 'saving'} 
+        isPrimaryAdmin={isPrimaryAdmin} 
+        onSave={handleSave} 
+      />
 
-      <div className="flex flex-col md:flex-row gap-8 items-start">
-        {/* Sidebar Tabs */}
-        <div className="w-full md:w-56 shrink-0 bg-white rounded-3xl p-4 shadow-sm border border-silk-light space-y-1">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange(tab.id)}
-              className={`w-full text-left px-4 py-3 rounded-xl transition-colors font-bold text-sm ${
-                activeTab === tab.id ? 'bg-dark-red text-white' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      <div className="flex flex-col md:flex-row">
+        {/* Sidebar Navigation */}
+        <div className="w-full md:w-64 shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 z-30 p-4 md:py-6 overflow-x-auto md:sticky md:top-[72px] self-start">
+          <SettingsSidebar tabs={TABS} activeSection={activeSection} onSelect={scrollToSection} />
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 w-full">
-          <form onSubmit={handleSave} className="space-y-6">
+        <div ref={scrollContainerRef} className="flex-1 bg-slate-50/50 p-4 sm:p-8">
+          <div className="max-w-4xl mx-auto space-y-8 pb-24">
+            
+            <SettingsCard id="general" title="General Information" description="Basic details about your business and store profile.">
+              <Field label="Store Name"><Input value={s.storeName} onChange={(v: string) => update('storeName', v)} /></Field>
+              <Field label="Support Email"><Input value={s.supportEmail} onChange={(v: string) => update('supportEmail', v)} type="email" /></Field>
+              <Field label="Support Phone"><Input value={s.supportPhone} onChange={(v: string) => update('supportPhone', v)} /></Field>
+              <Field label="Store Address" description="Physical address for invoices"><Input value={s.storeAddress} onChange={(v: string) => update('storeAddress', v)} /></Field>
+              
+              <div className="pt-6 mt-6 border-t border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Tax & Invoicing</h4>
+                <Field label="Invoice Prefix"><Input value={s.invoicePrefix} onChange={(v: string) => update('invoicePrefix', v)} placeholder="BOD-" /></Field>
+                <Field label="GST Number"><Input value={s.gstNumber} onChange={(v: string) => update('gstNumber', v)} /></Field>
+                <Field label="PAN Number"><Input value={s.panNumber} onChange={(v: string) => update('panNumber', v)} /></Field>
+                <Field label="Tax Rate (%)" description="Applied to applicable orders"><Input value={s.taxRatePercent} onChange={(v: number) => update('taxRatePercent', v)} type="number" /></Field>
+              </div>
 
-            {/* ── 1. GENERAL ──────────────────────────────── */}
-            {activeTab === 'general' && (
-              <div className="space-y-6">
+              <div className="pt-6 mt-6 border-t border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Social Links & SEO</h4>
+                <Field label="Instagram"><Input value={s.socialLinks?.instagram} onChange={(v: string) => update('socialLinks.instagram', v)} placeholder="https://instagram.com/..." /></Field>
+                <Field label="Facebook"><Input value={s.socialLinks?.facebook} onChange={(v: string) => update('socialLinks.facebook', v)} placeholder="https://facebook.com/..." /></Field>
+                <Field label="YouTube"><Input value={s.socialLinks?.youtube} onChange={(v: string) => update('socialLinks.youtube', v)} placeholder="https://youtube.com/..." /></Field>
+                <Field label="SEO Title"><Input value={s.seoMeta?.title} onChange={(v: string) => update('seoMeta.title', v)} /></Field>
+                <Field label="SEO Description"><Input value={s.seoMeta?.description} onChange={(v: string) => update('seoMeta.description', v)} /></Field>
+              </div>
+            </SettingsCard>
 
-                {(!form.usdExchangeRateLastUpdated || (Date.now() - new Date(form.usdExchangeRateLastUpdated).getTime() > 48 * 60 * 60 * 1000)) && (
-                  <Callout type="danger">
-                    <strong>Critical Issue:</strong> The USD Exchange Rate is stale or missing! The automated cron job hasn't successfully updated it in over 48 hours. International pricing may be incorrect.
-                  </Callout>
-                )}
+            <SettingsCard id="storefront" title="Storefront Experience" description="Configure announcement bars, modals, and promotional blocks.">
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Announcement Bar</h4>
+                <Toggle checked={!!s.announcementBar?.isActive} onChange={v => update('announcementBar.isActive', v)} label="Show Announcement Bar" description="Displays a dismissible banner at the top of every page" />
+                <Field label="Announcement Text"><Input value={s.announcementBar?.text} onChange={(v: string) => update('announcementBar.text', v)} placeholder="Free shipping on orders over ₹999!" /></Field>
+                <Field label="Announcement Link" description="Optional — clicking the bar navigates here"><Input value={s.announcementBar?.link} onChange={(v: string) => update('announcementBar.link', v)} placeholder="/shop" /></Field>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Launch Modal</h4>
+                <Toggle checked={!!s.launchModal?.isActive} onChange={v => update('launchModal.isActive', v)} label="Show Launch Modal" description="Pop-up shown on first visit (email capture / promotion)" />
+                <Field label="Badge Text"><Input value={s.launchModal?.badge} onChange={(v: string) => update('launchModal.badge', v)} placeholder="Just Launched" /></Field>
+                <Field label="Title"><Input value={s.launchModal?.title} onChange={(v: string) => update('launchModal.title', v)} /></Field>
+                <Field label="Description"><Input value={s.launchModal?.description} onChange={(v: string) => update('launchModal.description', v)} /></Field>
+                <Field label="CTA Label"><Input value={s.launchModal?.ctaLabel} onChange={(v: string) => update('launchModal.ctaLabel', v)} placeholder="Explore Collection" /></Field>
+                <Field label="CTA Link"><Input value={s.launchModal?.ctaLink} onChange={(v: string) => update('launchModal.ctaLink', v)} placeholder="/shop" /></Field>
+              </div>
+            </SettingsCard>
 
-                <Card title="Maintenance Mode">
-                  <div className="space-y-4">
-                    <ToggleRow label="Maintenance Mode" description="Takes the storefront offline for all non-admin visitors." checked={form.maintenanceMode} onChange={v => set('maintenanceMode', v)} danger />
-                    {form.maintenanceMode && (
-                      <Callout type="danger">Maintenance mode is ON. Customers cannot access the storefront. The admin panel remains accessible.</Callout>
-                    )}
-                    <Field label="Maintenance Message"><textarea className={`${inputCls} h-20`} value={form.maintenanceMessage} onChange={e => set('maintenanceMessage', e.target.value)} /></Field>
-                    <Field label="Bypass Secret (Query Param)">
-                      <input type="text" placeholder="e.g. preview-secret-2024" className={inputCls} value={form.maintenanceBypassSecret} onChange={e => set('maintenanceBypassSecret', e.target.value)} />
-                      <p className="text-xs text-gray-500 mt-2">Access the live site via <code className="bg-gray-100 px-1 rounded">/?preview=YOUR_SECRET</code> to bypass the maintenance wall.</p>
-                    </Field>
-                  </div>
-                </Card>
+            <SettingsCard id="shipping" title="Shipping & Delivery" description="Manage shipping thresholds, costs, and international settings.">
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Domestic Shipping</h4>
+                <Field label="Free Shipping Threshold (₹)" description="Orders above this value get free shipping"><Input value={s.shippingThreshold} onChange={(v: number) => update('shippingThreshold', v)} type="number" /></Field>
+                <Field label="Shipping Cost (₹)" description="Flat fee for orders below threshold"><Input value={s.shippingCost} onChange={(v: number) => update('shippingCost', v)} type="number" /></Field>
+                <Field label="Avg. Delivery Days"><Input value={s.averageDeliveryDays} onChange={(v: number) => update('averageDeliveryDays', v)} type="number" /></Field>
+                <Toggle checked={!!s.showEstimatedDeliveryDate} onChange={v => update('showEstimatedDeliveryDate', v)} label="Show Estimated Delivery Date" description="Show estimated delivery on product and cart pages" />
+                <Toggle checked={!!s.temperatureSensitiveWarningEnabled} onChange={v => update('temperatureSensitiveWarningEnabled', v)} label="Temperature Sensitive Warning" description="Show warning for summer heat sensitive products" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">International Shipping</h4>
+                <Toggle checked={!!s.internationalShippingEnabled} onChange={v => update('internationalShippingEnabled', v)} label="Enable International Shipping" />
+                <Toggle checked={!!s.internationalCheckoutEnabled} onChange={v => update('internationalCheckoutEnabled', v)} label="Enable International Checkout" />
+                <Toggle checked={!!s.autoCurrencySwitchingEnabled} onChange={v => update('autoCurrencySwitchingEnabled', v)} label="Auto Currency Switching" description="Automatically switch currency based on visitor's country" />
+                <Field label="International Shipping Cost (₹)"><Input value={s.internationalShippingCost} onChange={(v: number) => update('internationalShippingCost', v)} type="number" /></Field>
+                <Field label="International Free Shipping Threshold (₹)"><Input value={s.internationalShippingThreshold} onChange={(v: number) => update('internationalShippingThreshold', v)} type="number" /></Field>
+              </div>
+            </SettingsCard>
 
-                <div className="bg-gray-50 p-6 rounded-3xl border border-silk-light flex flex-col gap-1 text-sm text-gray-500">
-                  <h4 className="font-bold text-gray-800 mb-2">Audit Information</h4>
-                  <p><strong>Last Updated At:</strong> {form.lastUpdatedAt ? new Date(form.lastUpdatedAt).toLocaleString() : 'Never'}</p>
-                  <p><strong>Last Updated By (UID):</strong> {form.lastUpdatedBy || 'N/A'}</p>
+            <SettingsCard id="payments" title="Payments" description="Configure Cash on Delivery and payment gateways.">
+              <Toggle checked={!!s.codEnabled} onChange={v => update('codEnabled', v)} label="Enable Cash on Delivery" />
+              <Field label="COD Extra Charge (₹)" description="Additional fee for COD orders (0 = free)"><Input value={s.codExtraCharge} onChange={(v: number) => update('codExtraCharge', v)} type="number" /></Field>
+              <Field label="Minimum Order Value for COD (₹)" description="COD not available below this amount"><Input value={s.minOrderValueForCOD} onChange={(v: number) => update('minOrderValueForCOD', v)} type="number" /></Field>
+            </SettingsCard>
+
+            <SettingsCard id="notifications" title="Notifications & Messaging" description="Manage Email and WhatsApp automated triggers.">
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Master Switches</h4>
+                <Toggle checked={!!s.waAllEnabled} onChange={v => update('waAllEnabled', v)} label="WhatsApp Notifications" description="Master switch for all WhatsApp messages" />
+                <Toggle checked={!!s.emailAllEnabled} onChange={v => update('emailAllEnabled', v)} label="Email Notifications" description="Master switch for all email communications" />
+              </div>
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">WhatsApp Triggers</h4>
+                <Toggle checked={!!s.waOrderPlacedEnabled} onChange={v => update('waOrderPlacedEnabled', v)} label="Order Placed" description="Send WhatsApp on order confirmation" />
+                <Toggle checked={!!s.waOutForDeliveryEnabled} onChange={v => update('waOutForDeliveryEnabled', v)} label="Out for Delivery" />
+                <Toggle checked={!!s.waStaleCartEnabled} onChange={v => update('waStaleCartEnabled', v)} label="Abandoned Cart Recovery" />
+                <Toggle checked={!!s.waPaymentFailureEnabled} onChange={v => update('waPaymentFailureEnabled', v)} label="Payment Failure" />
+                <Toggle checked={!!s.waTicketRaisedEnabled} onChange={v => update('waTicketRaisedEnabled', v)} label="Support Ticket Raised" />
+                <Toggle checked={!!s.waTicketResolvedEnabled} onChange={v => update('waTicketResolvedEnabled', v)} label="Support Ticket Resolved" />
+                <Toggle checked={!!s.waTrendingProductsEnabled} onChange={v => update('waTrendingProductsEnabled', v)} label="Trending Products" />
+                <Toggle checked={!!s.waReEngagementEnabled} onChange={v => update('waReEngagementEnabled', v)} label="Re-engagement Messages" />
+              </div>
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Admin Email Alerts</h4>
+                <Toggle checked={!!s.notifyAdminOnOrder} onChange={v => update('notifyAdminOnOrder', v)} label="Notify Admin on New Order" />
+                <Field label="Admin Notification Email"><Input value={s.adminNotificationEmail} onChange={(v: string) => update('adminNotificationEmail', v)} type="email" /></Field>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Email Triggers</h4>
+                <Toggle checked={!!s.sendOrderConfirmationToCustomer} onChange={v => update('sendOrderConfirmationToCustomer', v)} label="Order Confirmation to Customer" />
+                <Toggle checked={!!s.emailReturnApproved} onChange={v => update('emailReturnApproved', v)} label="Return Approved" />
+                <Toggle checked={!!s.emailReturnRejected} onChange={v => update('emailReturnRejected', v)} label="Return Rejected" />
+                <Toggle checked={!!s.emailTicketRaised} onChange={v => update('emailTicketRaised', v)} label="Support Ticket Created" />
+                <Toggle checked={!!s.emailTicketReply} onChange={v => update('emailTicketReply', v)} label="Support Ticket Reply" />
+                <Toggle checked={!!s.emailTicketResolved} onChange={v => update('emailTicketResolved', v)} label="Support Ticket Resolved" />
+                <Toggle checked={!!s.emailTicketCancelled} onChange={v => update('emailTicketCancelled', v)} label="Support Ticket Cancelled" />
+              </div>
+            </SettingsCard>
+
+            <SettingsCard id="returns" title="Return Policy" description="Configure return windows and refund methods.">
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <Field label="Return Window (days)"><Input value={s.returnWindowDays} onChange={(v: number) => update('returnWindowDays', v)} type="number" /></Field>
+                <Toggle checked={!!s.allowReturnOpened} onChange={v => update('allowReturnOpened', v)} label="Allow Returns on Opened Products" />
+                <Toggle checked={!!s.allowReturnUnopened} onChange={v => update('allowReturnUnopened', v)} label="Allow Returns on Unopened Products" />
+                <Toggle checked={!!s.requirePhotoForReturn} onChange={v => update('requirePhotoForReturn', v)} label="Require Photo Evidence for Return" />
+              </div>
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Adverse Reactions</h4>
+                <Toggle checked={!!s.adverseReactionReturnEnabled} onChange={v => update('adverseReactionReturnEnabled', v)} label="Enable Adverse Reaction Returns" description="Extends return window for allergic reactions" />
+                <Field label="Adverse Reaction Return Window (days)"><Input value={s.adverseReactionWindowDays} onChange={(v: number) => update('adverseReactionWindowDays', v)} type="number" /></Field>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Refund Processing</h4>
+                <Field label="Default Refund Method">
+                  <select
+                    value={s.refundMethod}
+                    onChange={e => update('refundMethod', e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white"
+                  >
+                    <option value="original">Original Payment Source</option>
+                    <option value="both">Let Customer Choose (Original / Replacement)</option>
+                  </select>
+                </Field>
+              </div>
+            </SettingsCard>
+
+            <SettingsCard id="reviews" title="Reviews & Personalisation" description="Manage product reviews and user skin profiles.">
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Review Features</h4>
+                <Toggle checked={!!s.reviewSkinTypeTaggingEnabled} onChange={v => update('reviewSkinTypeTaggingEnabled', v)} label="Skin Type Tagging" description="Allow reviewers to tag their skin type" />
+                <Toggle checked={!!s.reviewBeforeAfterPhotosEnabled} onChange={v => update('reviewBeforeAfterPhotosEnabled', v)} label="Before & After Photos" description="Allow photo uploads with reviews" />
+                <Toggle checked={!!s.reviewVerifiedBadgeEnabled} onChange={v => update('reviewVerifiedBadgeEnabled', v)} label="Verified Purchase Badge" description="Show 'Verified' badge on purchases reviews" />
+                <Toggle checked={!!s.reviewModerationEnabled} onChange={v => update('reviewModerationEnabled', v)} label="Review Moderation" description="Reviews require admin approval before appearing" />
+              </div>
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Review Incentives</h4>
+                <Toggle checked={!!s.reviewIncentiveEnabled} onChange={v => update('reviewIncentiveEnabled', v)} label="Discount for Leaving a Review" description="Automatically send a discount code after review submission" />
+                <Field label="Discount Percentage (%)"><Input value={s.reviewIncentiveDiscountPercent} onChange={(v: number) => update('reviewIncentiveDiscountPercent', v)} type="number" /></Field>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Skin Profile & Personalisation</h4>
+                <Toggle checked={!!s.skinQuizEnabled} onChange={v => update('skinQuizEnabled', v)} label="Ritual Finder / Skin Quiz" />
+                <Toggle checked={!!s.productCompatibilityWarningsEnabled} onChange={v => update('productCompatibilityWarningsEnabled', v)} label="Product Compatibility Warnings" />
+                <Toggle checked={!!s.storeSkinProfileOnAccount} onChange={v => update('storeSkinProfileOnAccount', v)} label="Store Skin Profile on Account" />
+              </div>
+            </SettingsCard>
+
+            <SettingsCard id="system" title="System & Inventory" description="Low-level application settings and maintenance mode.">
+              <div className="mb-6 pb-6 border-b border-slate-100">
+                <div className={`p-4 rounded-lg border mb-4 transition-colors ${s.maintenanceMode ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <Toggle
+                    checked={!!s.maintenanceMode}
+                    onChange={v => update('maintenanceMode', v)}
+                    label="Maintenance Mode"
+                    description="When enabled, the storefront shows a maintenance page to visitors. Admins can still access via bypass secret."
+                  />
                 </div>
+                <Field label="Maintenance Message" description="Shown to visitors when maintenance mode is on">
+                  <textarea
+                    value={s.maintenanceMessage || ''}
+                    onChange={e => update('maintenanceMessage', e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white resize-none"
+                    rows={3}
+                  />
+                </Field>
+                <Field label="Bypass Secret" description="Add ?preview=[secret] to URL to bypass maintenance mode">
+                  <Input value={s.maintenanceBypassSecret} onChange={(v: string) => update('maintenanceBypassSecret', v)} placeholder="e.g. admin123" />
+                </Field>
               </div>
-            )}
-
-            {/* ── 2. ORDERS & INVOICING ────────────────────── */}
-            {activeTab === 'orders' && (
-              <div className="space-y-6">
-                <Card title="Orders & Invoicing">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Field label="Invoice Prefix"><input type="text" className={inputCls} value={form.invoicePrefix} onChange={e => set('invoicePrefix', e.target.value)} placeholder="e.g. BOD-" /></Field>
-                    <Field label="Order ID Start From"><input type="number" className={inputCls} value={form.orderIdStartFrom} onChange={e => set('orderIdStartFrom', Number(e.target.value))} /></Field>
-                    <Field label="GST Number"><input type="text" className={inputCls} value={form.gstNumber} onChange={e => set('gstNumber', e.target.value)} /></Field>
-                    <Field label="PAN Number"><input type="text" className={inputCls} value={form.panNumber} onChange={e => set('panNumber', e.target.value)} /></Field>
-                    <Field label="Business Type">
-                      <Select
-                        value={form.businessType}
-                        onChange={val => set('businessType', val as string)}
-                        options={[
-                          { value: 'Sole Proprietor', label: 'Sole Proprietor' },
-                          { value: 'LLP', label: 'LLP' },
-                          { value: 'Pvt Ltd', label: 'Pvt Ltd' }
-                        ]}
-                      />
-                    </Field>
-                    <Field label="Low Stock Alert Threshold">
-                      <input type="number" min="0" className={inputCls} value={form.lowStockThreshold} onChange={e => set('lowStockThreshold', Number(e.target.value))} />
-                    </Field>
-                  </div>
-                </Card>
-
-                <Card title="Cash on Delivery (COD)">
-                  <div className="space-y-4">
-                    <ToggleRow label="Enable COD" description="Allow customers to pay on delivery." checked={form.codEnabled} onChange={v => set('codEnabled', v)} />
-                    {form.codEnabled && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                        <Field label="COD Extra Charge (₹)"><input type="number" min="0" className={inputCls} value={form.codExtraCharge} onChange={e => set('codExtraCharge', Number(e.target.value))} /></Field>
-                        <Field label="Min Order Value for COD (₹)"><input type="number" min="0" className={inputCls} value={form.minOrderValueForCOD} onChange={e => set('minOrderValueForCOD', Number(e.target.value))} /></Field>
-                      </div>
-                    )}
-                  </div>
-                </Card>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Inventory</h4>
+                <Field label="Low Stock Alert Threshold" description="Products below this quantity trigger low stock warnings">
+                  <Input value={s.lowStockThreshold} onChange={(v: number) => update('lowStockThreshold', v)} type="number" />
+                </Field>
               </div>
-            )}
+            </SettingsCard>
 
-            {/* ── 3. SHIPPING ──────────────────────────────── */}
-            {activeTab === 'shipping' && (
-              <div className="space-y-6">
-                <Card title="Shipping & Taxes">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Field label="Free Shipping Threshold (₹)"><input type="number" min="0" className={inputCls} value={form.shippingThreshold} onChange={e => set('shippingThreshold', Number(e.target.value))} /></Field>
-                    <Field label="Standard Shipping Cost (₹)"><input type="number" min="0" className={inputCls} value={form.shippingCost} onChange={e => set('shippingCost', Number(e.target.value))} /></Field>
-                    <Field label="Tax Rate Percent (%)"><input type="number" min="0" max="100" className={inputCls} value={form.taxRatePercent} onChange={e => set('taxRatePercent', Number(e.target.value))} /></Field>
-                  </div>
-                  <div className="mt-6">
-                    <Callout type="warning">Changing these values will immediately affect new orders. Existing orders are unaffected.</Callout>
-                  </div>
-                </Card>
-
-                <Card title="Cold Chain & Delivery">
-                  <div className="space-y-4">
-                    <ToggleRow label="Temperature-Sensitive Product Warning" description="Show a summer heat warning banner for heat-sensitive products (Vitamin C serums, retinols)." checked={form.temperatureSensitiveWarningEnabled} onChange={v => set('temperatureSensitiveWarningEnabled', v)} />
-                    <ToggleRow label="Show Estimated Delivery Date" description="Display an estimated delivery date on product and checkout pages. Reduces 'where is my order' tickets." checked={form.showEstimatedDeliveryDate} onChange={v => set('showEstimatedDeliveryDate', v)} />
-                    {form.showEstimatedDeliveryDate && (
-                      <Field label="Average Delivery Days">
-                        <input type="number" min="1" className={inputCls} value={form.averageDeliveryDays} onChange={e => set('averageDeliveryDays', Number(e.target.value))} />
-                      </Field>
-                    )}
-                    <ToggleRow label="Fragile Packaging Surcharge" description="Charge extra for items that require special packaging (glass bottles, dropper serums)." checked={form.fragilePackagingSurchargeEnabled} onChange={v => set('fragilePackagingSurchargeEnabled', v)} />
-                    {form.fragilePackagingSurchargeEnabled && (
-                      <div className="space-y-3">
-                        <Field label="Surcharge Amount (₹)"><input type="number" min="0" className={inputCls} value={form.fragilePackagingSurcharge} onChange={e => set('fragilePackagingSurcharge', Number(e.target.value))} /></Field>
-                        <Callout type="info">This surcharge requires a product-level <code className="font-mono text-xs bg-blue-100 px-1 rounded">isFragile</code> flag on individual products to take effect. Add this to the product schema before enabling.</Callout>
-                      </div>
-                    )}
-                    <ToggleRow label="Pincode Serviceability Check" description="Validate delivery coverage before checkout." checked={form.pincodeCheckEnabled} onChange={v => set('pincodeCheckEnabled', v)} />
-                    {form.pincodeCheckEnabled && (
-                      <div className="space-y-3">
-                        <Field label="Serviceability Data Source">
-                          <Select
-                            value={form.pincodeServiceabilitySource}
-                            onChange={val => set('pincodeServiceabilitySource', val as string)}
-                            options={[
-                              { value: 'manual', label: 'Manual (upload pincode list)' },
-                              { value: 'shiprocket', label: 'Shiprocket API' },
-                              { value: 'delhivery', label: 'Delhivery API' }
-                            ]}
-                          />
-                        </Field>
-                        <Callout type="info">Pincode checking requires API credentials or a pincode list to be configured separately. Enabling this toggle without a data source will block all checkouts.</Callout>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
-                <Card title="International Commerce">
-                  <div className="space-y-4">
-                    <ToggleRow label="Enable Auto Currency Switching" description="Automatically switch to USD for customers outside India based on their IP address." checked={form.autoCurrencySwitchingEnabled} onChange={v => set('autoCurrencySwitchingEnabled', v)} />
-                    <ToggleRow label="Enable International Shipping" description="Allow physical deliveries outside India." checked={form.internationalShippingEnabled} onChange={v => set('internationalShippingEnabled', v)} />
-                    <ToggleRow label="Enable International Checkout (Payments)" description="Allow Razorpay checkout for international customers. Only enable after FEMA compliance is approved." checked={form.internationalCheckoutEnabled} onChange={v => set('internationalCheckoutEnabled', v)} danger />
-                    {form.internationalShippingEnabled && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                          <Field label="International Shipping Cost (₹)"><input type="number" min="0" className={inputCls} value={form.internationalShippingCost} onChange={e => set('internationalShippingCost', Number(e.target.value))} /></Field>
-                          <Field label="Free Int. Shipping Threshold (₹)"><input type="number" min="0" className={inputCls} value={form.internationalShippingThreshold} onChange={e => set('internationalShippingThreshold', Number(e.target.value))} /></Field>
-                        </div>
-                        <Field label="Supported Countries">
-                          <p className="text-sm text-gray-500 mb-2">Customers from unlisted countries will be blocked at checkout. Example: 'United States', 'United Kingdom', 'Canada'.</p>
-                          <TagInput tags={form.supportedCountries} onChange={tags => set('supportedCountries', tags)} />
-                        </Field>
-                        <Callout type="warning">Note: International Razorpay payments and Shiprocket shipments require explicit approval from your account managers. Proceed only if your accounts are activated for cross-border commerce.</Callout>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {/* ── 4. RETURNS & REFUNDS ─────────────────────── */}
-            {activeTab === 'returns' && (
-              <div className="space-y-6">
-                <Card title="Return Policy">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2">
-                      <Field label="Standard Return Window (Days)">
-                        <input type="number" min="0" className={inputCls} value={form.returnWindowDays} onChange={e => set('returnWindowDays', Number(e.target.value))} />
-                      </Field>
-                      <Field label="Refund Method">
-                        <Select
-                          value={form.refundMethod}
-                          onChange={val => set('refundMethod', val as any)}
-                          options={[
-                            { value: 'original', label: 'Refund to Original Payment Source' },
-                            { value: 'store_credit', label: 'Store Credit Only' },
-                            { value: 'both', label: "Customer's Choice (Original or Store Credit)" }
-                          ]}
-                        />
-                      </Field>
-                    </div>
-                    <ToggleRow label="Allow Returns on Unopened Products" description="Standard return policy — product must be in original sealed condition." checked={form.allowReturnUnopened} onChange={v => set('allowReturnUnopened', v)} />
-                    <ToggleRow label="Allow Returns on Opened Products" description="Skincare-sensitive policy. Enable with caution — opened products carry hygiene risk." checked={form.allowReturnOpened} onChange={v => set('allowReturnOpened', v)} />
-                    <ToggleRow label="Require Photo for Return Requests" description="Customers must upload a photo of the product to submit a return. Prevents abuse while protecting legitimate claims." checked={form.requirePhotoForReturn} onChange={v => set('requirePhotoForReturn', v)} />
-                  </div>
-                </Card>
-
-                <Card title="Adverse Reaction Returns">
-                  <div className="space-y-4">
-                    <ToggleRow label="Enable Adverse Reaction Fast-Track" description="Customers who experience a reaction get a separate, prioritised resolution path." checked={form.adverseReactionReturnEnabled} onChange={v => set('adverseReactionReturnEnabled', v)} />
-                    {form.adverseReactionReturnEnabled && (
-                      <div className="space-y-3">
-                        <Field label="Adverse Reaction Return Window (Days)">
-                          <input type="number" min="0" className={inputCls} value={form.adverseReactionWindowDays} onChange={e => set('adverseReactionWindowDays', Number(e.target.value))} />
-                        </Field>
-                        {form.adverseReactionWindowDays < 14 && (
-                          <Callout type="warning">Adverse reaction return windows shorter than 14 days are not recommended for products with active ingredients. Reactions to retinols, AHAs, and actives can appear after 7–10 days of use.</Callout>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
-                <Card title="Return Reason Tags">
-                  <p className="text-sm text-gray-500 mb-4">These reasons appear on the return request form. Use for QC tracking and reformulation decisions.</p>
-                  <TagInput tags={form.returnReasonTags} onChange={tags => { setForm(prev => ({ ...prev, returnReasonTags: tags })); setIsDirty(true); }} />
-                </Card>
-              </div>
-            )}
-
-            {/* ── 5. BEST SELLERS ─────────────────────────── */}
-            {activeTab === 'bestsellers' && (() => {
-              const selectedProducts = form.bestSellerPids
-                .map(pid => allProducts.find(p => p.pid === pid))
-                .filter(Boolean) as typeof allProducts;
-
-              const searchResults = productSearch.trim().length > 1
-                ? allProducts
-                    .filter(p =>
-                      p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
-                      !form.bestSellerPids.includes(p.pid)
-                    )
-                    .slice(0, 8)
-                : [];
-
-              const addProduct = (pid: string) => {
-                if (!form.bestSellerPids.includes(pid)) {
-                  setForm(prev => ({ ...prev, bestSellerPids: [...prev.bestSellerPids, pid] }));
-                  setIsDirty(true);
-                }
-                setProductSearch('');
-              };
-
-              const removeProduct = (pid: string) => {
-                setForm(prev => ({ ...prev, bestSellerPids: prev.bestSellerPids.filter(p => p !== pid) }));
-                setIsDirty(true);
-              };
-
-              const moveProduct = (pid: string, direction: 'up' | 'down') => {
-                const arr = [...form.bestSellerPids];
-                const idx = arr.indexOf(pid);
-                if (direction === 'up' && idx > 0) [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
-                if (direction === 'down' && idx < arr.length - 1) [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
-                setForm(prev => ({ ...prev, bestSellerPids: arr }));
-                setIsDirty(true);
-              };
-
-              return (
-                <div className="space-y-6">
-                  <Card title="Best Sellers — Homepage Curation">
-                    <p className="text-sm text-gray-500 mb-6">
-                      Select up to 8 products to feature in the Best Sellers section on the homepage. Drag to reorder using the up/down arrows. If no products are pinned here, the homepage will fall back to keyword-based selection.
-                    </p>
-
-                    {/* Search & Add */}
-                    <div className="relative mb-6">
-                      <Field label="Search & Add a Product">
-                        <input
-                          type="text"
-                          className={inputCls}
-                          value={productSearch}
-                          onChange={e => setProductSearch(e.target.value)}
-                          placeholder={productsLoading ? 'Loading products...' : 'Type a product name to search...'}
-                          disabled={productsLoading || form.bestSellerPids.length >= 8}
-                        />
-                      </Field>
-                      {searchResults.length > 0 && (
-                        <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-silk-light rounded-xl shadow-lg overflow-hidden">
-                          {searchResults.map(p => (
-                            <button
-                              key={p.pid}
-                              type="button"
-                              onClick={() => addProduct(p.pid)}
-                              className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors border-b border-silk-light last:border-b-0 text-left"
-                            >
-                              {p.images?.[0] && (
-                                <img src={p.images[0]} alt={p.name} className="w-10 h-10 object-contain rounded-lg bg-gray-50 border border-silk-light shrink-0" />
-                              )}
-                              <span className="text-sm font-bold text-gray-800 truncate">{p.name}</span>
-                              <span className="ml-auto shrink-0">
-                                <Plus size={16} className="text-dark-red" />
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {form.bestSellerPids.length >= 8 && (
-                        <p className="text-xs text-amber-600 mt-2 font-bold">Maximum of 8 best sellers reached. Remove one to add another.</p>
-                      )}
-                    </div>
-
-                    {/* Selected Products */}
-                    {selectedProducts.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-silk-light rounded-2xl text-gray-400">
-                        <p className="text-sm font-bold">No products pinned yet</p>
-                        <p className="text-xs mt-1">Search above to add products to the Best Sellers section</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-xs font-bold text-grey-beige uppercase tracking-wider mb-3">Pinned Products ({selectedProducts.length}/8) — Displayed left to right on homepage</p>
-                        {selectedProducts.map((product, idx) => (
-                          <div key={product.pid} className="flex items-center gap-3 p-3 bg-gray-50 border border-silk-light rounded-xl group">
-                            <span className="text-xs font-bold text-grey-beige w-5 text-center shrink-0">{idx + 1}</span>
-                            {product.images?.[0] && (
-                              <img src={product.images[0]} alt={product.name} className="w-12 h-12 object-contain rounded-lg bg-white border border-silk-light shrink-0" />
-                            )}
-                            <span className="flex-1 text-sm font-bold text-gray-800 truncate">{product.name}</span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => moveProduct(product.pid, 'up')}
-                                disabled={idx === 0}
-                                className="p-1.5 rounded-lg hover:bg-gray-200 disabled:opacity-30 transition-colors"
-                                title="Move up"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/></svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveProduct(product.pid, 'down')}
-                                disabled={idx === selectedProducts.length - 1}
-                                className="p-1.5 rounded-lg hover:bg-gray-200 disabled:opacity-30 transition-colors"
-                                title="Move down"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeProduct(product.pid)}
-                                className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-600 text-gray-400 transition-colors ml-1"
-                                title="Remove"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Card>
-                </div>
-              );
-            })()}
-
-            {/* ── 6. CUSTOMER EXPERIENCE ───────────────────── */}
-            {activeTab === 'experience' && (
-              <div className="space-y-6">
-                <Card title="Skin Profile & Personalisation">
-                  <div className="space-y-4">
-                    <ToggleRow label="Skin Quiz / Ritual Finder" description="Enable the Ritual Finder quiz page. Disabling this route removes the highest-converting personalisation flow." checked={form.skinQuizEnabled} onChange={v => set('skinQuizEnabled', v)} />
-                    <ToggleRow label="Store Skin Profile on Customer Account" description="Save quiz results to the user's profile for persistent personalisation." checked={form.storeSkinProfileOnAccount} onChange={v => set('storeSkinProfileOnAccount', v)} />
-                    <ToggleRow label="Product Compatibility Warnings" description='Show "do not layer X + Y" warnings on product pages (e.g. Vitamin C + Niacinamide). Major trust signal — reduces adverse reactions and returns.' checked={form.productCompatibilityWarningsEnabled} onChange={v => set('productCompatibilityWarningsEnabled', v)} />
-                    <ToggleRow label="Routine Builder Tool (AM/PM Regimen)" description="Cross-sell complementary products by building morning and evening routines. Increases AOV." checked={form.routineBuilderEnabled} onChange={v => set('routineBuilderEnabled', v)} />
-                    {form.routineBuilderEnabled && (
-                      <Callout type="info">The Routine Builder tool is not yet built. This toggle reserves the configuration for when the feature is implemented.</Callout>
-                    )}
-                  </div>
-                </Card>
-
-                <Card title="Reviews & Social Proof">
-                  <div className="space-y-4">
-                    <ToggleRow label="Skin Type Tagging on Reviews" description="Customers see skin type (oily, dry, combination) on reviews. Industry standard — customers filter by skin type before buying." checked={form.reviewSkinTypeTaggingEnabled} onChange={v => set('reviewSkinTypeTaggingEnabled', v)} />
-                    <ToggleRow label="Before & After Photo Uploads in Reviews" description="The single most persuasive content type in skincare. Allow customers to upload results photos." checked={form.reviewBeforeAfterPhotosEnabled} onChange={v => set('reviewBeforeAfterPhotosEnabled', v)} />
-                    <ToggleRow label="Verified Purchase Badge" description='Show a "Verified Purchase" badge on reviews from confirmed buyers.' checked={form.reviewVerifiedBadgeEnabled} onChange={v => set('reviewVerifiedBadgeEnabled', v)} />
-                    <ToggleRow label="Review Moderation Queue" description="Hold reviews for admin approval before they go live. Recommended for brand management." checked={form.reviewModerationEnabled} onChange={v => set('reviewModerationEnabled', v)} />
-                    <ToggleRow label="Review Incentive (Discount for Review)" description="Offer a discount coupon to customers who leave a review." checked={form.reviewIncentiveEnabled} onChange={v => set('reviewIncentiveEnabled', v)} />
-                    {form.reviewIncentiveEnabled && (
-                      <div className="space-y-3">
-                        <Field label="Incentive Discount (%)">
-                          <input type="number" min="1" max="100" className={inputCls} value={form.reviewIncentiveDiscountPercent} onChange={e => set('reviewIncentiveDiscountPercent', Number(e.target.value))} />
-                        </Field>
-                        <Callout type="warning">Incentivised reviews must be marked as such to comply with ASCI (Advertising Standards Council of India) guidelines. Ensure your review display clearly labels these as incentivised.</Callout>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {/* ── NOTIFICATIONS ──────────────────────────── */}
-            {activeTab === 'notifications' && (
-              <div className="space-y-6">
-                <Card title="Master Kill Switches">
-                  <div className="space-y-4">
-                    <ToggleRow label="Enable ALL WhatsApp Messages" description="If disabled, no WhatsApp messages will be sent by the system regardless of individual settings." checked={form.waAllEnabled} onChange={v => set('waAllEnabled', v)} danger />
-                    <ToggleRow label="Enable ALL Automated Emails" description="If disabled, no automated emails will be sent. (Excludes critical account emails like password reset)." checked={form.emailAllEnabled} onChange={v => set('emailAllEnabled', v)} danger />
-                  </div>
-                </Card>
-
-                <Card title="WhatsApp Triggers">
-                  <div className="space-y-4">
-                    <ToggleRow label="Order Placed" description="Sent immediately upon successful checkout." checked={form.waOrderPlacedEnabled} onChange={v => set('waOrderPlacedEnabled', v)} />
-                    <ToggleRow label="Payment Failure" description="Sent on Razorpay failure with a retry link." checked={form.waPaymentFailureEnabled} onChange={v => set('waPaymentFailureEnabled', v)} />
-                    <ToggleRow label="Out for Delivery" description="Sent via Shiprocket webhook when a package is out." checked={form.waOutForDeliveryEnabled} onChange={v => set('waOutForDeliveryEnabled', v)} />
-                    <ToggleRow label="Stale Cart" description="Nudge customers to complete a purchase for items sitting >30 days." checked={form.waStaleCartEnabled} onChange={v => set('waStaleCartEnabled', v)} />
-                    <ToggleRow label="Trending Products" description="Broadcast to active users when a product enters the top trending list." checked={form.waTrendingProductsEnabled} onChange={v => set('waTrendingProductsEnabled', v)} />
-                    <ToggleRow label="Re-engagement" description="Sent to users who haven't ordered in 60 days." checked={form.waReEngagementEnabled} onChange={v => set('waReEngagementEnabled', v)} />
-                    <ToggleRow label="Ticket Raised" description="Sent when a customer submits a support query." checked={form.waTicketRaisedEnabled} onChange={v => set('waTicketRaisedEnabled', v)} />
-                    <ToggleRow label="Ticket Resolved" description="Sent when an admin closes a support ticket." checked={form.waTicketResolvedEnabled} onChange={v => set('waTicketResolvedEnabled', v)} />
-                  </div>
-                </Card>
-
-                <Card title="Email Triggers">
-                  <div className="space-y-4">
-                    <ToggleRow label="Admin Alert: New Order" description="Send an alert to the admin email when a new order is placed." checked={form.notifyAdminOnOrder} onChange={v => set('notifyAdminOnOrder', v)} />
-                    <ToggleRow label="Order Confirmation" description="Automatically email a receipt to the customer after successful checkout." checked={form.sendOrderConfirmationToCustomer} onChange={v => set('sendOrderConfirmationToCustomer', v)} />
-                    <ToggleRow label="Return Approved" description="Email sent when a return request is approved." checked={form.emailReturnApproved} onChange={v => set('emailReturnApproved', v)} />
-                    <ToggleRow label="Return Rejected" description="Email sent when a return request is denied." checked={form.emailReturnRejected} onChange={v => set('emailReturnRejected', v)} />
-                    <ToggleRow label="Ticket Raised" description="Acknowledgement email when a customer submits a query." checked={form.emailTicketRaised} onChange={v => set('emailTicketRaised', v)} />
-                    <ToggleRow label="Ticket Reply" description="Email sent when support replies to a ticket." checked={form.emailTicketReply} onChange={v => set('emailTicketReply', v)} />
-                    <ToggleRow label="Ticket Resolved" description="Email sent when a ticket is closed." checked={form.emailTicketResolved} onChange={v => set('emailTicketResolved', v)} />
-                    <ToggleRow label="Ticket Cancelled" description="Email sent when a ticket is cancelled." checked={form.emailTicketCancelled} onChange={v => set('emailTicketCancelled', v)} />
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            {/* ── 7. STOREFRONT ────────────────────────────── */}
-            {activeTab === 'storefront' && (
-              <div className="space-y-6">
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-silk-light shadow-sm">
-                  <div className="flex justify-between items-center mb-6 border-b border-silk-light pb-4">
-                    <h3 className="font-bold text-lg text-dark-red">Announcement Bar</h3>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <span className="text-sm font-bold text-gray-600">Active</span>
-                      <div className="relative">
-                        <input type="checkbox" className="sr-only" checked={form.announcementBar.isActive} onChange={e => setNested('announcementBar', 'isActive', e.target.checked)} />
-                        <div className={`block w-10 h-6 rounded-full transition-colors ${form.announcementBar.isActive ? 'bg-dark-red' : 'bg-gray-300'}`} />
-                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${form.announcementBar.isActive ? 'translate-x-4' : ''}`} />
-                      </div>
-                    </label>
-                  </div>
-                  <div className="space-y-4">
-                    <Field label="Text"><input type="text" className={inputCls} value={form.announcementBar.text} onChange={e => setNested('announcementBar', 'text', e.target.value)} placeholder="e.g. Free shipping on orders over ₹999!" /></Field>
-                    <Field label="Link (Optional)"><input type="text" className={inputCls} value={form.announcementBar.link} onChange={e => setNested('announcementBar', 'link', e.target.value)} placeholder="https://..." /></Field>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-silk-light shadow-sm">
-                  <div className="flex justify-between items-center mb-6 border-b border-silk-light pb-4">
-                    <h3 className="font-bold text-lg text-dark-red">Launch Modal (Pop-up)</h3>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <span className="text-sm font-bold text-gray-600">Active</span>
-                      <div className="relative">
-                        <input type="checkbox" className="sr-only" checked={form.launchModal?.isActive || false} onChange={e => setNested('launchModal', 'isActive', e.target.checked)} />
-                        <div className={`block w-10 h-6 rounded-full transition-colors ${form.launchModal?.isActive ? 'bg-dark-red' : 'bg-gray-300'}`} />
-                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${form.launchModal?.isActive ? 'translate-x-4' : ''}`} />
-                      </div>
-                    </label>
-                  </div>
-                  <div className="space-y-4">
-                    <Field label="Badge Text"><input type="text" className={inputCls} value={form.launchModal?.badge || ''} onChange={e => setNested('launchModal', 'badge', e.target.value)} placeholder="e.g. Just Launched" /></Field>
-                    <Field label="Title"><input type="text" className={inputCls} value={form.launchModal?.title || ''} onChange={e => setNested('launchModal', 'title', e.target.value)} placeholder="e.g. New Collection" /></Field>
-                    <Field label="Description"><textarea className={`${inputCls} h-20`} value={form.launchModal?.description || ''} onChange={e => setNested('launchModal', 'description', e.target.value)} placeholder="Enter details..." /></Field>
-                    <Field label="CTA Button Label"><input type="text" className={inputCls} value={form.launchModal?.ctaLabel || ''} onChange={e => setNested('launchModal', 'ctaLabel', e.target.value)} placeholder="e.g. Explore Collection" /></Field>
-                    <Field label="CTA Button Link"><input type="text" className={inputCls} value={form.launchModal?.ctaLink || ''} onChange={e => setNested('launchModal', 'ctaLink', e.target.value)} placeholder="e.g. /shop" /></Field>
-                    
-                    <div>
-                      <label className="block text-xs font-bold text-grey-beige uppercase tracking-wider mb-2">Popup Image</label>
-                      <div className="flex items-center gap-4">
-                        {form.launchModal?.image && (
-                          <div className="relative group w-24 h-24 rounded-xl border border-silk-light overflow-hidden bg-gray-50 shrink-0">
-                            <img src={form.launchModal.image} alt="Popup Graphic" className="w-full h-full object-cover" />
-                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                type="button"
-                                onClick={() => setNested('launchModal', 'image', '')}
-                                className="bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center shadow-md font-bold"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        <label className="flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-silk-light rounded-xl hover:bg-gray-50 cursor-pointer transition-colors text-center">
-                          <span className="text-dark-red font-bold block mb-1">Click to Upload Image</span>
-                          <span className="text-sm text-gray-500">JPG, PNG, WEBP (Transparent background recommended)</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={handleLaunchModalImageUpload} />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Card title="Social Links">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(['instagram', 'facebook', 'twitter', 'youtube'] as const).map(platform => (
-                      <Field key={platform} label={platform.charAt(0).toUpperCase() + platform.slice(1)}>
-                        <input type="url" placeholder="https://..." className={inputCls} value={(form.socialLinks as any)[platform]} onChange={e => setNested('socialLinks', platform, e.target.value)} />
-                      </Field>
-                    ))}
-                  </div>
-                </Card>
-
-                <Card title="SEO Meta">
-                  <div className="space-y-4">
-                    <Field label="Meta Title"><input type="text" className={inputCls} value={form.seoMeta.title} onChange={e => setNested('seoMeta', 'title', e.target.value)} /></Field>
-                    <Field label="Meta Description"><textarea className={`${inputCls} h-20`} value={form.seoMeta.description} onChange={e => setNested('seoMeta', 'description', e.target.value)} /></Field>
-                    <div>
-                      <label className="block text-xs font-bold text-grey-beige uppercase tracking-wider mb-2">OG Image (Social Sharing)</label>
-                      <div className="flex items-center gap-4">
-                        {form.seoMeta.ogImage && (
-                          <div className="relative group w-24 h-24 rounded-xl border border-silk-light overflow-hidden bg-gray-50 shrink-0">
-                            <img src={form.seoMeta.ogImage} alt="OG Image" className="w-full h-full object-cover" />
-                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                type="button"
-                                onClick={() => setNested('seoMeta', 'ogImage', '')}
-                                className="bg-white text-red-500 rounded-full w-6 h-6 flex items-center justify-center shadow-md font-bold"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        <label className="flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-silk-light rounded-xl hover:bg-gray-50 cursor-pointer transition-colors text-center">
-                          <span className="text-dark-red font-bold block mb-1">Click to Upload OG Image</span>
-                          <span className="text-sm text-gray-500">Ideal size: 1200x630 pixels (JPG, PNG)</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={handleOGImageUpload} />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            )}
-
-          </form>
+          </div>
         </div>
       </div>
     </div>

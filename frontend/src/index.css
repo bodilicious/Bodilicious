@@ -75,4 +75,13 @@
     @apply absolute top-0 right-0 bottom-0 w-8 pointer-events-none;
     background: linear-gradient(to right, transparent, rgba(255,255,255,0.9));
   }
+
+  /* Hide scrollbar completely but allow scrolling */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
 }

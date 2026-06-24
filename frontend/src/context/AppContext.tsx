@@ -123,7 +123,7 @@ interface AppContextType {
   refreshAuthState: () => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
 
-  getAuthHeaders: () => Promise<HeadersInit>;
+  getAuthHeaders: (json?: boolean) => Promise<HeadersInit>;
 
   navigateTo: (page: Page, pid?: string, orderId?: string) => void;
   setShopFilter: (f: 'all' | 'skin' | 'hair' | 'body' | 'lip' | 'makeup' | 'other') => void;
@@ -134,9 +134,12 @@ interface AppContextType {
   updateQuantity: (pid: string, qty: number) => void;
 
   checkout: (shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null) => Promise<{ order: Order }>;
-  initRazorpayOrder: (items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, quoteId?: string) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
+  initRazorpayOrder: (items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, quoteId?: string, couponCode?: string) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
   verifyPayment: (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string, items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails) => Promise<Order>;
-  fetchShippingQuote: (items: any[], shippingDetails: any) => Promise<any>;
+  fetchShippingQuote: (items: any[], shippingDetails: any, couponCode?: string) => Promise<any>;
+
+  appliedCoupon: string | null;
+  setAppliedCoupon: (code: string | null) => void;
 
   cancelOrder: (orderId: string) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
@@ -229,12 +232,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const [userCurrency, _setUserCurrency] = useState<string>('INR');
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
 
-  const setUserCurrency = useCallback((currency: string) => {
-    if (storeSettings.autoCurrencySwitchingEnabled === false) return;
-    _setUserCurrency(currency);
-    localStorage.setItem('bodilicious_currency_preference', currency);
-  }, [storeSettings.autoCurrencySwitchingEnabled]);
+  const setUserCurrency = useCallback((_currency: string) => {
+    // Disabled manual currency selection; currency is strictly IP-detected
+    console.warn("Manual currency selection is disabled.");
+  }, []);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const toggleChat = useCallback(() => setIsChatOpen(prev => !prev), []);
@@ -272,8 +275,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* =============================
      Auth headers (Memoized)
   ============================== */
-  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
-    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  const getAuthHeaders = useCallback(async (json: boolean = true): Promise<HeadersInit> => {
+    const headers: HeadersInit = {};
+    if (json) headers['Content-Type'] = 'application/json';
 
     if (auth.currentUser) {
       const token = await getIdToken(auth.currentUser);
@@ -353,7 +357,11 @@ const fetchUserProfileAndSync = useCallback(async () => {
 
     setRecentlyBought(data?.recentlyBought ?? []);
 
-       setUser(prev => {
+    const hasPastSuccessfulOrders = validOrders.some((o: any) => 
+      !['abandoned', 'cancelled', 'returned'].includes(o.orderStatus)
+    );
+
+    setUser(prev => {
       if (!prev) return null;
       return {
         ...prev,
@@ -366,7 +374,7 @@ const fetchUserProfileAndSync = useCallback(async () => {
         addresses: data?.addresses ?? [],
         welcomeOfferUsed: data?.welcomeOfferUsed,
         welcomeOffer: {
-          eligible: !data?.welcomeOfferUsed,
+          eligible: !data?.welcomeOfferUsed && !hasPastSuccessfulOrders,
           type: "first_order",
           value: 10,
           message: "Welcome Offer: Get 10% off on your first order!"
@@ -387,7 +395,7 @@ const fetchUserProfileAndSync = useCallback(async () => {
   }
 }, [getAuthHeaders]);
 
-  const fetchShippingQuote = useCallback(async (items: any[], shippingDetails: any) => {
+  const fetchShippingQuote = useCallback(async (items: any[], shippingDetails: any, couponCode?: string) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
@@ -396,7 +404,7 @@ const fetchUserProfileAndSync = useCallback(async () => {
       const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/payment/quote`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, shippingDetails, targetCurrency: userCurrency }),
+        body: JSON.stringify({ items, shippingDetails, targetCurrency: userCurrency, couponCode }),
         signal: controller.signal,
       });
 
@@ -654,9 +662,9 @@ const triggerPasswordReset = async (email: string) => {
         url += query.startsWith('?') ? query : `?${query}`;
       }
 
-      // Default limit to 50 for performance if not specified
+      // Default limit to 500 for performance if not specified
       if (!url.includes('limit=')) {
-        url += (url.includes('?') ? '&' : '?') + 'limit=50';
+        url += (url.includes('?') ? '&' : '?') + 'limit=500';
       }
 
       const res = await fetch(url);
@@ -699,15 +707,12 @@ const triggerPasswordReset = async (email: string) => {
           localStorage.removeItem('bodilicious_currency_preference');
           localStorage.setItem('bodilicious_currency_auto', 'INR');
         } else {
-          const pref = localStorage.getItem('bodilicious_currency_preference');
-          if (pref) {
-            _setUserCurrency(pref);
-          } else {
-            // Auto-detect: map the IP-detected country code to its local currency
-            const detected = getCurrencyForCountry(json.data.detectedCountryCode || 'IN');
-            _setUserCurrency(detected);
-            localStorage.setItem('bodilicious_currency_auto', detected);
-          }
+          // Strictly force auto-detect: map the IP-detected country code to its local currency
+          const detected = getCurrencyForCountry(json.data.detectedCountryCode || 'IN');
+          _setUserCurrency(detected);
+          localStorage.setItem('bodilicious_currency_auto', detected);
+          // Clear any old preference
+          localStorage.removeItem('bodilicious_currency_preference');
         }
       }
     } catch (err) {
@@ -730,6 +735,8 @@ const triggerPasswordReset = async (email: string) => {
       pathname === '/' ||
       pathname === '/shop' ||
       pathname === '/ritual-finder' ||
+      pathname === '/admin/homepage-editor' ||
+      pathname === '/internal/homepage-preview' ||
       pathname.startsWith('/product');
 
     if (!isProductRoute) return;
@@ -957,7 +964,8 @@ const triggerPasswordReset = async (email: string) => {
     items: { productId: string; quantity: number }[],
     shippingDetails: ShippingDetails,
     billingDetails?: ShippingDetails | null,
-    quoteId?: string
+    quoteId?: string,
+    couponCode?: string
   ): Promise<{ razorpayOrder: any; calculatedAmount: number }> => {
     if (authStatus !== 'authenticated') throw new Error('Please sign in');
 
@@ -974,7 +982,7 @@ const triggerPasswordReset = async (email: string) => {
       res = await fetch(`${API_BASE}/payment/razorpay/init`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ items, shippingDetails, billingDetails, marketing, quoteId }),
+        body: JSON.stringify({ items, shippingDetails, billingDetails, marketing, quoteId, couponCode }),
         signal: controller.signal
       });
     } catch (err: any) {
@@ -1298,6 +1306,8 @@ const triggerPasswordReset = async (email: string) => {
         initRazorpayOrder,
         verifyPayment,
         fetchShippingQuote,
+        appliedCoupon,
+        setAppliedCoupon,
         cancelOrder,
         deleteOrder,
         requestReturn,

@@ -1,4 +1,5 @@
 import StoreSettings from "./models.js";
+import HomepageContent from "./homepageModel.js";
 import { COUNTRIES } from "../utils/countries.js";
 import { logAction } from "../admin/controller.js";
 import { clearSettingsCache } from "./cache.js";
@@ -201,6 +202,153 @@ export const updateSettings = async (req, res) => {
     });
   } catch (err) {
     console.error("UpdateSettings Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ------------------------------------------------------------------
+// HOMEPAGE CONTENT BUILDER
+// ------------------------------------------------------------------
+import sanitizeHtml from "sanitize-html";
+
+const sanitizeOptions = {
+  allowedTags: [], // Strip all HTML tags
+  allowedAttributes: {}
+};
+
+const sanitizeContent = (data, keyName = '') => {
+  // Do not sanitize URL fields to prevent &amp; encoding from destroying query parameters
+  if (typeof data === 'string') {
+    const isUrlField = ['url', 'link', 'imageUrl', 'ctaLink', 'videoUrl', 'src'].includes(keyName);
+    if (isUrlField || data.startsWith('http://') || data.startsWith('https://')) {
+      return data;
+    }
+    const sanitized = sanitizeHtml(data, sanitizeOptions);
+    return sanitized
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeContent(item, keyName));
+  }
+  if (data && typeof data === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(data)) {
+      cleaned[key] = sanitizeContent(value, key);
+    }
+    return cleaned;
+  }
+  return data;
+};
+
+export const getHomepageContent = async (req, res) => {
+  try {
+    const content = await HomepageContent.findOne();
+    if (!content) {
+      return res.json({ success: true, data: null });
+    }
+    res.json({ success: true, data: content.published });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const getHomepageDraft = async (req, res) => {
+  try {
+    let content = await HomepageContent.findOneAndUpdate(
+      {},
+      { $setOnInsert: { draft: { status: 'draft' }, published: { status: 'published' } } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({ success: true, data: content.draft });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const updateHomepageDraft = async (req, res) => {
+  try {
+    let content = await HomepageContent.findOneAndUpdate(
+      {},
+      { $setOnInsert: { draft: { status: 'draft' }, published: { status: 'published' } } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Sanitize input
+    const sanitizedBody = sanitizeContent(req.body);
+
+    const existingDraft = content.draft ? (typeof content.draft.toObject === 'function' ? content.draft.toObject() : content.draft) : {};
+    content.draft = {
+      ...existingDraft,
+      ...sanitizedBody,
+      status: 'draft',
+      updatedAt: new Date(),
+      updatedBy: req.user ? req.user.uid : null
+    };
+
+    await content.save();
+    res.json({ success: true, data: content.draft });
+  } catch (err) {
+    console.error("UpdateHomepageDraft Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const publishHomepageContent = async (req, res) => {
+  try {
+    const content = await HomepageContent.findOne();
+    if (!content) {
+      return res.status(404).json({ success: false, message: "No content to publish" });
+    }
+
+    if (!content.draft) {
+       return res.status(400).json({ success: false, message: "Draft is empty" });
+    }
+
+    const version = (content.published && content.published.version ? content.published.version : 0) + 1;
+
+    const draftObj = typeof content.draft.toObject === 'function' ? content.draft.toObject() : { ...content.draft };
+    content.published = {
+      ...draftObj,
+      status: 'published',
+      publishedAt: new Date(),
+      updatedBy: req.user ? req.user.uid : null,
+      version
+    };
+
+    await content.save();
+    
+    // Log action
+    if (req.user) {
+      await logAction(req, "homepage_published", "settings", content._id.toString(), { version });
+    }
+
+    res.json({ success: true, data: content.published });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const revertHomepageDraft = async (req, res) => {
+  try {
+    const content = await HomepageContent.findOne();
+    if (!content) {
+      return res.status(404).json({ success: false, message: "No content found" });
+    }
+
+    const existingPublished = content.published ? (typeof content.published.toObject === 'function' ? content.published.toObject() : content.published) : {};
+    content.draft = {
+      ...existingPublished,
+      status: 'draft',
+      updatedAt: new Date()
+    };
+
+    await content.save();
+    res.json({ success: true, data: content.draft });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };

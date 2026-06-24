@@ -4,6 +4,8 @@ import Product from "../products/models.js";
 import { logAuditEvent } from "../audit/logger.js";
 import { logAction } from "../admin/controller.js";
 import { sendReturnApprovedEmail, sendReturnRejectedEmail } from "../email/emailService.js";
+import Razorpay from "razorpay";
+import { toRazorpayMinorUnits } from "../utils/currencies.js";
 
 const AUTO_RESTOCK = process.env.AUTO_RESTOCK_ON_RECEIPT === "true";
 
@@ -26,7 +28,7 @@ export const getReturnsQueue = async (req, res) => {
       Order.find(query)
         .populate("user", "name email")
         .populate("items.product", "name pid images")
-        .sort({ returnRequestedAt: 1 }) // oldest first
+        .sort({ returnRequestedAt: -1 }) // newest first
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -53,8 +55,8 @@ export const getReturnsQueue = async (req, res) => {
 export const approveReturn = async (req, res) => {
   try {
     const { refundMethod, note } = req.body;
-    if (!refundMethod || !["original_payment", "store_credit", "replacement"].includes(refundMethod)) {
-      return res.status(400).json({ success: false, message: "Valid refundMethod is required (original_payment | store_credit | replacement)" });
+    if (!refundMethod || !["original_payment", "replacement"].includes(refundMethod)) {
+      return res.status(400).json({ success: false, message: "Valid refundMethod is required (original_payment | replacement)" });
     }
 
     const order = await Order.findById(req.params.id).populate("user", "name email");
@@ -112,6 +114,7 @@ export const rejectReturn = async (req, res) => {
     order.returnStatus = "rejected";
     order.returnResolvedAt = new Date();
     order.adminNote = rejectionReason;
+    order.orderStatus = "delivered"; // Restore order status to delivered
 
     await order.save();
 
@@ -155,6 +158,22 @@ export const markReceived = async (req, res) => {
 
     order.physicalReceived = true;
     order.returnStatus = "completed";
+    order.orderStatus = "returned"; // Update order status to returned
+
+    if (order.isWelcomeOfferApplied) {
+        const userHasPaidOrder = await Order.exists({
+            user: order.user,
+            orderStatus: { $nin: ["abandoned", "cancelled", "returned"] },
+            _id: { $ne: order._id },
+            $or: [
+                { paymentMethod: "cod" },
+                { paymentStatus: { $in: ["paid", "refunded"] } }
+            ]
+        });
+        if (!userHasPaidOrder) {
+            await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
+        }
+    }
 
     // Optional restock
     const restockLog = [];
@@ -182,6 +201,34 @@ export const markReceived = async (req, res) => {
             }
           });
         }
+      }
+    }
+
+    // Process automated refund if applicable
+    let refundLog = null;
+    if (order.returnRefundMethod === "original_payment" && order.razorpayPaymentId && !["processed", "pending"].includes(order.refundStatus)) {
+      try {
+        const razorpayInstance = new Razorpay({
+          key_id: process.env.RAZORPAY_KEY_ID,
+          key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+
+        const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+          amount: toRazorpayMinorUnits(order.totalAmount, order.currency || "INR"),
+          speed: "normal",
+          notes: { reason: "Return marked as received" },
+        });
+
+        order.refundId = refund.id;
+        order.refundStatus = "pending";
+        order.refundAmount = order.totalAmount;
+        order.paymentStatus = "refunded";
+        refundLog = { status: "success", id: refund.id };
+      } catch (refundErr) {
+        console.error("Razorpay refund failed in markReceived:", refundErr.message);
+        order.refundStatus = "failed";
+        order.refundAmount = order.totalAmount;
+        refundLog = { status: "failed", error: refundErr.message };
       }
     }
 

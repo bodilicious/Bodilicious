@@ -45,6 +45,9 @@ interface Order {
   estimatedDeliveryDate?: string | null;
   // Customer comments
   customerComments?: { text: string; createdAt: string }[];
+  refundId?: string | null;
+  refundStatus?: string | null;
+  refundAmount?: number | null;
 }
 
 interface Props {
@@ -116,6 +119,30 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* Payment & Refund Block */}
+        {(order.paymentStatus === 'refunded' || order.refundId) && (
+          <div className="px-6 py-4 border-b border-gray-100 bg-purple-50/30">
+            <div className="flex items-center gap-2 mb-3">
+              <RotateCcw size={14} className="text-purple-500" />
+              <h3 className="text-sm font-semibold text-purple-900">Refund Details</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-x-6 gap-y-3 text-sm">
+              <div>
+                <p className="text-xs text-purple-400 uppercase tracking-wider mb-0.5">Refund Status</p>
+                <span className="font-medium text-purple-700 text-xs capitalize">{order.refundStatus || '—'}</span>
+              </div>
+              <div>
+                <p className="text-xs text-purple-400 uppercase tracking-wider mb-0.5">Refund Amount</p>
+                <span className="font-medium text-purple-700 text-xs">₹{order.refundAmount?.toLocaleString('en-IN') || '—'}</span>
+              </div>
+              <div>
+                <p className="text-xs text-purple-400 uppercase tracking-wider mb-0.5">Refund ID</p>
+                <span className="font-mono text-purple-700 text-xs">{order.refundId || '—'}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Shiprocket Info Block */}
         <div className="px-6 py-4 border-b border-gray-100">

@@ -13,7 +13,6 @@ export default function ProfileCompletionCard({ user, orders }: Props) {
     const steps = [
         { id: 'photo', label: 'Upload profile photo', completed: !!user.photoURL },
         { id: 'info', label: 'Complete personal info', completed: !!(user.displayName && user.phone && user.gender) },
-        { id: 'skin', label: 'Finish skin profile', completed: !!(user.skinType && user.skinConcerns?.length) },
         { id: 'address', label: 'Save delivery address', completed: !!(user.addresses && user.addresses.length > 0) },
         { id: 'order', label: 'Place your first order', completed: orders.length > 0 },
     ];

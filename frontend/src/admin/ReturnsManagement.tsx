@@ -331,9 +331,8 @@ const ReturnsManagement: React.FC = () => {
             <p className="text-sm text-gray-500 mb-5">Select how to refund the customer. A confirmation email will be sent automatically.</p>
             <div className="space-y-2 mb-6">
               {[
-                { value: 'original_payment', label: 'Original Payment Method', desc: 'Refund via Razorpay / COD credit' },
-                { value: 'store_credit', label: 'Store Credit', desc: 'Add credit to customer account' },
-                { value: 'replacement', label: 'Replacement Shipment', desc: 'Create new draft order with same items' },
+                { value: 'original_payment', label: 'Original Payment', desc: 'Refund to original payment source' },
+                { value: 'replacement', label: 'Replacement', desc: 'Ship a new product' },
               ].map(opt => (
                 <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${approveModal.refundMethod === opt.value ? 'border-dark-red bg-red-50' : 'border-gray-100 hover:border-gray-200'}`}>
                   <input type="radio" name="refund" value={opt.value} checked={approveModal.refundMethod === opt.value}

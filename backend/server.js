@@ -6,12 +6,13 @@ import { initAnalyticsCron } from "./analytics/etl.js";
 import { initSupportCleanupCron } from "./support/cleanup.js";
 import { shutdownPosthog } from "./utils/posthog.js";
 import { startWhatsAppWorker } from "./whatsapp/worker.js";
+import { startSupportWorker } from "./support/worker.js";
 import { initWhatsAppCrons } from "./whatsapp/cron.js";
 import { initPaymentReconciliationCron } from "./payment/reconciliation.js";
 import { initExchangeRateCron } from "./cron/exchangeRates.js";
 import { initDraftOrderCleanupCron } from "./cron/draftOrders.js";
 import { runSettingsMigration } from "./settings/migration.js";
-import { flushBuffer as flushAuditBuffer } from "./audit/logger.js";
+
 import Order from "./tracker/models.js";
 import NotificationService from "./procurement/notificationService.js";
 
@@ -52,7 +53,7 @@ const gracefulShutdown = async (signal) => {
 
     console.log(`✅ Successfully updated ${updatedCount} products.`);
     await shutdownPosthog();
-    await flushAuditBuffer();
+
     await mongoose.connection.close();
     console.log("MongoDB connection closed.");
     process.exit(0);
@@ -68,7 +69,7 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 mongoose
   .connect(process.env.MONGO_URI, {
     dbName: process.env.DB_NAME,
-    maxPoolSize: 20, // Strict limit for M0 free tier
+    maxPoolSize: 50, // Safe limit for M0 (500 max) when running separate web/worker dynos
   })
   .then(async () => {
     console.log("MongoDB connected");
@@ -77,7 +78,7 @@ mongoose
     await initProductCollection();
     initAnalyticsCron(); // Start background aggregations
     initSupportCleanupCron(); // Start orphaned Cloudinary upload cleanup
-    startWhatsAppWorker(); // Start BullMQ worker for WhatsApp jobs
+    // Workers moved to separate worker.js process
     initWhatsAppCrons(); // Start WhatsApp scheduled tasks
     initPaymentReconciliationCron(); // Recover payments captured but never verified
     initExchangeRateCron(); // Fetch exchange rates periodically

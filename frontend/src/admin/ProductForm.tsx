@@ -342,7 +342,7 @@ const ProductForm: React.FC = () => {
                   onDrop={(e) => handleDrop(e, i)}
                   className="relative group w-24 h-24 rounded-xl border overflow-hidden cursor-move bg-gray-50"
                 >
-                  <img src={img} alt={`Product ${i}`} className="w-full h-full object-cover" />
+                  <img src={img?.startsWith('assets/') ? `/${img}` : img} alt={`Product ${i}`} className="w-full h-full object-cover" />
                   <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter((_, j) => j !== i) }))}

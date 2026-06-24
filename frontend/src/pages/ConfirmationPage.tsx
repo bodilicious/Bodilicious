@@ -11,7 +11,6 @@ type ConfirmationState = { orderId: string; status: 'success' | 'failed' | 'canc
 export default function ConfirmationPage() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { storeSettings } = useApp();
     const { orders, refreshProfile } = useApp();
 
     // ── Recover state from router OR sessionStorage (survives page refresh) ──

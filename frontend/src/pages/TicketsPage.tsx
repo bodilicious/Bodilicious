@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Ticket, Clock, CheckCircle, AlertCircle, ChevronRight, ChevronDown, MessageSquare, Calendar } from 'lucide-react';
+import { Ticket, Clock, CheckCircle, AlertCircle, ChevronRight, ChevronDown, MessageSquare, Calendar, Bot } from 'lucide-react';
 import Footer from '../components/Footer';
 import { useApp } from '../context/AppContext';
 import { useSEO } from '../hooks/useSEO';
@@ -10,7 +10,9 @@ const API_BASE = `${import.meta.env.VITE_API_URL}/api/v1`;
 interface Message {
   _id: string;
   text: string;
-  authorRole: 'admin' | 'customer';
+  authorRole: 'admin' | 'customer' | 'system';
+  isAutomated?: boolean;
+  visibleToCustomer?: boolean;
   createdAt: string;
   attachments?: string[];
 }
@@ -196,7 +198,9 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
   const isOpen = ticket.status === 'open';
   const [expanded, setExpanded] = useState(false);
 
-  const adminReplies = ticket.messages.filter((m) => m.authorRole === 'admin');
+  const visibleReplies = ticket.messages.filter(
+    (m) => (m.authorRole === 'admin' || m.authorRole === 'system') && m.visibleToCustomer !== false
+  );
 
   return (
     <div className="bg-white border border-silk rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-sm">
@@ -234,7 +238,7 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
                   <MessageSquare size={11} /> {ticket.messages.length} message{ticket.messages.length !== 1 ? 's' : ''}
                 </span>
               )}
-              {adminReplies.length > 0 && (
+              {visibleReplies.length > 0 && (
                 <span className="flex items-center gap-1 text-dark-red font-medium">
                   <CheckCircle size={11} /> Support replied
                 </span>
@@ -261,17 +265,23 @@ function TicketCard({ ticket }: { ticket: SupportTicket }) {
             </div>
           </div>
 
-          {/* Admin replies (read-only) */}
-          {adminReplies.length > 0 && (
+          {/* Admin and System replies (read-only) */}
+          {visibleReplies.length > 0 && (
             <div>
               <p className="text-[10px] uppercase tracking-widest text-grey-beige font-semibold mb-2">Support Response</p>
               <div className="space-y-3">
-                {adminReplies.map((msg) => (
+                {visibleReplies.map((msg) => (
                   <div key={msg._id} className="bg-white border border-silk rounded-xl p-4 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-ruby-red bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full">
-                        Bodilicious Support
-                      </span>
+                      {msg.authorRole === 'system' ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Bot size={10} /> System Note
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-ruby-red bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full">
+                          Bodilicious Support
+                        </span>
+                      )}
                       <span className="text-[10px] text-grey-beige/60">{formatTime(msg.createdAt)}</span>
                     </div>
                     <p className="text-sm text-dark-red leading-relaxed whitespace-pre-wrap">{msg.text}</p>

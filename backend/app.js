@@ -1,11 +1,19 @@
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import RedisStore from "rate-limit-redis";
+import Redis from "ioredis";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import { razorpayWebhook } from "./payment/controller.js";
 import { trackActiveSession } from "./analytics/live.js";
 import routes from "./index.js";
+
+// Dedicated ioredis client for rate limiting
+const rateLimitRedisClient = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
+if (!rateLimitRedisClient) {
+  console.warn("⚠️ REDIS_URL not set. Rate limiting will fall back to memory store if RedisStore fails.");
+}
 
 const app = express();
 app.use(helmet({
@@ -41,6 +49,7 @@ const globalLimiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:global:' }) }),
   message: {
     success: false,
     message: "Too many requests from this IP, please try again after 1 minute."
@@ -54,6 +63,7 @@ const quoteLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:quote:' }) }),
   message: {
     success: false,
     message: "Too many quote requests, please wait a moment before retrying."
@@ -68,6 +78,7 @@ const sensitiveLimiter = rateLimit({
   max: 50,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:sensitive:' }) }),
   message: {
     success: false,
     message: "Too many requests on this endpoint, please try again later."
@@ -100,7 +111,12 @@ app.use((req, res, next) => {
 // /api/v1 route, otherwise Express has already matched them and these never fire.
 
 // /quote — price calculator, called on shipping + payment pages and tab-focus
-app.use("/api/v1/payment/quote", quoteLimiter);
+app.use("/api/v1/payment/quote", (req, res, next) => {
+    if (req.body && req.body.couponCode) {
+        return sensitiveLimiter(req, res, next);
+    }
+    return quoteLimiter(req, res, next);
+});
 
 // Actual money-moving endpoints — strict limit
 app.use("/api/v1/payment/razorpay/init", sensitiveLimiter);

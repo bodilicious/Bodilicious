@@ -531,7 +531,7 @@ export default function OrderDetailsPage() {
                                         {order.paymentStatus === 'paid' && (
                                             <div className="relative pl-6">
                                                 <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-dark-red border-[3px] border-white ring-1 ring-dark-red"></div>
-                                                <p className="text-sm font-sans font-medium text-gray-900">Payment of ₹{total.toLocaleString('en-IN')} was processed</p>
+                                                <p className="text-sm font-sans font-medium text-gray-900">Payment of ₹{rawTotalAmount.toLocaleString('en-IN')} was processed</p>
                                                 <p className="text-xs font-sans text-grey-beige mt-1">{new Date(order.createdAt).toLocaleString()}</p>
                                             </div>
                                         )}

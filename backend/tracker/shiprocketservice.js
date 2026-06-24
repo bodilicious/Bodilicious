@@ -160,10 +160,30 @@ export const pushOrderToShiprocket = async (order) => {
     if (createRes.ok) {
       const data = await createRes.json();
       if (data.shipment_id) {
-        await Order.findByIdAndUpdate(order._id, {
+        let updateData = {
           shipmentId: data.shipment_id,
           shiprocketOrderId: data.order_id,
-        });
+        };
+
+        try {
+          const awbRes = await fetch("https://apiv2.shiprocket.in/v1/external/courier/assign/awb", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ shipment_id: data.shipment_id }),
+          });
+          const awbData = await awbRes.json();
+          if (awbData.status_code === 200 || awbData.awb_assign_status === 1) {
+            if (awbData.response && awbData.response.data && awbData.response.data.awb_code) {
+              updateData.awb = awbData.response.data.awb_code;
+            }
+          } else {
+            console.warn("AWB assignment failed:", JSON.stringify(awbData));
+          }
+        } catch (awbErr) {
+          console.error("Error assigning AWB:", awbErr.message);
+        }
+
+        await Order.findByIdAndUpdate(order._id, updateData);
       }
     } else {
       console.error("Shiprocket Order Creation Failed:", await createRes.text());

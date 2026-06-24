@@ -183,7 +183,11 @@ export const getCouponStats = async (req, res) => {
  */
 export const validateCouponAtCheckout = async (code, cartTotal, userId, activeCouponIds = []) => {
   try {
-    const coupon = await Coupon.findOne({ code: code.toUpperCase().trim(), isActive: true });
+    if (!code || typeof code !== 'string') return { valid: false, error: "Invalid coupon code" };
+    const normalizedCode = code.toUpperCase().trim();
+    if (!normalizedCode) return { valid: false, error: "Invalid coupon code" };
+
+    const coupon = await Coupon.findOne({ code: normalizedCode, isActive: true });
     if (!coupon) return { valid: false, error: "Coupon not found or inactive" };
 
     // Expiry
