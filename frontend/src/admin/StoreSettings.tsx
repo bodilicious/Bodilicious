@@ -82,7 +82,7 @@ function SettingsCard({ id, title, description, children }: { id: string; title:
 
 function SettingsHeader({ isDirty, isSaving, isPrimaryAdmin, onSave }: any) {
   return (
-    <div className="sticky top-0 z-40 flex items-center justify-between px-6 py-4 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm -mx-4 sm:mx-0 sm:rounded-t-xl">
+    <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm -mx-4 sm:mx-0 sm:rounded-t-xl">
       <div>
         <h2 className="text-xl font-serif text-dark-red hidden sm:block">Store Settings</h2>
         <h2 className="text-lg font-serif text-dark-red sm:hidden">Settings</h2>
@@ -280,7 +280,7 @@ export default function StoreSettings() {
 
       <div className="flex flex-col md:flex-row">
         {/* Sidebar Navigation */}
-        <div className="w-full md:w-64 shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 z-30 p-4 md:py-6 overflow-x-auto md:sticky md:top-[72px] self-start">
+        <div className="w-full md:w-64 shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 z-10 p-4 md:py-6 overflow-x-auto md:sticky md:top-[72px] self-start">
           <SettingsSidebar tabs={TABS} activeSection={activeSection} onSelect={scrollToSection} />
         </div>
 
