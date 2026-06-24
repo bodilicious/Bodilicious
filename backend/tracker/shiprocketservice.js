@@ -165,23 +165,8 @@ export const pushOrderToShiprocket = async (order) => {
           shiprocketOrderId: data.order_id,
         };
 
-        try {
-          const awbRes = await fetch("https://apiv2.shiprocket.in/v1/external/courier/assign/awb", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ shipment_id: data.shipment_id }),
-          });
-          const awbData = await awbRes.json();
-          if (awbData.status_code === 200 || awbData.awb_assign_status === 1) {
-            if (awbData.response && awbData.response.data && awbData.response.data.awb_code) {
-              updateData.awb = awbData.response.data.awb_code;
-            }
-          } else {
-            console.warn("AWB assignment failed:", JSON.stringify(awbData));
-          }
-        } catch (awbErr) {
-          console.error("Error assigning AWB:", awbErr.message);
-        }
+        // Skip automatic AWB assignment so the order stays in "New" section
+        // on Shiprocket, allowing the user to select the courier manually.
 
         await Order.findByIdAndUpdate(order._id, updateData);
       }
