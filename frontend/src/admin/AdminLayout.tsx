@@ -91,7 +91,9 @@ const AdminLayout: React.FC = () => {
     };
     if (user) {
       fetchCounts();
-      const interval = setInterval(fetchCounts, 60000); // refresh every minute
+      const interval = setInterval(() => {
+          if (document.visibilityState === 'visible') fetchCounts();
+      }, 300000); // refresh every 5 minutes
       return () => {
         isMounted = false;
         clearInterval(interval);

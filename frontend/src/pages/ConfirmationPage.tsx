@@ -53,12 +53,13 @@ export default function ConfirmationPage() {
     // ── Auto-poll: re-fetch profile until the order appears ─────────────────
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [pollCount, setPollCount] = useState(0);
-    const MAX_POLLS = 10; // try up to 10 times (every 2.5s = ~25s max)
+    const MAX_POLLS = 12; // try up to 12 times (every 5s = ~60s max)
 
     useEffect(() => {
         if (orderLoaded || !resolvedState) return; // already have it, or no state
 
         const run = async () => {
+            if (document.visibilityState === 'hidden') return;
             await refreshProfile();
             setPollCount(c => c + 1);
         };
@@ -66,7 +67,7 @@ export default function ConfirmationPage() {
         // kick off immediately
         run();
 
-        pollRef.current = setInterval(run, 2500);
+        pollRef.current = setInterval(run, 5000);
 
         return () => {
             if (pollRef.current) clearInterval(pollRef.current);

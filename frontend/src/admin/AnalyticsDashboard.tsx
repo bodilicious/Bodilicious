@@ -51,7 +51,9 @@ const AnalyticsDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const i = setInterval(() => fetchData(true), 60000);
+    const i = setInterval(() => {
+        if (document.visibilityState === 'visible') fetchData(true);
+    }, 300000);
     return () => clearInterval(i);
   }, [fetchData]);
 
