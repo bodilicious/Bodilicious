@@ -1,6 +1,7 @@
 import Order from "../tracker/models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
+import { Ticket } from "../support/models.js";
 import RitualResponse from "./ritualModels.js";
 import AuditLogV2 from "../audit/models.js";
 
@@ -24,13 +25,20 @@ export const getSalesAnalytics = async (req, res) => {
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          grossRevenue: { $sum: "$totalAmount" },
+          grossRevenue: { 
+            $sum: {
+              $cond: [{ $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }, "$totalAmount", 0]
+            } 
+          },
           netRevenue: { 
             $sum: { 
               $cond: [
-                { $in: ["$orderStatus", ["returned", "cancelled"]] }, 
-                0, 
-                "$totalAmount" 
+                { $and: [
+                  { $not: { $in: ["$orderStatus", ["returned", "cancelled"]] } },
+                  { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+                ]}, 
+                "$totalAmount",
+                0
               ] 
             } 
           },
@@ -58,15 +66,27 @@ export const getSalesAnalytics = async (req, res) => {
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
+          totalRevenue: { 
+            $sum: {
+              $cond: [{ $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }, "$totalAmount", 0]
+            }
+          },
           netRevenue: { 
             $sum: { 
               $cond: [
-                { $in: ["$orderStatus", ["returned", "cancelled"]] }, 
-                0, 
-                "$totalAmount" 
+                { $and: [
+                  { $not: { $in: ["$orderStatus", ["returned", "cancelled"]] } },
+                  { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+                ]}, 
+                "$totalAmount",
+                0
               ] 
             } 
+          },
+          foreignOrdersCount: {
+            $sum: {
+              $cond: [{ $ne: [{ $ifNull: ["$currency", "INR"] }, "INR"] }, 1, 0]
+            }
           },
           totalOrders: { $sum: 1 },
           newCustomers: { $addToSet: "$user" } // Rough estimate for now
@@ -190,12 +210,75 @@ export const getProductAnalytics = async (req, res) => {
         };
     }).sort((a, b) => b.returnRate - a.returnRate);
 
+    // Refund Processing Time
+    const refundProcessing = await Order.aggregate([
+      { 
+        $match: { 
+          ...query, 
+          returnRequestedAt: { $type: "date" }, 
+          returnResolvedAt: { $type: "date" } 
+        } 
+      },
+      {
+        $addFields: {
+          processingDays: {
+            $divide: [
+              { $subtract: ["$returnResolvedAt", "$returnRequestedAt"] },
+              1000 * 60 * 60 * 24
+            ]
+          }
+        }
+      },
+      {
+        $facet: {
+          histogram: [
+            {
+              $bucket: {
+                groupBy: "$processingDays",
+                boundaries: [0, 1, 3, 7, 999999],
+                default: "Other",
+                output: { count: { $sum: 1 } }
+              }
+            }
+          ],
+          monthlyTrend: [
+            {
+              $group: {
+                _id: {
+                  year: { $year: "$returnResolvedAt" },
+                  month: { $month: "$returnResolvedAt" }
+                },
+                avgProcessingDays: { $avg: "$processingDays" }
+              }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+            {
+              $project: {
+                _id: 0,
+                month: { $concat: [{ $toString: "$_id.year" }, "-", { $toString: "$_id.month" }] },
+                avgProcessingDays: 1
+              }
+            }
+          ],
+          gauge: [
+            {
+              $group: {
+                _id: null,
+                overallAvg: { $avg: "$processingDays" }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
     res.json({ 
       success: true, 
       data: { 
         topSelling, 
         categoryRevenue,
-        returnRates: returnRates.slice(0, 10)
+        returnRates: returnRates.slice(0, 10),
+        refundProcessing: refundProcessing[0]
       } 
     });
   } catch (err) {
@@ -385,12 +468,97 @@ export const getCustomerAnalytics = async (req, res) => {
         }
     ]);
 
+    // Customer Support / Tickets
+    const ticketTrends = await Ticket.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            dayOfWeek: { $dayOfWeek: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: "$_id.date",
+          dayOfWeek: "$_id.dayOfWeek",
+          count: 1
+        }
+      },
+      { $sort: { date: 1 } }
+    ]);
+
+    const topIssues = await Ticket.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: "$type",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      {
+        $project: {
+          _id: 0,
+          type: "$_id",
+          count: 1
+        }
+      }
+    ]);
+
+    const resolutionRaw = await Ticket.aggregate([
+      { $match: query },
+      {
+        $project: {
+          type: 1,
+          createdAt: 1,
+          resolvedAt: 1,
+          messages: 1
+        }
+      }
+    ]);
+    
+    const resolutionTimes = {
+      overall: { frt: [], ttr: [] },
+      byType: {}
+    };
+
+    resolutionRaw.forEach(t => {
+       const type = t.type || "other";
+       if (!resolutionTimes.byType[type]) resolutionTimes.byType[type] = { frt: [], ttr: [] };
+       
+       if (t.resolvedAt) {
+          const ttr = (t.resolvedAt - t.createdAt) / (1000 * 60 * 60); // hours
+          resolutionTimes.overall.ttr.push(ttr);
+          resolutionTimes.byType[type].ttr.push(ttr);
+       }
+       
+       const adminMsgs = (t.messages || []).filter(m => m.authorRole === "admin" || m.authorRole === "system");
+       if (adminMsgs && adminMsgs.length > 0) {
+          const firstAdminMsg = adminMsgs[0];
+          // Schema timestamps create createdAt on subdocuments usually, or fall back
+          const msgTime = firstAdminMsg.createdAt || t.createdAt;
+          const frt = msgTime - t.createdAt; 
+          const frtHours = Math.max(0, frt / (1000 * 60 * 60));
+          resolutionTimes.overall.frt.push(frtHours);
+          resolutionTimes.byType[type].frt.push(frtHours);
+       }
+    });
+
     res.json({ 
       success: true, 
       data: { 
         segmentStats, 
         funnelData,
-        trendData
+        trendData,
+        support: {
+          ticketTrends,
+          topIssues,
+          resolutionTimes
+        }
       } 
     });
   } catch (err) {
@@ -404,41 +572,178 @@ export const getCustomerAnalytics = async (req, res) => {
  */
 export const getOperationAnalytics = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    const query = { orderStatus: "delivered" };
+    const { startDate, endDate, pincodeState } = req.query;
+    const matchQuery = { orderStatus: { $nin: ["abandoned", "pending"] } };
     if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      matchQuery.createdAt = {};
+      if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
+      if (endDate) matchQuery.createdAt.$lte = new Date(endDate);
     }
 
-    // Shipping Efficiency (Placed -> Fulfilled/Delivered)
-    const orders = await Order.find(query, "createdAt statusHistory").lean();
-    
-    let totalTime = 0;
-    let count = 0;
-    const slaBreakdown = { "1 day": 0, "2 days": 0, "3 days": 0, "4+ days": 0 };
-
-    orders.forEach(o => {
-      const deliveredStatus = o.statusHistory.find(h => h.status === "delivered");
-      if (deliveredStatus) {
-        const diffDays = Math.ceil((deliveredStatus.changedAt - o.createdAt) / (1000 * 60 * 60 * 24));
-        totalTime += diffDays;
-        count++;
-
-        if (diffDays <= 1) slaBreakdown["1 day"]++;
-        else if (diffDays <= 2) slaBreakdown["2 days"]++;
-        else if (diffDays <= 3) slaBreakdown["3 days"]++;
-        else slaBreakdown["4+ days"]++;
+    // 1. Carrier Performance
+    const carrierPerformance = await Order.aggregate([
+      { $match: { ...matchQuery, orderStatus: "delivered", deliveredAt: { $type: "date" } } },
+      {
+        $group: {
+          _id: { $ifNull: ["$estimatedCourierName", "Unknown"] },
+          count: { $sum: 1 },
+          avgOrderToDeliveryDays: {
+            $avg: { $divide: [{ $subtract: ["$deliveredAt", "$createdAt"] }, 1000 * 60 * 60 * 24] }
+          },
+          avgCarrierTransitDays: {
+            $avg: {
+              $cond: [
+                { $eq: [{ $type: "$shippedAt" }, "date"] },
+                { $divide: [{ $subtract: ["$deliveredAt", "$shippedAt"] }, 1000 * 60 * 60 * 24] },
+                null
+              ]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          courier_name: "$_id",
+          count: 1,
+          avgOrderToDeliveryDays: 1,
+          avgCarrierTransitDays: 1
+        }
       }
-    });
+    ]);
+
+    // 2. Heatmap
+    // a. State level (always returned)
+    const stateHeatmap = await Order.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: { $ifNull: ["$shippingDetails.state", "Unknown"] },
+          order_count: { $sum: 1 },
+          avg_shipping_cost: { $avg: "$shippingCost" }
+        }
+      },
+      { $sort: { order_count: -1 } },
+      {
+        $project: {
+          _id: 0,
+          state: "$_id",
+          order_count: 1,
+          avg_shipping_cost: 1
+        }
+      }
+    ]);
+
+    // b. Pincode level drill-down (if requested)
+    let pincodeHeatmap = [];
+    if (pincodeState) {
+       pincodeHeatmap = await Order.aggregate([
+         { $match: { ...matchQuery, "shippingDetails.state": pincodeState } },
+         {
+           $group: {
+             _id: { $ifNull: ["$shippingDetails.pincode", "Unknown"] },
+             order_count: { $sum: 1 },
+             avg_shipping_cost: { $avg: "$shippingCost" }
+           }
+         },
+         { $sort: { order_count: -1 } },
+         { $limit: 50 },
+         {
+           $project: {
+             _id: 0,
+             pincode: "$_id",
+             order_count: 1,
+             avg_shipping_cost: 1
+           }
+         }
+       ]);
+    }
+
+    // 3. Cost Analysis (Scatter plot)
+    const costAnalysis = await Order.aggregate([
+      { $match: { ...matchQuery, totalAmount: { $gt: 0, $lte: 50000 } } },
+      {
+        $project: {
+          _id: 0,
+          order_id: "$_id",
+          totalAmount: 1,
+          shippingCost: 1,
+          freight_pct_of_value: {
+            $multiply: [ { $divide: ["$shippingCost", "$totalAmount"] }, 100 ]
+          }
+        }
+      }
+    ]);
+
+    // 4. RTO Rate
+    const funnelStages = await Order.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          total_processed: { $sum: 1 },
+          shipped: {
+            $sum: {
+              $cond: [
+                { $or: [
+                  { $in: ["$orderStatus", ["shipped", "delivered", "returned", "return_requested"]] },
+                  { $eq: [{ $type: "$shippedAt" }, "date"] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
+          delivered: {
+            $sum: {
+              $cond: [{ $eq: ["$orderStatus", "delivered"] }, 1, 0]
+            }
+          },
+          rto: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ["$orderStatus", "returned"] },
+                  { $in: ["$returnStatus", ["none", null]] }
+                ]},
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    // RTO Reasons Donut
+    const rtoReasons = await Order.aggregate([
+      { $match: { ...matchQuery, orderStatus: "returned", returnStatus: { $in: ["none", null] } } },
+      {
+        $group: {
+          _id: { $ifNull: ["$rtoReason", "Courier RTO"] },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          reason: "$_id",
+          count: 1
+        }
+      }
+    ]);
 
     res.json({
       success: true,
       data: {
-        avgFulfillmentDays: count > 0 ? (totalTime / count).toFixed(1) : 0,
-        slaBreakdown,
-        totalDelivered: count
+        carrierPerformance,
+        heatmap: {
+          state: stateHeatmap,
+          pincode: pincodeHeatmap
+        },
+        costAnalysis,
+        funnel: funnelStages[0] || { total_processed: 0, shipped: 0, delivered: 0, rto: 0 },
+        rtoReasons
       }
     });
 
@@ -707,7 +1012,7 @@ export const getErrorDashboardData = async (req, res) => {
         user_id: order.user,
         metadata: {
           reason: order.paymentStatus === "failed" ? "Payment Gateway Rejected" : "Abandoned Checkout / Pending Payment",
-          email: order.shippingAddress?.email || "",
+          email: order.shippingDetails?.email || "",
           amount: order.totalAmount
         }
       }));

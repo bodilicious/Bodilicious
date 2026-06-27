@@ -225,3 +225,19 @@ export function getCurrencyForCountry(countryCode: string): string {
   return COUNTRY_CURRENCY_MAP[countryCode.toUpperCase()] ?? 'INR';
 }
 
+
+
+const FALLBACK_LOCALE = 'en-US';
+
+export function formatCurrency(amount: number, currency?: string | null): string {
+  const code = (currency || 'INR').trim().toUpperCase();
+  try {
+    return new Intl.NumberFormat(FALLBACK_LOCALE, {
+      style: 'currency',
+      currency: code,
+    }).format(amount);
+  } catch (e) {
+    return `${code} ${amount.toLocaleString()}`;
+  }
+}
+

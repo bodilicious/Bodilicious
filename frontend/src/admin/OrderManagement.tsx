@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 import OrderTimelineModal from './OrderTimelineModal';
 import ShippingLabel from './ShippingLabel';
 import Select from '../components/Select';
+import { formatCurrency } from '../utils/currencies';
 
 const OrderManagement: React.FC = () => {
   const { getAuthHeaders } = useApp();
@@ -353,8 +354,8 @@ const OrderManagement: React.FC = () => {
                   </td>
                   <td className="px-4 py-4 font-bold text-dark-red">
                     <div className="flex flex-col items-start">
-                      <span>₹{Number(order.totalAmount || 0).toFixed(0)}</span>
-                      {order.refundAmount > 0 && <span className="text-[10px] text-purple-600 font-medium">Refund: ₹{order.refundAmount.toLocaleString('en-IN')}</span>}
+                      <span>{formatCurrency(Number(order.totalAmount || 0), order.currency)}</span>
+                      {order.refundAmount > 0 && <span className="text-[10px] text-purple-600 font-medium">Refund: {formatCurrency(order.refundAmount, order.currency)}</span>}
                     </div>
                   </td>
                   <td className="px-4 py-4">

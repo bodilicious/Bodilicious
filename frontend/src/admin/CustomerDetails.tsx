@@ -966,29 +966,60 @@ function CartHistorySection({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'aggregated' | 'chronological'>('aggregated');
 
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const fetchHistory = useCallback(async (isFilter = false) => {
+    setLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      let url = `${API_BASE}/admin/customers/${userId}/cart-history?limit=10`;
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error('Failed to load cart history');
+      const json = await res.json();
+      setLogs(json.data);
+      if (!isFilter) setAggregated(json.aggregatedData || []);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, startDate, endDate]);
+
   useEffect(() => {
+    fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const handleApplyFilters = () => fetchHistory(true);
+  const handleClearFilters = () => {
+    setStartDate('');
+    setEndDate('');
     (async () => {
+      setLoading(true);
       try {
         const headers = await getAuthHeaders();
         const res = await fetch(`${API_BASE}/admin/customers/${userId}/cart-history?limit=10`, { headers });
         if (!res.ok) throw new Error('Failed to load cart history');
         const json = await res.json();
         setLogs(json.data);
-        setAggregated(json.aggregatedData || []);
       } catch (e: any) {
         toast.error(e.message);
       } finally {
         setLoading(false);
       }
     })();
-  }, [userId]);
+  };
 
   if (loading) return <TabSkeleton rows={2} />;
 
   return (
     <div className="mt-8 border-t border-gray-100 pt-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Recent Cart Activity</p>
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Cart Activity</p>
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
           <button
             onClick={() => setViewMode('aggregated')}
@@ -1004,6 +1035,23 @@ function CartHistorySection({ userId }: { userId: string }) {
           </button>
         </div>
       </div>
+
+      {viewMode === 'chronological' && (
+        <div className="bg-white rounded-[24px] px-5 py-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] border border-gray-100 mb-4 flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Start Date</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-xs border-gray-200 rounded-full px-4 py-2 focus:ring-[#3D0A05] focus:border-[#3D0A05]" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">End Date</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-xs border-gray-200 rounded-full px-4 py-2 focus:ring-[#3D0A05] focus:border-[#3D0A05]" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleApplyFilters} className="bg-b-burgundy text-white text-xs font-semibold uppercase tracking-wider px-5 py-2 rounded-full hover:bg-ruby-red transition-colors">Apply</button>
+            <button onClick={handleClearFilters} className="bg-white text-b-text-secondary border border-gray-200 text-xs font-semibold uppercase tracking-wider px-5 py-2 rounded-full hover:bg-gray-50 transition-colors">Clear</button>
+          </div>
+        </div>
+      )}
 
       {viewMode === 'aggregated' ? (
         aggregated.length === 0 ? (
@@ -1154,8 +1202,38 @@ function ActivityAuditTab({ userId }: { userId: string }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const fetchSessions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      let url = `${API_BASE}/admin/customers/${userId}/activity?limit=10`;
+      if (startDate) url += `&startDate=${startDate}`;
+      if (endDate) url += `&endDate=${endDate}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error('Failed to load activity');
+      const json = await res.json();
+      setSessions(json.data);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, startDate, endDate]);
+
   useEffect(() => {
+    fetchSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const handleApplyFilters = () => fetchSessions();
+  const handleClearFilters = () => {
+    setStartDate('');
+    setEndDate('');
     (async () => {
+      setLoading(true);
       try {
         const headers = await getAuthHeaders();
         const res = await fetch(`${API_BASE}/admin/customers/${userId}/activity?limit=10`, { headers });
@@ -1168,14 +1246,31 @@ function ActivityAuditTab({ userId }: { userId: string }) {
         setLoading(false);
       }
     })();
-  }, [userId]);
+  };
 
   if (loading) return <TabSkeleton rows={4} />;
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Recent Sessions</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Sessions Activity</p>
+        </div>
+
+        <div className="bg-white rounded-[24px] px-5 py-4 shadow-[0_1px_4px_rgba(0,0,0,0.07)] border border-gray-100 mb-4 flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">Start Date</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-xs border-gray-200 rounded-full px-4 py-2 focus:ring-[#3D0A05] focus:border-[#3D0A05]" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">End Date</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-xs border-gray-200 rounded-full px-4 py-2 focus:ring-[#3D0A05] focus:border-[#3D0A05]" />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleApplyFilters} className="bg-b-burgundy text-white text-xs font-semibold uppercase tracking-wider px-5 py-2 rounded-full hover:bg-ruby-red transition-colors">Apply</button>
+            <button onClick={handleClearFilters} className="bg-white text-b-text-secondary border border-gray-200 text-xs font-semibold uppercase tracking-wider px-5 py-2 rounded-full hover:bg-gray-50 transition-colors">Clear</button>
+          </div>
+        </div>
         {sessions.length === 0 ? (
           <div className="bg-gray-50 rounded-xl p-6 text-center border border-gray-100 border-dashed">
             <Activity className="w-6 h-6 text-gray-300 mx-auto mb-2" />

@@ -10,6 +10,10 @@ import mongoose from "mongoose";
 import { pushOrderToShiprocket as srPush, getShiprocketToken } from "../tracker/shiprocketservice.js";
 import Redis from "ioredis";
 import { Ticket } from "../support/models.js";
+import escapeStringRegexp from "escape-string-regexp";
+import path from "path";
+
+
 
 const redisUrl = process.env.REDIS_URL || null;
 const redis = redisUrl ? new Redis(redisUrl) : {
@@ -135,41 +139,18 @@ export const getNotificationCounts = async (req, res) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // To count users requiring attention, we need an aggregate
-    const usersReqAttention = await UserProfile.aggregate([
-      {
-        $lookup: {
-          from: "orders",
-          localField: "_id",
-          foreignField: "user",
-          as: "userOrders"
-        }
-      },
-      {
-        $lookup: {
-          from: "tickets",
-          localField: "_id",
-          foreignField: "user",
-          let: { userId: "$_id" },
-          pipeline: [
-            { $match: { $expr: { $and: [ { $eq: ["$user", "$$userId"] }, { $eq: ["$status", "open"] } ] } } },
-            { $limit: 1 }
-          ],
-          as: "openTickets"
-        }
-      },
-      {
-        $match: {
-          $or: [
-            { "userOrders.paymentStatus": "failed" },
-            { openTickets: { $not: { $size: 0 } } }
-          ]
-        }
-      },
-      { $count: "count" }
+    // To count users requiring attention, we find users with failed orders or open tickets directly
+    const [usersWithFailedOrders, usersWithOpenTickets] = await Promise.all([
+      Order.distinct("user", { paymentStatus: "failed" }),
+      Ticket.distinct("user", { status: "open" })
     ]);
 
-    const usersCount = usersReqAttention[0]?.count || 0;
+    const usersReqAttentionSet = new Set([
+      ...usersWithFailedOrders.map(id => id.toString()),
+      ...usersWithOpenTickets.map(id => id.toString())
+    ]);
+
+    const usersCount = usersReqAttentionSet.size;
 
     const ordersQuery = { orderStatus: "pending" };
     if (lastViewedOrders && !isNaN(Number(lastViewedOrders))) {
@@ -239,9 +220,10 @@ export const getAllProductsAdmin = async (req, res) => {
 
     const query = {};
     if (search) {
+      const safeSearch = escapeStringRegexp(search);
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { pid: { $regex: search, $options: "i" } }
+        { name: { $regex: safeSearch, $options: "i" } },
+        { pid: { $regex: safeSearch, $options: "i" } }
       ];
     }
     if (category) query.category = category;
@@ -272,7 +254,27 @@ export const getAllProductsAdmin = async (req, res) => {
  */
 export const createProductAdmin = async (req, res) => {
   try {
-    const product = new Product(req.body);
+    const {
+      name, price, price_inr, description, images, stock, lowStockThreshold,
+      category, sub_category, product_type, item_form, texture,
+      brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
+      usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
+      product_weight_g, product_weight_ml, availability, is_active_based,
+      slug, isActive,
+    } = req.body;
+
+    const allowedFields = Object.fromEntries(
+      Object.entries({
+        name, price, price_inr, description, images, stock, lowStockThreshold,
+        category, sub_category, product_type, item_form, texture,
+        brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
+        usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
+        product_weight_g, product_weight_ml, availability, is_active_based,
+        slug, isActive,
+      }).filter(([, v]) => v !== undefined)
+    );
+
+    const product = new Product(allowedFields);
     await product.save();
     res.status(201).json({ success: true, data: product });
   } catch (err) {
@@ -479,11 +481,12 @@ export const getAllOrdersAdmin = async (req, res) => {
 
     const query = {};
     if (search) {
+      const safeSearch = escapeStringRegexp(search);
       query.$or = [
         { _id: mongoose.isValidObjectId(search) ? search : undefined },
-        { "shippingDetails.email": { $regex: search, $options: "i" } },
-        { "shippingDetails.phone": { $regex: search, $options: "i" } },
-        { "shippingDetails.name": { $regex: search, $options: "i" } }
+        { "shippingDetails.email": { $regex: safeSearch, $options: "i" } },
+        { "shippingDetails.phone": { $regex: safeSearch, $options: "i" } },
+        { "shippingDetails.name": { $regex: safeSearch, $options: "i" } }
       ].filter(Boolean);
     }
     if (orderStatus) query.orderStatus = orderStatus;
@@ -491,8 +494,14 @@ export const getAllOrdersAdmin = async (req, res) => {
     
     if (startDate || endDate) {
       query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      if (startDate) {
+        if (isNaN(new Date(startDate).getTime())) return res.status(400).json({ success: false, message: "Invalid startDate" });
+        query.createdAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        if (isNaN(new Date(endDate).getTime())) return res.status(400).json({ success: false, message: "Invalid endDate" });
+        query.createdAt.$lte = new Date(endDate);
+      }
     }
 
     const [orders, total] = await Promise.all([
@@ -504,8 +513,8 @@ export const getAllOrdersAdmin = async (req, res) => {
       Order.countDocuments(query)
     ]);
 
-    // Auto-sync active orders before returning
-    await autoSyncOrdersWithShiprocket(orders);
+    // Auto-sync active orders before returning (fire and forget to prevent blocking response)
+    autoSyncOrdersWithShiprocket(orders).catch(console.error);
 
     res.json({
       success: true,
@@ -683,9 +692,10 @@ export const getAllUsersAdmin = async (req, res) => {
 
     const query = {};
     if (search) {
+      const safeSearch = escapeStringRegexp(search);
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } }
+        { name: { $regex: safeSearch, $options: "i" } },
+        { email: { $regex: safeSearch, $options: "i" } }
       ];
     }
     if (role && role !== "") query.role = role;
@@ -882,16 +892,31 @@ export const updateUserRole = async (req, res) => {
 export const getLogsAdmin = async (req, res) => {
   try {
     const { limit, skip } = req.pagination;
-    const { event_type, severity, is_anomaly, search } = req.query;
+    const { event_type, severity, is_anomaly, search, startDate, endDate } = req.query;
 
     const query = {};
     if (event_type) query.event_type = event_type;
     if (severity) query.severity = severity;
     if (is_anomaly !== undefined) query['flags.is_anomaly'] = is_anomaly === 'true';
+
+    if (startDate || endDate) {
+      query.timestamp_utc = {};
+      if (startDate) {
+        const d = new Date(startDate);
+        if (!isNaN(d.valueOf())) query.timestamp_utc.$gte = d;
+      }
+      if (endDate) {
+        const d = new Date(endDate);
+        if (!isNaN(d.valueOf())) query.timestamp_utc.$lte = d;
+      }
+      if (Object.keys(query.timestamp_utc).length === 0) delete query.timestamp_utc;
+    }
+
     if (search) {
+      const safeSearch = escapeStringRegexp(search);
       query.$or = [
-        { correlation_id: new RegExp(search, "i") },
-        { session_id: new RegExp(search, "i") }
+        { correlation_id: new RegExp(safeSearch, "i") },
+        { session_id: new RegExp(safeSearch, "i") }
       ];
     }
 
@@ -921,20 +946,26 @@ export const getLogsAdmin = async (req, res) => {
  */
 export const exportLogsCSV = async (req, res) => {
   try {
-    const { range = "30d" } = req.query;
-    const days = parseInt(range) || 30;
-    const dateLimit = new Date();
-    dateLimit.setDate(dateLimit.getDate() - days);
+    const logs = await AuditLogV2.find().sort({ timestamp: -1 }).limit(1000).lean();
 
-    const logs = await AuditLogV2.find({ timestamp_utc: { $gte: dateLimit } })
-      .populate("user_id", "name email")
-      .sort({ timestamp_utc: -1 });
+    const sanitizeCsv = (val) => {
+      if (typeof val !== "string") val = String(val || "");
+      if (val.match(/^[=\+\-@]/)) return "'" + val;
+      return val;
+    };
 
-    let csv = "Timestamp (UTC),Event Type,User/System,Severity,IP Address,Correlation ID\n";
+    let csv = "Timestamp,Level,Type,User,Resource,Message,IP\n";
     logs.forEach(l => {
-      const user = l.user_id ? l.user_id.email : l.source_system || "System";
-      const ip = l.network?.ip_address || "N/A";
-      csv += `${l.timestamp_utc.toISOString()},${l.event_type},"${user}",${l.severity},${ip},${l.correlation_id || ""}\n`;
+      const ts = new Date(l.timestamp).toISOString();
+      const level = sanitizeCsv(l.severity);
+      const type = sanitizeCsv(l.event_type);
+      const user = sanitizeCsv(l.user_id || "System");
+      const resource = sanitizeCsv(l.target_id || "None");
+      const rawMsg = l.details?.reason || l.details?.error || l.details?.action || "";
+      const msg = `"${sanitizeCsv(rawMsg).replace(/"/g, '""')}"`;
+      const ip = sanitizeCsv(l.network?.ip_address || "Unknown");
+
+      csv += `${ts},${level},${type},${user},${resource},${msg},${ip}\n`;
     });
 
     res.header("Content-Type", "text/csv");
@@ -951,25 +982,30 @@ export const exportLogsCSV = async (req, res) => {
  */
 export const exportOrdersCSV = async (req, res) => {
   try {
-    const { range = "30d" } = req.query;
-    const days = parseInt(range) || 30;
-    const dateLimit = new Date();
-    dateLimit.setDate(dateLimit.getDate() - days);
+    const orders = await Order.find().sort({ createdAt: -1 }).lean();
 
-    const orders = await Order.find({ createdAt: { $gte: dateLimit } })
-      .populate("user", "name email")
-      .sort({ createdAt: -1 });
+    const sanitizeCsv = (val) => {
+      if (typeof val !== "string") val = String(val || "");
+      if (val.match(/^[=\+\-@]/)) return "'" + val;
+      return val;
+    };
 
-    // Basic CSV construction
-    let csv = "Order ID,Date,Customer,Email,Amount,Status,Payment\n";
+    let csv = "Order ID,Date,Customer Name,Email,Phone,Total,Payment Method,Payment Status,Order Status,AWB\n";
     orders.forEach(o => {
-      csv += `${o._id},${o.createdAt.toISOString()},"${o.shippingDetails.name}","${o.shippingDetails.email}",${o.totalAmount},${o.orderStatus},${o.paymentStatus}\n`;
+      const date = new Date(o.createdAt).toISOString().split("T")[0];
+      const name = `"${sanitizeCsv(o.shippingDetails?.name || "").replace(/"/g, '""')}"`;
+      const email = `"${sanitizeCsv(o.shippingDetails?.email || "").replace(/"/g, '""')}"`;
+      const phone = sanitizeCsv(o.shippingDetails?.phone || "");
+      const total = o.totalAmount;
+      const paymentMethod = sanitizeCsv(o.paymentMethod || "N/A");
+      const paymentStatus = sanitizeCsv(o.paymentStatus || "N/A");
+      const orderStatus = sanitizeCsv(o.orderStatus || "N/A");
+      const awb = sanitizeCsv(o.awb || "N/A");
+      csv += `${o._id},${date},${name},${email},${phone},${total},${paymentMethod},${paymentStatus},${orderStatus},${awb}\n`;
     });
 
-    await logAction(req, "EXPORT_ORDERS", "Order", "all", { range });
-
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename=orders_${range}.csv`);
+    res.setHeader("Content-Disposition", `attachment; filename=orders.csv`);
     res.status(200).send(csv);
   } catch (err) {
     console.error("Admin ExportOrders Error:", err);
@@ -1543,7 +1579,8 @@ export const createDraftOrder = async (req, res) => {
   session.startTransaction();
 
   try {
-    let { userId, items, shippingDetails, manualDiscount = 0, notes, paymentMethod = "razorpay", paymentStatus = "pending" } = req.body;
+    let { userId, items, shippingDetails, manualDiscount = 0, notes, paymentMethod = "razorpay" } = req.body;
+    const paymentStatus = "pending";
 
     if (!items || items.length === 0 || !shippingDetails?.address) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -1586,16 +1623,25 @@ export const createDraftOrder = async (req, res) => {
 
     // Calculate prices and lock inventory
     for (const item of items) {
-      let product;
+      let productMatch = null;
       if (mongoose.Types.ObjectId.isValid(item.productId)) {
-        product = await Product.findById(item.productId).session(session);
+        productMatch = { _id: item.productId };
+      } else {
+        productMatch = { pid: item.pid || item.productId };
       }
+
+      const product = await Product.findOneAndUpdate(
+        { ...productMatch, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
+        { new: true, session }
+      );
+
       if (!product) {
-        const searchPid = item.pid || item.productId;
-        product = await Product.findOne({ pid: searchPid }).session(session);
+        // Determine if it didn't exist or just didn't have stock
+        const exists = await Product.findOne(productMatch).session(session);
+        if (!exists) throw new Error(`Product ${item.productId} not found`);
+        throw new Error(`Insufficient stock for ${exists.name}`);
       }
-      if (!product) throw new Error(`Product ${item.productId} not found`);
-      if (product.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
 
       totalAmount += product.price * item.quantity;
       
@@ -1604,9 +1650,6 @@ export const createDraftOrder = async (req, res) => {
         quantity: item.quantity,
         priceAtPurchase: product.price
       });
-
-      product.stock -= item.quantity;
-      await product.save({ session });
     }
 
     const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
@@ -1703,11 +1746,20 @@ export const deleteImages = async (req, res) => {
       return res.status(400).json({ success: false, message: "No publicIds provided" });
     }
 
-    const tenantFolder = "bodilicious_products";
-    for (const id of publicIds) {
-      if (!id.startsWith(`${tenantFolder}/`)) {
-        return res.status(403).json({ success: false, message: `Access denied to delete image: ${id}` });
+    const tenantFolder = process.env.CLOUDINARY_FOLDER || "bodilicious";
+
+    const invalidIds = publicIds.filter(id => {
+      try {
+        const decoded = decodeURIComponent(id);
+        const normalized = path.normalize(decoded).replace(/\\/g, '/');
+        return normalized.includes('..') || !normalized.startsWith(`${tenantFolder}/`);
+      } catch (e) {
+        return true;
       }
+    });
+
+    if (invalidIds.length > 0) {
+      return res.status(403).json({ success: false, message: "Invalid or unauthorized image path detected" });
     }
 
     cloudinary.config({ 
@@ -1734,15 +1786,14 @@ export const getImageUsage = async (req, res) => {
     const { publicId } = req.query;
     if (!publicId) return res.status(400).json({ success: false, message: "publicId is required" });
 
-    const searchString = publicId;
-    const usage = [];
+    const searchString = escapeStringRegexp(publicId);
     
-    // Check Products
-    const products = await Product.find({ 
-      $or: [
-        { images: { $regex: searchString, $options: 'i' } }
-      ]
-    });
+    // Warning: This does a full collection scan with a regex on every request
+    const products = await Product.find({
+      images: { $regex: searchString }
+    }).select("pid name images isActive").lean();
+
+    const usage = [];
     if (products.length > 0) {
       usage.push(...products.map(p => ({ type: 'Product', name: p.name, id: p._id })));
     }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { CheckCircle2, XCircle, PackageX, ChevronRight, FileText, Check, AlertTriangle } from 'lucide-react';
 import Footer from '../components/Footer';
+import { formatCurrency } from '../utils/currencies';
 
 const CONFIRMATION_STATE_KEY = 'bodilicious_confirmation_state';
 
@@ -259,7 +260,7 @@ export default function ConfirmationPage() {
                                                 <p className="font-sans text-xs text-gray-500">Qty: {item.quantity}</p>
                                             </div>
                                         </div>
-                                        <p className="font-sans text-sm font-semibold">₹{(item.priceAtPurchase * item.quantity).toLocaleString('en-IN')}</p>
+                                        <p className="font-sans text-sm font-semibold">{formatCurrency(item.priceAtPurchase * item.quantity, order.currency)}</p>
                                     </div>
                                 ))}
                             </div>
@@ -272,39 +273,32 @@ export default function ConfirmationPage() {
                                     const rawTotalAmount = order.totalAmount ?? 0;
                                     const rawSubtotal = (order.originalAmount ?? rawTotalAmount) - rawShippingCost;
                                     
-                                    const formatCurrency = (amount: number) => {
-                                        return new Intl.NumberFormat('en-IN', {
-                                            style: 'currency',
-                                            currency: order.currency || 'INR',
-                                            minimumFractionDigits: 0
-                                        }).format(amount);
-                                    };
+                                    const _fmt = (amt: number) => formatCurrency(amt, order.currency);
 
                                     return (
                                         <>
                                             <div className="flex justify-between font-sans text-sm text-gray-600">
                                                 <span>Subtotal</span>
-                                                <span>{formatCurrency(rawSubtotal)}</span>
+                                                <span>{_fmt(rawSubtotal)}</span>
                                             </div>
                                             <div className="flex justify-between items-center py-2">
                                                 <span className="text-gray-500 text-sm font-sans">Shipping</span>
                                                 <span className="text-sm font-sans text-gray-600">
-                                                    {rawShippingCost <= 0 ? 'Free' : formatCurrency(rawShippingCost)}
+                                                    {rawShippingCost <= 0 ? 'Free' : _fmt(rawShippingCost)}
                                                 </span>
                                             </div>
                                             {rawDiscountAmount > 0 && (
                                                 <div className="flex justify-between items-center py-1">
                                                     <span className="text-gray-500 text-sm font-sans">Discount {order.isWelcomeOfferApplied ? '(Welcome Offer)' : ''}</span>
-                                                    <span className="text-sm font-sans text-green-700">-{formatCurrency(rawDiscountAmount)}</span>
+                                                    <span className="text-sm font-sans text-green-700">-{_fmt(rawDiscountAmount)}</span>
                                                 </div>
                                             )}
-                                            <div className="flex justify-between items-center py-1">
-                                                <span className="text-gray-500 text-sm font-sans">Tax (Inclusive)</span>
-                                                <span className="text-sm font-sans text-gray-600">{formatCurrency(rawTaxAmount)}</span>
-                                            </div>
-                                            <div className="flex justify-between font-serif text-xl text-dark-red mt-4 pt-4 border-t border-silk">
-                                                <span>Total Amount</span>
-                                                <span>{formatCurrency(rawTotalAmount)}</span>
+                                            <div className="flex justify-between items-center py-4 border-t border-silk mt-2 text-base font-serif text-dark-red">
+                                                <span>Total</span>
+                                                <div className="text-right flex flex-col">
+                                                    <span className="font-bold">{_fmt(rawTotalAmount)}</span>
+                                                    <span className="text-[10px] text-gray-400 font-sans tracking-widest uppercase mt-0.5">Includes {order.currency || 'INR'} {_fmt(rawTaxAmount)} Taxes</span>
+                                                </div>
                                             </div>
                                         </>
                                     );

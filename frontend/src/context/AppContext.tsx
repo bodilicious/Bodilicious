@@ -663,8 +663,10 @@ const triggerPasswordReset = async (email: string) => {
       }
 
       // Default limit to 500 for performance if not specified
+      // Reduce limit to 50 on the shop page to avoid massive framer-motion layout lag
       if (!url.includes('limit=')) {
-        url += (url.includes('?') ? '&' : '?') + 'limit=500';
+        const defaultLimit = window.location.pathname.startsWith('/shop') ? 50 : 500;
+        url += (url.includes('?') ? '&' : '?') + `limit=${defaultLimit}`;
       }
 
       const res = await fetch(url);

@@ -5,6 +5,7 @@ import { Package, ArrowLeft, AlertCircle, RefreshCw, Calendar, CreditCard, FileT
 import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 import { Order, TimelineEvent } from '../types';
+import { formatCurrency } from '../utils/currencies';
 
 
 export default function TrackingPage() {
@@ -266,7 +267,7 @@ export default function TrackingPage() {
                                         {order.items[0]?.product?.name} {order.items.length > 1 ? `+ ${order.items.length - 1} more item(s)` : ''}
                                     </p>
                                     <p className="font-sans text-xs font-semibold text-gray-900 mt-auto">
-                                        ₹{order.totalAmount.toLocaleString('en-IN')}
+                                        {formatCurrency(order.totalAmount, order.currency)}
                                     </p>
                                     {order.estimatedDeliveryDate && ['pending', 'processing', 'shipped'].includes(order.orderStatus.toLowerCase()) && (
                                         <p className="font-sans text-[11px] text-[#e77600] mt-1 font-medium">
@@ -334,7 +335,7 @@ export default function TrackingPage() {
                                         <CreditCard size={12} /> Total Amount
                                     </div>
                                     <p className="font-sans text-sm font-semibold text-gray-900">
-                                        ₹{selectedOrder.totalAmount.toLocaleString('en-IN')}
+                                        {formatCurrency(selectedOrder.totalAmount, selectedOrder.currency)}
                                     </p>
                                 </div>
                                 <div>
@@ -494,7 +495,7 @@ export default function TrackingPage() {
                         </p>
                         {selectedOrder.paymentStatus === 'paid' && selectedOrder.paymentMethod === 'razorpay' && (
                             <div className="mb-4 bg-purple-50 p-3 text-purple-800 text-xs border border-purple-100 rounded">
-                                A refund of <strong>₹{selectedOrder.totalAmount.toLocaleString('en-IN')}</strong> will be initiated immediately to your original payment method. It may take 5-7 business days to reflect in your account.
+                                A refund of <strong>{formatCurrency(selectedOrder.totalAmount, selectedOrder.currency)}</strong> will be initiated immediately to your original payment method. It may take 5-7 business days to reflect in your account.
                             </div>
                         )}
                         <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-2">

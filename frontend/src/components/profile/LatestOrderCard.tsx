@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle2, Clock, XCircle, ChevronRight, ShoppingBag } from 'lucide-react';
 import { Order } from '../../types';
+import { formatCurrency } from '../../utils/currencies';
 
 interface Props {
     order: Order | null;
@@ -88,7 +89,7 @@ export default function LatestOrderCard({ order, navigateTo, onReorder }: Props)
                                 : order.items[0]?.product?.name || 'Product'
                             }
                         </p>
-                        <p className="font-sans text-xs text-grey-beige mt-0.5">Total Amount: ₹{order.totalAmount.toLocaleString('en-IN')}</p>
+                        <p className="font-sans text-xs text-grey-beige mt-0.5">Total Amount: {formatCurrency(order.totalAmount, order.currency)}</p>
                     </div>
                 </div>
 

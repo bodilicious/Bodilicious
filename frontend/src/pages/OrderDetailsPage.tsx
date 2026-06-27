@@ -454,10 +454,10 @@ export default function OrderDetailsPage() {
                                                     <p className="text-xs font-sans text-grey-beige mt-1 uppercase tracking-wider">{item.product?.category || 'Standard'}</p>
                                                 </div>
                                                 <div className="text-right text-sm font-sans text-gray-500">
-                                                    ₹{item.priceAtPurchase.toLocaleString('en-IN')} × {item.quantity}
+                                                    {formatCurrency(item.priceAtPurchase)} × {item.quantity}
                                                 </div>
                                                 <div className="text-right text-sm font-sans font-semibold text-dark-red min-w-[80px]">
-                                                    ₹{(item.priceAtPurchase * item.quantity).toLocaleString('en-IN')}
+                                                    {formatCurrency(item.priceAtPurchase * item.quantity)}
                                                 </div>
                                             </div>
                                         ))}
@@ -509,7 +509,7 @@ export default function OrderDetailsPage() {
                                             </div>
                                             {order.refundId && (
                                                 <div className="text-sm text-gray-600 flex flex-col justify-start items-start pt-2 border-t border-gray-200 mt-2">
-                                                    <span className="font-semibold text-purple-700">Refund: ₹{order.refundAmount?.toLocaleString('en-IN')} ({order.refundStatus})</span>
+                                                    <span className="font-semibold text-purple-700">Refund: {order.refundAmount ? formatCurrency(order.refundAmount) : '—'} ({order.refundStatus})</span>
                                                     <span className="font-mono text-[10px] text-gray-400">Refund Ref: {order.refundId}</span>
                                                 </div>
                                             )}
@@ -531,7 +531,7 @@ export default function OrderDetailsPage() {
                                         {order.paymentStatus === 'paid' && (
                                             <div className="relative pl-6">
                                                 <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-dark-red border-[3px] border-white ring-1 ring-dark-red"></div>
-                                                <p className="text-sm font-sans font-medium text-gray-900">Payment of ₹{rawTotalAmount.toLocaleString('en-IN')} was processed</p>
+                                                <p className="text-sm font-sans font-medium text-gray-900">Payment of {formatCurrency(rawTotalAmount)} was processed</p>
                                                 <p className="text-xs font-sans text-grey-beige mt-1">{new Date(order.createdAt).toLocaleString()}</p>
                                             </div>
                                         )}
@@ -684,7 +684,7 @@ export default function OrderDetailsPage() {
                         </p>
                         {order.paymentStatus === 'paid' && order.paymentMethod === 'razorpay' && (
                             <div className="mb-4 bg-purple-50 p-3 text-purple-800 text-xs border border-purple-100 rounded">
-                                A refund of <strong>₹{order.totalAmount.toLocaleString('en-IN')}</strong> will be initiated immediately to your original payment method. It may take 5-7 business days to reflect in your account.
+                                A refund of <strong>{formatCurrency(order.totalAmount)}</strong> will be initiated immediately to your original payment method. It may take 5-7 business days to reflect in your account.
                             </div>
                         )}
                         <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-2">
@@ -721,7 +721,7 @@ export default function OrderDetailsPage() {
                         </div>
                         {order.paymentStatus === 'paid' && order.paymentMethod === 'razorpay' && (
                             <div className="mb-4 bg-purple-50 p-3 text-purple-800 text-xs border border-purple-100 rounded">
-                                Upon successful return processing, a refund of <strong>₹{order.totalAmount.toLocaleString('en-IN')}</strong> will be initiated to your original payment method.
+                                Upon successful return processing, a refund of <strong>{formatCurrency(order.totalAmount)}</strong> will be initiated to your original payment method.
                             </div>
                         )}
                         <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-2">

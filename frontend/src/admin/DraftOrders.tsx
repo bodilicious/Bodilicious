@@ -10,6 +10,7 @@ import {
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import Select from '../components/Select';
+import { formatCurrency } from '../utils/currencies';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -320,7 +321,7 @@ const DraftOrders: React.FC = () => {
                           <div className="text-xs text-grey-beige">Stock: {p.stock}</div>
                         </div>
                       </div>
-                      <div className="font-bold text-dark-red">₹{p.price.toLocaleString()}</div>
+                      <div className="font-bold text-dark-red">{formatCurrency(p.price)}</div>
                     </div>
                   ))}
                 </div>
@@ -343,7 +344,7 @@ const DraftOrders: React.FC = () => {
                     {cartItems.map(item => (
                       <tr key={item.product._id}>
                         <td className="p-3 font-medium text-dark-red">{item.product.name}</td>
-                        <td className="p-3">₹{item.product.price}</td>
+                        <td className="p-3">{formatCurrency(item.product.price)}</td>
                         <td className="p-3">
                           <input 
                             type="number" min="1" max={item.product.stock}
@@ -435,11 +436,11 @@ const DraftOrders: React.FC = () => {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Items ({cartItems.length})</span>
-                    <span className="font-medium">₹{totals.subtotal.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrency(totals.subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Shipping</span>
-                    <span className="font-medium">{totals.shipping === 0 ? 'Free' : `₹${totals.shipping}`}</span>
+                    <span className="font-medium">{totals.shipping === 0 ? 'Free' : formatCurrency(totals.shipping)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                     <span className="text-gray-600">Manual Discount (₹)</span>
@@ -453,7 +454,7 @@ const DraftOrders: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-bold text-lg text-dark-red">
                     <span>Total</span>
-                    <span>₹{totals.total.toLocaleString()}</span>
+                    <span>{formatCurrency(totals.total)}</span>
                   </div>
                 </div>
 

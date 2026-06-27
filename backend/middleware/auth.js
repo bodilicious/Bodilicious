@@ -5,9 +5,6 @@ import { logAction } from "../admin/controller.js";
 export const protect = async (req, res, next) => {
   try {
     let header = req.headers.authorization;
-    if (!header && req.query.token) {
-      header = `Bearer ${req.query.token}`;
-    }
 
     if (!header || !header.startsWith("Bearer ")) {
       return res.status(401).json({
@@ -106,9 +103,6 @@ export const protect = async (req, res, next) => {
 export const tryProtect = async (req, res, next) => {
   try {
     let header = req.headers.authorization;
-    if (!header && req.query.token) {
-      header = `Bearer ${req.query.token}`;
-    }
 
     if (!header || !header.startsWith("Bearer ")) {
       return next();

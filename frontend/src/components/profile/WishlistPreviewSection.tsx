@@ -4,6 +4,7 @@ import { Heart, ShoppingBag, ChevronRight, X, AlertCircle } from 'lucide-react';
 import { Product } from '../../types';
 import { useApp } from '../../context/AppContext';
 import toast from 'react-hot-toast';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface Props {
     wishlist: Product[];
@@ -12,6 +13,7 @@ interface Props {
 
 export default function WishlistPreviewSection({ wishlist, navigateTo }: Props) {
     const { addToCart, toggleWishlist } = useApp();
+    const { formatPrice } = useCurrency();
 
     const previewItems = wishlist.slice(0, 4);
 
@@ -101,7 +103,7 @@ export default function WishlistPreviewSection({ wishlist, navigateTo }: Props) 
                                 <div className="p-3">
                                     <h4 className="font-sans text-[11px] text-dark font-medium truncate mb-0.5">{product.name}</h4>
                                     <div className="flex items-center justify-between">
-                                        <p className="font-sans text-xs text-ruby-red font-semibold">₹{product.price.toLocaleString('en-IN')}</p>
+                                        <p className="font-sans text-xs text-ruby-red font-semibold">{formatPrice(product.price)}</p>
                                         {product.stock > 0 && product.stock < 5 && (
                                             <span className="text-[9px] text-amber-600 font-bold uppercase tracking-tighter flex items-center gap-0.5">
                                                 <AlertCircle size={8} /> Low Stock

@@ -246,6 +246,12 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
+    shippedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
     /* =========================================
        Shipping Snapshot
     ========================================= */
@@ -274,6 +280,11 @@ const orderSchema = new mongoose.Schema(
     /* =========================================
        Return / Refund Fields
     ========================================= */
+
+    rtoReason: {
+      type: String,
+      default: null,
+    },
 
     returnStatus: {
       type: String,

@@ -170,7 +170,7 @@ const FilterAccordion = ({
 };
 
 export default function ShopPage() {
-  const { products, isLoading, filters } = useApp();
+  const { products, isLoading, filters, totalProducts } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
@@ -305,9 +305,11 @@ export default function ShopPage() {
   };
 
   // Products are already filtered by the API via AppContext listening to location.search
-  const filteredProducts = products;
+  // Cap the array to 50 items to prevent framer-motion layout lag,
+  // in case the global context holds more products from another route.
+  const filteredProducts = products.slice(0, 50);
 
-  const totalProducts = filteredProducts.length;
+  // totalProducts is provided by useApp()
 
   const totalActiveFilters =
     selectedCategories.length + selectedSubCategories.length + selectedTypes.length +

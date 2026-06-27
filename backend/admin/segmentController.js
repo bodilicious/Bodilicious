@@ -730,8 +730,17 @@ export const getCustomerActivity = async (req, res) => {
     const objectId = mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id) : null;
     if (!objectId) return res.status(400).json({ success: false, message: "Invalid user ID" });
 
-    const total = await UserSession.countDocuments({ user_id: objectId });
-    const rawSessions = await UserSession.find({ user_id: objectId })
+    const { startDate, endDate } = req.query;
+    const query = { user_id: objectId };
+    if (startDate && endDate) {
+      query.start_time = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const total = await UserSession.countDocuments(query);
+    const rawSessions = await UserSession.find(query)
       .sort({ start_time: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

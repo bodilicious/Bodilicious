@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import Select from '../components/Select';
+import DateRangePicker from './analytics/DateRangePicker';
 import { useLocation } from 'react-router-dom';
 
 const AuditLogs: React.FC = () => {
@@ -26,6 +27,11 @@ const AuditLogs: React.FC = () => {
   const [eventTypeFilter, setEventTypeFilter] = useState(queryParams.get('event_type') || '');
   const [severityFilter, setSeverityFilter] = useState('');
   const [isAnomalyFilter, setIsAnomalyFilter] = useState('');
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    label: 'Last 30 Days'
+  });
 
   const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -38,6 +44,8 @@ const AuditLogs: React.FC = () => {
       if (eventTypeFilter) params.append('event_type', eventTypeFilter);
       if (severityFilter) params.append('severity', severityFilter);
       if (isAnomalyFilter) params.append('is_anomaly', isAnomalyFilter);
+      if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+      if (dateRange.endDate) params.append('endDate', dateRange.endDate);
 
       const res = await fetch(`${API_URL}/api/v1/admin/logs?${params.toString()}`, { headers });
       const data = await res.json();
@@ -52,7 +60,7 @@ const AuditLogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [getAuthHeaders, API_URL, page, searchTerm, eventTypeFilter, severityFilter, isAnomalyFilter]);
+  }, [getAuthHeaders, API_URL, page, searchTerm, eventTypeFilter, severityFilter, isAnomalyFilter, dateRange]);
 
   // Use a debounced effect to fetch logs whenever dependencies change
   useEffect(() => {
@@ -138,8 +146,9 @@ const AuditLogs: React.FC = () => {
       </div>
 
       {/* Filters & Actions */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+      <div className="flex flex-col xl:flex-row justify-between items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          <DateRangePicker onRangeChange={(range: any) => { setDateRange(range); setPage(1); }} currentRange={dateRange} />
           <Select
             className="w-48"
             value={eventTypeFilter}
@@ -183,7 +192,7 @@ const AuditLogs: React.FC = () => {
           onClick={async () => {
             try {
               const headers = await getAuthHeaders();
-              const res = await fetch(`${API_URL}/api/v1/admin/logs/export?range=30d`, { headers });
+              const res = await fetch(`${API_URL}/api/v1/admin/logs/export?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`, { headers });
               if (!res.ok) throw new Error();
               const blob = await res.blob();
               const url = window.URL.createObjectURL(blob);
@@ -197,7 +206,7 @@ const AuditLogs: React.FC = () => {
           }}
           className="flex items-center gap-2 px-4 py-2 bg-dark-red text-white rounded-xl text-sm font-medium hover:bg-ruby-red transition-all shadow-sm whitespace-nowrap w-full md:w-auto justify-center"
         >
-          <Search size={16} /> Export CSV (30 Days)
+          <Search size={16} /> Export CSV
         </button>
       </div>
 

@@ -88,14 +88,14 @@ const AnalyticsDashboard: React.FC = () => {
 
   const kpis = [
     {
-      label: 'Net Revenue', value: fmt(summary?.netRevenue || 0),
+      label: 'Net Revenue (INR orders)', value: fmt(summary?.netRevenue || 0),
       icon: <IndianRupee size={20} />, color: '#065F46', bg: '#F0FDF4',
       sub: `Gross: ${fmt(summary?.totalRevenue || 0)}`
     },
     {
       label: 'Total Orders', value: (summary?.totalOrders || 0).toLocaleString(),
       icon: <ShoppingCart size={20} />, color: '#1D4ED8', bg: '#EFF6FF',
-      sub: `AOV: ${fmt(summary?.aov || 0)}`
+      sub: `AOV (INR): ${fmt(summary?.aov || 0)} | Int'l Orders: ${summary?.foreignOrdersCount || 0}`
     },
     {
       label: 'Total Customers', value: totalCustomers.toLocaleString(),

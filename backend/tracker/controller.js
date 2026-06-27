@@ -640,6 +640,12 @@ export const shiprocketWebhook = async (req, res) => {
               isUpdated = true;
           }
 
+          // Stamp shippedAt exactly once
+          if (internalStatus === "shipped" && !order.shippedAt) {
+              order.shippedAt = new Date();
+              isUpdated = true;
+          }
+
           console.log(`[Shiprocket Webhook] Order ${order._id} updated to ${internalStatus}`);
           
           // Trigger WhatsApp alert for Out for Delivery
@@ -665,6 +671,11 @@ export const shiprocketWebhook = async (req, res) => {
           } else if (internalStatus === "returned" || shiprocketStatus.includes("rto") || shiprocketStatus.includes("failed")) {
              await logAction(req, "delivery_failed", "order", order._id.toString(), { awb, reason: shiprocketStatus }, { source: "shiprocket-webhook", severity: "WARNING" }).catch(err => console.error("Fulfillment Audit Failed:", err));
              
+             if (shiprocketStatus.includes("rto")) {
+                 order.rtoReason = req.body.scrapping_reason || req.body.remark || req.body.reason || req.body.cancellation_reason || "Courier RTO";
+                 isUpdated = true;
+             }
+
              // Release welcome offer for returned/failed deliveries
              if (order.isWelcomeOfferApplied && (internalStatus === "returned" || shiprocketStatus.includes("rto"))) {
                  const userHasPaidOrder = await Order.exists({

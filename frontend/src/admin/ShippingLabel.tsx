@@ -28,38 +28,7 @@ export default function ShippingLabel({ order, onClose }: LabelProps) {
   if (!order) return null;
 
   const handlePrint = () => {
-    const content = labelRef.current?.innerHTML;
-    if (!content) return;
-
-    const printWin = window.open('', '_blank', 'width=600,height=400');
-    if (!printWin) return;
-
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Shipping Label - #${order._id.slice(-8).toUpperCase()}</title>
-        <style>
-          body { margin: 0; font-family: Arial, sans-serif; }
-          @page { size: 100mm 150mm; margin: 0; }
-          .label { width: 100mm; min-height: 150mm; padding: 8mm; box-sizing: border-box; border: 1px solid #000; }
-          .header { border-bottom: 2px solid #000; padding-bottom: 4mm; margin-bottom: 4mm; display: flex; align-items: center; justify-content: space-between; }
-          .brand { font-size: 18px; font-weight: bold; letter-spacing: 2px; }
-          .order-id { font-size: 11px; color: #555; }
-          .section-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 1mm; }
-          .recipient { margin: 4mm 0; }
-          .recipient-name { font-size: 16px; font-weight: bold; }
-          .address { font-size: 12px; line-height: 1.6; }
-          .footer { border-top: 1px dashed #ccc; padding-top: 3mm; margin-top: 4mm; font-size: 10px; color: #555; display: flex; justify-content: space-between; }
-          .barcode-placeholder { text-align: center; margin: 4mm 0; font-size: 9px; border: 1px solid #eee; padding: 2mm; color: #aaa; letter-spacing: 3px; }
-        </style>
-      </head>
-      <body>${content}</body>
-      </html>
-    `);
-    printWin.document.close();
-    printWin.focus();
-    setTimeout(() => { printWin.print(); printWin.close(); }, 500);
+    window.print();
   };
 
   const { shippingDetails: sd } = order;
@@ -85,8 +54,16 @@ export default function ShippingLabel({ order, onClose }: LabelProps) {
         </div>
 
         {/* Label Preview */}
-        <div className="p-5">
-          <div ref={labelRef} className="label border-2 border-gray-800 rounded-lg p-5 font-mono" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="p-5 print-section">
+          <style>{`
+            @media print {
+              body * { visibility: hidden !important; }
+              .print-section, .print-section * { visibility: visible !important; }
+              .print-section { position: absolute; left: 0; top: 0; padding: 0; margin: 0; width: 100%; border: none !important; box-shadow: none !important; }
+              @page { size: 100mm 150mm; margin: 0; }
+            }
+          `}</style>
+          <div ref={labelRef} className="label border-2 border-gray-800 rounded-lg p-5 font-mono" style={{ fontFamily: 'Arial, sans-serif', width: '100mm', minHeight: '150mm', boxSizing: 'border-box' }}>
             {/* Header */}
             <div className="header flex items-center justify-between border-b-2 border-gray-800 pb-3 mb-3">
               <div>

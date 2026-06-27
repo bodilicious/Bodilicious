@@ -28,6 +28,7 @@ export default function VisualHomepageEditor() {
 
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
       if (e.data?.type === 'preview-ready') setPreviewReady(true);
       else if (e.data?.type === 'content-change') handleContentChange(e.data.payload);
     };
@@ -37,7 +38,7 @@ export default function VisualHomepageEditor() {
 
   useEffect(() => {
     if (previewReady && draftContent && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({ type: 'content-update', payload: draftContent }, '*');
+      iframeRef.current.contentWindow.postMessage({ type: 'content-update', payload: draftContent }, window.location.origin);
     }
   }, [previewReady, draftContent]);
 

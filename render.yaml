@@ -122,6 +122,21 @@ services:
         source: /*
         destination: /index.html
     headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: "max-age=31536000; includeSubDomains; preload"
+      - path: /*
+        name: X-Frame-Options
+        value: "SAMEORIGIN"
+      - path: /*
+        name: X-Content-Type-Options
+        value: "nosniff"
+      - path: /*
+        name: Referrer-Policy
+        value: "strict-origin-when-cross-origin"
+      - path: /*
+        name: Content-Security-Policy
+        value: "frame-ancestors 'self';"
       - path: /products/*
         name: Cache-Control
         value: "public, max-age=3600, must-revalidate"

@@ -37,7 +37,6 @@ export const getProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: err.message,
-      ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
     });
   }
 };
@@ -459,13 +458,13 @@ export const setDefaultAddress = async (req, res) => {
 */
 export const triggerEmailVerification = async (req, res) => {
   try {
-    const userEmail = req.user?.email || req.body?.email;
+    const userEmail = req.user?.email;
     console.log("Triggering verification for:", userEmail);
 
     if (!userEmail) {
       return res.status(400).json({
         success: false,
-        message: "User email not found in profile or request",
+        message: "User email not found in profile",
       });
     }
 
@@ -483,8 +482,6 @@ export const triggerEmailVerification = async (req, res) => {
       return res.status(500).json({
         success: false,
         message: "Failed to generate verification link from Firebase",
-        error: firebaseErr.message,
-        hint: "Check if Firebase Admin SDK is correctly initialized and has project permissions."
       });
     }
 
@@ -503,8 +500,6 @@ export const triggerEmailVerification = async (req, res) => {
       return res.status(500).json({
         success: false,
         message: "Link generated but failed to send email",
-        error: emailErr.message,
-        hint: "Check RESEND_API_KEY environment variable and verified domains."
       });
     }
 
@@ -518,8 +513,6 @@ export const triggerEmailVerification = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Verification failed",
-      error: error.message,
-      stack: error.stack
     });
   }
 };
@@ -575,8 +568,6 @@ export const triggerPasswordReset = async (req, res) => {
       return res.status(500).json({
         success: false,
         message: "Failed to send reset email.",
-        error: emailErr.message,
-        code: emailErr.code
       });
     }
 

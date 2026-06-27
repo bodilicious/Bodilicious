@@ -1,4 +1,5 @@
 import { X, Package, Truck, CheckCircle, XCircle, RotateCcw, Clock, AlertCircle, ExternalLink } from 'lucide-react';
+import { formatCurrency } from '../utils/currencies';
 
 const STATUS_STEPS = [
   { key: 'pending',          label: 'Order Placed',       icon: Clock },
@@ -29,6 +30,7 @@ interface TimelineEntry {
 interface Order {
   _id: string;
   orderStatus: string;
+  currency?: string;
   shippingDetails: { name: string; address: string; city: string; state: string; pincode: string; phone: string; email?: string };
   billingDetails?: { name: string; address: string; city: string; state: string; pincode: string; country?: string } | null;
   items?: any[];
@@ -97,7 +99,7 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
           </div>
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Total</p>
-            <p className="font-medium text-gray-800">₹{order.totalAmount.toFixed(0)}</p>
+            <p className="font-medium text-gray-800">{formatCurrency(order.totalAmount, order.currency)}</p>
             <p className="text-gray-500 text-xs capitalize">{order.paymentMethod} · {order.paymentStatus}</p>
           </div>
           <div>
@@ -134,7 +136,7 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
               </div>
               <div>
                 <p className="text-xs text-purple-400 uppercase tracking-wider mb-0.5">Refund Amount</p>
-                <span className="font-medium text-purple-700 text-xs">₹{order.refundAmount?.toLocaleString('en-IN') || '—'}</span>
+                <span className="font-medium text-purple-700 text-xs">{order.refundAmount ? formatCurrency(order.refundAmount, order.currency) : '—'}</span>
               </div>
               <div>
                 <p className="text-xs text-purple-400 uppercase tracking-wider mb-0.5">Refund ID</p>

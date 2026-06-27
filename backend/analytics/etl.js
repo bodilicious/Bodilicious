@@ -47,22 +47,50 @@ async function aggregateDailySales() {
         _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
         gross_revenue: {
           $sum: {
-            $cond: [{ $in: ["$paymentStatus", ["paid", "refunded"]] }, "$totalAmount", 0]
+            $cond: [
+              { $and: [
+                { $in: ["$paymentStatus", ["paid", "refunded"]] },
+                { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+              ]}, 
+              "$totalAmount", 
+              0
+            ]
           }
         },
         refunded_amount: {
           $sum: {
-            $cond: [{ $eq: ["$paymentStatus", "refunded"] }, "$refundAmount", 0]
+            $cond: [
+              { $and: [
+                { $eq: ["$paymentStatus", "refunded"] },
+                { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+              ]}, 
+              "$refundAmount", 
+              0
+            ]
           }
         },
         order_count: {
           $sum: {
-            $cond: [{ $in: ["$paymentStatus", ["paid", "refunded"]] }, 1, 0]
+            $cond: [
+              { $and: [
+                { $in: ["$paymentStatus", ["paid", "refunded"]] },
+                { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+              ]}, 
+              1, 
+              0
+            ]
           }
         },
         refund_count: {
           $sum: {
-            $cond: [{ $eq: ["$paymentStatus", "refunded"] }, 1, 0]
+            $cond: [
+              { $and: [
+                { $eq: ["$paymentStatus", "refunded"] },
+                { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+              ]}, 
+              1, 
+              0
+            ]
           }
         }
       }
@@ -300,7 +328,9 @@ async function aggregateCustomerCohorts() {
   const bulkOps = [];
   
   for (const [key, data] of cohortActivity.entries()) {
-    const [cohort_month, monthIndexStr] = key.split("_");
+    const lastUnderscore = key.lastIndexOf("_");
+    const cohort_month = key.substring(0, lastUnderscore);
+    const monthIndexStr = key.substring(lastUnderscore + 1);
     const month_index = parseInt(monthIndexStr, 10);
     const total_users = cohortSizes.get(cohort_month) || 0;
 
