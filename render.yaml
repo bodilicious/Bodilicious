@@ -137,15 +137,63 @@ services:
       - path: /*
         name: Content-Security-Policy
         value: "frame-ancestors 'self';"
+
+      # ── HTML shell — must revalidate so SPA routing always works ─────────────
+      - path: /index.html
+        name: Cache-Control
+        value: "no-cache, no-store, must-revalidate"
+
+      # ── Hashed JS/CSS bundles — content-addressed, safe to cache forever ─────
+      - path: /assets/*.js
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+      - path: /assets/*.css
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+
+      # ── Images — long cache, serve stale while revalidating ──────────────────
+      - path: /assets/*.webp
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /assets/*.png
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /assets/*.jpg
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /assets/*.svg
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /assets/*.gif
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+
+      # ── Fonts — very stable, cache for 1 year ────────────────────────────────
+      - path: /assets/*.woff2
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+      - path: /assets/*.woff
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+      - path: /assets/*.ttf
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+
+      # ── Video snipets — 7 days cache (bandwidth-heavy, keep cached) ──────────
+      - path: /snipets/*.webm
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /snipets/*.mp4
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+
+      # ── Product/ingredient pages — short cache (dynamic content) ─────────────
       - path: /products/*
         name: Cache-Control
         value: "public, max-age=3600, must-revalidate"
       - path: /ingredients/*
         name: Cache-Control
         value: "public, max-age=3600, must-revalidate"
-      - path: /snipets/*.webm
-        name: Cache-Control
-        value: "public, max-age=604800, stale-while-revalidate=86400"
 
   # ─── Backend (Node Web Service) ─────────────────────────────────────────────
   - type: web

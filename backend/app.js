@@ -17,7 +17,9 @@ if (!rateLimitRedisClient) {
 }
 
 const app = express();
-app.use(compression());
+// Level 9 = maximum compression. Threshold 512 B catches more small API responses.
+// This directly reduces Render outbound bandwidth on every API reply.
+app.use(compression({ level: 9, threshold: 512 }));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -127,9 +129,10 @@ app.use("/api/v1/payment/verify", sensitiveLimiter);
 // Everything else under /api/v1 (includes remaining /payment/* like /webhook)
 app.use("/api/v1", globalLimiter, routes);
 
-// Health check endpoint for UptimeRobot
+// Health check endpoint for UptimeRobot — keep body minimal to save bandwidth.
+// UptimeRobot only checks the HTTP 200 status, not the body content.
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", timestamp: new Date() });
+  res.status(200).send("ok");
 });
 
 export default app;
