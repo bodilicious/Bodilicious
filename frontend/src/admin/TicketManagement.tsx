@@ -139,7 +139,7 @@ const TicketManagement: React.FC = () => {
   // Poll every 6 s when drawer is open so customer replies appear automatically
   useEffect(() => {
     if (!selectedTicket) return;
-    const interval = setInterval(silentRefetch, 6000);
+    const interval = setInterval(silentRefetch, 30000);
     return () => clearInterval(interval);
   }, [selectedTicket, silentRefetch]);
 

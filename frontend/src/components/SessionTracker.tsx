@@ -41,14 +41,17 @@ export default function SessionTracker() {
 
     startSession();
 
-    // 60-second heartbeat ping to keep session alive in case of crash
+    // 3-minute heartbeat ping to keep session alive in case of crash
+    // Check visibility state to avoid pinging if the user left the tab in the background
     const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      
       fetch(`${import.meta.env.VITE_API_URL}/api/v1/user/session/ping`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId })
       }).catch(() => {});
-    }, 60000);
+    }, 180000);
 
     // End session using sendBeacon for reliability on tab close/hidden
     const endSession = () => {

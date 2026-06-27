@@ -46,8 +46,8 @@ export default function FloatingSupportBubble() {
     };
 
     fetchNotificationCount();
-    // Check for new notifications every 25 seconds
-    const interval = setInterval(fetchNotificationCount, 25000);
+    // Check for new notifications every 2 minutes
+    const interval = setInterval(fetchNotificationCount, 120000);
     return () => clearInterval(interval);
   }, [user, authStatus, getAuthHeaders]);
 
