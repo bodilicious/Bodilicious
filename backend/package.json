@@ -20,6 +20,7 @@
         "@sentry/profiling-node": "^10.56.0",
         "bullmq": "^5.77.3",
         "cloudinary": "^2.9.0",
+        "compression": "^1.8.1",
         "cors": "^2.8.6",
         "dotenv": "^17.3.1",
         "escape-string-regexp": "^5.0.0",

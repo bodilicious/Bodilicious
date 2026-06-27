@@ -136,10 +136,10 @@ const TicketManagement: React.FC = () => {
     }
   }, [tickets]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll every 6 s when drawer is open so customer replies appear automatically
+  // Poll every 5 m when drawer is open so customer replies appear automatically
   useEffect(() => {
     if (!selectedTicket) return;
-    const interval = setInterval(silentRefetch, 30000);
+    const interval = setInterval(silentRefetch, 300000);
     return () => clearInterval(interval);
   }, [selectedTicket, silentRefetch]);
 

@@ -53,7 +53,7 @@ const AnalyticsDashboard: React.FC = () => {
     fetchData();
     const i = setInterval(() => {
         if (document.visibilityState === 'visible') fetchData(true);
-    }, 300000);
+    }, 900000);
     return () => clearInterval(i);
   }, [fetchData]);
 

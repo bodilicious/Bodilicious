@@ -64,12 +64,12 @@ const NotificationsDrawer: React.FC = () => {
     finally { setLoading(false); }
   }, [getAuthHeaders, API]);
 
-  // Poll unread count every 3m
+  // Poll unread count every 1h to conserve bandwidth
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(() => {
         if (document.visibilityState === 'visible') fetchUnreadCount();
-    }, 180000);
+    }, 3600000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 

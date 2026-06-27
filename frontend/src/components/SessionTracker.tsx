@@ -41,7 +41,7 @@ export default function SessionTracker() {
 
     startSession();
 
-    // 3-minute heartbeat ping to keep session alive in case of crash
+    // 1-hour heartbeat ping to conserve extreme bandwidth
     // Check visibility state to avoid pinging if the user left the tab in the background
     const interval = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
@@ -51,7 +51,7 @@ export default function SessionTracker() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId })
       }).catch(() => {});
-    }, 180000);
+    }, 3600000);
 
     // End session using sendBeacon for reliability on tab close/hidden
     const endSession = () => {

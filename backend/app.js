@@ -5,6 +5,7 @@ import RedisStore from "rate-limit-redis";
 import Redis from "ioredis";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
+import compression from "compression";
 import { razorpayWebhook } from "./payment/controller.js";
 import { trackActiveSession } from "./analytics/live.js";
 import routes from "./index.js";
@@ -16,6 +17,7 @@ if (!rateLimitRedisClient) {
 }
 
 const app = express();
+app.use(compression());
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
