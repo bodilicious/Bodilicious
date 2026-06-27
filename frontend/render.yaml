@@ -128,7 +128,7 @@ services:
       - path: /ingredients/*
         name: Cache-Control
         value: "public, max-age=3600, must-revalidate"
-      - path: /snipets/*.mp4
+      - path: /snipets/*.webm
         name: Cache-Control
         value: "public, max-age=604800, stale-while-revalidate=86400"
 

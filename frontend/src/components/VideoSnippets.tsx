@@ -6,10 +6,10 @@ import EditableList from './EditableList';
 import EditableBlock from './EditableBlock';
 
 const PLACEHOLDER_VIDEOS = [
-    { url: '/snipets/morning.mp4', caption: 'Morning Routine', order: 1 },
-    { url: '/snipets/night.mp4', caption: 'Night Routine', order: 2 },
-    { url: '/snipets/nourishment.mp4', caption: 'Nourishment and Hydration', order: 3 },
-    { url: '/snipets/instant-glow.mp4', caption: 'Instant Glow', order: 4 },
+    { url: '/snipets/morning.webm', caption: 'Morning Routine', order: 1 },
+    { url: '/snipets/night.webm', caption: 'Night Routine', order: 2 },
+    { url: '/snipets/nourishment.webm', caption: 'Nourishment and Hydration', order: 3 },
+    { url: '/snipets/instant-glow.webm', caption: 'Instant Glow', order: 4 },
 ];
 
 /**
