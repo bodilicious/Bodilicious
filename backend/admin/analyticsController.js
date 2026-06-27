@@ -141,6 +141,7 @@ export const getProductAnalytics = async (req, res) => {
           }
         },
         { $sort: { totalSold: -1 } },
+        { $limit: 10 },
         {
           $lookup: {
             from: "products",
