@@ -4,8 +4,8 @@ import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
 
 export const initDraftOrderCleanupCron = () => {
-    // Run every 10 minutes (synced with quote lock)
-    cron.schedule("*/10 * * * *", async () => {
+    // Run every 30 minutes — synced with 30-min quote lock expiry. No point running faster.
+    cron.schedule("*/30 * * * *", async () => {
         try {
             // Quote expiry is 30 minutes, so lock should be 30 minutes.
             const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);

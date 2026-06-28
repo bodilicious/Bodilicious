@@ -191,8 +191,9 @@ export async function runPaymentReconciliation() {
 export function initPaymentReconciliationCron() {
     if (process.env.NODE_ENV === "test") return;
 
-    // Run every 5 minutes
-    cron.schedule("*/5 * * * *", () => {
+    // Run every 30 minutes — webhook handles instant recovery, this is only the fallback.
+    // Was every 5 min (288 Razorpay API calls/day) → now 48 calls/day.
+    cron.schedule("*/30 * * * *", () => {
         runPaymentReconciliation().catch((err) =>
             console.error("[Reconcile] Unhandled error:", err.message)
         );
