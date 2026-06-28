@@ -58,7 +58,7 @@ router.delete("/", protect, async (req, res) => {
 
 // WISHLIST
 router.get("/wishlist", protect, async (req, res) => {
-  const user = await UserProfile.findById(req.user._id).populate("wishlist");
+  const user = await UserProfile.findById(req.user._id).populate("wishlist", "pid name price images rating ratingCount stock category brand isActive");
   if (!user) {
     return res.status(404).json({ success: false, message: "User not found" });
   }
