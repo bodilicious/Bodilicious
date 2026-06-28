@@ -101,8 +101,6 @@ const textContainer = {
   exit: { transition: { staggerChildren: 0.05, staggerDirection: -1 } },
 };
 
-
-
 interface HeroCarouselProps {
   slides?: any[];
   isEditing?: boolean;
@@ -110,10 +108,6 @@ interface HeroCarouselProps {
 }
 
 export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesChange }: HeroCarouselProps) {
-  // Use DB slides only if they've been properly customised.
-  // The seed script stores a single Pexels placeholder slide — we detect it by
-  // checking for a pexels.com URL in the first slide. If the admin has added
-  // a second slide or replaced the image, we trust the DB data.
   const isPlaceholderSlides =
     !propSlides ||
     propSlides.length === 0 ||
@@ -123,6 +117,7 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
   const TOTAL = activeSlides?.length || 0;
 
   const [current, setCurrent] = useState(0);
+  const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [isAnimating, setIsAnimating] = useState(false);
   const pausedRef = useRef(false);
   const currentRef = useRef(0);
@@ -136,6 +131,7 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
     setIsAnimating(true);
     currentRef.current = idx;
     setCurrent(idx);
+    setVisited(prev => new Set(prev).add(idx));
     setTimeout(() => setIsAnimating(false), FADE_MS + 100);
   }, [isAnimating, isEditing]);
 
@@ -148,22 +144,23 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
   }, [goTo, TOTAL]);
 
   useEffect(() => {
-    if (isEditing) return; // Don't autoplay while editing
+    if (isEditing) return;
     const id = setInterval(() => {
       if (!pausedRef.current) {
         const nextIdx = (currentRef.current + 1) % TOTAL;
         currentRef.current = nextIdx;
         setCurrent(nextIdx);
+        setVisited(prev => new Set(prev).add(nextIdx));
       }
     }, AUTOPLAY_MS);
     return () => clearInterval(id);
   }, [isEditing, TOTAL]);
 
-  // When active slides change, clamp current index
   useEffect(() => {
     if (current >= TOTAL) {
       setCurrent(Math.max(0, TOTAL - 1));
       currentRef.current = Math.max(0, TOTAL - 1);
+      setVisited(prev => new Set(prev).add(Math.max(0, TOTAL - 1)));
     }
   }, [TOTAL, current]);
 
@@ -263,7 +260,8 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
                   overlayDesktop: 'from-dark-red/90 via-dark-red/60'
                 }];
                 onSlidesChange(newSlides);
-                setCurrent(newSlides.length - 1); // Move to the newly added slide
+                setCurrent(newSlides.length - 1);
+                setVisited(prev => new Set(prev).add(newSlides.length - 1));
               }
             }}
             className="flex items-center gap-1 text-xs font-sans text-green-600 hover:text-green-700 whitespace-nowrap font-bold uppercase tracking-widest"
@@ -277,7 +275,6 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
               if (onSlidesChange) {
                 const newSlides = activeSlides.filter((_, i) => i !== current);
                 onSlidesChange(newSlides);
-                // Clamp current to stay in bounds after deletion
                 setCurrent(Math.min(current, newSlides.length - 1));
               }
             }}
@@ -311,7 +308,9 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
             />
           ) : (
             <picture className="absolute inset-0 w-full h-full">
-              <img src={s.imageUrl} alt={s.imageAlt} className="w-full h-full object-cover object-center" />
+              {visited.has(idx) && (
+                <img src={s.imageUrl} alt={s.imageAlt} className="w-full h-full object-cover object-center" loading={idx === 0 ? "eager" : "lazy"} />
+              )}
             </picture>
           )}
 
@@ -413,3 +412,4 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
     </section>
   );
 }
+

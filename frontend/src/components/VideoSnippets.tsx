@@ -13,53 +13,10 @@ const PLACEHOLDER_VIDEOS = [
 ];
 
 /**
- * LazyVideo: Only loads and plays video when it enters the viewport.
- * This prevents the browser from fetching 40-62MB video files on page load.
+ * LazyVideo: Removed lazy loading as requested. Renders a native video element that auto-plays.
  */
 function LazyVideo({ src, className }: { src: string; className: string }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const [hasLoaded, setHasLoaded] = useState(false);
-    const [isIntersecting, setIsIntersecting] = useState(false);
-
     const isInstagram = src.includes('instagram.com/reel/') || src.includes('instagram.com/p/');
-
-    useEffect(() => {
-        setHasLoaded(false);
-        setIsIntersecting(false);
-    }, [src]);
-
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setHasLoaded(true);
-                    setIsIntersecting(true);
-                } else {
-                    setIsIntersecting(false);
-                }
-            },
-            { threshold: 0.1 }
-        );
-
-        observer.observe(container);
-        return () => observer.disconnect();
-    }, []);
-
-    useEffect(() => {
-        if (!videoRef.current || isInstagram) return;
-
-        if (isIntersecting) {
-            videoRef.current.muted = true; // Ensure muted for browser autoplay policies
-            videoRef.current.play().catch(() => {});
-        } else {
-            videoRef.current.pause();
-        }
-    }, [isIntersecting, hasLoaded, isInstagram]);
 
     // Handle Instagram iframe URL formatting
     const getIgSrc = () => {
@@ -74,33 +31,31 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
         }
     };
 
-    return (
-        <div ref={containerRef} className={className}>
-            {isInstagram ? (
-                hasLoaded ? (
-                    <iframe
-                        ref={iframeRef}
-                        src={getIgSrc()}
-                        className="w-full h-full border-none pointer-events-auto"
-                        scrolling="no"
-                        allowTransparency={true}
-                        allow="encrypted-media"
-                    />
-                ) : null
-            ) : (
-                <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    preload="none"
-                    loop
-                    muted
-                    playsInline
-                    disablePictureInPicture
-                    controlsList="nodownload nofullscreen noremoteplayback"
-                    src={hasLoaded ? src : undefined}
+    if (isInstagram) {
+        return (
+            <div className={className}>
+                <iframe
+                    src={getIgSrc()}
+                    className="w-full h-full border-none pointer-events-auto"
+                    scrolling="no"
+                    allowTransparency={true}
+                    allow="encrypted-media"
                 />
-            )}
-        </div>
+            </div>
+        );
+    }
+
+    return (
+        <video
+            className={className}
+            autoPlay
+            loop
+            muted
+            playsInline
+            disablePictureInPicture
+            controlsList="nodownload nofullscreen noremoteplayback"
+            src={src}
+        />
     );
 }
 
@@ -115,7 +70,11 @@ export default function VideoSnippets({ isEditing = false, items, onItemsChange 
     const stagger = getAccessibleVariant(staggerContainerVariant, !!shouldReduceMotion);
     const fadeUp = getAccessibleVariant(fadeUpVariant, !!shouldReduceMotion);
 
-    const videos = items && items.length > 0 ? items : PLACEHOLDER_VIDEOS;
+    // Fix incorrect .mp4 extensions from the database
+    const videos = (items && items.length > 0 ? items : PLACEHOLDER_VIDEOS).map(v => ({
+        ...v,
+        url: v.url ? v.url.replace(/\.mp4$/, '.webm') : v.url
+    }));
 
     return (
         <section className="py-20 bg-white overflow-hidden">

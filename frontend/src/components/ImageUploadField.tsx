@@ -83,7 +83,7 @@ export default function ImageUploadField({
   if (!isEditing) {
     if (!imageUrl) return null;
     return (
-      <img src={displayUrl} alt={imageAlt} className={className} style={{ aspectRatio }} />
+      <img src={displayUrl} alt={imageAlt} className={className} style={{ aspectRatio }} loading="lazy" decoding="async" />
     );
   }
 
@@ -92,7 +92,7 @@ export default function ImageUploadField({
   return (
     <div className={`${positionClass} group border-2 border-dashed rounded-sm ${imageUrl ? 'border-transparent hover:border-slate-300' : 'border-slate-300 bg-slate-50'} ${containerClassName}`}>
       {imageUrl ? (
-        <img src={displayUrl} alt={imageAlt} className={className} style={{ aspectRatio }} />
+        <img src={displayUrl} alt={imageAlt} className={className} style={{ aspectRatio }} loading="lazy" decoding="async" />
       ) : (
         <div className="flex flex-col items-center justify-center p-6 text-slate-400" style={{ aspectRatio }}>
           <ImageIcon size={32} className="mb-2" />
