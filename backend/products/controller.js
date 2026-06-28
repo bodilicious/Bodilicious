@@ -46,10 +46,13 @@ export const getAllProducts = async (req, res) => {
       priceMax,
       inStock,
       excludePid,
+      slim,           // slim=true → strip heavy fields (reviews, description, ingredients)
       sort = "best_selling",
       page = 1,
       limit = 12,
     } = req.query;
+
+    const isSlim = slim === 'true';
 
     const query = { isActive: true };
     const andConditions = [];
@@ -138,46 +141,43 @@ export const getAllProducts = async (req, res) => {
     // Add Vercel-CDN-Cache-Control for edge caching
     res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 
+    // slim=true: only card-level fields (no reviews/description/ingredients)
+    // Full fields are only needed on the individual product page (/api/products/:pid)
+    const projection = isSlim
+      ? { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1 }
+      : { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1, description: 1, ingredients: 1, reviews: 1 };
+
+    let productQuery = Product.find(query, projection).sort(sortObj).skip(skip).limit(numLimit);
+
+    // Only populate reviews.user when we're actually returning reviews
+    if (!isSlim) {
+      productQuery = productQuery.populate("reviews.user", "name");
+    }
+
     const [products, total] = await Promise.all([
-      Product.find(query, {
-        pid: 1,
-        name: 1,
-        price: 1,
-        images: 1,
-        rating: 1,
-        ratingCount: 1,
-        stock: 1,
-        category: 1,
-        brand: 1,
-        isActive: 1,
-        description: 1,
-        ingredients: 1,
-        reviews: 1 // Needed for the transformation below
-      })
-        .sort(sortObj)
-        .skip(skip)
-        .limit(numLimit)
-        .populate("reviews.user", "name")
-        .lean(),
+      productQuery.lean(),
       Product.countDocuments(query),
     ]);
 
     // Map populated user object to just the name string for the frontend
-    const transformedProducts = products.map(product => {
-      if (product.reviews && product.reviews.length > 0) {
-        return {
-          ...product,
-      reviews: (product.reviews || []).map(r => ({
-        rating: r.rating,
-        comment: r.comment,
-        isVerified: !!r.isVerified,
-        createdAt: r.createdAt,
-        user: r.user?.name || "Customer"
-      }))
-        };
-      }
-      return product;
-    });
+    // (only needed when reviews are included, i.e. not slim mode)
+    const transformedProducts = isSlim
+      ? products
+      : products.map(product => {
+          if (product.reviews && product.reviews.length > 0) {
+            return {
+              ...product,
+              reviews: (product.reviews || []).map(r => ({
+                rating: r.rating,
+                comment: r.comment,
+                isVerified: !!r.isVerified,
+                createdAt: r.createdAt,
+                user: r.user?.name || "Customer"
+              }))
+            };
+          }
+          return product;
+        });
 
     if (search) {
       logAuditEvent({

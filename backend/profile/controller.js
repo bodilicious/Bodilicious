@@ -10,21 +10,30 @@ import { logAction } from "../admin/controller.js";
 */
 export const getProfile = async (req, res) => {
   try {
+    // Slim projections: only send what the frontend actually uses.
+    // cartHistory and productViewCounts are analytics-only and never read by the client.
+    const productCardFields = 'pid name price images rating ratingCount stock category brand';
 
-    const user = await UserProfile.findById(req.user._id)
-      .populate("wishlist")
-      .populate("cart.product")
+    const user = await UserProfile.findById(req.user._id, {
+      // Exclude heavy analytics arrays that the frontend never reads
+      cartHistory: 0,
+      productViewCounts: 0,
+    })
+      .populate('wishlist', productCardFields)
+      .populate('cart.product', productCardFields)
       .populate({
-        path: "orders",
+        path: 'orders',
+        options: { sort: { createdAt: -1 }, limit: 20 }, // cap at 20 most recent orders
         populate: {
-          path: "items.product",
+          path: 'items.product',
+          select: productCardFields,
         },
       });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: 'User not found',
       });
     }
 
@@ -33,7 +42,7 @@ export const getProfile = async (req, res) => {
       data: user,
     });
   } catch (err) {
-    console.error("GET PROFILE ERROR:", err);
+    console.error('GET PROFILE ERROR:', err);
     res.status(500).json({
       success: false,
       message: err.message,
@@ -305,9 +314,10 @@ export const syncCart = async (req, res) => {
       await UserProfile.bulkWrite(bulkOps).catch(err => console.error("Failed to bulk write cartHistory:", err));
     }
 
+    const productCardFields = 'pid name price images rating ratingCount stock category brand';
     const userWithPopulatedCart = await UserProfile.findById(user._id)
-      .populate("cart.product")
-      .populate("wishlist");
+      .populate('cart.product', productCardFields)
+      .populate('wishlist', productCardFields);
     res.json({ success: true, cart: userWithPopulatedCart.cart });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -321,7 +331,8 @@ export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id, orderStatus: { $ne: "abandoned" } })
       .sort({ createdAt: -1 })
-      .populate("items.product");
+      .select('items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb shippingCost discountAmount originalAmount currency')
+      .populate('items.product', 'name images price pid slug');
 
     res.json({ success: true, data: orders });
   } catch (err) {
@@ -334,11 +345,12 @@ export const getMyOrders = async (req, res) => {
 */
 export const getRecentlyBought = async (req, res) => {
   try {
+    const productCardFields = 'pid name price images rating ratingCount stock category brand';
     const user = await UserProfile.findById(req.user._id)
-      .populate("recentlyBought");
+      .populate('recentlyBought', productCardFields);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     res.json({ success: true, data: user.recentlyBought });

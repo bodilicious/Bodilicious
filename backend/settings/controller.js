@@ -32,6 +32,10 @@ export const getSettings = async (req, res) => {
         console.warn("[WARNING] Exchange Rates have never been updated.");
     }
 
+    // Allow browsers/CDN to cache public settings for 60 s.
+    // Every page load calls this; a short cache halves traffic from SPA navigation.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+
     res.json({
       success: true,
       data: {

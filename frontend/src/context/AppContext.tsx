@@ -662,11 +662,17 @@ const triggerPasswordReset = async (email: string) => {
         url += query.startsWith('?') ? query : `?${query}`;
       }
 
-      // Default limit to 500 for performance if not specified
-      // Reduce limit to 50 on the shop page to avoid massive framer-motion layout lag
+      // Default limit to 100 for homepage/ritual-finder (enough for best-seller matching);
+      // the shop page stays at 50 since it paginates.
       if (!url.includes('limit=')) {
-        const defaultLimit = window.location.pathname.startsWith('/shop') ? 50 : 500;
+        const defaultLimit = window.location.pathname.startsWith('/shop') ? 50 : 100;
         url += (url.includes('?') ? '&' : '?') + `limit=${defaultLimit}`;
+      }
+
+      // Always request slim mode for list endpoints — descriptions, ingredients and reviews
+      // are only needed on the individual product page which has its own /products/:pid route.
+      if (!url.includes('slim=')) {
+        url += '&slim=true';
       }
 
       const res = await fetch(url);
