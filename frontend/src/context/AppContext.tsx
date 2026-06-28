@@ -500,6 +500,7 @@ const syncUserState = useCallback(async (firebaseUser: any) => {
   }
 }, [fetchUserProfileAndSync]);
   useEffect(() => {
+    if (window.location.pathname === '/internal/homepage-preview') return;
     const unsub = onAuthStateChanged(auth, async firebaseUser => {
       await syncUserState(firebaseUser);
     });
@@ -729,13 +730,18 @@ const triggerPasswordReset = async (email: string) => {
   }, []);
 
   // Sync products with URL query and fetch filters once
+  // Skip entirely inside the preview iframe — it receives all data via postMessage.
   useEffect(() => {
+    if (window.location.pathname === '/internal/homepage-preview') return;
     fetchFilters();
     fetchSettings();
   }, [fetchFilters, fetchSettings]);
 
   // Route-aware product fetch: only runs on pages that actually render products.
   // Explicit equality checks prevent '/' matching every route via startsWith.
+  // NOTE: '/internal/homepage-preview' is intentionally excluded — the preview iframe
+  // receives content exclusively via postMessage from VisualHomepageEditor and must
+  // not fire its own API calls (doing so doubles every fetch and wastes bandwidth).
   useEffect(() => {
     const pathname = location.pathname;
 
@@ -744,7 +750,6 @@ const triggerPasswordReset = async (email: string) => {
       pathname === '/shop' ||
       pathname === '/ritual-finder' ||
       pathname === '/admin/homepage-editor' ||
-      pathname === '/internal/homepage-preview' ||
       pathname.startsWith('/product');
 
     if (!isProductRoute) return;
