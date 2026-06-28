@@ -53,7 +53,7 @@ const AnalyticsDashboard: React.FC = () => {
     fetchData();
     const i = setInterval(() => {
         if (document.visibilityState === 'visible') fetchData(true);
-    }, 900000);
+    }, 7200000); // 2 hours — ETL only runs every 2h so more frequent polling wastes bandwidth
     return () => clearInterval(i);
   }, [fetchData]);
 

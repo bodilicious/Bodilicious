@@ -486,11 +486,11 @@ export async function runETL() {
   }
 }
 
-// Start cron job (runs every 15 minutes)
+// Start cron job (runs every 2 hours — reduces service-initiated MongoDB bandwidth)
 export function initAnalyticsCron() {
   if (process.env.NODE_ENV !== 'test') {
-    cron.schedule('*/15 * * * *', runETL);
-    console.log("[Analytics ETL] Cron job scheduled (every 15 mins).");
+    cron.schedule('0 */2 * * *', runETL);
+    console.log("[Analytics ETL] Cron job scheduled (every 2 hours).");
     
     // Run an initial aggregation shortly after startup to ensure fresh data
     setTimeout(() => {

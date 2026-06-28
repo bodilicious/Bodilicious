@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   TrendingUp, Users, ShoppingCart, IndianRupee,
   Activity, Package, RefreshCw, TrendingDown,
@@ -85,84 +85,116 @@ const AnalyticsPage: React.FC = () => {
 
   const API_URL = import.meta.env.VITE_API_URL || '';
 
-  const fetchData = useCallback(async (isPoll = false) => {
+  // Track which sections have already been fetched to avoid redundant calls
+  const fetchedSections = useRef<Set<string>>(new Set());
+
+  const safeJson = async (p: Promise<Response>) => {
     try {
-      if (!isPoll) setLoading(true);
-      else setIsRefreshing(true);
+      const r = await p;
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  };
+
+  // Fetch only what the current section needs
+  const fetchSection = useCallback(async (section: Section, force = false) => {
+    const cacheKey = `${section}:${dateRange.startDate}:${dateRange.endDate}`;
+    if (!force && fetchedSections.current.has(cacheKey)) return;
+
+    try {
+      setLoading(true);
       const headers = await getAuthHeaders();
       const qp = `startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
       const diffTime = new Date(dateRange.endDate).getTime() - new Date(dateRange.startDate).getTime();
       const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-      const [
-        salesRes, prodRes, invRes, custRes, opsRes, behRes,
-        summaryRes, trendRes, cohortRes, funnelRes, stockRes,
-        intellRes, atRiskRes, mktRes, searchRes, forecastRes
-      ] = await Promise.allSettled([
-        // Admin (chart-heavy)
-        fetch(`${API_URL}/api/v1/admin/analytics/sales?${qp}`,         { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/products?${qp}`,      { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/inventory`,            { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/customers?${qp}`,     { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/operations?${qp}`,    { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/behavioral?${qp}`,    { headers }),
-        // Deep ETL analytics
-        fetch(`${API_URL}/api/v1/admin/analytics/executive-summary?days=${diffDays}`, { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/trending-products?days=${diffDays}`, { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/cohorts`,                             { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/product-funnel?days=${diffDays}`,    { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/low-stock`,                           { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/product-intelligence`,                { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/customers-at-risk`,                   { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/marketing`,                           { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/search-stats`,                        { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/inventory-forecast`,                  { headers }),
-      ]);
+      if (section === 'sales') {
+        const [sData, sumData, trendData] = await Promise.all([
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/sales?${qp}`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/executive-summary?days=${diffDays}`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/trending-products?days=${diffDays}`, { headers })),
+        ]);
+        if (sData?.success)   setSalesData(sData.data);
+        if (sumData?.success) setSummaryData(sumData.data);
+        if (trendData?.success) setTrendingData(trendData.data);
+      }
 
-      const safeJson = async (res: PromiseSettledResult<Response>) => {
-        if (res && res.status === 'fulfilled' && res.value.ok) {
-          try { return await res.value.json(); } catch { return null; }
-        }
-        return null;
-      };
+      if (section === 'products') {
+        const [pData, fuData, stData] = await Promise.all([
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/products?${qp}`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/product-funnel?days=${diffDays}`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/low-stock`, { headers })),
+        ]);
+        if (pData?.success) setProductData(pData.data);
+        if (fuData?.success) setFunnelData(fuData.data);
+        if (stData?.success) setLowStockData(stData.data);
+      }
 
-      const [
-        sData, pData, _invData, cData, oData, bData,
-        sumData, trData, coData, fuData, stData,
-        _intellData, arData, mkData, seData, foData
-      ] = await Promise.all([
-        safeJson(salesRes), safeJson(prodRes), safeJson(invRes), safeJson(custRes),
-        safeJson(opsRes), safeJson(behRes),
-        safeJson(summaryRes), safeJson(trendRes), safeJson(cohortRes), safeJson(funnelRes),
-        safeJson(stockRes), safeJson(intellRes), safeJson(atRiskRes),
-        safeJson(mktRes), safeJson(searchRes), safeJson(forecastRes),
-      ]);
+      if (section === 'customers') {
+        const [cData, arData] = await Promise.all([
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/customers?${qp}`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/customers-at-risk`, { headers })),
+        ]);
+        if (cData?.success) setCustomerData(cData.data);
+        if (arData?.success) setAtRiskData(arData.data);
+      }
 
-      if (sData?.success)   setSalesData(sData.data);
-      if (pData?.success)   setProductData(pData.data);
-      if (cData?.success)   setCustomerData(cData.data);
-      if (oData?.success)   setOperationData(oData.data);
-      if (bData?.success)   setBehavioralData(bData.data);
-      if (sumData?.success) setSummaryData(sumData.data);
-      if (trData?.success)  setTrendingData(trData.data);
-      if (coData?.success)  setCohortData(coData.data);
-      if (fuData?.success)  setFunnelData(fuData.data);
-      if (stData?.success)  setLowStockData(stData.data);
-      if (arData?.success)  setAtRiskData(arData.data);
-      if (mkData?.success)  setMarketingData(mkData.data);
-      if (seData?.success)  setSearchData(seData.data);
-      if (foData?.success)  setInventoryForecast(foData.data);
+      if (section === 'operations') {
+        const oData = await safeJson(fetch(`${API_URL}/api/v1/admin/analytics/operations?${qp}`, { headers }));
+        if (oData?.success) setOperationData(oData.data);
+      }
 
+      if (section === 'behavioral') {
+        const bData = await safeJson(fetch(`${API_URL}/api/v1/admin/analytics/behavioral?${qp}`, { headers }));
+        if (bData?.success) setBehavioralData(bData.data);
+      }
+
+      if (section === 'intelligence') {
+        const [coData, mkData, seData, foData] = await Promise.all([
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/cohorts`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/marketing`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/search-stats`, { headers })),
+          safeJson(fetch(`${API_URL}/api/v1/admin/analytics/inventory-forecast`, { headers })),
+        ]);
+        if (coData?.success) setCohortData(coData.data);
+        if (mkData?.success) setMarketingData(mkData.data);
+        if (seData?.success) setSearchData(seData.data);
+        if (foData?.success) setInventoryForecast(foData.data);
+      }
+
+      fetchedSections.current.add(cacheKey);
     } catch (err) {
       console.error(err);
-      toast.error('Failed to load some analytics data');
+      toast.error('Failed to load analytics data');
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
   }, [getAuthHeaders, API_URL, dateRange]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Refresh button forces a re-fetch of the current section
+  const fetchData = useCallback((isPoll = false) => {
+    if (isPoll) {
+      setIsRefreshing(true);
+      // Clear cache for current section so it re-fetches
+      const prefix = `${activeSection}:`;
+      for (const key of fetchedSections.current) {
+        if (key.startsWith(prefix)) fetchedSections.current.delete(key);
+      }
+    }
+    return fetchSection(activeSection, isPoll);
+  }, [fetchSection, activeSection]);
+
+  // Fetch on section change and date range change
+  useEffect(() => { fetchSection(activeSection); }, [activeSection, fetchSection]);
+
+  // When date changes, clear all cache and re-fetch current section
+  useEffect(() => {
+    fetchedSections.current.clear();
+    fetchSection(activeSection, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange]);
+
 
   // Sync URL param when section changes
   const handleSectionChange = (key: Section) => {
