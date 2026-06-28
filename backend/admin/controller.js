@@ -907,7 +907,10 @@ export const getLogsAdmin = async (req, res) => {
       }
       if (endDate) {
         const d = new Date(endDate);
-        if (!isNaN(d.valueOf())) query.timestamp_utc.$lte = d;
+        if (!isNaN(d.valueOf())) {
+          d.setUTCHours(23, 59, 59, 999); // include entire end day
+          query.timestamp_utc.$lte = d;
+        }
       }
       if (Object.keys(query.timestamp_utc).length === 0) delete query.timestamp_utc;
     }
@@ -946,7 +949,23 @@ export const getLogsAdmin = async (req, res) => {
  */
 export const exportLogsCSV = async (req, res) => {
   try {
-    const logs = await AuditLogV2.find().sort({ timestamp: -1 }).limit(1000).lean();
+    const { startDate, endDate } = req.query;
+    const exportQuery = {};
+    if (startDate || endDate) {
+      exportQuery.timestamp_utc = {};
+      if (startDate) exportQuery.timestamp_utc.$gte = new Date(startDate);
+      if (endDate) {
+        const d = new Date(endDate);
+        d.setUTCHours(23, 59, 59, 999);
+        exportQuery.timestamp_utc.$lte = d;
+      }
+    }
+
+    const logs = await AuditLogV2.find(exportQuery)
+      .populate("user_id", "name email")
+      .sort({ timestamp_utc: -1 })
+      .limit(5000)
+      .lean();
 
     const sanitizeCsv = (val) => {
       if (typeof val !== "string") val = String(val || "");
@@ -954,18 +973,19 @@ export const exportLogsCSV = async (req, res) => {
       return val;
     };
 
-    let csv = "Timestamp,Level,Type,User,Resource,Message,IP\n";
+    let csv = "Timestamp,Level,Type,User,CorrelationID,Message,IP\n";
     logs.forEach(l => {
-      const ts = new Date(l.timestamp).toISOString();
+      const ts = new Date(l.timestamp_utc).toISOString();
       const level = sanitizeCsv(l.severity);
       const type = sanitizeCsv(l.event_type);
-      const user = sanitizeCsv(l.user_id || "System");
-      const resource = sanitizeCsv(l.target_id || "None");
-      const rawMsg = l.details?.reason || l.details?.error || l.details?.action || "";
+      const userName = l.user_id?.name || l.user_id?.email || "System";
+      const user = sanitizeCsv(userName);
+      const corrId = sanitizeCsv(l.correlation_id || "None");
+      const rawMsg = l.metadata?.reason || l.metadata?.error || l.metadata?.action || "";
       const msg = `"${sanitizeCsv(rawMsg).replace(/"/g, '""')}"`;
       const ip = sanitizeCsv(l.network?.ip_address || "Unknown");
 
-      csv += `${ts},${level},${type},${user},${resource},${msg},${ip}\n`;
+      csv += `${ts},${level},${type},${user},${corrId},${msg},${ip}\n`;
     });
 
     res.header("Content-Type", "text/csv");
