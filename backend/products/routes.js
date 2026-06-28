@@ -14,6 +14,7 @@ import {
   deleteProductByPid,
   addReview,
   getProductFilters,
+  getTopReviews,
 } from "./controller.js";
 
 const router = express.Router();
@@ -23,6 +24,8 @@ router.post("/", protect, adminOnly, validate(createProductSchema), createProduc
 router.get("/", getAllProducts);
 
 router.get("/filters", getProductFilters);
+
+router.get("/reviews/top", getTopReviews);
 
 router.get("/:pid", getProductByPid);
 

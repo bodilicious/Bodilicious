@@ -210,13 +210,9 @@ export default function Navbar() {
             className="bg-gradient-to-r from-dark-red via-ruby-red to-dark-red text-white text-[10px] sm:text-xs tracking-widest font-sans uppercase z-50 shadow-md relative overflow-hidden"
           >
             <div className="py-2 sm:py-2.5 flex items-center relative pr-10">
-              {/* Marquee Container */}
               <div className="overflow-hidden w-full relative flex items-center h-4 sm:h-5">
-                <m.div 
-                  initial={{ x: "100vw" }}
-                  animate={{ x: "-100%" }}
-                  transition={{ repeat: Infinity, ease: "linear", duration: 20 }}
-                  className="whitespace-nowrap absolute left-0 flex items-center"
+                <div 
+                  className="whitespace-nowrap absolute left-0 flex items-center animate-marquee"
                 >
                   {storeSettings.announcementBar.link ? (
                     <a href={storeSettings.announcementBar.link} className="hover:text-silk-light transition-colors flex items-center gap-2 group/link cursor-pointer px-4">
@@ -228,7 +224,7 @@ export default function Navbar() {
                   ) : (
                     <span className="font-bold opacity-90 px-4">{storeSettings.announcementBar.text}</span>
                   )}
-                </m.div>
+                </div>
               </div>
               
               <button 

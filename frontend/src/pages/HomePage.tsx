@@ -350,34 +350,13 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
   const [websiteReviews, setWebsiteReviews] = useState<any[]>([]);
 
   useEffect(() => {
-    // Fetch a small batch of top products with full data (slim=false) just to extract their reviews.
-    // We can't use the global context `products` because it uses `slim=true` (omitting reviews) to save bandwidth.
-    const url = `${import.meta.env.VITE_API_URL || ''}/api/v1/products?limit=15&slim=false`;
+    // Fetch a small batch of top reviews via dedicated lightweight endpoint to save bandwidth
+    const url = `${import.meta.env.VITE_API_URL || ''}/api/v1/products/reviews/top`;
     fetch(url)
       .then(res => res.json())
       .then(json => {
         if (json && json.success && Array.isArray(json.data)) {
-          const fetchedProducts = json.data;
-          const seenComments = new Set<string>();
-          const seenProducts = new Set<string>();
-          const unique: any[] = [];
-          
-          const sorted = [...fetchedProducts].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-          
-          for (const p of sorted) {
-            if (unique.length >= 6) break;
-            if (seenProducts.has(p.name)) continue;
-            for (const r of (p.reviews || [])) {
-              const key = (r.comment || '').trim().toLowerCase();
-              if (seenComments.has(key)) continue;
-              seenComments.add(key);
-              seenProducts.add(p.name);
-              unique.push({ ...r, productName: p.name });
-              break;
-            }
-          }
-          
-          setWebsiteReviews(unique.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 3));
+          setWebsiteReviews(json.data);
         }
       })
       .catch(err => console.error('Failed to fetch reviews for homepage:', err));

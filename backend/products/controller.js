@@ -488,3 +488,66 @@ export const addReview = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+/**
+ * GET TOP REVIEWS
+ * GET /api/products/reviews/top
+ */
+export const getTopReviews = async (req, res) => {
+  try {
+    // Add Vercel-CDN-Cache-Control for edge caching
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+
+    // Fetch products that have at least one review. We only need name and reviews.
+    const products = await Product.find(
+      { isActive: true, "reviews.0": { $exists: true } },
+      { name: 1, reviews: 1 }
+    )
+      .lean()
+      .populate("reviews.user", "name");
+
+    const unique = [];
+    const seenComments = new Set();
+    const seenProducts = new Set();
+
+    // Sort products by their overall rating (descending), though we calculate it inline if it doesn't exist
+    const sortedProducts = [...products].sort((a, b) => {
+      const aRating = a.rating ?? (a.reviews.reduce((acc, r) => acc + r.rating, 0) / a.reviews.length || 0);
+      const bRating = b.rating ?? (b.reviews.reduce((acc, r) => acc + r.rating, 0) / b.reviews.length || 0);
+      return bRating - aRating;
+    });
+
+    for (const p of sortedProducts) {
+      if (unique.length >= 6) break;
+      if (seenProducts.has(p.name)) continue;
+      
+      // Sort reviews within the product by rating descending
+      const sortedReviews = [...p.reviews].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+      
+      for (const r of sortedReviews) {
+        const key = (r.comment || '').trim().toLowerCase();
+        if (seenComments.has(key)) continue;
+        
+        seenComments.add(key);
+        seenProducts.add(p.name);
+        unique.push({
+          rating: r.rating,
+          comment: r.comment,
+          isVerified: !!r.isVerified,
+          createdAt: r.createdAt,
+          user: r.user?.name || "Customer",
+          productName: p.name
+        });
+        break; // Only one review per product
+      }
+    }
+
+    res.json({
+      success: true,
+      data: unique.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 3)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

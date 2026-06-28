@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { m, useReducedMotion } from 'framer-motion';
 import { getAccessibleVariant, staggerContainerVariant, fadeUpVariant } from '../utils/motionTokens';
 
@@ -20,66 +20,73 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const hasLoaded = useRef(false);
-    const lastSrc = useRef(src);
+    const [hasLoaded, setHasLoaded] = useState(false);
+    const [isIntersecting, setIsIntersecting] = useState(false);
 
     const isInstagram = src.includes('instagram.com/reel/') || src.includes('instagram.com/p/');
 
     useEffect(() => {
-        if (lastSrc.current !== src) {
-            hasLoaded.current = false;
-            lastSrc.current = src;
-        }
+        setHasLoaded(false);
+        setIsIntersecting(false);
+    }, [src]);
 
+    useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
 
         const observer = new IntersectionObserver(
             ([entry]) => {
                 if (entry.isIntersecting) {
-                    if (!hasLoaded.current) {
-                        if (isInstagram && iframeRef.current) {
-                            try {
-                                const urlObj = new URL(src);
-                                let pathname = urlObj.pathname;
-                                if (!pathname.endsWith('/')) pathname += '/';
-                                if (!pathname.includes('embed')) pathname += 'embed/';
-                                iframeRef.current.src = `${urlObj.origin}${pathname}`;
-                            } catch(e) {
-                                iframeRef.current.src = src;
-                            }
-                        } else if (videoRef.current) {
-                            videoRef.current.src = src;
-                            videoRef.current.load();
-                        }
-                        hasLoaded.current = true;
-                    }
-                    if (!isInstagram && videoRef.current) {
-                        videoRef.current.play().catch(() => {});
-                    }
+                    setHasLoaded(true);
+                    setIsIntersecting(true);
                 } else {
-                    if (!isInstagram && videoRef.current) {
-                        videoRef.current.pause();
-                    }
+                    setIsIntersecting(false);
                 }
             },
-            { threshold: 0.25 }
+            { threshold: 0.1 }
         );
 
         observer.observe(container);
         return () => observer.disconnect();
-    }, [src, isInstagram]);
+    }, []);
+
+    useEffect(() => {
+        if (!videoRef.current || isInstagram) return;
+
+        if (isIntersecting) {
+            videoRef.current.muted = true; // Ensure muted for browser autoplay policies
+            videoRef.current.play().catch(() => {});
+        } else {
+            videoRef.current.pause();
+        }
+    }, [isIntersecting, hasLoaded, isInstagram]);
+
+    // Handle Instagram iframe URL formatting
+    const getIgSrc = () => {
+        try {
+            const urlObj = new URL(src);
+            let pathname = urlObj.pathname;
+            if (!pathname.endsWith('/')) pathname += '/';
+            if (!pathname.includes('embed')) pathname += 'embed/';
+            return `${urlObj.origin}${pathname}`;
+        } catch(e) {
+            return src;
+        }
+    };
 
     return (
         <div ref={containerRef} className={className}>
             {isInstagram ? (
-                <iframe
-                    ref={iframeRef}
-                    className="w-full h-full border-none pointer-events-auto"
-                    scrolling="no"
-                    allowTransparency={true}
-                    allow="encrypted-media"
-                />
+                hasLoaded ? (
+                    <iframe
+                        ref={iframeRef}
+                        src={getIgSrc()}
+                        className="w-full h-full border-none pointer-events-auto"
+                        scrolling="no"
+                        allowTransparency={true}
+                        allow="encrypted-media"
+                    />
+                ) : null
             ) : (
                 <video
                     ref={videoRef}
@@ -90,6 +97,7 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
                     playsInline
                     disablePictureInPicture
                     controlsList="nodownload nofullscreen noremoteplayback"
+                    src={hasLoaded ? src : undefined}
                 />
             )}
         </div>
@@ -162,10 +170,10 @@ export default function VideoSnippets({ isEditing = false, items, onItemsChange 
                             ) : null}
                             <LazyVideo
                                 src={video.url}
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 z-0"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-dark-red/70 via-dark-red/10 to-transparent opacity-80 pointer-events-none" />
-                            <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                            <div className="absolute inset-0 bg-gradient-to-t from-dark-red/70 via-dark-red/10 to-transparent opacity-80 pointer-events-none z-10" />
+                            <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
                                 <EditableBlock
                                     isEditing={isEditing}
                                     value={video.caption}
