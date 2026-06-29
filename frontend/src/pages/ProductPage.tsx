@@ -224,35 +224,6 @@ export default function ProductPage() {
     fetchProduct();
   }, [fetchProduct, productId]);
 
-  useEffect(() => {
-    if (product && product.pid) {
-      if (posthog) {
-        posthog.capture('Product Viewed', {
-          product_id: product.pid,
-          product_name: product.name,
-          category: product.category,
-        });
-      }
-      
-      const trackInternal = async () => {
-        try {
-          const headers = await getAuthHeaders();
-          await fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/analytics/track`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              event: 'product_viewed',
-              productId: product.pid,
-              productName: product.name
-            })
-          });
-        } catch (e) {
-          // ignore
-        }
-      };
-      trackInternal();
-    }
-  }, [product, posthog, getAuthHeaders]);
 
   const submitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -355,7 +326,7 @@ export default function ProductPage() {
         price: product.price
       });
     }
-  }, [product?.pid, product?.name, product?.category, product?.price, posthog]);
+  }, [product?.pid]); // pid is the only meaningful dep; viewTracked ref + sessionStorage deduplicate
 
   const prevImage = useCallback(() => {
     setActiveImage((i) => (i === 0 ? (product?.images.length || 1) - 1 : i - 1));

@@ -12,6 +12,7 @@ import { initPaymentReconciliationCron } from "./payment/reconciliation.js";
 import { initExchangeRateCron } from "./cron/exchangeRates.js";
 import { initDraftOrderCleanupCron } from "./cron/draftOrders.js";
 import { runSettingsMigration } from "./settings/migration.js";
+import { initAuditWorker } from "./audit/worker.js";
 
 import Order from "./tracker/models.js";
 import NotificationService from "./procurement/notificationService.js";
@@ -78,7 +79,13 @@ mongoose
     await initProductCollection();
     initAnalyticsCron(); // Start background aggregations
     initSupportCleanupCron(); // Start orphaned Cloudinary upload cleanup
-    // Workers moved to separate worker.js process
+    
+    // Workers started in main process for simpler deployment
+    console.log("Starting background workers in main process...");
+    startWhatsAppWorker();
+    startSupportWorker();
+    initAuditWorker();
+    
     initWhatsAppCrons(); // Start WhatsApp scheduled tasks
     initPaymentReconciliationCron(); // Recover payments captured but never verified
     initExchangeRateCron(); // Fetch exchange rates periodically

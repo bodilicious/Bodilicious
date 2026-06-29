@@ -58,12 +58,16 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // Gate on user UID (a string primitive) rather than the full user object.
+  // The user object is a new reference on every fetchUserProfileAndSync call,
+  // causing fetchTickets + the useEffect to re-fire after every profile sync.
+  const userUid = (user as any)?.uid || (user as any)?.firebaseUID || null;
+
   const fetchTickets = useCallback(async () => {
-    if (!user) return;
+    if (!userUid) return;
     try {
       const headers = await getAuthHeaders();
-      const uid = (user as any).uid || (user as any).firebaseUID;
-      const res = await fetch(`${API_BASE}/support/tickets/${uid}`, { headers });
+      const res = await fetch(`${API_BASE}/support/tickets/${userUid}`, { headers });
       const json = await res.json();
       if (json.success) {
         setTickets(json.tickets);
@@ -75,13 +79,13 @@ export default function TicketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, getAuthHeaders]);
+  }, [userUid, getAuthHeaders]); // stable string dep instead of object
 
   useEffect(() => {
     if (authStatus === 'loading') return;
-    if (authStatus === 'unauthenticated' || !user) { navigate('/signin'); return; }
+    if (authStatus === 'unauthenticated' || !userUid) { navigate('/signin'); return; }
     fetchTickets();
-  }, [authStatus, user, fetchTickets]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authStatus, userUid, fetchTickets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = tickets.filter((t) => t.status === 'open');
   const resolved = tickets.filter((t) => t.status === 'resolved');

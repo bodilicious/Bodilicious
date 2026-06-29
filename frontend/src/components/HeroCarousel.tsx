@@ -8,8 +8,8 @@ import ImageUploadField from './ImageUploadField';
 const FALLBACK_SLIDES = [
   {
     id: 's1',
-    imageUrl: '/assets/hero_carousel_1.png',
-    mobileImage: '/assets/hero_mobile_1.png',
+    imageUrl: '/assets/hero_carousel_1.webp',
+    mobileImage: '/assets/hero_mobile_1.webp',
     eyebrow: 'Dermatologically Tested • Science-Backed • Skin-Safe',
     title: 'Skincare That',
     highlight: 'Goes Beyond the Surface',
@@ -22,8 +22,8 @@ const FALLBACK_SLIDES = [
   },
   {
     id: 's2',
-    imageUrl: '/assets/hero_carousel_2.png',
-    mobileImage: '/assets/hero_mobile_2.png',
+    imageUrl: '/assets/hero_carousel_2.webp',
+    mobileImage: '/assets/hero_mobile_2.webp',
     eyebrow: 'Bhringraj • Hibiscus • Keratin • Ashwagandha',
     title: 'Hair Care Rooted',
     highlight: "in Nature's Wisdom",
@@ -36,8 +36,8 @@ const FALLBACK_SLIDES = [
   },
   {
     id: 's3',
-    imageUrl: '/assets/hero_carousel_3.png',
-    mobileImage: '/assets/hero_mobile_3.png',
+    imageUrl: '/assets/hero_carousel_3.webp',
+    mobileImage: '/assets/hero_mobile_3.webp',
     eyebrow: 'Rose • Turmeric • Sandalwood • Coconut',
     title: 'Body Rituals',
     highlight: "You'll Love Every Day",
@@ -50,8 +50,8 @@ const FALLBACK_SLIDES = [
   },
   {
     id: 's4',
-    imageUrl: '/assets/hero_carousel_4.png',
-    mobileImage: '/assets/hero_mobile_4.png',
+    imageUrl: '/assets/hero_carousel_4.webp',
+    mobileImage: '/assets/hero_mobile_4.webp',
     eyebrow: 'Niacinamide • Retinol • Hyaluronic Acid • Salicylic Acid',
     title: 'Complete Routines',
     highlight: 'Built for Real Skin',
@@ -64,8 +64,8 @@ const FALLBACK_SLIDES = [
   },
   {
     id: 's5',
-    imageUrl: '/assets/hero_carousel_5.png',
-    mobileImage: '/assets/hero_mobile_5.png',
+    imageUrl: '/assets/hero_carousel_5.webp',
+    mobileImage: '/assets/hero_mobile_5.webp',
     eyebrow: 'Vegan • Cruelty-Free • Earth-Friendly',
     title: 'Conscious Beauty',
     highlight: 'For a Better Tomorrow',
@@ -78,8 +78,8 @@ const FALLBACK_SLIDES = [
   },
   {
     id: 's6',
-    imageUrl: '/assets/hero_carousel_6.png',
-    mobileImage: '/assets/hero_mobile_6.png',
+    imageUrl: '/assets/hero_carousel_6.webp',
+    mobileImage: '/assets/hero_mobile_6.webp',
     eyebrow: 'Vitamin C • Peptides • Bakuchiol • Squalane',
     title: 'Glow With',
     highlight: 'Unstoppable Radiance',
@@ -113,7 +113,12 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
     propSlides.length === 0 ||
     (propSlides.length === 1 && propSlides[0]?.seeded);
 
-  const activeSlides = isPlaceholderSlides && !isEditing ? FALLBACK_SLIDES : (propSlides || []);
+  const rawActiveSlides = isPlaceholderSlides && !isEditing ? FALLBACK_SLIDES : (propSlides || []);
+  const activeSlides = rawActiveSlides.map(slide => ({
+    ...slide,
+    imageUrl: slide.imageUrl ? slide.imageUrl.replace('.png', '.webp') : slide.imageUrl,
+    mobileImage: slide.mobileImage ? slide.mobileImage.replace('.png', '.webp') : slide.mobileImage
+  }));
   const TOTAL = activeSlides?.length || 0;
 
   const [current, setCurrent] = useState(0);

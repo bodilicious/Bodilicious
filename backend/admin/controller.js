@@ -284,8 +284,12 @@ export const getAllProductsAdmin = async (req, res) => {
       query.isActive = isActive === "true";
     }
 
+    // Exclude embedded reviews array — it can be hundreds of KB per product.
+    // Admin product list only needs card-level fields; reviews are fetched on the individual product page.
+    const ADMIN_PRODUCT_LIST_FIELDS = '-reviews';
+
     const [products, total] = await Promise.all([
-      Product.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Product.find(query).select(ADMIN_PRODUCT_LIST_FIELDS).sort({ createdAt: -1 }).skip(skip).limit(limit),
       Product.countDocuments(query)
     ]);
 
@@ -404,10 +408,12 @@ export const toggleProductStatus = async (req, res) => {
  */
 export const getLowStockProducts = async (req, res) => {
   try {
+    // Only the fields the analytics dashboard actually renders — strip reviews.
+    const LOW_STOCK_FIELDS = 'pid name stock lowStockThreshold category images price isActive';
     const products = await Product.find({
       isActive: true,
       $expr: { $lte: ["$stock", "$lowStockThreshold"] }
-    }).sort({ stock: 1 }).limit(100);
+    }).select(LOW_STOCK_FIELDS).sort({ stock: 1 }).limit(100);
 
     res.json({ success: true, data: products });
   } catch (err) {
@@ -571,9 +577,12 @@ export const getAllOrdersAdmin = async (req, res) => {
       }
     }
 
+    // Slim product populate — the admin orders list only needs image+name for the thumbnail.
+    // Returning full product docs (with reviews) inflates each order document enormously.
     const [orders, total] = await Promise.all([
       Order.find(query)
         .populate("user", "name email")
+        .populate("items.product", "name pid images price")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),

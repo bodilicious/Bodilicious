@@ -1,5 +1,5 @@
 import { ArrowRight, Leaf, Sparkles, ChevronRight, Loader2, FlaskConical, CheckCircle2, MessageCircle } from 'lucide-react';
-import { useMemo, useCallback, useEffect, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -202,7 +202,7 @@ interface HomePageProps {
 export default function HomePage({ isEditing = false, contentData: propContentData, onContentChange }: HomePageProps) {
   const { setShopFilter, products, isLoading, error } = useApp();
   const [publishedContent, setPublishedContent] = useState<any>(null);
-  const [fetchingHomepage, setFetchingHomepage] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
   const shouldReduceMotion = useReducedMotion();
@@ -266,24 +266,27 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     }
   }, [location]);
 
+  // Ref guard: fetch homepage content exactly once — avoids re-fetching every time
+  // publishedContent or fetchingHomepage state changes (which re-triggered the effect).
+  const homepageFetchedRef = useRef(false);
   useEffect(() => {
-    if (!isEditing && !propContentData && !publishedContent && !fetchingHomepage) {
-      setFetchingHomepage(true);
-      fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/settings/homepage`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            setPublishedContent(data.data);
-          } else {
-            setPublishedContent({});
-          }
-        })
-        .catch(err => {
-          console.error('Failed to load homepage content', err);
+    if (isEditing || propContentData || homepageFetchedRef.current) return;
+    homepageFetchedRef.current = true;
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/settings/homepage`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setPublishedContent(data.data);
+        } else {
           setPublishedContent({});
-        });
-    }
-  }, [isEditing, propContentData, publishedContent, fetchingHomepage]);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load homepage content', err);
+        homepageFetchedRef.current = false; // allow retry on error
+        setPublishedContent({});
+      });
+  }, [isEditing, propContentData]); // stable deps — no publishedContent/fetchingHomepage loop
 
   const contentData = propContentData || publishedContent;
 

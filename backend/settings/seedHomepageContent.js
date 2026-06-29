@@ -7,7 +7,7 @@ dotenv.config({ path: "../.env" });
 const seedData = {
   heroSlides: [
     {
-      imageUrl: '/assets/hero_carousel_1.png',
+      imageUrl: '/assets/hero_carousel_1.webp',
       imageAlt: 'Dermatologically tested skincare',
       eyebrow: 'Dermatologically Tested • Science-Backed • Skin-Safe',
       title: 'Skincare That',
@@ -21,7 +21,7 @@ const seedData = {
       order: 1
     },
     {
-      imageUrl: '/assets/hero_carousel_2.png',
+      imageUrl: '/assets/hero_carousel_2.webp',
       imageAlt: 'Hair care that transforms',
       eyebrow: 'Bhringraj • Hibiscus • Keratin • Ashwagandha',
       title: 'Hair Care Rooted',
@@ -35,7 +35,7 @@ const seedData = {
       order: 2
     },
     {
-      imageUrl: '/assets/hero_carousel_3.png',
+      imageUrl: '/assets/hero_carousel_3.webp',
       imageAlt: 'Body care reimagined',
       eyebrow: 'Rose • Turmeric • Sandalwood • Coconut',
       title: 'Body Rituals',
@@ -49,7 +49,7 @@ const seedData = {
       order: 3
     },
     {
-      imageUrl: '/assets/hero_carousel_4.png',
+      imageUrl: '/assets/hero_carousel_4.webp',
       imageAlt: 'Complete Routines Built for Real Skin',
       eyebrow: 'Niacinamide • Retinol • Hyaluronic Acid • Salicylic Acid',
       title: 'Complete Routines',
@@ -63,7 +63,7 @@ const seedData = {
       order: 4
     },
     {
-      imageUrl: '/assets/hero_carousel_5.png',
+      imageUrl: '/assets/hero_carousel_5.webp',
       imageAlt: 'Conscious Beauty',
       eyebrow: 'Vegan • Cruelty-Free • Earth-Friendly',
       title: 'Conscious Beauty',
@@ -77,7 +77,7 @@ const seedData = {
       order: 5
     },
     {
-      imageUrl: '/assets/hero_carousel_6.png',
+      imageUrl: '/assets/hero_carousel_6.webp',
       imageAlt: 'Glow With Unstoppable Radiance',
       eyebrow: 'Vitamin C • Peptides • Bakuchiol • Squalane',
       title: 'Glow With',

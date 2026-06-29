@@ -6,8 +6,8 @@ dotenv.config({ path: "../.env" });
 
 const heroSlides = [
   {
-    imageUrl: '/assets/hero_carousel_1.png',
-    mobileImage: '/assets/hero_mobile_1.png',
+    imageUrl: '/assets/hero_carousel_1.webp',
+    mobileImage: '/assets/hero_mobile_1.webp',
     eyebrow: 'Dermatologically Tested • Science-Backed • Skin-Safe',
     title: 'Skincare That',
     highlight: 'Goes Beyond the Surface',
@@ -20,8 +20,8 @@ const heroSlides = [
     order: 0,
   },
   {
-    imageUrl: '/assets/hero_carousel_2.png',
-    mobileImage: '/assets/hero_mobile_2.png',
+    imageUrl: '/assets/hero_carousel_2.webp',
+    mobileImage: '/assets/hero_mobile_2.webp',
     eyebrow: 'Bhringraj • Hibiscus • Keratin • Ashwagandha',
     title: 'Hair Care Rooted',
     highlight: "in Nature's Wisdom",
@@ -34,8 +34,8 @@ const heroSlides = [
     order: 1,
   },
   {
-    imageUrl: '/assets/hero_carousel_3.png',
-    mobileImage: '/assets/hero_mobile_3.png',
+    imageUrl: '/assets/hero_carousel_3.webp',
+    mobileImage: '/assets/hero_mobile_3.webp',
     eyebrow: 'Rose • Turmeric • Sandalwood • Coconut',
     title: 'Body Rituals',
     highlight: "You'll Love Every Day",
@@ -48,8 +48,8 @@ const heroSlides = [
     order: 2,
   },
   {
-    imageUrl: '/assets/hero_carousel_4.png',
-    mobileImage: '/assets/hero_mobile_4.png',
+    imageUrl: '/assets/hero_carousel_4.webp',
+    mobileImage: '/assets/hero_mobile_4.webp',
     eyebrow: 'Niacinamide • Retinol • Hyaluronic Acid • Salicylic Acid',
     title: 'Complete Routines',
     highlight: 'Built for Real Skin',
@@ -62,8 +62,8 @@ const heroSlides = [
     order: 3,
   },
   {
-    imageUrl: '/assets/hero_carousel_5.png',
-    mobileImage: '/assets/hero_mobile_5.png',
+    imageUrl: '/assets/hero_carousel_5.webp',
+    mobileImage: '/assets/hero_mobile_5.webp',
     eyebrow: 'Vegan • Cruelty-Free • Earth-Friendly',
     title: 'Conscious Beauty',
     highlight: 'For a Better Tomorrow',
@@ -76,8 +76,8 @@ const heroSlides = [
     order: 4,
   },
   {
-    imageUrl: '/assets/hero_carousel_6.png',
-    mobileImage: '/assets/hero_mobile_6.png',
+    imageUrl: '/assets/hero_carousel_6.webp',
+    mobileImage: '/assets/hero_mobile_6.webp',
     eyebrow: 'Vitamin C • Peptides • Bakuchiol • Squalane',
     title: 'Glow With',
     highlight: 'Unstoppable Radiance',

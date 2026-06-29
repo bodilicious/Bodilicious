@@ -17,9 +17,12 @@ export default function FloatingSupportBubble() {
   const [showBubble, setShowBubble] = useState(false);
   const supportMenuRef = useRef<HTMLDivElement>(null);
 
-  // Fetch ticket notification count for support bubble
+  // Gate on user UID (a stable primitive) instead of the full `user` object.
+  // `user` is a new reference on every fetchUserProfileAndSync call (spreads into a new
+  // object), which made this effect re-fire and hit the tickets API on every auth sync.
+  const userUid = (user as any)?.uid || (user as any)?.firebaseUID || null;
   useEffect(() => {
-    if (authStatus !== 'authenticated' || !user) {
+    if (authStatus !== 'authenticated' || !userUid) {
       setUnreadTicketsCount(0);
       return;
     }
@@ -27,8 +30,7 @@ export default function FloatingSupportBubble() {
     const fetchNotificationCount = async () => {
       try {
         const headers = await getAuthHeaders();
-        const uid = (user as any).uid || (user as any).firebaseUID;
-        const res = await fetch(`${API_BASE}/support/tickets/${uid}`, { headers });
+        const res = await fetch(`${API_BASE}/support/tickets/${userUid}`, { headers });
         const json = await res.json();
         if (json.success) {
           const count = json.tickets.filter((t: any) => {
@@ -49,7 +51,7 @@ export default function FloatingSupportBubble() {
     // Check for new notifications every 1 hour to conserve bandwidth
     const interval = setInterval(fetchNotificationCount, 3600000);
     return () => clearInterval(interval);
-  }, [user, authStatus, getAuthHeaders]);
+  }, [userUid, authStatus, getAuthHeaders]); // userUid is a string — stable, won't churn
 
   // Handle clicking outside of support popover to close it
   useEffect(() => {

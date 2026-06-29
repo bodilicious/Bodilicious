@@ -181,6 +181,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<any>(null);
+  // Refs used as fetch-once guards so fetchFilters/fetchSettings have stable [] deps
+  // and don't create new references (which would re-trigger their useEffect every render).
+  const filtersFetchedRef = useRef(false);
+  const settingsFetchedRef = useRef(false);
 
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedProductPid, setSelectedProductPid] = useState<string | null>(null);
@@ -689,19 +693,29 @@ const triggerPasswordReset = async (email: string) => {
   }, []);
 
   const fetchFilters = useCallback(async () => {
-    // Deduplicate: Don't fetch if we already have filters
-    if (filters) return;
-    
+    // Guard via ref (not state) so this useCallback has stable [] deps.
+    // Using [filters] as deps was the root cause of the bandwidth blowout:
+    // filters: null → object caused a new fetchFilters ref → re-triggered the
+    // useEffect([fetchFilters, fetchSettings]) → called fetchSettings again →
+    // _setUserCurrency() state update → re-render → new ref → infinite loop.
+    if (filtersFetchedRef.current) return;
+    filtersFetchedRef.current = true;
     try {
       const res = await fetch(`${API_BASE}/products/filters`);
       const json = await res.json();
       if (json.success) setFilters(json.data);
     } catch (err) {
       console.error('Failed to fetch filters', err);
+      filtersFetchedRef.current = false; // allow retry on error
     }
-  }, [filters]);
+  }, []); // stable [] deps — no re-creation, no re-trigger loop
 
   const fetchSettings = useCallback(async () => {
+    // Guard via ref: fetchSettings should run exactly once on mount.
+    // Without this, the useEffect([fetchFilters, fetchSettings]) loop would
+    // re-call this on every cycle, firing _setUserCurrency → state update → re-render.
+    if (settingsFetchedRef.current) return;
+    settingsFetchedRef.current = true;
     try {
       const bypassToken = localStorage.getItem('maintenance_bypass');
       const query = bypassToken ? `?bypass=${bypassToken}` : '';
@@ -726,8 +740,9 @@ const triggerPasswordReset = async (email: string) => {
       }
     } catch (err) {
       console.error('Failed to fetch store settings', err);
+      settingsFetchedRef.current = false; // allow retry on error
     }
-  }, []);
+  }, []); // stable [] deps — runs exactly once
 
   // Sync products with URL query and fetch filters once
   // Skip entirely inside the preview iframe — it receives all data via postMessage.

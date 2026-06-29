@@ -197,15 +197,23 @@ export default function ShopPage() {
   const [localPriceMax, setLocalPriceMax] = useState(priceMax);
   const [localPriceMin, setLocalPriceMin] = useState(priceMin);
 
+  // dynamicFilters narrows filter options when a category is active.
+  // When NO category is selected, skip the fetch — global `filters` from AppContext
+  // already covers the full set (and was already fetched once on mount).
+  // This eliminates a redundant hit to /api/v1/products/filters on every page load.
   const [dynamicFilters, setDynamicFilters] = useState<any>(null);
 
   const categoriesString = selectedCategories.join(',');
   useEffect(() => {
+    if (!categoriesString) {
+      // No category selected: clear dynamic overrides so global filters apply
+      setDynamicFilters(null);
+      return;
+    }
     let active = true;
     const fetchDynamicFilters = async () => {
       try {
-        const catQuery = categoriesString ? `?category=${categoriesString}` : '';
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/products/filters${catQuery}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/products/filters?category=${categoriesString}`);
         const json = await res.json();
         if (active && json.success) {
           setDynamicFilters(json.data);
@@ -216,7 +224,7 @@ export default function ShopPage() {
     };
     fetchDynamicFilters();
     return () => { active = false; };
-  }, [categoriesString]);
+  }, [categoriesString]); // only fires when a category is actually selected
 
   useEffect(() => {
     const timeout = setTimeout(() => {
