@@ -36,8 +36,10 @@ const getMonthIndex = (startDate, targetDate) => {
  * Re-aggregates the last 365 days of orders to handle delayed refunds or status changes.
  */
 async function aggregateDailySales() {
+  // 30-day rolling window — older data is already aggregated and won't change.
+  // Scanning 365 days every 2 hours was the primary source of Atlas→Render bandwidth.
   const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 365);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   // Group by day
   const salesData = await Order.aggregate([
@@ -124,8 +126,9 @@ async function aggregateDailySales() {
  * Aggregates purchases over the last 365 days from order data.
  */
 async function aggregateProductPurchases() {
+  // 30-day rolling window — same rationale as aggregateDailySales.
   const daysAgo = new Date();
-  daysAgo.setDate(daysAgo.getDate() - 365);
+  daysAgo.setDate(daysAgo.getDate() - 30);
 
   const productData = await Order.aggregate([
     { $match: { createdAt: { $gte: daysAgo }, paymentStatus: { $in: ["paid", "refunded"] } } },
@@ -166,8 +169,9 @@ async function aggregateProductPurchases() {
  * Reads product_viewed events and aggregates per product per day.
  */
 async function aggregateProductViews() {
+  // 30-day rolling window.
   const daysAgo = new Date();
-  daysAgo.setDate(daysAgo.getDate() - 365);
+  daysAgo.setDate(daysAgo.getDate() - 30);
 
   const viewData = await AuditLogV2.aggregate([
     {
@@ -218,8 +222,9 @@ async function aggregateProductViews() {
  * Reads cart_item_added events and aggregates per product per day.
  */
 async function aggregateCartAdds() {
+  // 30-day rolling window.
   const daysAgo = new Date();
-  daysAgo.setDate(daysAgo.getDate() - 365);
+  daysAgo.setDate(daysAgo.getDate() - 30);
 
   const cartData = await AuditLogV2.aggregate([
     {
@@ -468,33 +473,78 @@ async function aggregateProductIntelligence() {
 }
 
 /**
- * Runs all aggregations
+ * Fast incremental ETL — only the last 30 days of data.
+ * These four jobs are cheap because they only touch recent records.
  */
-export async function runETL() {
-  console.log("[Analytics ETL] Starting background aggregation...");
+export async function runIncrementalETL() {
+  console.log("[Analytics ETL] Starting incremental aggregation (30-day window)...");
   const start = Date.now();
   try {
     await aggregateDailySales();
     await aggregateProductPurchases();
     await aggregateProductViews();
     await aggregateCartAdds();
-    await aggregateCustomerCohorts();
-    await aggregateProductIntelligence();
-    console.log(`[Analytics ETL] Completed successfully in ${Date.now() - start}ms.`);
+    console.log(`[Analytics ETL] Incremental aggregation completed in ${Date.now() - start}ms.`);
   } catch (err) {
-    console.error("[Analytics ETL] Failed to aggregate data:", err);
+    console.error("[Analytics ETL] Incremental aggregation failed:", err);
   }
 }
 
-// Start cron job (runs every 2 hours — reduces service-initiated MongoDB bandwidth)
+/**
+ * Slow full-scan ETL — cohort and intelligence jobs scan all-time data.
+ * Run once daily (3:30 AM) instead of every 2 hours.
+ */
+export async function runFullETL() {
+  console.log("[Analytics ETL] Starting full (all-time) aggregation...");
+  const start = Date.now();
+  try {
+    // Run incremental jobs first so the daily run also refreshes recent metrics
+    await aggregateDailySales();
+    await aggregateProductPurchases();
+    await aggregateProductViews();
+    await aggregateCartAdds();
+    await aggregateCustomerCohorts();
+    await aggregateProductIntelligence();
+    console.log(`[Analytics ETL] Full aggregation completed in ${Date.now() - start}ms.`);
+  } catch (err) {
+    console.error("[Analytics ETL] Full aggregation failed:", err);
+  }
+}
+
+/**
+ * @deprecated Use runIncrementalETL or runFullETL directly.
+ * Kept for backward compatibility with any manual admin triggers.
+ */
+export async function runETL() {
+  return runFullETL();
+}
+
+/**
+ * Schedule analytics cron jobs.
+ *
+ * Tier 1 — incremental (every 2h): re-aggregates the last 30 days.
+ *   Scans ~1/12th the data compared to the previous 365-day window.
+ *
+ * Tier 2 — full scan (daily at 3:30 AM): adds cohort + product-intelligence
+ *   which need all-time data but change slowly. Moved off the 2-hour schedule
+ *   to stop scanning millions of rows 12 times per day.
+ *
+ * Startup burst removed: the previous 5-second startup run fired on every
+ * deploy, causing a bandwidth spike before the process was fully warm.
+ * Fresh data is available within 2 hours of deploy.
+ */
 export function initAnalyticsCron() {
   if (process.env.NODE_ENV !== 'test') {
-    cron.schedule('0 */2 * * *', runETL);
-    console.log("[Analytics ETL] Cron job scheduled (every 2 hours).");
-    
-    // Run an initial aggregation shortly after startup to ensure fresh data
-    setTimeout(() => {
-      runETL().catch(err => console.error("[Analytics ETL] Initial run failed:", err));
-    }, 5000);
+    // Tier 1: lightweight incremental — every 2 hours
+    cron.schedule('0 */2 * * *', () => {
+      runIncrementalETL().catch(err => console.error("[Analytics ETL] Incremental cron failed:", err));
+    });
+    console.log("[Analytics ETL] Incremental cron scheduled (every 2 hours, 30-day window).");
+
+    // Tier 2: expensive full-scan — once daily at 3:30 AM
+    cron.schedule('30 3 * * *', () => {
+      runFullETL().catch(err => console.error("[Analytics ETL] Full cron failed:", err));
+    });
+    console.log("[Analytics ETL] Full cron scheduled (daily at 03:30).");
   }
 }

@@ -61,8 +61,30 @@ export const logAction = async (req, action, entity, entityId, details, options 
 
 /**
  * GET /api/v1/admin/dashboard/summary
+ *
+ * Cached for 5 minutes — this scans the full Order and AuditLogV2 collections.
+ * Re-scanning on every admin page open was generating hundreds of MB of Atlas→Render
+ * wire traffic per day even with zero real users.
  */
+const DASHBOARD_CACHE_TTL = 300; // 5 minutes in seconds
+let _dashboardMemCache = null; // fallback when Redis is unavailable
+let _dashboardMemCacheAt = 0;
+
 export const getDashboardSummary = async (req, res) => {
+  // ── 1. Serve from cache if fresh ─────────────────────────────────────────
+  const CACHE_KEY = 'admin:dashboard:summary';
+  try {
+    const cached = await redis.get(CACHE_KEY);
+    if (cached) {
+      return res.json({ success: true, data: JSON.parse(cached), cached: true });
+    }
+  } catch (_) {
+    // Redis miss or unavailable — try in-memory fallback
+    if (_dashboardMemCache && (Date.now() - _dashboardMemCacheAt) < DASHBOARD_CACHE_TTL * 1000) {
+      return res.json({ success: true, data: _dashboardMemCache, cached: true });
+    }
+  }
+
   try {
     const [
       revenueData,
@@ -109,20 +131,27 @@ export const getDashboardSummary = async (req, res) => {
     const totalRevenue = revenueData[0]?.total || 0;
     const aov = totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : 0;
 
-    res.json({
-      success: true,
-      data: {
-        totalRevenue,
-        totalOrders,
-        totalUsers,
-        pendingShipments,
-        lowStockCount,
-        outOfStockCount,
-        averageOrderValue: parseFloat(aov),
-        recentActivity,
-        categorySales
-      }
-    });
+    const payload = {
+      totalRevenue,
+      totalOrders,
+      totalUsers,
+      pendingShipments,
+      lowStockCount,
+      outOfStockCount,
+      averageOrderValue: parseFloat(aov),
+      recentActivity,
+      categorySales
+    };
+
+    // ── 2. Write to cache ───────────────────────────────────────────────────
+    try {
+      await redis.setex(CACHE_KEY, DASHBOARD_CACHE_TTL, JSON.stringify(payload));
+    } catch (_) {
+      _dashboardMemCache = payload;
+      _dashboardMemCacheAt = Date.now();
+    }
+
+    res.json({ success: true, data: payload });
   } catch (err) {
     console.error("Dashboard Summary Error:", err);
     res.status(500).json({ success: false, message: "Error fetching dashboard summary" });
@@ -131,8 +160,30 @@ export const getDashboardSummary = async (req, res) => {
 
 /**
  * GET /api/v1/admin/notifications
+ *
+ * Cached for 2 minutes — runs 6 MongoDB queries (2 distinct + 4 count).
+ * Previously re-ran every time any admin opened the panel.
  */
+const NOTIF_CACHE_TTL = 120; // 2 minutes
+let _notifMemCache = null;
+let _notifMemCacheAt = 0;
+
 export const getNotificationCounts = async (req, res) => {
+  // Only cache when no timestamp filters are active (i.e. the standard sidebar badge poll)
+  const canCache = !req.query.lastViewedOrders && !req.query.lastViewedReturns;
+  const CACHE_KEY = 'admin:notif:counts';
+
+  if (canCache) {
+    try {
+      const cached = await redis.get(CACHE_KEY);
+      if (cached) return res.json({ success: true, data: JSON.parse(cached), cached: true });
+    } catch (_) {
+      if (_notifMemCache && (Date.now() - _notifMemCacheAt) < NOTIF_CACHE_TTL * 1000) {
+        return res.json({ success: true, data: _notifMemCache, cached: true });
+      }
+    }
+  }
+
   try {
     const { lastViewedOrders, lastViewedReturns } = req.query;
 
@@ -172,16 +223,18 @@ export const getNotificationCounts = async (req, res) => {
       Order.countDocuments(returnsQuery)
     ]);
 
-    res.json({
-      success: true,
-      data: {
-        tickets,
-        users: usersCount,
-        logs,
-        orders,
-        returns
+    const payload = { tickets, users: usersCount, logs, orders, returns };
+
+    if (canCache) {
+      try {
+        await redis.setex(CACHE_KEY, NOTIF_CACHE_TTL, JSON.stringify(payload));
+      } catch (_) {
+        _notifMemCache = payload;
+        _notifMemCacheAt = Date.now();
       }
-    });
+    }
+
+    res.json({ success: true, data: payload });
   } catch (err) {
     console.error("Notification Counts Error:", err);
     res.status(500).json({ success: false, message: "Error fetching notification counts" });
@@ -386,19 +439,32 @@ export const bulkUpdateProductStatus = async (req, res) => {
 /**
  * GET /api/v1/admin/orders
  */
+// Per-order last-sync timestamps — in-process cache, reset on redeploy.
+// Keeps us from hammering Shiprocket API every time an admin refreshes the orders list.
+const shiprocketSyncCache = new Map(); // orderId (string) → last synced timestamp (ms)
+const SR_SYNC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes per order
+const SR_SYNC_MAX_PER_CALL = 10; // never more than 10 Shiprocket calls per admin page load
+
 const autoSyncOrdersWithShiprocket = async (orders) => {
   if (!process.env.SHIPROCKET_EMAIL) return;
-  const activeOrders = orders.filter(
-    (o) =>
-      o.shiprocketOrderId &&
-      ["pending", "processing", "shipped", "return_requested"].includes(o.orderStatus)
-  );
 
-  if (activeOrders.length === 0) return;
+  const now = Date.now();
+
+  // Only sync orders that are active AND haven't been synced in the last 30 minutes
+  const staleOrders = orders.filter((o) => {
+    if (!o.shiprocketOrderId) return false;
+    if (!["pending", "processing", "shipped", "return_requested"].includes(o.orderStatus)) return false;
+    const lastSync = shiprocketSyncCache.get(o._id.toString());
+    return !lastSync || (now - lastSync) > SR_SYNC_COOLDOWN_MS;
+  }).slice(0, SR_SYNC_MAX_PER_CALL); // hard cap
+
+  if (staleOrders.length === 0) return;
 
   try {
     const token = await getShiprocketToken();
-    const syncPromises = activeOrders.map(async (order) => {
+    const syncPromises = staleOrders.map(async (order) => {
+      // Mark as synced immediately to prevent concurrent duplicate calls
+      shiprocketSyncCache.set(order._id.toString(), now);
       try {
         const detailRes = await fetch(
           `https://apiv2.shiprocket.in/v1/external/orders/show/${order.shiprocketOrderId}`,
@@ -470,6 +536,7 @@ const autoSyncOrdersWithShiprocket = async (orders) => {
     console.error("Auto Sync Token Error:", err.message);
   }
 };
+
 
 /**
  * GET /api/v1/admin/orders

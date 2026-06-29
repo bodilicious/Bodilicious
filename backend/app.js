@@ -132,7 +132,7 @@ app.use("/api/v1", globalLimiter, routes);
 // Health check endpoint for UptimeRobot — keep body minimal to save bandwidth.
 // UptimeRobot only checks the HTTP 200 status, not the body content.
 app.get("/health", (req, res) => {
-  res.status(200).send("ok");
+  res.status(200).end();
 });
 
 export default app;

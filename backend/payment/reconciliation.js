@@ -36,10 +36,25 @@ const MAX_AGE_HOURS = 24;
 // Safety: never process more than this many orders per cron tick
 const MAX_ORDERS_PER_RUN = 20;
 
+// ── Idle-skip: when no stale orders exist, avoid a DB round-trip every 30 min.
+// After a quiet run we wait 4 hours before hitting MongoDB again.
+// Any non-zero find resets this so we stay responsive.
+const QUIET_SKIP_MS = 4 * 60 * 60 * 1000; // 4 hours
+let lastQuietAt = null; // timestamp of last run that found 0 orders
+
 /**
  * Core reconciliation logic — exported for manual triggering from admin routes.
  */
 export async function runPaymentReconciliation() {
+    // ── Idle-skip: if the last run found nothing and we're still within the
+    // quiet window, skip the entire function to avoid pointless DB round-trips.
+    // Manual admin triggers bypass this by calling the function directly outside
+    // the cron — lastQuietAt is only set by zero-result cron runs.
+    if (lastQuietAt !== null && (Date.now() - lastQuietAt) < QUIET_SKIP_MS) {
+        console.log(`[Reconcile] Quiet skip — no stale orders found in last run. Next full check in ${Math.round((QUIET_SKIP_MS - (Date.now() - lastQuietAt)) / 60000)} min.`);
+        return { skipped: true, reason: 'quiet' };
+    }
+
     const staleThreshold = new Date(Date.now() - 5 * 60 * 1000);
     let lock;
     try {
@@ -66,15 +81,16 @@ export async function runPaymentReconciliation() {
     let recovered = 0;
     let errors = 0;
 
+
     try {
         const now = new Date();
         const minAge = new Date(now.getTime() - MIN_AGE_MINUTES * 60 * 1000);
         const maxAge = new Date(now.getTime() - MAX_AGE_HOURS * 60 * 60 * 1000);
 
-        // Find pending or failed Razorpay orders created within the recoverable window
-        // Find pending or failed Razorpay orders created within the recoverable window
+        // Find pending or failed Razorpay orders created within the recoverable window.
         // Including lastClaimFailedAt ensures we pick up reverted claims too.
-        const stalePendingOrders = await Order.find({
+
+    const stalePendingOrders = await Order.find({
             $or: [
                 {
                     paymentStatus: { $in: ["pending", "failed"] },
@@ -95,10 +111,15 @@ export async function runPaymentReconciliation() {
             .lean();
 
         if (stalePendingOrders.length === 0) {
+            // Record quiet timestamp so the next ticks can skip the DB call.
+            lastQuietAt = Date.now();
             return { checked: 0, recovered: 0, errors: 0, durationMs: Date.now() - startedAt };
         }
 
         console.log(`[Reconcile] Checking ${stalePendingOrders.length} stale pending orders…`);
+        // Reset quiet-skip: orders exist, keep checking on every tick until drained.
+        lastQuietAt = null;
+
 
         const razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID,

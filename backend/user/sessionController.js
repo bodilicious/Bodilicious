@@ -33,7 +33,9 @@ export const startSession = async (req, res) => {
       await UserProfile.findByIdAndUpdate(user_id, { $inc: { lifetimeSessions: 1 } });
     }
 
-    res.json({ success: true, data: newSession });
+    // No need to send the full session document — the frontend only checks for HTTP 200
+    res.json({ success: true });
+
   } catch (err) {
     console.error("StartSession Error:", err);
     res.status(500).json({ success: false, message: err.message });

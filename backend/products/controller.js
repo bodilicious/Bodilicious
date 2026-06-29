@@ -497,54 +497,58 @@ export const getTopReviews = async (req, res) => {
   try {
     // Add Vercel-CDN-Cache-Control for edge caching
     res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    // Also set standard Cache-Control so the browser can cache it
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
 
-    // Fetch products that have at least one review. We only need name and reviews.
-    const products = await Product.find(
-      { isActive: true, "reviews.0": { $exists: true } },
-      { name: 1, reviews: 1 }
-    )
-      .lean()
-      .populate("reviews.user", "name");
-
-    const unique = [];
-    const seenComments = new Set();
-    const seenProducts = new Set();
-
-    // Sort products by their overall rating (descending), though we calculate it inline if it doesn't exist
-    const sortedProducts = [...products].sort((a, b) => {
-      const aRating = a.rating ?? (a.reviews.reduce((acc, r) => acc + r.rating, 0) / a.reviews.length || 0);
-      const bRating = b.rating ?? (b.reviews.reduce((acc, r) => acc + r.rating, 0) / b.reviews.length || 0);
-      return bRating - aRating;
-    });
-
-    for (const p of sortedProducts) {
-      if (unique.length >= 6) break;
-      if (seenProducts.has(p.name)) continue;
-      
-      // Sort reviews within the product by rating descending
-      const sortedReviews = [...p.reviews].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-      
-      for (const r of sortedReviews) {
-        const key = (r.comment || '').trim().toLowerCase();
-        if (seenComments.has(key)) continue;
-        
-        seenComments.add(key);
-        seenProducts.add(p.name);
-        unique.push({
-          rating: r.rating,
-          comment: r.comment,
-          isVerified: !!r.isVerified,
-          createdAt: r.createdAt,
-          user: r.user?.name || "Customer",
-          productName: p.name
-        });
-        break; // Only one review per product
+    // Aggregate to get the top 3 reviews efficiently without loading everything into memory.
+    // This prevents massive bandwidth consumption between MongoDB (Atlas) and Render,
+    // and prevents Node.js from crashing due to Out-Of-Memory errors.
+    const topReviews = await Product.aggregate([
+      { $match: { isActive: true, "reviews.0": { $exists: true } } },
+      { $unwind: "$reviews" },
+      { $match: { "reviews.rating": { $gte: 4 } } },
+      { $sort: { "reviews.rating": -1, "reviews.createdAt": -1 } },
+      // Group by product to get 1 review per product
+      { 
+        $group: {
+          _id: "$_id",
+          productName: { $first: "$name" },
+          review: { $first: "$reviews" }
+        }
+      },
+      // Re-sort the grouped results
+      { $sort: { "review.rating": -1, "review.createdAt": -1 } },
+      { $limit: 3 },
+      { 
+        $lookup: {
+          from: "userprofiles",
+          localField: "review.user",
+          foreignField: "_id",
+          as: "userData"
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          productName: 1,
+          rating: "$review.rating",
+          comment: "$review.comment",
+          isVerified: "$review.isVerified",
+          createdAt: "$review.createdAt",
+          user: {
+             $cond: {
+               if: { $gt: [{ $size: "$userData" }, 0] },
+               then: { $arrayElemAt: ["$userData.name", 0] },
+               else: "Customer"
+             }
+          }
+        }
       }
-    }
+    ]);
 
     res.json({
       success: true,
-      data: unique.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 3)
+      data: topReviews
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
