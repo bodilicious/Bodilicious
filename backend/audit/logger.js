@@ -1,24 +1,15 @@
 import { nanoid } from 'nanoid';
-import { Queue } from 'bullmq';
-import Redis from 'ioredis';
 import { emitLiveEvent } from '../analytics/live.js'; 
+import { processAuditBatch } from './worker.js';
 
-const redisUrl = process.env.REDIS_URL || null;
-let auditQueue = null;
+let batchBuffer = [];
+let flushTimer = null;
 
-if (redisUrl) {
-  const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
-  auditQueue = new Queue('auditQueue', {
-    connection,
-    defaultJobOptions: {
-      removeOnComplete: { count: 500 },
-      removeOnFail: { count: 2000 },
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 1000 }
-    }
-  });
-} else {
-  console.warn("⚠️ REDIS_URL not set. Audit logger will not queue events.");
+function flushBatch() {
+  if (batchBuffer.length === 0) return;
+  const eventsToProcess = [...batchBuffer];
+  batchBuffer = [];
+  processAuditBatch(eventsToProcess).catch(e => console.error('Audit Batch Process Error:', e));
 }
 
 /**
@@ -39,14 +30,13 @@ function maskPII(payload) {
 }
 
 /**
- * Enqueue an audit event asynchronously
+ * Enqueue an audit event in-memory and flush periodically
  * @param {Object} event
  */
 export async function logAuditEvent(event) {
   try {
     const event_id = nanoid();
     const timestamp_utc = new Date();
-    // derived IST string
     const timestamp_ist = timestamp_utc.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
     const payload = {
@@ -54,7 +44,7 @@ export async function logAuditEvent(event) {
       event_id,
       event_type: event.event_type,
       user_id: event.user_id || null,
-      session_id: event.session_id || nanoid(), // Fallback session id
+      session_id: event.session_id || nanoid(),
       timestamp_utc,
       timestamp_ist,
       environment: process.env.NODE_ENV || 'development',
@@ -66,7 +56,7 @@ export async function logAuditEvent(event) {
       metadata: maskPII(event.metadata || {}),
       flags: {
         is_error: event.is_error || false,
-        is_anomaly: false, // Calculated by worker
+        is_anomaly: false,
         is_pii_masked: true
       }
     };
@@ -74,10 +64,21 @@ export async function logAuditEvent(event) {
     // Emit live event for real-time dashboard
     emitLiveEvent(payload.event_type, payload.metadata);
 
-    // Enqueue job via BullMQ
-    if (auditQueue) {
-      await auditQueue.add('audit-event', payload);
+    // Buffer in-memory
+    batchBuffer.push(payload);
+    
+    // Flush if batch is full
+    if (batchBuffer.length >= 100) {
+      if (flushTimer) clearTimeout(flushTimer);
+      flushTimer = null;
+      flushBatch();
+    } else if (!flushTimer) {
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flushBatch();
+      }, 5000); // 5 seconds window
     }
+
   } catch (err) {
     console.error('CRITICAL: Audit logger failed completely', err);
   }

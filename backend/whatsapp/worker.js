@@ -262,8 +262,8 @@ export const startWhatsAppWorker = () => {
   const worker = new Worker("whatsappQueue", processJob, { 
     connection,
     concurrency: 5,
-    drainDelay: 60000, // 60 seconds: safely stays well under 500k quota with large buffer
-    stalledInterval: 300000, // 5 minutes: check for stalled jobs less often
+    drainDelay: 300000, // 5 minutes: safely stays well under 500k quota with large buffer
+    stalledInterval: 900000, // 15 minutes: check for stalled jobs less often
     metrics: { maxDataPoints: 0 } // Disable metrics writes to save commands
   });
 

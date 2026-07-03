@@ -1,20 +1,12 @@
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import RedisStore from "rate-limit-redis";
-import Redis from "ioredis";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import compression from "compression";
 import { razorpayWebhook } from "./payment/controller.js";
 import { trackActiveSession } from "./analytics/live.js";
 import routes from "./index.js";
-
-// Dedicated ioredis client for rate limiting
-const rateLimitRedisClient = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
-if (!rateLimitRedisClient) {
-  console.warn("⚠️ REDIS_URL not set. Rate limiting will fall back to memory store if RedisStore fails.");
-}
 
 const app = express();
 // Level 9 = maximum compression. Threshold 512 B catches more small API responses.
