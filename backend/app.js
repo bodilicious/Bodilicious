@@ -53,39 +53,28 @@ const globalLimiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  passOnStoreError: true,
-  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:global:' }) }),
   message: {
     success: false,
     message: "Too many requests from this IP, please try again after 1 minute."
   }
 });
 
-// Quote endpoint: price calculation only — called on shipping page, payment page,
-// and on tab-focus. High limit since it moves no money and is expected to be frequent.
 const quoteLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  passOnStoreError: true,
-  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:quote:' }) }),
   message: {
     success: false,
     message: "Too many quote requests, please wait a moment before retrying."
   }
 });
 
-// Strict limiter only for endpoints that actually move money or create accounts.
-// Intentionally kept tight — these should never be called more than a handful
-// of times per checkout session.
 const sensitiveLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 50,
   standardHeaders: true,
   legacyHeaders: false,
-  passOnStoreError: true,
-  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:sensitive:' }) }),
   message: {
     success: false,
     message: "Too many requests on this endpoint, please try again later."
