@@ -6,7 +6,6 @@ import { initAnalyticsCron } from "./analytics/etl.js";
 import { initSupportCleanupCron } from "./support/cleanup.js";
 import { shutdownPosthog } from "./utils/posthog.js";
 import { startWhatsAppWorker } from "./whatsapp/worker.js";
-import { startSupportWorker } from "./support/worker.js";
 import { initWhatsAppCrons } from "./whatsapp/cron.js";
 import { initPaymentReconciliationCron } from "./payment/reconciliation.js";
 import { initExchangeRateCron } from "./cron/exchangeRates.js";
@@ -83,7 +82,6 @@ mongoose
     // Workers started in main process for simpler deployment
     console.log("Starting background workers in main process...");
     startWhatsAppWorker();
-    startSupportWorker();
     initAuditWorker();
     
     initWhatsAppCrons(); // Start WhatsApp scheduled tasks

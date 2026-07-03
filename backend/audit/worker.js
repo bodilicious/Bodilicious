@@ -67,7 +67,12 @@ export function initAuditWorker() {
       console.error(`[Audit Worker] Job ${job.id} failed:`, err);
       throw err;
     }
-  }, { connection });
+  }, { 
+    connection,
+    drainDelay: 300000,
+    stalledInterval: 300000,
+    metrics: { maxDataPoints: 0 }
+  });
 
   worker.on('failed', (job, err) => {
     console.error(`[Audit Worker] Job ${job?.id} failed in queue: ${err.message}`);

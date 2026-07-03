@@ -112,6 +112,9 @@ export const startSupportWorker = () => {
   workerInstance = new Worker("support_jobs", processLookup, {
     connection,
     concurrency: 5,
+    drainDelay: 300000,
+    stalledInterval: 300000,
+    metrics: { maxDataPoints: 0 }
   });
 
   workerInstance.on("completed", (job) => {
