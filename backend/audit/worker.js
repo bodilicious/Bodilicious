@@ -69,7 +69,7 @@ export function initAuditWorker() {
     }
   }, { 
     connection,
-    drainDelay: 300000,
+    drainDelay: 60000,
     stalledInterval: 300000,
     metrics: { maxDataPoints: 0 }
   });
