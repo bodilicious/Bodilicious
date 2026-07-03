@@ -53,6 +53,7 @@ const globalLimiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
   ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:global:' }) }),
   message: {
     success: false,
@@ -67,6 +68,7 @@ const quoteLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
   ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:quote:' }) }),
   message: {
     success: false,
@@ -82,6 +84,7 @@ const sensitiveLimiter = rateLimit({
   max: 50,
   standardHeaders: true,
   legacyHeaders: false,
+  passOnStoreError: true,
   ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:sensitive:' }) }),
   message: {
     success: false,
@@ -133,6 +136,19 @@ app.use("/api/v1", globalLimiter, routes);
 // UptimeRobot only checks the HTTP 200 status, not the body content.
 app.get("/health", (req, res) => {
   res.status(200).end();
+});
+
+// Global Error Handler to prevent Express from sending HTML 500 pages
+app.use((err, req, res, next) => {
+  console.error("Unhandled API Error:", err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    success: false,
+    message: process.env.NODE_ENV === "production" && status === 500 
+      ? "Internal Server Error" 
+      : (err.message || "Internal Server Error"),
+    ...(process.env.NODE_ENV !== "production" && { stack: err.stack })
+  });
 });
 
 export default app;
