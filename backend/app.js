@@ -87,7 +87,8 @@ app.post("/api/v1/payment/webhook",
   razorpayWebhook
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "40mb" }));
+app.use(express.urlencoded({ limit: "40mb", extended: true }));
 // Custom integration for express-mongo-sanitize to avoid read-only getter crash on req.query
 app.use((req, res, next) => {
   if (req.body) mongoSanitize.sanitize(req.body);
