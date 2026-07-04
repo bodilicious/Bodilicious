@@ -14,7 +14,6 @@ const PLACEHOLDER_VIDEOS = [
 
 function LazyVideo({ src, className }: { src: string; className: string }) {
     const isInstagram = src.includes('instagram.com/reel/') || src.includes('instagram.com/p/');
-    const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
     // Handle Instagram iframe URL formatting
     const getIgSrc = () => {
@@ -28,38 +27,6 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
             return src;
         }
     };
-
-    useEffect(() => {
-        if (isInstagram) return;
-
-        let objectUrl: string | null = null;
-        let isMounted = true;
-
-        const fetchVideo = async () => {
-            try {
-                // Fetch the video as a blob to force the browser to cache it in memory.
-                // This prevents the infamous iOS Safari bug where looping <video> tags
-                // re-download the entire file on every loop (which causes massive bandwidth usage).
-                const response = await fetch(src);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const blob = await response.blob();
-                if (isMounted) {
-                    objectUrl = URL.createObjectURL(blob);
-                    setBlobUrl(objectUrl);
-                }
-            } catch (error) {
-                console.error("Failed to load video as blob, falling back to direct src:", error);
-                if (isMounted) setBlobUrl(src);
-            }
-        };
-
-        fetchVideo();
-
-        return () => {
-            isMounted = false;
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
-        };
-    }, [src, isInstagram]);
 
     if (isInstagram) {
         return (
@@ -75,11 +42,6 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
         );
     }
 
-    if (!blobUrl) {
-        // While fetching the blob, show a placeholder skeleton to prevent layout shift
-        return <div className={`${className} bg-slate-200 animate-pulse`} />;
-    }
-
     return (
         <video
             className={className}
@@ -89,7 +51,7 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
             playsInline
             disablePictureInPicture
             controlsList="nodownload nofullscreen noremoteplayback"
-            src={blobUrl}
+            src={src}
         />
     );
 }
