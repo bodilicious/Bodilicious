@@ -23,9 +23,10 @@ async function processDirectory(dir) {
           let instance = sharp(filePath);
           const metadata = await instance.metadata();
           
-          // Only resize if it's very large, otherwise just re-encode
-          if (metadata.width > 1200) {
-             instance = instance.resize({ width: 1200, withoutEnlargement: true });
+          // Resize ingredients to 600px, products to 800px
+          const targetWidth = dir.includes('ingredients') ? 600 : 800;
+          if (metadata.width > targetWidth) {
+             instance = instance.resize({ width: targetWidth, withoutEnlargement: true });
           }
           
           await instance

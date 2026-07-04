@@ -311,13 +311,12 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
               className="absolute inset-0 w-full h-full object-cover"
               containerClassName="absolute inset-0"
             />
-          ) : (
+          ) : visited.has(idx) ? (
             <picture className="absolute inset-0 w-full h-full">
-              {visited.has(idx) && (
-                <img src={s.imageUrl} alt={s.imageAlt} className="w-full h-full object-cover object-center" loading={idx === 0 ? "eager" : "lazy"} />
-              )}
+              <img src={s.imageUrl} alt={s.imageAlt} className="w-full h-full object-cover object-center" loading={idx === 0 ? "eager" : "lazy"} />
             </picture>
-          )}
+          ) : null}
+
 
           <div className="absolute inset-x-0 top-0 h-[140px] bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent md:hidden pointer-events-none" />

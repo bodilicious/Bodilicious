@@ -122,15 +122,72 @@ services:
         source: /*
         destination: /index.html
     headers:
-      - path: /products/*
+      # ── Vite hashed bundles (JS/CSS) — safe to cache forever, hash changes on every build
+      - path: /assets/*.js
         name: Cache-Control
-        value: "public, max-age=3600, must-revalidate"
-      - path: /ingredients/*
+        value: "public, max-age=31536000, immutable"
+      - path: /assets/*.css
         name: Cache-Control
-        value: "public, max-age=3600, must-revalidate"
-      - path: /snipets/*.webm
+        value: "public, max-age=31536000, immutable"
+      # ── Hero carousel & UI images in /assets/
+      - path: /assets/*.webp
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /assets/*.png
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /assets/*.jpg
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /assets/*.svg
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      # ── Product images (30 days — product images rarely change)
+      - path: /products/*.webp
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /products/*.jpg
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /products/*.jpeg
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /products/*.png
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /products/*.avif
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      # ── Ingredient images (30 days)
+      - path: /ingredients/*.webp
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /ingredients/*.jpg
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /ingredients/*.jpeg
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /ingredients/*.png
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      # ── Root-level images: logo, favicons, og-image (7 days)
+      - path: /*.webp
         name: Cache-Control
         value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /*.png
+        name: Cache-Control
+        value: "public, max-age=604800, stale-while-revalidate=86400"
+      - path: /*.ico
+        name: Cache-Control
+        value: "public, max-age=604800"
+      # ── Video snippets (30 days)
+      - path: /snipets/*.webm
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
+      - path: /snipets/*.mp4
+        name: Cache-Control
+        value: "public, max-age=2592000, stale-while-revalidate=86400"
 
   # ─── Backend (Node Web Service) ─────────────────────────────────────────────
   - type: web

@@ -14,7 +14,7 @@ const PLACEHOLDER_VIDEOS = [
 
 function LazyVideo({ src, className }: { src: string; className: string }) {
     const isInstagram = src.includes('instagram.com/reel/') || src.includes('instagram.com/p/');
-    const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    const [inView, setInView] = useState(false);
 
     // Handle Instagram iframe URL formatting
     const getIgSrc = () => {
@@ -29,12 +29,10 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
         }
     };
 
-    const [inView, setInView] = useState(false);
-
     useEffect(() => {
         if (isInstagram) return;
         
-        // Simple IntersectionObserver to trigger fetch when in or near viewport
+        // Simple IntersectionObserver to trigger loading when in or near viewport
         const observer = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) {
                 setInView(true);
@@ -47,38 +45,6 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
         
         return () => observer.disconnect();
     }, [src, isInstagram]);
-
-    useEffect(() => {
-        if (isInstagram || !inView) return;
-
-        let objectUrl: string | null = null;
-        let isMounted = true;
-
-        const fetchVideo = async () => {
-            try {
-                // Fetch the video as a blob to force the browser to cache it in memory.
-                // This prevents the infamous iOS Safari bug where looping <video> tags
-                // re-download the entire file on every loop (which causes massive bandwidth usage).
-                const response = await fetch(src);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const blob = await response.blob();
-                if (isMounted) {
-                    objectUrl = URL.createObjectURL(blob);
-                    setBlobUrl(objectUrl);
-                }
-            } catch (error) {
-                console.error("Failed to load video as blob, falling back to direct src:", error);
-                if (isMounted) setBlobUrl(src);
-            }
-        };
-
-        fetchVideo();
-
-        return () => {
-            isMounted = false;
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
-        };
-    }, [src, isInstagram, inView]);
 
     if (isInstagram) {
         return (
@@ -94,11 +60,6 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
         );
     }
 
-    if (!blobUrl) {
-        // While fetching the blob, show a placeholder skeleton to prevent layout shift
-        return <div id={`video-container-${src}`} className={`${className} bg-slate-200 animate-pulse`} />;
-    }
-
     return (
         <video
             id={`video-container-${src}`}
@@ -107,10 +68,10 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
             loop
             muted
             playsInline
-            preload="metadata"
+            preload="none"
             disablePictureInPicture
             controlsList="nodownload nofullscreen noremoteplayback"
-            src={blobUrl}
+            src={inView ? src : undefined}
         />
     );
 }
