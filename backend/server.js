@@ -79,11 +79,11 @@ mongoose
     initAnalyticsCron(); // Start background aggregations
     initSupportCleanupCron(); // Start orphaned Cloudinary upload cleanup
     
-    // Workers started in main process for simpler deployment
-    console.log("Starting background workers in main process...");
+    // Since this is a free tier and we only have one process, we MUST run 
+    // the background workers inside the main Express web server process.
+    console.log("Starting background workers in main process (Free Tier Setup)...");
     startWhatsAppWorker();
     initAuditWorker();
-    
     initWhatsAppCrons(); // Start WhatsApp scheduled tasks
     initPaymentReconciliationCron(); // Recover payments captured but never verified
     initExchangeRateCron(); // Fetch exchange rates periodically

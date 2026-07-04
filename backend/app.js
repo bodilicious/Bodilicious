@@ -9,9 +9,8 @@ import { trackActiveSession } from "./analytics/live.js";
 import routes from "./index.js";
 
 const app = express();
-// Level 9 = maximum compression. Threshold 512 B catches more small API responses.
-// This directly reduces Render outbound bandwidth on every API reply.
-app.use(compression({ level: 9, threshold: 512 }));
+// Default compression level (usually 6) to avoid CPU-induced HTTP response latency spikes.
+app.use(compression());
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {

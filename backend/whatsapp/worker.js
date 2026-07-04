@@ -261,7 +261,7 @@ const processJob = async (job) => {
 export const startWhatsAppWorker = () => {
   const worker = new Worker("whatsappQueue", processJob, { 
     connection,
-    concurrency: 5,
+    concurrency: 1, // Reduced from 5 to 1 to prevent starving the Express HTTP Event Loop
     drainDelay: 300000, // 5 minutes: safely stays well under 500k quota with large buffer
     stalledInterval: 900000, // 15 minutes: check for stalled jobs less often
     metrics: { maxDataPoints: 0 } // Disable metrics writes to save commands
