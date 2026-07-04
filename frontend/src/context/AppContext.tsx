@@ -667,10 +667,10 @@ const triggerPasswordReset = async (email: string) => {
         url += query.startsWith('?') ? query : `?${query}`;
       }
 
-      // Default limit to 100 for homepage/ritual-finder (enough for best-seller matching);
+      // Default limit to 24 for homepage/ritual-finder (enough for best-seller matching);
       // the shop page stays at 50 since it paginates.
       if (!url.includes('limit=')) {
-        const defaultLimit = window.location.pathname.startsWith('/shop') ? 50 : 100;
+        const defaultLimit = window.location.pathname.startsWith('/shop') ? 50 : 24;
         url += (url.includes('?') ? '&' : '?') + `limit=${defaultLimit}`;
       }
 

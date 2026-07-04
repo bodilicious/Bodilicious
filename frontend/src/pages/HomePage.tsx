@@ -298,7 +298,52 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     else navigate(`/shop?category=${filter}`);
   }, [navigate, setShopFilter, isEditing]);
 
+  const [fetchedBestSellers, setFetchedBestSellers] = useState<any[]>([]);
+
+  useEffect(() => {
+    // If we already have the products in AppContext, we might not need to fetch,
+    // but to guarantee we have all 6 regardless of AppContext's limit=24, we fetch them explicitly.
+    if (isEditing) return;
+
+    if (contentData?.bestSellerMode === 'manual' && contentData.bestSellerPids?.length > 0) {
+      Promise.all(
+        contentData.bestSellerPids.map((pid: string) =>
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products/${pid}`)
+            .then(res => res.json())
+            .then(res => res.data)
+            .catch(() => null)
+        )
+      ).then(results => {
+        setFetchedBestSellers(results.filter(Boolean));
+      });
+    } else {
+      const defaultAutoNames = [
+        "coenzyme q10 serum",
+        "glow boost serum",
+        "physical sunscreen with spf 50",
+        "kojic glycolic",
+        "hydrating sunscreen spray",
+        "peptide ceramide collagen"
+      ];
+      
+      Promise.all(
+        defaultAutoNames.map(name =>
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products?name=${encodeURIComponent(name)}&slim=true`)
+            .then(res => res.json())
+            .then(res => res.data?.[0])
+            .catch(() => null)
+        )
+      ).then(results => {
+        setFetchedBestSellers(results.filter(Boolean));
+      });
+    }
+  }, [contentData?.bestSellerMode, contentData?.bestSellerPids, isEditing]);
+
   const bestSellers = useMemo(() => {
+    if (fetchedBestSellers.length > 0) {
+      return fetchedBestSellers;
+    }
+    // Fallback to context products while fetching
     if (!products || !Array.isArray(products) || products.length === 0) return [];
     
     if (contentData?.bestSellerMode === 'manual' && contentData.bestSellerPids?.length > 0) {
@@ -332,7 +377,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     }
 
     return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4);
-  }, [products, contentData?.bestSellerMode, contentData?.bestSellerPids]);
+  }, [products, fetchedBestSellers, contentData?.bestSellerMode, contentData?.bestSellerPids]);
 
   const newArrivals = useMemo(() => {
     if (!products || !Array.isArray(products) || products.length === 0) return [];

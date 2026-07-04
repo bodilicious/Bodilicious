@@ -7,7 +7,7 @@ export default defineConfig({
   build: {
     target: 'esnext',
     // Prevent small images from being inlined as base64 in JS bundles
-    assetsInlineLimit: 0,
+    // assetsInlineLimit: 0, (removed to save requests)
     rollupOptions: {
       output: {
         // Split vendor chunks for better long-term caching:

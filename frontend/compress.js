@@ -1,0 +1,67 @@
+import fs from 'fs/promises';
+import path from 'path';
+import sharp from 'sharp';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dirs = [
+  path.join(__dirname, 'public', 'products'),
+  path.join(__dirname, 'public', 'ingredients')
+];
+
+async function processDirectory(dir) {
+  try {
+    const files = await fs.readdir(dir);
+    for (const file of files) {
+      if (file.match(/\.(webp|png|jpg|jpeg)$/i)) {
+        const filePath = path.join(dir, file);
+        const tempPath = filePath + '.tmp';
+        
+        try {
+          let instance = sharp(filePath);
+          const metadata = await instance.metadata();
+          
+          // Only resize if it's very large, otherwise just re-encode
+          if (metadata.width > 1200) {
+             instance = instance.resize({ width: 1200, withoutEnlargement: true });
+          }
+          
+          await instance
+            .webp({ quality: 75, effort: 6 }) // better compression for webp
+            .toFile(tempPath);
+            
+          const oldSize = (await fs.stat(filePath)).size;
+          const newSize = (await fs.stat(tempPath)).size;
+          
+          // Only replace if it's actually smaller
+          if (newSize < oldSize) {
+             await fs.rename(tempPath, filePath);
+             console.log(`Compressed ${file}: ${(oldSize/1024/1024).toFixed(2)}MB -> ${(newSize/1024/1024).toFixed(2)}MB`);
+          } else {
+             await fs.unlink(tempPath);
+             console.log(`Skipped ${file}: not smaller`);
+          }
+        } catch (e) {
+          console.error(`Error processing ${file}:`, e.message);
+        }
+      }
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error(`Error reading directory ${dir}:`, err.message);
+    }
+  }
+}
+
+async function main() {
+  console.log('Starting image compression...');
+  for (const dir of dirs) {
+    console.log(`Processing ${dir}...`);
+    await processDirectory(dir);
+  }
+  console.log('Done!');
+}
+
+main();
