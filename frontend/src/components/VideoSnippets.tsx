@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { m, useReducedMotion } from 'framer-motion';
 import { getAccessibleVariant, staggerContainerVariant, fadeUpVariant } from '../utils/motionTokens';
 
@@ -15,6 +15,7 @@ const PLACEHOLDER_VIDEOS = [
 function LazyVideo({ src, className }: { src: string; className: string }) {
     const isInstagram = src.includes('instagram.com/reel/') || src.includes('instagram.com/p/');
     const [inView, setInView] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     // Handle Instagram iframe URL formatting
     const getIgSrc = () => {
@@ -32,13 +33,17 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
     useEffect(() => {
         if (isInstagram) return;
         
-        // Simple IntersectionObserver to trigger loading when in or near viewport
         const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) {
+            const entry = entries[0];
+            if (entry.isIntersecting) {
                 setInView(true);
-                observer.disconnect();
+            } else {
+                // Pause when scrolled out of view to save bandwidth and CPU
+                if (videoRef.current) {
+                    videoRef.current.pause();
+                }
             }
-        }, { rootMargin: '200px' });
+        }, { threshold: 0.5 }); // Play when at least 50% of the video is visible
         
         const el = document.getElementById(`video-container-${src}`);
         if (el) observer.observe(el);
@@ -46,15 +51,22 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
         return () => observer.disconnect();
     }, [src, isInstagram]);
 
+    useEffect(() => {
+        if (inView && videoRef.current) {
+            videoRef.current.play().catch(() => {});
+        }
+    }, [inView]);
+
     if (isInstagram) {
         return (
             <div className={className}>
                 <iframe
-                    src={getIgSrc()}
+                    src={inView ? getIgSrc() : undefined}
                     className="w-full h-full border-none pointer-events-auto"
                     scrolling="no"
                     allowTransparency={true}
                     allow="encrypted-media"
+                    loading="lazy"
                 />
             </div>
         );
@@ -62,9 +74,9 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
 
     return (
         <video
+            ref={videoRef}
             id={`video-container-${src}`}
             className={className}
-            autoPlay
             loop
             muted
             playsInline
