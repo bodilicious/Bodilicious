@@ -134,9 +134,15 @@ export const getAllProducts = async (req, res) => {
 
     const sortObj = sortMap[sort] || sortMap.best_selling;
 
-    const numLimit = Number(limit);
-    const numPage = Number(page);
-    const skip = numLimit ? (numPage - 1) * numLimit : 0;
+    let numLimit = Math.floor(Number(limit));
+    if (isNaN(numLimit) || numLimit <= 0) numLimit = 12;
+    if (numLimit > 100) numLimit = 100; // Hard cap payload size
+
+    let numPage = Math.floor(Number(page));
+    if (isNaN(numPage) || numPage <= 0) numPage = 1;
+    if (numPage > 1000) numPage = 1000; // Hard cap skip depth to prevent DB CPU spikes
+
+    const skip = (numPage - 1) * numLimit;
 
     // Add Vercel-CDN-Cache-Control for edge caching
     res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
@@ -145,7 +151,7 @@ export const getAllProducts = async (req, res) => {
     // Full fields are only needed on the individual product page (/api/products/:pid)
     const projection = isSlim
       ? { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1 }
-      : { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1, description: 1, ingredients: 1, reviews: 1 };
+      : { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1, description: 1, ingredients: 1, reviews: { $slice: -50 } };
 
     let productQuery = Product.find(query, projection).sort(sortObj).skip(skip).limit(numLimit);
 
@@ -167,7 +173,7 @@ export const getAllProducts = async (req, res) => {
           if (product.reviews && product.reviews.length > 0) {
             return {
               ...product,
-              reviews: (product.reviews || []).map(r => ({
+              reviews: (product.reviews || []).slice().reverse().map(r => ({
                 rating: r.rating,
                 comment: r.comment,
                 isVerified: !!r.isVerified,
