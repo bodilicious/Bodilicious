@@ -16,6 +16,7 @@ const reviewSchema = new mongoose.Schema(
     comment: {
       type: String,
       trim: true,
+      maxlength: 1000,
       default: "",
     },
     isVerified: {
@@ -53,9 +54,12 @@ const productSchema = new mongoose.Schema(
     images: {
       type: [String],
       required: true,
-      validate: [(arr) => arr.length > 0, "At least one image is required"],
+      validate: [
+        { validator: (arr) => arr.length > 0, message: "At least one image is required" },
+        { validator: (arr) => arr.length <= 15, message: "Maximum 15 images allowed" }
+      ],
     },
-    description: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true, maxlength: 5000 },
 
     category: {
       type: String,

@@ -151,7 +151,7 @@ export const getAllProducts = async (req, res) => {
     // Full fields are only needed on the individual product page (/api/products/:pid)
     const projection = isSlim
       ? { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1 }
-      : { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1, description: 1, ingredients: 1, reviews: { $slice: -50 } };
+      : { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1, description: 1, ingredients: 1, reviews: { $slice: -30 } };
 
     let productQuery = Product.find(query, projection).sort(sortObj).skip(skip).limit(numLimit);
 
