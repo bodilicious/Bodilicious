@@ -481,7 +481,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
             exit={{ opacity: 0, transition: { duration: 0.8, ease: easings.standard } }}
           >
             <div className="relative flex flex-col items-center pointer-events-none z-10 w-full max-w-lg px-6">
-              <img src="/logo.webp" alt="Bodilicious Logo" className="w-56 md:w-72 mb-10" />
+              <img src="/logo.webp" alt="Bodilicious Logo" loading="eager" decoding="async" className="w-56 md:w-72 mb-10" />
             </div>
           </m.div>
         )}

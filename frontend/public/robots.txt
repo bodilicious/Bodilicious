@@ -16,6 +16,7 @@ Disallow: /confirmation
 Disallow: /signin
 Disallow: /admin
 Disallow: /admin/
+Disallow: /internal/
 Disallow: /tracking
 Disallow: /order-details
 Disallow: /orders/

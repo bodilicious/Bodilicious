@@ -7,12 +7,12 @@
        TIER 1 — HOMEPAGE (Priority 1.0 | Daily crawl)
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://www.bodilicious.in/logo.webp</image:loc>
+      <image:loc>https://bodilicious.in/logo.webp</image:loc>
       <image:title>Bodilicious — Premium Herbal Skincare &amp; Haircare</image:title>
       <image:caption>Science-backed herbal beauty products made in India</image:caption>
     </image:image>
@@ -22,15 +22,15 @@
        TIER 2 — CORE COMMERCE PAGES (Priority 0.9 | Daily)
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/shop</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/offers</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/offers</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -40,222 +40,222 @@
        Deep-linked category pages for faceted SEO coverage
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/shop?category=skin</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?category=skin</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?category=hair</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?category=hair</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?category=body</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?category=body</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?category=lip</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?category=lip</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?category=makeup</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?category=makeup</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <!-- Sub-category / product type filter pages — high-value SEO terms -->
   <url>
-    <loc>https://www.bodilicious.in/shop?type=serum</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=serum</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=sunscreen</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=sunscreen</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=face+wash</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=face+wash</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=moisturizer</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=moisturizer</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=shampoo</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=shampoo</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=conditioner</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=conditioner</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=soap</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=soap</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=lip+balm</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=lip+balm</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?type=eye+cream</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?type=eye+cream</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.78</priority>
   </url>
 
   <!-- Concern-targeted filter pages — intent-rich long-tail SEO -->
   <url>
-    <loc>https://www.bodilicious.in/shop?concern=acne</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?concern=acne</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?concern=brightening</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?concern=brightening</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?concern=anti-aging</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?concern=anti-aging</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?concern=hyperpigmentation</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?concern=hyperpigmentation</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?concern=hair+growth</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?concern=hair+growth</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shop?concern=dandruff</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shop?concern=dandruff</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <!-- ═══════════════════════════════════════════════════════════
        TIER 4 — INDIVIDUAL PRODUCT PAGES (Priority 0.80–0.92)
-       All 38 active products — PIDs verified from MongoDB backup.
+       All 42 active products — PIDs verified from MongoDB backup.
        Route: /product/:pid  →  backend lookup: Product.findOne({ pid })
        ═══════════════════════════════════════════════════════════ -->
 
   <!-- ── SKINCARE SERUMS ── -->
   <url>
     <!-- Niacinamide Serum with SPF 30 — #1 bestseller -->
-    <loc>https://www.bodilicious.in/product/BD-SER-NIA-SPF30</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-NIA-SPF30</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.92</priority>
   </url>
 
   <url>
     <!-- Retinol Night Repair Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-RET</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-RET</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.88</priority>
   </url>
 
   <url>
     <!-- Vitamin C Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-VITC</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-VITC</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.88</priority>
   </url>
 
   <url>
     <!-- Salicylic Acid Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-SAL</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-SAL</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
     <!-- AHA &amp; BHA Exfoliating Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-AHA-BHA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-AHA-BHA</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
     <!-- Azelaic Acid Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-AZE</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-AZE</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
     <!-- Hyaluronic Acid Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-HA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-HA</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.84</priority>
   </url>
 
   <url>
     <!-- Coenzyme Q10 Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-COQ10</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-COQ10</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.84</priority>
   </url>
 
   <url>
     <!-- Glow Boost Serum -->
-    <loc>https://www.bodilicious.in/product/BD-SER-GLOW</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SER-GLOW</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
@@ -263,16 +263,16 @@
   <!-- ── SUNSCREENS ── -->
   <url>
     <!-- Liquid Sunscreen SPF 50+ -->
-    <loc>https://www.bodilicious.in/product/BD-SUN-LIQ</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SUN-LIQ</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
 
   <url>
     <!-- Physical Sunscreen SPF 50 -->
-    <loc>https://www.bodilicious.in/product/BD-SUN-PHYS-SPF50</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SUN-PHYS-SPF50</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
@@ -280,40 +280,40 @@
   <!-- ── MOISTURISERS ── -->
   <url>
     <!-- Peptide Ceramide Collagen Complex Moisturizer -->
-    <loc>https://www.bodilicious.in/product/BD-MOIST-PEP</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-MOIST-PEP</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.87</priority>
   </url>
 
   <url>
     <!-- Oats Protein Moisturizer -->
-    <loc>https://www.bodilicious.in/product/BD-MOIST-OATS</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-MOIST-OATS</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.86</priority>
   </url>
 
   <url>
     <!-- Squalene Silica Oats Moisturizer -->
-    <loc>https://www.bodilicious.in/product/BD-MOIST-SILICA-OATS</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-MOIST-SILICA-OATS</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.84</priority>
   </url>
 
   <url>
     <!-- SAF Gel For Glowing Skin -->
-    <loc>https://www.bodilicious.in/product/BD-GEL-SAF</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-GEL-SAF</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
 
   <url>
     <!-- Retinol Night Cream -->
-    <loc>https://www.bodilicious.in/product/BD-RET-CREAM</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-RET-CREAM</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
@@ -321,16 +321,16 @@
   <!-- ── EYE CARE ── -->
   <url>
     <!-- Day Care Eye Cream -->
-    <loc>https://www.bodilicious.in/product/BD-EYE-DAY</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-EYE-DAY</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
 
   <url>
     <!-- Night Care Eye Cream -->
-    <loc>https://www.bodilicious.in/product/BD-EYE-NIGHT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-EYE-NIGHT</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.82</priority>
   </url>
@@ -338,40 +338,40 @@
   <!-- ── FACE WASH / CLEANSERS ── -->
   <url>
     <!-- Kojic Glycolic Infused Facewash -->
-    <loc>https://www.bodilicious.in/product/BD-CLE-KOJIC-GLY</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-CLE-KOJIC-GLY</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.87</priority>
   </url>
 
   <url>
     <!-- No Acne Face Wash -->
-    <loc>https://www.bodilicious.in/product/BD-CLE-ACNE</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-CLE-ACNE</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
     <!-- Rose Face and Body Wash -->
-    <loc>https://www.bodilicious.in/product/BD-CLE-ROSE</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-CLE-ROSE</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
 
   <url>
     <!-- Strawberry Face and Body Wash -->
-    <loc>https://www.bodilicious.in/product/BD-CLE-STRAW</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-CLE-STRAW</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
 
   <url>
     <!-- Kaolin Clay Cleanser -->
-    <loc>https://www.bodilicious.in/product/BD-CLAY-KAOLIN</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-CLAY-KAOLIN</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.82</priority>
   </url>
@@ -379,16 +379,16 @@
   <!-- ── SOAPS ── -->
   <url>
     <!-- Organic Goat Milk Soap -->
-    <loc>https://www.bodilicious.in/product/BD-SOAP-GOAT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SOAP-GOAT</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.84</priority>
   </url>
 
   <url>
     <!-- Organic Olive Oil Soap -->
-    <loc>https://www.bodilicious.in/product/BD-SOAP-OLIVE</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SOAP-OLIVE</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
@@ -396,24 +396,24 @@
   <!-- ── LIP CARE ── -->
   <url>
     <!-- Beetroot Lip Balm — high backlinks (7 linking sites) -->
-    <loc>https://www.bodilicious.in/product/BD-LIP-BEET</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-LIP-BEET</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
 
   <url>
     <!-- Carrot Lip Balm -->
-    <loc>https://www.bodilicious.in/product/BD-LIP-CARROT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-LIP-CARROT</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
 
   <url>
     <!-- Sunscreen Lip Balm with UV Protection -->
-    <loc>https://www.bodilicious.in/product/BD-LIP-SUN</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-LIP-SUN</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
@@ -421,16 +421,16 @@
   <!-- ── MAKEUP ── -->
   <url>
     <!-- Matt Liquid Lipstick — most backlinks (21 links, 1 site) -->
-    <loc>https://www.bodilicious.in/product/BD-LIP-MATT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-LIP-MATT</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.92</priority>
   </url>
 
   <url>
     <!-- Fresh Look Foundation -->
-    <loc>https://www.bodilicious.in/product/BD-FOUND-FRESH</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-FOUND-FRESH</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
@@ -438,24 +438,24 @@
   <!-- ── HAIRCARE — SHAMPOOS ── -->
   <url>
     <!-- Banana Shampoo — high backlinks (17 links, 2 sites) -->
-    <loc>https://www.bodilicious.in/product/BD-SHAM-BANANA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SHAM-BANANA</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
 
   <url>
     <!-- Anti-Dandruff Shampoo (Ketoconazole) -->
-    <loc>https://www.bodilicious.in/product/BD-SHAM-DAND</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SHAM-DAND</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.86</priority>
   </url>
 
   <url>
     <!-- Ashwagandha &amp; Shikakai Shampoo Bar -->
-    <loc>https://www.bodilicious.in/product/BD-SHAM-BAR</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-SHAM-BAR</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.83</priority>
   </url>
@@ -463,8 +463,8 @@
   <!-- ── HAIRCARE — CONDITIONER ── -->
   <url>
     <!-- Keratin Enriched Hair Conditioner -->
-    <loc>https://www.bodilicious.in/product/BD-COND-KERATIN</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-COND-KERATIN</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.86</priority>
   </url>
@@ -472,24 +472,24 @@
   <!-- ── HAIRCARE — SERUMS &amp; TREATMENTS ── -->
   <url>
     <!-- Hair Serum Frizz Control -->
-    <loc>https://www.bodilicious.in/product/BD-HAIR-SER</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-HAIR-SER</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.86</priority>
   </url>
 
   <url>
     <!-- Hair Scalp Growth Promoter -->
-    <loc>https://www.bodilicious.in/product/BD-HAIR-GROWTH</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-HAIR-GROWTH</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
     <!-- Baby Hair Growth Serum -->
-    <loc>https://www.bodilicious.in/product/BD-HAIR-BABY</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-HAIR-BABY</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
@@ -497,8 +497,8 @@
   <!-- ── HAIRCARE — OIL ── -->
   <url>
     <!-- Organic Herbal Hair Oil -->
-    <loc>https://www.bodilicious.in/product/BD-HAIR-OIL-HERB</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/product/BD-HAIR-OIL-HERB</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.86</priority>
   </url>
@@ -507,15 +507,15 @@
        TIER 5 — DISCOVERY &amp; ENGAGEMENT PAGES (Priority 0.75–0.80)
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/ritual-finder</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/ritual-finder</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.80</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/how-to-order</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/how-to-order</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
@@ -524,22 +524,22 @@
        TIER 6 — BRAND / TRUST PAGES (Priority 0.65–0.72)
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/about</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/about</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.72</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/brand-story</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/brand-story</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/contact</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/contact</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.68</priority>
   </url>
@@ -548,43 +548,43 @@
        TIER 7 — HELP &amp; POLICY PAGES (Priority 0.45–0.60)
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/faqs</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/faqs</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/shipping-refund</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/shipping-refund</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.55</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/stores</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/stores</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.55</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/careers</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/careers</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/students</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/students</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.50</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/accessibility</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/accessibility</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.40</priority>
   </url>
@@ -594,17 +594,46 @@
        Low crawl priority — content rarely changes
        ═══════════════════════════════════════════════════════════ -->
   <url>
-    <loc>https://www.bodilicious.in/terms</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/terms</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
   </url>
 
   <url>
-    <loc>https://www.bodilicious.in/privacy</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://bodilicious.in/privacy</loc>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.30</priority>
+  </url>
+
+
+  <url>
+    <loc>https://bodilicious.in/product/BD-SUN-HYD-SPF50-SPRAY</loc>
+    <lastmod>2026-07-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://bodilicious.in/product/BD-SOAP-RED-SANDAL-100G</loc>
+    <lastmod>2026-07-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://bodilicious.in/product/BD-SOAP-TEMPLE-100G</loc>
+    <lastmod>2026-07-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://bodilicious.in/product/BD-SOAP-FRANKINCENSE-100G</loc>
+    <lastmod>2026-07-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
   </url>
 
 </urlset>

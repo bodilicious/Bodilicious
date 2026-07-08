@@ -221,6 +221,8 @@ function HowToUseCarousel({ recommendedRoutine, navigateTo, routineTime }: HowTo
                                     <img
                                         src={current.product.images[0]}
                                         alt={current.product.name}
+                                        loading="lazy"
+                                        decoding="async"
                                         className="relative w-full h-full object-contain mix-blend-multiply drop-shadow-md"
                                     />
                                 </div>

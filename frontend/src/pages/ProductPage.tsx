@@ -616,6 +616,8 @@ export default function ProductPage() {
                 <img
                   src={product.images[activeImage]}
                   alt={product.name}
+                  loading="eager"
+                  decoding="async"
                   className={`w-full h-full object-cover transition-opacity duration-300 ${
                     !showIngredientSidebar && activeImage === 0 && isZoomed ? 'opacity-0' : 'opacity-100'
                   }`}
@@ -863,6 +865,8 @@ export default function ProductPage() {
                         <img 
                           src={ing.imagePath} 
                           alt={ing.title} 
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover mix-blend-multiply group-hover:scale-110 transition-transform duration-500" 
                         />
                       </div>
