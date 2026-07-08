@@ -226,7 +226,7 @@ export default function ChatPage() {
                             </div>
                             <div>
                                 <h3 className="font-sans font-medium text-dark-red text-base mb-1 tracking-wide">Expert Recommendations</h3>
-                                <p className="font-sans text-sm text-gray-500 leading-relaxed">Curated selections from our premium herbal collections.</p>
+                                <p className="font-sans text-sm text-gray-500 leading-relaxed">Curated selections from our premium collections.</p>
                             </div>
                         </div>
                     </div>

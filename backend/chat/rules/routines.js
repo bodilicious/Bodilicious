@@ -9,7 +9,7 @@ export const routineRules = (text, products, helpers) => {
 
     // 2. Men's Routine
     if (text.match(/\b(men|man|guys|shaving|beard)\b/i)) {
-        const mensSelection = products.filter(p => p.suitable_for?.includes("men") || p.name?.match(/(Charcoal|Tea Tree|Mint|Herbal)/i) || ["cleanser", "sunscreen"].includes(p.sub_category));
+        const mensSelection = products.filter(p => p.suitable_for?.includes("men") || p.name?.match(/(Charcoal|Tea Tree|Mint|)/i) || ["cleanser", "sunscreen"].includes(p.sub_category));
         return recommend(mensSelection, "Men's skin often needs no-fuss, effective hydration and oil control. We recommend: Deep Cleanser -> Soothing Hydrator -> Non-Greasy Sunscreen. Check out these men-friendly picks:");
     }
 

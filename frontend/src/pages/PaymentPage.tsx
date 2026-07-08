@@ -446,7 +446,7 @@ export default function PaymentPage() {
                     amount: razorpayOrder.amount,
                     currency: razorpayOrder.currency,
                     name: 'Bodilicious',
-                    description: 'Premium Herbal Beauty',
+                    description: 'Premium Beauty',
                     order_id: razorpayOrder.id,
 
                     handler: async function (response: any) {

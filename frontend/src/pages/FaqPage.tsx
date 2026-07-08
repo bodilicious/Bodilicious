@@ -78,7 +78,7 @@ export default function FaqPage() {
   useSEO({
     title: 'FAQs — Bodilicious',
     description: 'Find answers to the most common questions about Bodilicious products, shipping, payments, and more.',
-        keywords: 'bodilicious, skincare, haircare, natural beauty, herbal products, buy online',
+        keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     canonical: '/faqs',
     jsonLd: faqJsonLd,
   });

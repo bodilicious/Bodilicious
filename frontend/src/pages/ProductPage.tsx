@@ -132,7 +132,7 @@ export default function ProductPage() {
   // ── SEO: update meta tags + inject Product JSON-LD when loaded ──
   const productDesc = product?.description
     ? product.description.slice(0, 155)
-    : 'Premium herbal skincare and haircare from Bodilicious. Dermatologically tested, science-backed formulas.';
+    : 'Premium skincare and haircare from Bodilicious. Dermatologically tested, science-backed formulas.';
 
   const productSchema = product
     ? {
@@ -177,7 +177,6 @@ export default function ProductPage() {
       product.product_type,
       ...(product.concerns_targeted || []),
       'Bodilicious',
-      'herbal',
       'dermatologically tested'
     ].filter(Boolean) as string[];
 

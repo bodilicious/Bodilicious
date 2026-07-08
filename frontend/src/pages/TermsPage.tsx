@@ -9,7 +9,7 @@ export default function TermsPage() {
         title: 'Terms & Conditions — Bodilicious',
         description:
             'Review the Terms and Conditions governing your use of the Bodilicious website, products, intellectual property, and dispute resolution process.',
-        keywords: 'bodilicious, skincare, haircare, natural beauty, herbal products, buy online',
+        keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/terms',
     });
 

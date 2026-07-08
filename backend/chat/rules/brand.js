@@ -4,7 +4,7 @@ export const brandRules = (text, products, helpers) => {
     const rules = [
         {
             patterns: [/\bwhere (is|are) (you|bodilicious) from\b/i, /\borigin\b/i, /\bwhere (are |do )?products made\b/i],
-            handler: () => pureText("Bodilicious is proudly rooted in India. We source our high-quality herbal and organic ingredients from sustainable farms across the country and manufacture in state-of-the-art facilities that respect traditional Ayurvedic wisdom.")
+            handler: () => pureText("Bodilicious is proudly rooted in India. We source our high-quality and organic ingredients from sustainable farms across the country and manufacture in state-of-the-art facilities that respect traditional Ayurvedic wisdom.")
         },
         {
             patterns: [/\bis it organic\b/i, /\bare (the )?products organic\b/i, /\borganic status\b/i],
@@ -20,7 +20,7 @@ export const brandRules = (text, products, helpers) => {
         },
         {
             patterns: [/\bis it natural\b/i, /\b100% natural\b/i],
-            handler: () => pureText("We prioritize natural, plant-based ingredients in every bottle. While we use safe, science-backed preservatives to ensure product stability and your safety, our heart is 100% in herbal and botanical goodness.")
+            handler: () => pureText("We prioritize natural, plant-based ingredients in every bottle. While we use safe, science-backed preservatives to ensure product stability and your safety, our heart is 100% in and botanical goodness.")
         }
     ];
 

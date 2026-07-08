@@ -79,7 +79,7 @@ const buildEmailLayout = (content, data = {}) => {
     <!-- Footer -->
     <div style="border-top: 1px solid #eeeeee; background-color: #fafafa; padding: 22px 18px; text-align: center; font-size: 12px; color: #888888;">
       <p style="margin: 0 0 6px;"><strong>Bodilicious Natural Products</strong></p>
-      <p style="margin: 0 0 6px;">Premium Herbal Beauty Solutions</p>
+      <p style="margin: 0 0 6px;">Premium Beauty Solutions</p>
       <p style="margin: 0;">© ${new Date().getFullYear()} Bodilicious Natural Products</p>
     </div>
 

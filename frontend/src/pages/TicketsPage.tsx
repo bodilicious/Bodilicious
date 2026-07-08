@@ -48,7 +48,7 @@ export default function TicketsPage() {
   useSEO({
     title: 'My Support Tickets — Bodilicious',
     description: 'View and track your Bodilicious support queries.',
-        keywords: 'bodilicious, skincare, haircare, natural beauty, herbal products, buy online',
+        keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     canonical: '/account/tickets',
   });
 

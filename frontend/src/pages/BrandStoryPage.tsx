@@ -7,15 +7,15 @@ export default function BrandStoryPage() {
     useSEO({
         title: 'Our Brand Story — Bodilicious',
         description:
-            'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional herbal wisdom to create safe, targeted skincare and haircare for every concern.',
-        keywords: 'bodilicious, skincare, haircare, natural beauty, herbal products, buy online',
+            'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional wisdom to create safe, targeted skincare and haircare for every concern.',
+        keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/brand-story',
         jsonLd: {
             '@context': 'https://schema.org',
             '@type': 'WebPage',
             name: 'Our Brand Story — Bodilicious',
             url: 'https://www.bodilicious.in/brand-story',
-            description: 'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional herbal wisdom to create safe, targeted skincare and haircare.',
+            description: 'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional wisdom to create safe, targeted skincare and haircare.',
             publisher: {
                 '@type': 'Organization',
                 name: 'Bodilicious',

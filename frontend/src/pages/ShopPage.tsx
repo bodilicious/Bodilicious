@@ -193,14 +193,14 @@ export default function ShopPage() {
 
   const seoDescription = useMemo(() => {
     if (selectedConcerns.length === 1)
-      return `Shop Bodilicious products formulated for ${titleCase(selectedConcerns[0])}. Dermatologically tested, science-backed herbal skincare and haircare made in India.`;
+      return `Shop Bodilicious products formulated for ${titleCase(selectedConcerns[0])}. Dermatologically tested, science-backed skincare and haircare made in India.`;
     if (selectedCategories.length === 1)
-      return `Explore the Bodilicious ${titleCase(selectedCategories[0])} range. Premium herbal formulas with science-backed actives. Free shipping on orders over ₹1500.`;
-    return 'Browse our complete range of premium herbal skincare, haircare, lip care and makeup. Filter by skin concern, ingredient, or skin type and find your perfect match.';
+      return `Explore the Bodilicious ${titleCase(selectedCategories[0])} range. Premium formulas with science-backed actives. Free shipping on orders over ₹1500.`;
+    return 'Browse our complete range of premium skincare, haircare, lip care and makeup. Filter by skin concern, ingredient, or skin type and find your perfect match.';
   }, [selectedCategories, selectedConcerns]);
 
   const seoKeywords = useMemo(() => {
-    const keywords = ['shop', 'skincare', 'haircare', 'herbal', 'dermatologically tested', 'Bodilicious'];
+    const keywords = ['shop', 'skincare', 'haircare', 'dermatologically tested', 'Bodilicious'];
     if (selectedCategories.length > 0) keywords.push(...selectedCategories);
     if (selectedSubCategories.length > 0) keywords.push(...selectedSubCategories);
     if (selectedTypes.length > 0) keywords.push(...selectedTypes);

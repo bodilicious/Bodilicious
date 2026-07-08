@@ -10,8 +10,8 @@ import { useSEO } from '../hooks/useSEO';
 export default function NotFoundPage() {
   useSEO({
     title: 'Page Not Found — Bodilicious',
-    description: 'The page you are looking for does not exist. Shop our full range of herbal skincare and haircare at Bodilicious.',
-        keywords: 'bodilicious, skincare, haircare, natural beauty, herbal products, buy online',
+    description: 'The page you are looking for does not exist. Shop our full range of skincare and haircare at Bodilicious.',
+        keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     noIndex: true,
   });
 
