@@ -317,7 +317,7 @@ export const createProductAdmin = async (req, res) => {
       brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
       usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
       product_weight_g, product_weight_ml, availability, is_active_based,
-      slug, isActive,
+      slug, isActive, seo_keywords,
     } = req.body;
 
     const allowedFields = Object.fromEntries(
@@ -327,7 +327,7 @@ export const createProductAdmin = async (req, res) => {
         brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
         usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
         product_weight_g, product_weight_ml, availability, is_active_based,
-        slug, isActive,
+        slug, isActive, seo_keywords,
       }).filter(([, v]) => v !== undefined)
     );
 
@@ -352,7 +352,7 @@ export const updateProductAdmin = async (req, res) => {
       brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
       usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
       product_weight_g, product_weight_ml, availability, is_active_based,
-      slug, isActive,
+      slug, isActive, seo_keywords,
     } = req.body;
 
     const allowedFields = Object.fromEntries(
@@ -362,7 +362,7 @@ export const updateProductAdmin = async (req, res) => {
         brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
         usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
         product_weight_g, product_weight_ml, availability, is_active_based,
-        slug, isActive,
+        slug, isActive, seo_keywords,
       }).filter(([, v]) => v !== undefined)
     );
 
