@@ -8,7 +8,9 @@ export interface SEOConfig {
   title: string;
   description: string;
   canonical?: string;
+  keywords?: string;
   ogImage?: string;
+  ogImageAlt?: string;
   noIndex?: boolean;
   jsonLd?: object | object[];
 }
@@ -24,7 +26,9 @@ export function useSEO({
   title,
   description,
   canonical,
+  keywords,
   ogImage,
+  ogImageAlt,
   noIndex = false,
   jsonLd,
 }: SEOConfig) {
@@ -52,8 +56,11 @@ export function useSEO({
       return el;
     };
 
-    // ── 3. Meta description ────────────────────────────────────
+    // ── 3. Meta description & Keywords ─────────────────────────
     setMeta('meta[name="description"]', 'content', description);
+    if (keywords) {
+      setMeta('meta[name="keywords"]', 'content', keywords);
+    }
 
     // ── 4. Robots ──────────────────────────────────────────────
     setMeta('meta[name="robots"]', 'content', noIndex ? 'noindex, nofollow' : 'index, follow');
@@ -72,6 +79,7 @@ export function useSEO({
     setOg('og:description', description);
     setOg('og:url', canonicalUrl);
     setOg('og:image', image);
+    if (ogImageAlt) setOg('og:image:alt', ogImageAlt);
 
     // ── 6. Twitter tags ────────────────────────────────────────
     const setTwitter = (name: string, content: string) => {
@@ -86,6 +94,7 @@ export function useSEO({
     setTwitter('twitter:title', fullTitle);
     setTwitter('twitter:description', description);
     setTwitter('twitter:image', image);
+    if (ogImageAlt) setTwitter('twitter:image:alt', ogImageAlt);
 
     // ── 7. Canonical ───────────────────────────────────────────
     let canonicalEl = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');

@@ -13,6 +13,23 @@ export default function ContactPage() {
         description:
             'Get in touch with the Bodilicious team. Write us a review, ask about products or shipping, or give feedback. We are here to help you on your skincare journey.',
         canonical: '/contact',
+        jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'ContactPage',
+            name: 'Contact Bodilicious',
+            url: 'https://www.bodilicious.in/contact',
+            description: 'Reach out to the Bodilicious team for product queries, shipping help, or feedback.',
+            publisher: {
+                '@type': 'Organization',
+                name: 'Bodilicious',
+                url: 'https://www.bodilicious.in',
+                contactPoint: {
+                    '@type': 'ContactPoint',
+                    contactType: 'customer service',
+                    availableLanguage: ['English', 'Hindi'],
+                },
+            },
+        },
     });
 
     const { authStatus, getAuthHeaders } = useApp();

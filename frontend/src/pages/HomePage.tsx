@@ -213,6 +213,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     title: 'Bodilicious — Premium Herbal Skincare & Haircare',
     description:
       'Shop dermatologically tested herbal skincare and haircare made with science-backed actives like Niacinamide, Retinol & Hyaluronic Acid. Free shipping on orders over ₹1500.',
+    keywords: 'herbal skincare products, dermatologically tested herbal haircare, niacinamide serum for glowing skin, retinol anti-aging cream herbal, organic shampoo for hair fall, hyaluronic acid moisturizer natural, premium herbal skincare india, buy skincare products online india',
     canonical: '/',
   });
 

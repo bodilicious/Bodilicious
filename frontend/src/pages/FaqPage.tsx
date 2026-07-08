@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, MessageCircle, HelpCircle } from 'lucide-react';
 import Footer from '../components/Footer';
 import { useSEO } from '../hooks/useSEO';
@@ -53,16 +53,34 @@ function AccordionItem({ faq, isOpen, onToggle }: { faq: FAQ; isOpen: boolean; o
 }
 
 export default function FaqPage() {
-  useSEO({
-    title: 'FAQs — Bodilicious',
-    description: 'Find answers to the most common questions about Bodilicious products, shipping, payments, and more.',
-    canonical: '/faqs',
-  });
-
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+
+  // Build FAQPage JSON-LD from loaded questions for Google rich snippets
+  const faqJsonLd = useMemo(() => {
+    if (faqs.length === 0) return undefined;
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map(faq => ({
+        '@type': 'Question',
+        name: faq.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: faq.answer,
+        },
+      })),
+    };
+  }, [faqs]);
+
+  useSEO({
+    title: 'FAQs — Bodilicious',
+    description: 'Find answers to the most common questions about Bodilicious products, shipping, payments, and more.',
+    canonical: '/faqs',
+    jsonLd: faqJsonLd,
+  });
 
   useEffect(() => {
     const fetchFaqs = async () => {

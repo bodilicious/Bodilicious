@@ -3,9 +3,19 @@ import { useApp } from '../context/AppContext';
 import { Sparkles, ShoppingBag, Gift, CheckCircle, XCircle, Clock, ChevronRight, Instagram, Facebook, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Footer from '../components/Footer';
+import { useSEO } from '../hooks/useSEO';
 
 export default function OfferPage() {
   const { user, authStatus, navigateTo } = useApp();
+
+  useSEO({
+    title: 'Welcome Offer — 10% Off Your First Order | Bodilicious',
+    description:
+      'New to Bodilicious? Enjoy 10% off your first skincare or haircare order. Premium herbal beauty products, dermatologically tested, delivered free over ₹1500.',
+    canonical: '/offers',
+    ogImage: 'https://www.bodilicious.in/og-image.png',
+    ogImageAlt: 'Bodilicious Welcome Offer — 10% Off Your First Order',
+  });
 
   const welcomeOffer = (user as any)?.welcomeOffer;
   const isEligible = welcomeOffer?.eligible === true;

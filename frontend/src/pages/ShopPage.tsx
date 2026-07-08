@@ -174,21 +174,89 @@ export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
-  useSEO({
-    title: 'Shop Skincare & Haircare — Bodilicious',
-    description:
-      'Browse our complete range of premium herbal skincare, haircare, lip care and makeup. Filter by skin concern, ingredient, or skin type and find your perfect match.',
-    canonical: '/shop',
-  });
-
   const selectedCategories = parseCSV(searchParams.get('category'));
   const selectedSubCategories = parseCSV(searchParams.get('sub_category'));
-  const selectedTypes = parseCSV(searchParams.get('type')); // ← backend param is 'type'
+  const selectedTypes = parseCSV(searchParams.get('type'));
   const selectedConcerns = parseCSV(searchParams.get('concern'));
   const selectedIngredients = parseCSV(searchParams.get('ingredient'));
+
+  // Build dynamic SEO title + description based on active filters
+  const seoTitle = useMemo(() => {
+    if (selectedCategories.length === 1) {
+      const cat = titleCase(selectedCategories[0]);
+      return `${cat} Products — Bodilicious`;
+    }
+    if (selectedTypes.length === 1) return `${titleCase(selectedTypes[0])} — Bodilicious`;
+    if (selectedConcerns.length === 1) return `Best Products for ${titleCase(selectedConcerns[0])} — Bodilicious`;
+    return 'Shop Skincare & Haircare — Bodilicious';
+  }, [selectedCategories, selectedTypes, selectedConcerns]);
+
+  const seoDescription = useMemo(() => {
+    if (selectedConcerns.length === 1)
+      return `Shop Bodilicious products formulated for ${titleCase(selectedConcerns[0])}. Dermatologically tested, science-backed herbal skincare and haircare made in India.`;
+    if (selectedCategories.length === 1)
+      return `Explore the Bodilicious ${titleCase(selectedCategories[0])} range. Premium herbal formulas with science-backed actives. Free shipping on orders over ₹1500.`;
+    return 'Browse our complete range of premium herbal skincare, haircare, lip care and makeup. Filter by skin concern, ingredient, or skin type and find your perfect match.';
+  }, [selectedCategories, selectedConcerns]);
+
+  const seoKeywords = useMemo(() => {
+    const keywords = ['shop', 'skincare', 'haircare', 'herbal', 'dermatologically tested', 'Bodilicious'];
+    if (selectedCategories.length > 0) keywords.push(...selectedCategories);
+    if (selectedSubCategories.length > 0) keywords.push(...selectedSubCategories);
+    if (selectedTypes.length > 0) keywords.push(...selectedTypes);
+    if (selectedConcerns.length > 0) keywords.push(...selectedConcerns);
+    if (selectedIngredients.length > 0) keywords.push(...selectedIngredients);
+    return [...new Set(keywords)].join(', ');
+  }, [selectedCategories, selectedSubCategories, selectedTypes, selectedConcerns, selectedIngredients]);
+
+  // Build ItemList + BreadcrumbList JSON-LD for Google
+  const shopJsonLd = useMemo(() => {
+    const itemList = products.length > 0
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          name: seoTitle,
+          itemListElement: products.slice(0, 20).map((p, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: p.name,
+            url: `https://www.bodilicious.in/product/${p.pid}`,
+          })),
+        }
+      : null;
+
+    const activeCategory = selectedCategories[0];
+    const breadcrumb = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.bodilicious.in/' },
+        { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.bodilicious.in/shop' },
+        ...(activeCategory
+          ? [{
+              '@type': 'ListItem',
+              position: 3,
+              name: titleCase(activeCategory),
+              item: `https://www.bodilicious.in/shop?category=${activeCategory}`,
+            }]
+          : []),
+      ],
+    };
+
+    return itemList ? [itemList, breadcrumb] : breadcrumb;
+  }, [products, seoTitle, selectedCategories]);
+
+  useSEO({
+    title: seoTitle,
+    description: seoDescription,
+    keywords: seoKeywords,
+    canonical: '/shop',
+    jsonLd: shopJsonLd,
+  });
   const sort = searchParams.get('sort') || 'best_selling';
   const inStock = searchParams.get('inStock') || '';
   const searchQuery = searchParams.get('search') || '';
+
 
   const computedMaxPrice = 5000;
 

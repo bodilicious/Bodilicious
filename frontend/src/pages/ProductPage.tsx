@@ -134,7 +134,7 @@ export default function ProductPage() {
     ? product.description.slice(0, 155)
     : 'Premium herbal skincare and haircare from Bodilicious. Dermatologically tested, science-backed formulas.';
 
-  const productJsonLd = product
+  const productSchema = product
     ? {
         '@context': 'https://schema.org',
         '@type': 'Product',
@@ -165,15 +165,63 @@ export default function ProductPage() {
             }
           : {}),
       }
+    : null;
+
+  const productKeywords = product
+    ? [
+        product.name,
+        product.category,
+        product.sub_category,
+        product.product_type,
+        ...(product.concerns_targeted || []),
+        'Bodilicious',
+        'herbal',
+        'dermatologically tested'
+      ].filter(Boolean).join(', ')
     : undefined;
+
+  const breadcrumbSchema = product
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://www.bodilicious.in/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Shop',
+            item: 'https://www.bodilicious.in/shop',
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: product.name,
+            item: `https://www.bodilicious.in/product/${product.pid}`,
+          },
+        ],
+      }
+    : null;
+
+  const productJsonLd =
+    productSchema && breadcrumbSchema
+      ? [productSchema, breadcrumbSchema]
+      : productSchema ?? undefined;
 
   useSEO({
     title: product ? `${product.name} — Bodilicious` : 'Product — Bodilicious',
     description: productDesc,
+    keywords: productKeywords,
     canonical: product ? `/product/${product.pid}` : '/shop',
     ogImage: product?.images[0],
+    ogImageAlt: product ? `${product.name} by Bodilicious` : undefined,
     jsonLd: productJsonLd,
   });
+
 
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);

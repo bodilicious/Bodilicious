@@ -100,6 +100,18 @@ export default function HowToOrderPage() {
     description:
       'An interactive, step-by-step walkthrough to placing an order on Bodilicious. Discover, select, check out, and track your package.',
     canonical: '/how-to-order',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'HowTo',
+      name: 'How to Order from Bodilicious',
+      description: 'A step-by-step guide to placing an order on the Bodilicious website.',
+      step: [
+        { '@type': 'HowToStep', position: 1, name: 'Discover', text: 'Browse the shop or use the Ritual Finder to find products suited to your skin or hair concerns.' },
+        { '@type': 'HowToStep', position: 2, name: 'Select', text: 'Add your chosen products to the cart and review product details, ingredients, and size options.' },
+        { '@type': 'HowToStep', position: 3, name: 'Checkout', text: 'Enter your delivery address and complete payment securely via UPI, card, or COD.' },
+        { '@type': 'HowToStep', position: 4, name: 'Track', text: 'Receive a tracking link by email and WhatsApp. Monitor your order live from the Tracking page.' },
+      ],
+    },
   });
 
   const appContext = useContext(AppContext);

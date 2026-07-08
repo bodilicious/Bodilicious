@@ -9,6 +9,19 @@ export default function AboutPage() {
         description:
             'Bodilicious is a certified, registered Indian beauty brand offering science-backed herbal skincare and haircare. Learn about our mission, founders, and philosophy.',
         canonical: '/about',
+        jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'AboutPage',
+            name: 'About Bodilicious',
+            url: 'https://www.bodilicious.in/about',
+            description: 'Bodilicious is a certified, registered Indian beauty brand offering science-backed herbal skincare and haircare.',
+            publisher: {
+                '@type': 'Organization',
+                name: 'Bodilicious',
+                url: 'https://www.bodilicious.in',
+                logo: { '@type': 'ImageObject', url: 'https://www.bodilicious.in/logo.webp' },
+            },
+        },
     });
 
     useEffect(() => {
