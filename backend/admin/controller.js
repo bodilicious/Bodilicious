@@ -8,19 +8,19 @@ import AuditLogV2 from "../audit/models.js";
 import { logAuditEvent } from "../audit/logger.js";
 import mongoose from "mongoose";
 import { pushOrderToShiprocket as srPush, getShiprocketToken } from "../tracker/shiprocketservice.js";
-import Redis from "ioredis";
 import { Ticket } from "../support/models.js";
 import escapeStringRegexp from "escape-string-regexp";
 import path from "path";
+import _redis from "../utils/redis.js";
 
-
-
-const redisUrl = process.env.REDIS_URL || null;
-const redis = redisUrl ? new Redis(redisUrl) : {
-  get: () => null,
-  setex: () => {},
-  del: () => {}
-}; // Fallback if no redis url
+// Use the shared singleton; fall back to a no-op object if Redis is unavailable.
+// All methods return Promises because every call site uses await.
+const redis = _redis ?? {
+  get: () => Promise.resolve(null),
+  setex: () => Promise.resolve(),
+  del: () => Promise.resolve(),
+  incr: () => Promise.resolve(0),
+};
 
 /**
  * Helper to log administrative actions
@@ -66,7 +66,7 @@ export const logAction = async (req, action, entity, entityId, details, options 
  * Re-scanning on every admin page open was generating hundreds of MB of Atlas→Render
  * wire traffic per day even with zero real users.
  */
-const DASHBOARD_CACHE_TTL = 300; // 5 minutes in seconds
+const DASHBOARD_CACHE_TTL = 900; // 15 minutes — admin only, staleness is acceptable
 let _dashboardMemCache = null; // fallback when Redis is unavailable
 let _dashboardMemCacheAt = 0;
 
@@ -164,7 +164,7 @@ export const getDashboardSummary = async (req, res) => {
  * Cached for 2 minutes — runs 6 MongoDB queries (2 distinct + 4 count).
  * Previously re-ran every time any admin opened the panel.
  */
-const NOTIF_CACHE_TTL = 120; // 2 minutes
+const NOTIF_CACHE_TTL = 600; // 10 minutes — badge counts, admin-only, staleness is fine
 let _notifMemCache = null;
 let _notifMemCacheAt = 0;
 

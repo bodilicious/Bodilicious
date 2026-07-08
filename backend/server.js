@@ -12,6 +12,7 @@ import { initExchangeRateCron } from "./cron/exchangeRates.js";
 import { initDraftOrderCleanupCron } from "./cron/draftOrders.js";
 import { runSettingsMigration } from "./settings/migration.js";
 import { initAuditWorker } from "./audit/worker.js";
+import { getSettings } from "./settings/cache.js";
 
 import Order from "./tracker/models.js";
 import NotificationService from "./procurement/notificationService.js";
@@ -82,9 +83,20 @@ mongoose
     // Since this is a free tier and we only have one process, we MUST run 
     // the background workers inside the main Express web server process.
     console.log("Starting background workers in main process (Free Tier Setup)...");
-    startWhatsAppWorker();
+
+    // Only start WhatsApp worker + crons if WhatsApp is enabled in settings.
+    // BullMQ workers generate ~1,000+ idle Redis commands/day just by existing
+    // (BLPOP polling + stalled-job checks). Skip entirely when not in use.
+    const settings = await getSettings();
+    if (settings.waAllEnabled) {
+      startWhatsAppWorker();
+      initWhatsAppCrons();
+      console.log("[WhatsApp] Worker and crons started (waAllEnabled=true)");
+    } else {
+      console.log("[WhatsApp] Worker skipped — waAllEnabled is false. No Redis connections opened for WhatsApp.");
+    }
+
     initAuditWorker();
-    initWhatsAppCrons(); // Start WhatsApp scheduled tasks
     initPaymentReconciliationCron(); // Recover payments captured but never verified
     initExchangeRateCron(); // Fetch exchange rates periodically
     initDraftOrderCleanupCron(); // Delete abandoned draft orders

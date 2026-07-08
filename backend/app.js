@@ -40,9 +40,16 @@ app.use(cors({
   credentials: true
 }));
 
+// In-memory rate limiters — intentionally NOT Redis-backed.
+// The shared Redis instance is reserved for BullMQ queues/workers which
+// require persistent connections. Free-tier Redis caps concurrent
+// connections, so we avoid burning one just for counters.
+// Per-dyno in-memory limiting is still highly effective: each dyno
+// enforces its own window, and limits are set conservatively enough
+// that even split traffic across dynos stays well-controlled.
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 1000,
+  max: 120,            // ~2 req/sec — plenty for real users, stingy for bots
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -52,8 +59,8 @@ const globalLimiter = rateLimit({
 });
 
 const quoteLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 200,
+  windowMs: 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -63,8 +70,8 @@ const quoteLimiter = rateLimit({
 });
 
 const sensitiveLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 50,
+  windowMs: 60 * 1000,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -87,8 +94,10 @@ app.post("/api/v1/payment/webhook",
   razorpayWebhook
 );
 
-app.use(express.json({ limit: "40mb" }));
-app.use(express.urlencoded({ limit: "40mb", extended: true }));
+// 1 MB is ample for any JSON API payload. Upload routes use multer
+// (multipart/form-data) and are unaffected by this limit.
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ limit: "1mb", extended: true }));
 // Custom integration for express-mongo-sanitize to avoid read-only getter crash on req.query
 app.use((req, res, next) => {
   if (req.body) mongoSanitize.sanitize(req.body);
@@ -116,7 +125,8 @@ app.use("/api/v1", globalLimiter, routes);
 
 // Health check endpoint for UptimeRobot — keep body minimal to save bandwidth.
 // UptimeRobot only checks the HTTP 200 status, not the body content.
-app.get("/health", (req, res) => {
+// Rate-limited to prevent /health being used as a free flood vector.
+app.get("/health", globalLimiter, (req, res) => {
   res.status(200).end();
 });
 

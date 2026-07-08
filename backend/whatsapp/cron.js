@@ -8,6 +8,9 @@ import { getSettings } from "../settings/cache.js";
 
 const BATCH = 200;
 
+// Small sleep helper to spread Redis commands over time instead of bursting
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 export const initWhatsAppCrons = () => {
   // 1. Stale Cart Cron (10:00 AM daily)
   cron.schedule("0 10 * * *", async () => {
@@ -35,10 +38,12 @@ export const initWhatsAppCrons = () => {
 
         const users = await UserProfile.find(filter).skip(skip).limit(BATCH).lean();
         if (!users.length) break;
-        for (const u of users) {
-          await enqueueWhatsApp("stale_cart", { userId: u._id.toString() });
+        for (const [i, u] of users.entries()) {
+          // Stagger: 2 s gap between jobs so BullMQ enqueue commands don't burst
+          await enqueueWhatsApp("stale_cart", { userId: u._id.toString() }, { delay: i * 2000 });
         }
         skip += BATCH;
+        await sleep(500); // brief pause between batches
       }
     } catch (err) {
       console.error("[WhatsApp Cron] Stale cart error:", err);
@@ -77,10 +82,11 @@ export const initWhatsAppCrons = () => {
 
         const users = await UserProfile.find(filter).skip(skip).limit(BATCH).lean();
         if (!users.length) break;
-        for (const u of users) {
-          await enqueueWhatsApp("reengagement", { userId: u._id.toString() });
+        for (const [i, u] of users.entries()) {
+          await enqueueWhatsApp("reengagement", { userId: u._id.toString() }, { delay: i * 2000 });
         }
         skip += BATCH;
+        await sleep(500);
       }
     } catch (err) {
       console.error("[WhatsApp Cron] Re-engagement error:", err);
@@ -151,10 +157,11 @@ export const initWhatsAppCrons = () => {
            const currentSettings = await getSettings();
            if (!currentSettings.waAllEnabled || !currentSettings.waTrendingProductsEnabled) break;
 
-           for (const u of users) {
-             await enqueueWhatsApp("trending", { userId: u._id.toString(), productId: product._id.toString() });
+           for (const [i, u] of users.entries()) {
+             await enqueueWhatsApp("trending", { userId: u._id.toString(), productId: product._id.toString() }, { delay: i * 2000 });
            }
            skip += BATCH;
+           await sleep(500);
          }
       }, delay);
 

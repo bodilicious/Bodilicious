@@ -11,11 +11,12 @@ import {
 import { v2 as cloudinary } from "cloudinary";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
-import Redis from "ioredis";
+import _redis from "../utils/redis.js";
 import NotificationService from "../procurement/notificationService.js";
 
-const redisUrl = process.env.REDIS_URL || null;
-const redis = redisUrl ? new Redis(redisUrl) : { incr: () => {} };
+// Use the shared singleton; fall back to a no-op if Redis is unavailable.
+// incr returns a Promise since the call site uses await.
+const redis = _redis ?? { incr: () => Promise.resolve(0) };
 
 // POST /api/v1/support/tickets
 export const createTicket = async (req, res) => {

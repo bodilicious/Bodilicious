@@ -16,16 +16,12 @@ import { liveStreamHandler } from "./live.js";
 import { protect, adminOnly, tryProtect } from "../middleware/auth.js";
 
 import rateLimit from "express-rate-limit";
-import RedisStore from "rate-limit-redis";
-import Redis from "ioredis";
 
-const rateLimitRedisClient = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null;
 const trackLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(rateLimitRedisClient && { store: new RedisStore({ sendCommand: (...args) => rateLimitRedisClient.call(...args), prefix: 'rl:track:' }) }),
   message: { success: false, message: "Too many tracking events" }
 });
 

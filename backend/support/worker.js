@@ -111,7 +111,7 @@ export const startSupportWorker = () => {
 
   workerInstance = new Worker("support_jobs", processLookup, {
     connection,
-    concurrency: 5,
+    concurrency: 1,   // support jobs are rare; no benefit to >1, saves Redis poll commands
     drainDelay: 300000,
     stalledInterval: 900000,
     metrics: { maxDataPoints: 0 }

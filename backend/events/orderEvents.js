@@ -5,6 +5,7 @@ import UserProfile from "../profile/models.js";
 import Order from "../tracker/models.js";
 import { trackServerEvent } from "../utils/posthog.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
+import { getSettings } from "../settings/cache.js";
 
 class OrderEmitter extends EventEmitter {}
 const orderEvents = new OrderEmitter();
@@ -62,12 +63,15 @@ orderEvents.on("order_placed", async (order) => {
             console.error("[Order Events] Email dispatch failed:", err.message);
         }
 
-        // 4. WhatsApp Queueing
+        // 4. WhatsApp Queueing — skip entirely if WhatsApp is disabled
         try {
-            await enqueueWhatsApp("order_placed", {
-                userId: order.user.toString(),
-                orderId: order._id.toString()
-            });
+            const waSettings = await getSettings();
+            if (waSettings.waAllEnabled) {
+                await enqueueWhatsApp("order_placed", {
+                    userId: order.user.toString(),
+                    orderId: order._id.toString()
+                });
+            }
         } catch (err) {
             console.error("[Order Events] WhatsApp enqueue failed:", err.message);
         }
