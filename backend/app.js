@@ -126,7 +126,10 @@ app.use("/api/v1", globalLimiter, routes);
 // Health check endpoint for UptimeRobot — keep body minimal to save bandwidth.
 // UptimeRobot only checks the HTTP 200 status, not the body content.
 // Rate-limited to prevent /health being used as a free flood vector.
+// Cache-Control: no-store ensures Cloudflare always proxies to the real origin
+// so UptimeRobot gets a genuine response, not a cached one from the edge.
 app.get("/health", globalLimiter, (req, res) => {
+  res.set("Cache-Control", "no-store");
   res.status(200).end();
 });
 
