@@ -167,19 +167,34 @@ export default function ProductPage() {
       }
     : null;
 
-  const productKeywords = product
-    ? [
-        product.name,
-        product.category,
-        product.sub_category,
-        product.product_type,
-        ...(product.concerns_targeted || []),
-        'Bodilicious',
-        'herbal',
-        'dermatologically tested'
-      ].filter(Boolean).join(', ')
-    : undefined;
+  const productKeywords = (() => {
+    if (!product) return undefined;
 
+    const autoKeywords = [
+      product.name,
+      product.category,
+      product.sub_category,
+      product.product_type,
+      ...(product.concerns_targeted || []),
+      'Bodilicious',
+      'herbal',
+      'dermatologically tested'
+    ].filter(Boolean) as string[];
+
+    const customKeywords = product.seo_keywords
+      ? product.seo_keywords.split(',').map(k => k.trim()).filter(Boolean)
+      : [];
+
+    const seen = new Set<string>();
+    const merged = [...autoKeywords, ...customKeywords].filter(k => {
+      const key = k.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return merged.join(', ');
+  })();
   const breadcrumbSchema = product
     ? {
         '@context': 'https://schema.org',

@@ -56,6 +56,7 @@ export interface Product {
   texture?: string;
   warnings?: string[];
   is_active_based?: boolean;
+  seo_keywords?: string;
   createdAt?: string;
 }
 

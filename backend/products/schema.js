@@ -55,6 +55,7 @@ export const createProductSchema = z
     texture: z.string().optional(),
     warnings: z.array(z.string()).optional(),
     is_active_based: z.boolean().optional(),
+    seo_keywords: z.string().max(300, "Keywords cannot exceed 300 characters").optional(),
   })
   .strict();
 

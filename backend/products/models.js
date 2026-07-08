@@ -98,6 +98,7 @@ const productSchema = new mongoose.Schema(
     texture: { type: String, trim: true },
     warnings: { type: [String], default: [] },
     is_active_based: { type: Boolean, default: false },
+    seo_keywords: { type: String, trim: true, default: "" },
 
     rating: { type: Number, default: 0, min: 0, max: 5 },
     ratingCount: { type: Number, default: 0, min: 0 },

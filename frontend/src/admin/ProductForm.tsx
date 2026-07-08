@@ -371,6 +371,18 @@ const ProductForm: React.FC = () => {
               onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
             />
           </div>
+          <div className="mb-4">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Custom SEO Keywords</label>
+            <p className="text-xs text-gray-500 mb-2">Comma separated. Max 300 chars. Auto-deduplicated with default keywords.</p>
+            <input
+              type="text"
+              maxLength={300}
+              className="w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20"
+              value={(formData as any).seo_keywords || ''}
+              onChange={e => setFormData(prev => ({ ...prev, seo_keywords: e.target.value }))}
+              placeholder="vegan, cruelty-free, glowing skin"
+            />
+          </div>
           <InputField label="Texture" field="texture" />
           <ArrayField label="Benefits" value={formData.benefits} onChange={v => setFormData(prev => ({ ...prev, benefits: v }))} />
           <ArrayField label="Concerns Targeted" value={formData.concerns_targeted} onChange={v => setFormData(prev => ({ ...prev, concerns_targeted: v }))} />

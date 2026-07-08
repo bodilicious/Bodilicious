@@ -9,6 +9,7 @@ export default function PrivacyPage() {
         title: 'Privacy Policy — Bodilicious',
         description:
             'Read the Bodilicious Privacy Policy to understand how we collect, use, and protect your personal data when you shop with us.',
+        keywords: 'bodilicious, skincare, haircare, natural beauty, herbal products, buy online',
         canonical: '/privacy',
     });
 
