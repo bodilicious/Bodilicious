@@ -21,7 +21,8 @@ import {
   Monitor,
   Image,
   ChevronDown,
-  Store
+  Store,
+  FileText
 } from 'lucide-react';
 
 
@@ -176,6 +177,12 @@ const AdminLayout: React.FC = () => {
       items: [
         { name: 'Coupons', path: '/admin/coupons', icon: Tag },
         { name: 'Live Builder', path: '/admin/homepage-editor', icon: Monitor },
+      ]
+    },
+    {
+      title: 'Content',
+      items: [
+        { name: 'Blogs', path: '/admin/blogs', icon: FileText },
       ]
     },
     {

@@ -4,8 +4,15 @@ import { useApp } from '../context/AppContext';
 import { useCurrency } from '../hooks/useCurrency';
 import Footer from '../components/Footer';
 import { useState, useEffect, useMemo } from 'react';
+import { useSEO } from '../hooks/useSEO';
 
 export default function CartPage() {
+  useSEO({
+    title: 'Your Shopping Cart',
+    description: 'Review your cart items.',
+    noIndex: true
+  });
+
   const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings, fetchShippingQuote, appliedCoupon, setAppliedCoupon } = useApp();
   const { formatPrice, userCurrency } = useCurrency();
   const navigate = useNavigate();

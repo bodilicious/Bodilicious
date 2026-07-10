@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { CartItem } from '../types';
 import { COUNTRIES } from '../utils/countries';
 import { useCurrency } from '../hooks/useCurrency';
+import { useSEO } from '../hooks/useSEO';
 
 // ─── Checkout session timeout constants ──────────────────────────────────────
 // ⚠️ TEST VALUES — restore for production:
@@ -59,6 +60,12 @@ const VERIFY_TIMEOUT_MS = 25_000;
 type OverlayState = 'none' | 'init' | 'verifying' | 'success' | 'timeout' | 'captured_failed' | 'cod_processing';
 
 export default function PaymentPage() {
+    useSEO({
+        title: 'Secure Checkout - Payment',
+        description: 'Complete your secure checkout.',
+        noIndex: true
+    });
+
     const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings, cartLoading, fetchShippingQuote, appliedCoupon } = useApp();
     const { formatPrice, userCurrency } = useCurrency();
     const location = useLocation();

@@ -6,9 +6,16 @@ import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 import { Order, TimelineEvent } from '../types';
 import { formatCurrency } from '../utils/currencies';
+import { useSEO } from '../hooks/useSEO';
 
 
 export default function TrackingPage() {
+    useSEO({
+        title: 'Track Your Order',
+        description: 'Track the status of your order.',
+        noIndex: true
+    });
+
     const { navigateTo, getAuthHeaders, orders, cancelOrder } = useApp();
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);

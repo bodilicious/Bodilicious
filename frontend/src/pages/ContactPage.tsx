@@ -18,12 +18,12 @@ export default function ContactPage() {
             '@context': 'https://schema.org',
             '@type': 'ContactPage',
             name: 'Contact Bodilicious',
-            url: 'https://www.bodilicious.in/contact',
+            url: 'https://bodilicious.in/contact',
             description: 'Reach out to the Bodilicious team for product queries, shipping help, or feedback.',
             publisher: {
                 '@type': 'Organization',
                 name: 'Bodilicious',
-                url: 'https://www.bodilicious.in',
+                url: 'https://bodilicious.in',
                 contactPoint: {
                     '@type': 'ContactPoint',
                     contactType: 'customer service',

@@ -4,12 +4,19 @@ import { useApp } from '../context/AppContext';
 import { CheckCircle2, XCircle, PackageX, ChevronRight, FileText, Check, AlertTriangle } from 'lucide-react';
 import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/currencies';
+import { useSEO } from '../hooks/useSEO';
 
 const CONFIRMATION_STATE_KEY = 'bodilicious_confirmation_state';
 
 type ConfirmationState = { orderId: string; status: 'success' | 'failed' | 'cancelled' };
 
 export default function ConfirmationPage() {
+    useSEO({
+        title: 'Order Confirmation',
+        description: 'Your order confirmation details.',
+        noIndex: true
+    });
+
     const location = useLocation();
     const navigate = useNavigate();
     const { orders, refreshProfile } = useApp();

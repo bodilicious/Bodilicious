@@ -14,13 +14,13 @@ export default function AboutPage() {
             '@context': 'https://schema.org',
             '@type': 'AboutPage',
             name: 'About Bodilicious',
-            url: 'https://www.bodilicious.in/about',
+            url: 'https://bodilicious.in/about',
             description: 'Bodilicious is a certified, registered Indian beauty brand offering science-backed skincare and haircare.',
             publisher: {
                 '@type': 'Organization',
                 name: 'Bodilicious',
-                url: 'https://www.bodilicious.in',
-                logo: { '@type': 'ImageObject', url: 'https://www.bodilicious.in/logo.webp' },
+                url: 'https://bodilicious.in',
+                logo: { '@type': 'ImageObject', url: 'https://bodilicious.in/logo.webp' },
             },
         },
     });

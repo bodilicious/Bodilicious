@@ -38,4 +38,4 @@ Allow: /shop?concern=
 Allow: /shop?ingredient=
 
 # Sitemap location
-Sitemap: https://www.bodilicious.in/sitemap.xml
+Sitemap: https://bodilicious.in/sitemap.xml

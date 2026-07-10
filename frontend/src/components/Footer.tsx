@@ -49,6 +49,7 @@ export default function Footer() {
                 { label: 'Privacy Policy', path: '/privacy' },
                 { label: 'Terms & Conditions', path: '/terms' },
                 { label: 'Shipping & Refund Policy', path: '/shipping-refund' },
+                { label: 'Blogs', path: '/blogs' },
                 { label: 'About Us', path: '/about' },
                 { label: 'Brand Story', path: '/brand-story' },
                 { label: 'Offers', path: '/offers' },

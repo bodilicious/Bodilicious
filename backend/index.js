@@ -12,6 +12,7 @@ import supportRoutes from "./support/routes.js";
 import analyticsRoutes from "./analytics/routes.js";
 import settingsRoutes from "./settings/routes.js";
 import whatsappRoutes from "./whatsapp/routes.js";
+import { adminRouter as blogAdminRoutes, categoryRouter as blogCategoryRoutes, publicRouter as blogPublicRoutes } from "./blog/routes.js";
 
 const router = Router();
 
@@ -23,12 +24,13 @@ router.use("/payment", paymentRoutes);
 router.use("/admin/analytics", analyticsRoutes);
 router.use("/admin/returns", returnsRoutes);
 router.use("/admin/coupons", couponRoutes);
+router.use("/admin/blogs", blogAdminRoutes);
+router.use("/admin/blog-categories", blogCategoryRoutes);
 router.use("/admin", procurementRoutes);
 router.use("/admin", adminRoutes); // Moved to the bottom to avoid intercepting other /admin/* routes
 router.use("/settings", settingsRoutes);
 router.use("/support", supportRoutes);
 router.use("/whatsapp", whatsappRoutes);
+router.use("/blogs", blogPublicRoutes);
 
 export default router;
-
-

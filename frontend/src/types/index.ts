@@ -18,6 +18,12 @@ export interface UsageData {
   routine_step?: string;
 }
 
+export interface SeoKeywords {
+  primary?: string[];
+  secondary?: string[];
+  tertiary?: string[];
+}
+
 export interface Product {
   _id?: string;
   pid: string;
@@ -56,7 +62,7 @@ export interface Product {
   texture?: string;
   warnings?: string[];
   is_active_based?: boolean;
-  seo_keywords?: string;
+  seo_keywords?: SeoKeywords | string; // keeping string for backwards compatibility during transition
   createdAt?: string;
 }
 

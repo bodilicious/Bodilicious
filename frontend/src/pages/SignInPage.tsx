@@ -2,10 +2,17 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
+import { useSEO } from "../hooks/useSEO";
 
 type Mode = "signin" | "signup" | "forgot-password";
 
 export default function SignInPage() {
+  useSEO({
+    title: 'Sign In / Sign Up',
+    description: 'Sign in to your account.',
+    noIndex: true
+  });
+
   const {
     signInWithGoogle,
     signInWithEmail,

@@ -12,6 +12,7 @@ import { getCountryFlag } from '../utils/countries';
 
 import { useCurrency } from '../hooks/useCurrency';
 import { getIsoAlpha2Code } from '../utils/countryMapper';
+import { useSEO } from '../hooks/useSEO';
 
 // ─── Module-level pincode cache ────────────────────────────────────────────────
 const pincodeCache: Record<string, { city: string; state: string; areas: string[] }> = {};
@@ -45,6 +46,12 @@ function isIndiaCountry(c: string) {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 export default function ShippingPage() {
+    useSEO({
+        title: 'Checkout - Shipping',
+        description: 'Enter your shipping details.',
+        noIndex: true
+    });
+
     const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings, fetchShippingQuote, appliedCoupon, setAppliedCoupon } = useApp();
     const { formatPrice, userCurrency } = useCurrency();
     const navigate = useNavigate();

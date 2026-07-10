@@ -22,6 +22,14 @@ async function generateSitemap() {
     const products = await Product.find({}, 'pid category').lean();
     console.log(`Found ${products.length} active products`);
 
+    // Mongoose Model for Blogs
+    const BlogSchema = new mongoose.Schema({}, { strict: false });
+    const Blog = mongoose.models.Blog || mongoose.model('Blog', BlogSchema);
+
+    // Fetch published blogs
+    const blogs = await Blog.find({ status: 'published' }, 'slug updatedAt createdAt').lean();
+    console.log(`Found ${blogs.length} published blogs`);
+
     // Read current sitemap
     const currentSitemap = fs.readFileSync(sitemapPath, 'utf8');
 
@@ -55,17 +63,30 @@ async function generateSitemap() {
         
         productXml += `
   <url>
-    <loc>https://www.bodilicious.in/product/${p.pid}</loc>
+    <loc>https://bodilicious.in/product/${p.pid}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>${priority}</priority>
   </url>\n`;
     });
 
-    const newSitemap = topPart + productXml + '\n  ' + bottomPart;
+    let blogXml = `<!-- ═══════════════════════════════════════════════════════════\n       TIER 4.5 — BLOG POSTS (Priority 0.75)\n       Automatically generated from MongoDB.\n       ═══════════════════════════════════════════════════════════ -->\n`;
+    
+    blogs.forEach(b => {
+        const lastMod = (b.updatedAt || b.createdAt || new Date()).toISOString().split('T')[0];
+        blogXml += `
+  <url>
+    <loc>https://bodilicious.in/blogs/${b.slug}</loc>
+    <lastmod>${lastMod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>\n`;
+    });
+
+    const newSitemap = topPart + productXml + blogXml + '\n  ' + bottomPart;
     
     // Also change locs to www.bodilicious.in for consistency with robots.txt
-    const finalSitemap = newSitemap.replace(/<loc>https:\/\/bodilicious\.in\//g, '<loc>https://www.bodilicious.in/');
+    const finalSitemap = newSitemap.replace(/<loc>https:\/\/bodilicious\.in\//g, '<loc>https://bodilicious.in/');
 
     fs.writeFileSync(sitemapPath, finalSitemap, 'utf8');
     console.log('Successfully updated sitemap.xml');

@@ -3,6 +3,7 @@ import { LogOut, LogIn } from 'lucide-react';
 import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 import { Order } from '../types';
+import { useSEO } from '../hooks/useSEO';
 
 // Modular profile components
 import AccountHeaderCard from '../components/profile/AccountHeaderCard';
@@ -16,6 +17,12 @@ import OffersSection from '../components/profile/OffersSection';
 import WishlistPreviewSection from '../components/profile/WishlistPreviewSection';
 
 export default function AccountPage() {
+  useSEO({
+    title: 'My Account',
+    description: 'Manage your account.',
+    noIndex: true
+  });
+
   const {
     user,
     authStatus,

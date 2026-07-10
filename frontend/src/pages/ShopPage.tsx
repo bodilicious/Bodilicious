@@ -220,7 +220,7 @@ export default function ShopPage() {
             '@type': 'ListItem',
             position: i + 1,
             name: p.name,
-            url: `https://www.bodilicious.in/product/${p.pid}`,
+            url: `https://bodilicious.in/product/${p.pid}`,
           })),
         }
       : null;
@@ -230,14 +230,14 @@ export default function ShopPage() {
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.bodilicious.in/' },
-        { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.bodilicious.in/shop' },
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://bodilicious.in/' },
+        { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://bodilicious.in/shop' },
         ...(activeCategory
           ? [{
               '@type': 'ListItem',
               position: 3,
               name: titleCase(activeCategory),
-              item: `https://www.bodilicious.in/shop?category=${activeCategory}`,
+              item: `https://bodilicious.in/shop?category=${activeCategory}`,
             }]
           : []),
       ],

@@ -31,15 +31,26 @@ function ArrayField({ label, value, onChange }: {
         type="text"
         className="form-input w-full md:w-1/2 p-2 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-dark-red/20 outline-none"
         value={input}
-        onChange={e => setInput(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' && input.trim()) {
-            onChange([...value, input.trim()]);
+        onChange={e => {
+          const val = e.target.value;
+          if (val.includes(',')) {
+            const newItems = val.split(',').map(s => s.trim()).filter(Boolean);
+            if (newItems.length > 0) {
+              onChange([...value, ...newItems]);
+            }
             setInput('');
-            e.preventDefault();
+          } else {
+            setInput(val);
           }
         }}
-        placeholder={`Add ${label.toLowerCase()} and press Enter`}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && input.trim()) {
+            e.preventDefault();
+            onChange([...value, input.trim()]);
+            setInput('');
+          }
+        }}
+        placeholder={`Add ${label.toLowerCase()} (press Enter or comma)`}
       />
     </div>
   );
@@ -59,6 +70,7 @@ const defaultFormData = {
   skin_type_not_suitable: [] as string[],
   hair_type_suitable: [] as string[],
   ingredients: { key_actives: [] as string[], botanical_extracts: [] as string[], others: [] as string[] },
+  seo_keywords: { primary: [] as string[], secondary: [] as string[], tertiary: [] as string[] },
   usage: { time: '', frequency: '', routine_step: '' },
   price: 0, price_inr: 0, stock: 0, lowStockThreshold: 5,
   product_weight_ml: 0, product_weight_g: 0,
@@ -87,7 +99,15 @@ const ProductForm: React.FC = () => {
         const data = await res.json();
         if (data.success) {
           // Merge with defaultFormData to ensure nested objects exist
-          setFormData(prev => ({ ...prev, ...data.data, ingredients: { ...prev.ingredients, ...data.data.ingredients }, usage: { ...prev.usage, ...data.data.usage }}));
+          setFormData(prev => ({ 
+            ...prev, 
+            ...data.data, 
+            ingredients: { ...prev.ingredients, ...data.data.ingredients },
+            seo_keywords: typeof data.data.seo_keywords === 'string' 
+              ? { ...prev.seo_keywords, primary: data.data.seo_keywords.split(',').map((s: string) => s.trim()).filter(Boolean) }
+              : { ...prev.seo_keywords, ...data.data.seo_keywords },
+            usage: { ...prev.usage, ...data.data.usage }
+          }));
         } else {
           toast.error("Failed to load product");
         }
@@ -373,15 +393,24 @@ const ProductForm: React.FC = () => {
           </div>
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-2">Custom SEO Keywords</label>
-            <p className="text-xs text-gray-500 mb-2">Comma separated. Max 300 chars. Auto-deduplicated with default keywords.</p>
-            <input
-              type="text"
-              maxLength={300}
-              className="w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20"
-              value={(formData as any).seo_keywords || ''}
-              onChange={e => setFormData(prev => ({ ...prev, seo_keywords: e.target.value }))}
-              placeholder="vegan, cruelty-free, glowing skin"
-            />
+            <p className="text-xs text-gray-500 mb-4">Auto-deduplicated with default keywords.</p>
+            <div className="pl-4 border-l-2 border-dark-red/20 space-y-4">
+              <ArrayField 
+                label="Primary Keywords" 
+                value={(formData as any).seo_keywords.primary} 
+                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, primary: v } }))} 
+              />
+              <ArrayField 
+                label="Secondary Keywords" 
+                value={(formData as any).seo_keywords.secondary} 
+                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, secondary: v } }))} 
+              />
+              <ArrayField 
+                label="Tertiary Keywords" 
+                value={(formData as any).seo_keywords.tertiary} 
+                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, tertiary: v } }))} 
+              />
+            </div>
           </div>
           <InputField label="Texture" field="texture" />
           <ArrayField label="Benefits" value={formData.benefits} onChange={v => setFormData(prev => ({ ...prev, benefits: v }))} />

@@ -45,6 +45,15 @@ const usageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const seoKeywordSchema = new mongoose.Schema(
+  {
+    primary: { type: [String], default: [] },
+    secondary: { type: [String], default: [] },
+    tertiary: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema(
   {
     pid: { type: String, required: true, unique: true, trim: true },
@@ -98,7 +107,7 @@ const productSchema = new mongoose.Schema(
     texture: { type: String, trim: true },
     warnings: { type: [String], default: [] },
     is_active_based: { type: Boolean, default: false },
-    seo_keywords: { type: String, trim: true, default: "" },
+    seo_keywords: { type: seoKeywordSchema, default: () => ({ primary: [], secondary: [], tertiary: [] }) },
 
     rating: { type: Number, default: 0, min: 0, max: 5 },
     ratingCount: { type: Number, default: 0, min: 0 },

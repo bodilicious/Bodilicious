@@ -206,7 +206,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: FRONTEND_URL
-        value: https://www.bodilicious.in
+        value: https://bodilicious.in
       - key: RESEND_API_KEY
         sync: false   # set this secret in the Render dashboard
       - key: EMAIL_FROM

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const BASE_URL = 'https://www.bodilicious.in';
+const BASE_URL = 'https://bodilicious.in';
 const DEFAULT_IMAGE = `${BASE_URL}/og-image.png`;
 const BRAND = 'Bodilicious';
 
@@ -139,5 +139,5 @@ export function useSEO({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, canonical, ogImage, noIndex]);
+  }, [title, description, canonical, ogImage, ogImageAlt, noIndex, jsonLd, keywords]);
 }

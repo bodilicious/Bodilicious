@@ -39,7 +39,6 @@ const steps: Step[] = [
     subtitle: 'Find the perfect match for your skin',
     description:
       'Browse our curated collection of clean, clinical formulations. Use the Ritual Finder to get recommendation profiles tailored to your specific skin concern, or explore by product category.',
-        keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     cta: { label: 'Explore Shop', path: '/shop' },
     highlight: 'Tip: Filter by skin concern (e.g. brightening, hydration) for faster discovery.',
   },
@@ -101,6 +100,7 @@ export default function HowToOrderPage() {
     description:
       'An interactive, step-by-step walkthrough to placing an order on Bodilicious. Discover, select, check out, and track your package.',
     canonical: '/how-to-order',
+    keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     jsonLd: {
       '@context': 'https://schema.org',
       '@type': 'HowTo',

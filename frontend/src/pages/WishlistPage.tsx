@@ -2,8 +2,15 @@ import { Heart, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import Footer from '../components/Footer';
+import { useSEO } from '../hooks/useSEO';
 
 export default function WishlistPage() {
+  useSEO({
+    title: 'Your Wishlist',
+    description: 'Your saved favorite items.',
+    noIndex: true
+  });
+
   const { wishlist, navigateTo } = useApp();
 
   return (

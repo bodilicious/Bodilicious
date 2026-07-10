@@ -150,7 +150,7 @@ export default function ProductPage() {
             product.stock > 0
               ? 'https://schema.org/InStock'
               : 'https://schema.org/OutOfStock',
-          url: `https://www.bodilicious.in/product/${product.pid}`,
+          url: `https://bodilicious.in/product/${product.pid}`,
           seller: { '@type': 'Organization', name: 'Bodilicious' },
         },
         ...(product.rating && product.ratingCount && product.ratingCount > 0
@@ -180,9 +180,17 @@ export default function ProductPage() {
       'dermatologically tested'
     ].filter(Boolean) as string[];
 
-    const customKeywords = product.seo_keywords
-      ? product.seo_keywords.split(',').map(k => k.trim()).filter(Boolean)
-      : [];
+    const customKeywords = (() => {
+      if (!product.seo_keywords) return [];
+      if (typeof product.seo_keywords === 'string') {
+        return product.seo_keywords.split(',').map(k => k.trim()).filter(Boolean);
+      }
+      return [
+        ...(product.seo_keywords.primary || []),
+        ...(product.seo_keywords.secondary || []),
+        ...(product.seo_keywords.tertiary || [])
+      ].filter(Boolean);
+    })();
 
     const seen = new Set<string>();
     const merged = [...autoKeywords, ...customKeywords].filter(k => {
@@ -194,6 +202,23 @@ export default function ProductPage() {
 
     return merged.join(', ');
   })();
+
+  const primaryKw = product?.seo_keywords && typeof product.seo_keywords !== 'string' && product.seo_keywords.primary?.[0] 
+    ? product.seo_keywords.primary[0].trim() 
+    : '';
+  
+  const secondaryKw = product?.seo_keywords && typeof product.seo_keywords !== 'string' && product.seo_keywords.secondary?.[0]
+    ? product.seo_keywords.secondary[0].trim()
+    : '';
+
+  const pageTitle = product 
+    ? (primaryKw ? `${product.name} - ${primaryKw} | Bodilicious` : `${product.name} — Bodilicious`)
+    : 'Product — Bodilicious';
+
+  const ogAlt = product 
+    ? (secondaryKw ? `${product.name} - ${secondaryKw}` : `${product.name} by Bodilicious`)
+    : undefined;
+
   const breadcrumbSchema = product
     ? {
         '@context': 'https://schema.org',
@@ -203,19 +228,19 @@ export default function ProductPage() {
             '@type': 'ListItem',
             position: 1,
             name: 'Home',
-            item: 'https://www.bodilicious.in/',
+            item: 'https://bodilicious.in/',
           },
           {
             '@type': 'ListItem',
             position: 2,
             name: 'Shop',
-            item: 'https://www.bodilicious.in/shop',
+            item: 'https://bodilicious.in/shop',
           },
           {
             '@type': 'ListItem',
             position: 3,
             name: product.name,
-            item: `https://www.bodilicious.in/product/${product.pid}`,
+            item: `https://bodilicious.in/product/${product.pid}`,
           },
         ],
       }
@@ -227,12 +252,12 @@ export default function ProductPage() {
       : productSchema ?? undefined;
 
   useSEO({
-    title: product ? `${product.name} — Bodilicious` : 'Product — Bodilicious',
+    title: pageTitle,
     description: productDesc,
     keywords: productKeywords,
     canonical: product ? `/product/${product.pid}` : '/shop',
     ogImage: product?.images[0],
-    ogImageAlt: product ? `${product.name} by Bodilicious` : undefined,
+    ogImageAlt: ogAlt,
     jsonLd: productJsonLd,
   });
 

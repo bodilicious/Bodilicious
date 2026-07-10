@@ -14,12 +14,12 @@ export default function BrandStoryPage() {
             '@context': 'https://schema.org',
             '@type': 'WebPage',
             name: 'Our Brand Story — Bodilicious',
-            url: 'https://www.bodilicious.in/brand-story',
+            url: 'https://bodilicious.in/brand-story',
             description: 'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional wisdom to create safe, targeted skincare and haircare.',
             publisher: {
                 '@type': 'Organization',
                 name: 'Bodilicious',
-                url: 'https://www.bodilicious.in',
+                url: 'https://bodilicious.in',
             },
         },
     });

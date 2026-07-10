@@ -14,7 +14,7 @@ export default function OfferPage() {
       'New to Bodilicious? Enjoy 10% off your first skincare or haircare order. Premium beauty products, dermatologically tested, delivered free over ₹1500.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     canonical: '/offers',
-    ogImage: 'https://www.bodilicious.in/og-image.png',
+    ogImage: 'https://bodilicious.in/og-image.png',
     ogImageAlt: 'Bodilicious Welcome Offer — 10% Off Your First Order',
   });
 

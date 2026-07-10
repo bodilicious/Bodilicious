@@ -18,8 +18,15 @@ import {
 import { TimelineEvent } from '../types';
 import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
+import { useSEO } from '../hooks/useSEO';
 
 export default function OrderDetailsPage() {
+    useSEO({
+        title: 'Order Details',
+        description: 'View the details of your order.',
+        noIndex: true
+    });
+
     const { orderId: urlOrderId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();

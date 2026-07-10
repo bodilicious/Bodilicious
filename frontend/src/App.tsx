@@ -61,6 +61,10 @@ const TicketManagement = lazy(() => import('./admin/TicketManagement'));
 const VisualHomepageEditor = lazy(() => import('./admin/VisualHomepageEditor'));
 const MediaLibraryPage = lazy(() => import('./admin/MediaLibraryPage'));
 const HomepagePreviewFrame = lazy(() => import('./admin/HomepagePreviewFrame'));
+const BlogManagement = lazy(() => import('./admin/BlogManagement'));
+const BlogForm = lazy(() => import('./admin/BlogForm'));
+const BlogListPage = lazy(() => import('./pages/BlogListPage'));
+const BlogPostPage = lazy(() => import('./pages/BlogPostPage'));
 
 // Simple loading fallback with a full-screen transparent block to prevent clicks during lazy loading transitions
 const PageLoader = () => (
@@ -160,6 +164,10 @@ function AppRoutes() {
             <Route path="/offers" element={<PageTransition><OfferPage /></PageTransition>} />
             <Route path="/how-to-order" element={<PageTransition><HowToOrderPage /></PageTransition>} />
 
+            {/* Blog public pages */}
+            <Route path="/blogs" element={<PageTransition><BlogListPage /></PageTransition>} />
+            <Route path="/blogs/:slug" element={<PageTransition><BlogPostPage /></PageTransition>} />
+
             {/* Admin Routes */}
               <Route element={<AdminRoute />}>
               <Route path="/admin" element={<AdminLayout />}>
@@ -182,6 +190,11 @@ function AppRoutes() {
                 <Route path="homepage-editor" element={<VisualHomepageEditor />} />
                 <Route path="media" element={<MediaLibraryPage />} />
                 <Route path="logs" element={<AuditLogs />} />
+                {/* Blog routes — blogs/new must be before blogs/:id */}
+                <Route path="blogs" element={<BlogManagement />} />
+                <Route path="blogs/new" element={<BlogForm />} />
+                <Route path="blogs/:id" element={<BlogForm />} />
+                <Route path="blog-categories" element={<Navigate to="/admin/blogs?tab=categories" replace />} />
               </Route>
             </Route>
 

@@ -94,3 +94,16 @@
   0% { transform: translateX(100vw); }
   100% { transform: translateX(-100%); }
 }
+
+/* ── Tiptap editor ─────────────────────────────────────────────────────────── */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+.ProseMirror:focus {
+  outline: none;
+}
+
