@@ -5,16 +5,11 @@
 
 // Tier 1: Razorpay definitively supports these internationally.
 const TIER_1_CHECKOUT = new Set([
-  'INR', 'USD', 'EUR', 'GBP', 'SGD', 'AED', 'AUD', 'CAD',
-  'CHF', 'HKD', 'JPY', 'MYR', 'NZD', 'SAR', 'ZAR', 'THB',
-  'SEK', 'NOK', 'DKK', 'QAR', 'BHD', 'KWD', 'OMR',
+  'INR', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'DKK',
 ]);
 
 // Tier 2: Likely supported with international payments enabled.
 const TIER_2_CHECKOUT = new Set([
-  'IDR', 'PHP', 'BDT', 'LKR', 'NPR', 'PKR', 'MXN', 'BRL',
-  'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'TRY', 'EGP', 'NGN',
-  'KES', 'GHS', 'TZS', 'UGX',
 ]);
 
 export const CHECKOUT_CURRENCIES = new Set([

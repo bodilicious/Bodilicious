@@ -8,6 +8,7 @@ import RequireAuth from '../components/RequireAuth';
 import toast from 'react-hot-toast';
 import { CartItem } from '../types';
 import { COUNTRIES } from '../utils/countries';
+import { formatCurrency } from '../utils/currencies';
 import { useCurrency } from '../hooks/useCurrency';
 import { useSEO } from '../hooks/useSEO';
 
@@ -71,7 +72,7 @@ export default function PaymentPage() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string } | null>(null);
+    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string, currency: string, isFallback: boolean, subtotal?: number } | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(true);
     const [quoteError, setQuoteError] = useState<string | null>(null);
 
@@ -252,7 +253,10 @@ export default function PaymentPage() {
                         quoteId: data.quoteId,
                         shippingCost: data.shippingCost,
                         total: data.totalAmount || data.total,
-                        deliveryEstimate: data.deliveryEstimate
+                        deliveryEstimate: data.deliveryEstimate,
+                        currency: data.currency || 'INR',
+                        isFallback: !!data.isFallback,
+                        subtotal: data.subtotal
                     });
                     if (isBackgroundRefresh) {
                         toast.success("Prices refreshed", { id: 'quote-refresh' });
@@ -534,7 +538,8 @@ export default function PaymentPage() {
                         email: shippingDetails.email || user?.email || 'customer@example.com',
                         contact: shippingDetails.phone || '9999999999',
                         method:
-                            paymentMethod === 'card' ? 'card'
+                            !isIndiaCountry(shippingDetails.country) ? undefined
+                            : paymentMethod === 'card' ? 'card'
                             : paymentMethod === 'upi' ? 'upi'
                             : paymentMethod === 'netbanking' ? 'netbanking'
                             : undefined
@@ -805,46 +810,54 @@ export default function PaymentPage() {
                                                     className="w-4 h-4 text-dark-red focus:ring-dark-red"
                                                 />
                                                 <div className="ml-4 flex items-center justify-between w-full">
-                                                    <span className="font-sans text-sm tracking-wide text-gray-800">Credit / Debit Card</span>
-                                                    <div className="flex gap-1 opacity-60">
-                                                        <div className="w-8 h-5 bg-gray-200 rounded" />
-                                                        <div className="w-8 h-5 bg-gray-200 rounded" />
-                                                    </div>
+                                                    <span className="font-sans text-sm tracking-wide text-gray-800">
+                                                        {isIndiaCountry(shippingDetails.country) ? 'Credit / Debit Card' : 'Online Payment (Cards, Wallets, Bank Transfers)'}
+                                                    </span>
+                                                    {isIndiaCountry(shippingDetails.country) && (
+                                                        <div className="flex gap-1 opacity-60">
+                                                            <div className="w-8 h-5 bg-gray-200 rounded" />
+                                                            <div className="w-8 h-5 bg-gray-200 rounded" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </label>
                                         </div>
 
-                                        <div className="border-b border-silk">
-                                            <label className="flex items-center px-4 py-4 cursor-pointer hover:bg-neutral-50 transition-colors">
-                                                <input
-                                                    type="radio"
-                                                    name="payment"
-                                                    value="upi"
-                                                    checked={paymentMethod === 'upi'}
-                                                    onChange={() => setPaymentMethod('upi')}
-                                                    className="w-4 h-4 text-dark-red focus:ring-dark-red"
-                                                />
-                                                <div className="ml-4 flex items-center w-full">
-                                                    <span className="font-sans text-sm tracking-wide text-gray-800">UPI (GPay, PhonePe, Paytm)</span>
+                                        {isIndiaCountry(shippingDetails.country) && (
+                                            <>
+                                                <div className="border-b border-silk">
+                                                    <label className="flex items-center px-4 py-4 cursor-pointer hover:bg-neutral-50 transition-colors">
+                                                        <input
+                                                            type="radio"
+                                                            name="payment"
+                                                            value="upi"
+                                                            checked={paymentMethod === 'upi'}
+                                                            onChange={() => setPaymentMethod('upi')}
+                                                            className="w-4 h-4 text-dark-red focus:ring-dark-red"
+                                                        />
+                                                        <div className="ml-4 flex items-center w-full">
+                                                            <span className="font-sans text-sm tracking-wide text-gray-800">UPI (GPay, PhonePe, Paytm)</span>
+                                                        </div>
+                                                    </label>
                                                 </div>
-                                            </label>
-                                        </div>
 
-                                        <div className="border-b border-silk">
-                                            <label className="flex items-center px-4 py-4 cursor-pointer hover:bg-neutral-50 transition-colors">
-                                                <input
-                                                    type="radio"
-                                                    name="payment"
-                                                    value="netbanking"
-                                                    checked={paymentMethod === 'netbanking'}
-                                                    onChange={() => setPaymentMethod('netbanking')}
-                                                    className="w-4 h-4 text-dark-red focus:ring-dark-red"
-                                                />
-                                                <div className="ml-4 flex items-center w-full">
-                                                    <span className="font-sans text-sm tracking-wide text-gray-800">Net Banking</span>
+                                                <div className="border-b border-silk">
+                                                    <label className="flex items-center px-4 py-4 cursor-pointer hover:bg-neutral-50 transition-colors">
+                                                        <input
+                                                            type="radio"
+                                                            name="payment"
+                                                            value="netbanking"
+                                                            checked={paymentMethod === 'netbanking'}
+                                                            onChange={() => setPaymentMethod('netbanking')}
+                                                            className="w-4 h-4 text-dark-red focus:ring-dark-red"
+                                                        />
+                                                        <div className="ml-4 flex items-center w-full">
+                                                            <span className="font-sans text-sm tracking-wide text-gray-800">Net Banking</span>
+                                                        </div>
+                                                    </label>
                                                 </div>
-                                            </label>
-                                        </div>
+                                            </>
+                                        )}
 
                                         <div>
                                             <label className={`flex items-center px-4 py-4 ${!isIndiaCountry(shippingDetails.country) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50'} transition-colors`}>
@@ -1003,7 +1016,7 @@ export default function PaymentPage() {
                                                 Processing…
                                             </>
                                         ) : (
-                                            <>Place Order ({formatPrice(total)}) <ChevronRight size={16} /></>
+                                            <>Place Order ({formatCurrency(total, quoteData?.currency || 'INR')}) <ChevronRight size={16} /></>
                                         )}
                                     </button>
                                 </div>
@@ -1052,28 +1065,26 @@ export default function PaymentPage() {
                                 <div className="border-t border-silk pt-4 space-y-3 font-sans text-sm">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Subtotal</span>
-                                        <span>{formatPrice(cartTotal)}</span>
+                                        <span>{quoteData?.subtotal !== undefined ? formatCurrency(quoteData.subtotal, quoteData.currency) : formatPrice(cartTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
                                         <span>Shipping</span>
                                         <span className={shippingCost === 0 ? 'text-green-700 font-medium' : 'text-gray-900'}>
-                                            {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
+                                            {shippingCost === 0 ? 'Free' : formatCurrency(shippingCost, quoteData?.currency || 'INR')}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className="border-t border-silk mt-4 pt-4 flex justify-between font-serif text-xl text-dark-red">
                                     <span>Total</span>
-                                    <span>{formatPrice(total)}</span>
+                                    <span>{formatCurrency(total, quoteData?.currency || 'INR')}</span>
                                 </div>
 
-                                {userCurrency === 'USD' && (
+                                {quoteData?.isFallback && (
                                     <div className="mt-3 text-xs font-sans text-gray-500 bg-gray-50 p-3 rounded-sm border border-gray-100 leading-relaxed text-center">
-                                        You will be billed exactly <strong>₹{total.toLocaleString('en-IN')} INR</strong>.<br />
-                                        Your bank may apply a conversion fee.<br />
-                                        <span className="text-[10px] mt-1 block opacity-80">
-                                            *Note: Any future refunds will be issued in INR. Due to exchange rate fluctuations, the final USD amount credited back to you may vary slightly.
-                                        </span>
+                                        Your selected currency ({userCurrency}) is not supported for checkout.<br />
+                                        You will be billed exactly <strong>{formatCurrency(total, 'INR')}</strong>.<br />
+                                        Your bank may apply a conversion fee.
                                     </div>
                                 )}
 

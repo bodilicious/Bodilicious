@@ -9,6 +9,7 @@ import {
 import Footer from '../components/Footer';
 import RequireAuth from '../components/RequireAuth';
 import { getCountryFlag } from '../utils/countries';
+import { formatCurrency } from '../utils/currencies';
 
 import { useCurrency } from '../hooks/useCurrency';
 import { getIsoAlpha2Code } from '../utils/countryMapper';
@@ -174,10 +175,16 @@ export default function ShippingPage() {
         discountAmount?: number;
         isWelcomeOfferApplied?: boolean;
         isFreeShippingCouponApplied?: boolean;
+        currency?: string;
+        isFallback?: boolean;
+        subtotal?: number;
+        isFetched?: boolean;
     }>({
         shippingCost: storeSettings.shippingCost,
         total: cartTotal + storeSettings.shippingCost,
-        threshold: storeSettings.shippingThreshold
+        threshold: storeSettings.shippingThreshold,
+        currency: 'INR',
+        isFetched: false
     });
 
     useEffect(() => {
@@ -203,7 +210,11 @@ export default function ShippingPage() {
                             : storeSettings.internationalShippingThreshold,
                         discountAmount: data.discountAmount,
                         isWelcomeOfferApplied: data.isWelcomeOfferApplied,
-                        isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
+                        isFreeShippingCouponApplied: data.isFreeShippingCouponApplied,
+                        currency: data.currency || 'INR',
+                        isFallback: !!data.isFallback,
+                        subtotal: data.subtotal,
+                        isFetched: true
                     });
 
                     if (appliedCoupon && !data.couponCode) {
@@ -248,7 +259,11 @@ export default function ShippingPage() {
                 total: data.totalAmount,
                 discountAmount: data.discountAmount,
                 isWelcomeOfferApplied: data.isWelcomeOfferApplied,
-                isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
+                isFreeShippingCouponApplied: data.isFreeShippingCouponApplied,
+                currency: data.currency || 'INR',
+                isFallback: !!data.isFallback,
+                subtotal: data.subtotal,
+                isFetched: true
             }));
 
             setAppliedCoupon(data.couponCode);
@@ -1216,12 +1231,12 @@ export default function ShippingPage() {
                                 <div className="border-t border-silk pt-4 space-y-2 font-sans text-sm text-gray-600">
                                     <div className="flex justify-between">
                                         <span>Subtotal</span>
-                                        <span>{formatPrice(cartTotal)}</span>
+                                        <span>{quoteData.isFetched && quoteData.subtotal !== undefined ? formatCurrency(quoteData.subtotal, quoteData.currency) : formatPrice(cartTotal)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Shipping</span>
                                         <span className={shippingCost === 0 ? 'text-emerald-700 font-medium' : ''}>
-                                            {shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
+                                            {shippingCost === 0 ? 'Free' : quoteData.isFetched ? formatCurrency(shippingCost, quoteData.currency) : formatPrice(shippingCost)}
                                         </span>
                                     </div>
                                     {(quoteData.discountAmount! > 0 || quoteData.isFreeShippingCouponApplied) && (
@@ -1229,7 +1244,7 @@ export default function ShippingPage() {
                                             <span>
                                                 {quoteData.isWelcomeOfferApplied ? 'Welcome Offer (10%)' : quoteData.isFreeShippingCouponApplied && quoteData.discountAmount === 0 ? 'Free Shipping Coupon' : 'Coupon Applied'}
                                             </span>
-                                            <span>{quoteData.discountAmount! > 0 ? `-${formatPrice(quoteData.discountAmount!)}` : 'Applied'}</span>
+                                            <span>{quoteData.discountAmount! > 0 ? `-${quoteData.isFetched ? formatCurrency(quoteData.discountAmount!, quoteData.currency) : formatPrice(quoteData.discountAmount!)}` : 'Applied'}</span>
                                         </div>
                                     )}
                                 </div>
@@ -1237,8 +1252,8 @@ export default function ShippingPage() {
                                 <div className="border-t border-silk mt-4 pt-4 flex justify-between font-serif text-xl text-dark-red">
                                     <span>Total</span>
                                     <span>
-                                        {formatPrice(total)}
-                                        {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
+                                        {quoteData.isFetched ? formatCurrency(total, quoteData.currency) : formatPrice(total)}
+                                        {quoteData.isFallback && <span className="text-sm ml-1 opacity-60">*</span>}
                                     </span>
                                 </div>
 
