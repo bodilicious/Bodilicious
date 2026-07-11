@@ -941,7 +941,7 @@ const triggerPasswordReset = async (email: string) => {
     const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     let response;
     try {
@@ -1003,7 +1003,7 @@ const triggerPasswordReset = async (email: string) => {
     const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     let res;
     try {
