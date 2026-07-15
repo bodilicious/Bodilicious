@@ -2,7 +2,7 @@ export const getPhone = (user, fallback) => {
   const raw = user?.phone || fallback || null;
   if (!raw) return null;
   const digits = raw.replace(/\D/g, "");
-  return digits.length >= 10 ? `+91${digits.slice(-10)}` : null;
+  return digits.length >= 10 ? `91${digits.slice(-10)}` : null;
 };
 
 export const sendWhatsAppTemplate = async (phone, templateName, components) => {

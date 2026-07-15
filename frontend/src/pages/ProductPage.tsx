@@ -371,7 +371,7 @@ export default function ProductPage() {
         );
         const data = await res.json();
         if (data.success) {
-          setRelatedProducts(data.data);
+          setRelatedProducts(data.products);
         }
       } catch (err) {
         console.error('Error fetching related products:', err);

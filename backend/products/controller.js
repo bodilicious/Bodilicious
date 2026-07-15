@@ -208,7 +208,6 @@ export const getAllProducts = async (req, res) => {
       page: numPage,
       totalPages: numLimit ? Math.ceil(total / numLimit) : 1,
       products: transformedProducts,
-      data: transformedProducts
     });
   } catch (err) {
     res.status(500).json({
