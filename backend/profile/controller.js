@@ -21,14 +21,7 @@ export const getProfile = async (req, res) => {
     })
       .populate('wishlist', productCardFields)
       .populate('cart.product', productCardFields)
-      .populate({
-        path: 'orders',
-        options: { sort: { createdAt: -1 }, limit: 20 }, // cap at 20 most recent orders
-        populate: {
-          path: 'items.product',
-          select: productCardFields,
-        },
-      });
+      .lean();
 
     if (!user) {
       return res.status(404).json({
@@ -37,9 +30,18 @@ export const getProfile = async (req, res) => {
       });
     }
 
+    // NOTE: Mongoose silently ignores `options.limit` for array ref populations.
+    // Fetching orders via a separate query is the only way to guarantee the cap.
+    const recentOrders = await Order.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb shippingCost discountAmount originalAmount currency')
+      .populate('items.product', productCardFields)
+      .lean();
+
     res.json({
       success: true,
-      data: user,
+      data: { ...user, orders: recentOrders },
     });
   } catch (err) {
     console.error('GET PROFILE ERROR:', err);
@@ -316,8 +318,9 @@ export const syncCart = async (req, res) => {
 
     const productCardFields = 'pid name price images rating ratingCount stock category brand';
     const userWithPopulatedCart = await UserProfile.findById(user._id)
-      .populate('cart.product', productCardFields)
-      .populate('wishlist', productCardFields);
+      .populate('cart.product', productCardFields);
+    // Return only the updated cart — client manages wishlist state independently
+    // and re-populating the full wishlist on every cart sync is a significant bandwidth waste.
     res.json({ success: true, cart: userWithPopulatedCart.cart });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

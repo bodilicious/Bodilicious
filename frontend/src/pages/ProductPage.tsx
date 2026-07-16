@@ -367,7 +367,7 @@ export default function ProductPage() {
       setIsRelatedLoading(true);
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/v1/products?category=${product.category}&excludePid=${product.pid}&limit=4`
+          `${import.meta.env.VITE_API_URL}/api/v1/products?category=${product.category}&excludePid=${product.pid}&limit=4&slim=true`
         );
         const data = await res.json();
         if (data.success) {

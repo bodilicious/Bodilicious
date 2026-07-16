@@ -323,30 +323,43 @@ export const getInventoryAnalytics = async (req, res) => {
     // Identify currently out of stock products
     const outOfStock = activeProducts.filter(p => p.stock === 0);
     
-    // Estimate daily revenue for these products based on previous 30-day performance (when they were in stock)
-    // For simplicity, we'll just look at their average daily sales in the last 30 days overall
-    const stockoutImpact = await Promise.all(outOfStock.map(async (p) => {
-        const sales = await Order.aggregate([
-            { $match: { 
-                createdAt: { $gte: thirtyDaysAgo }, 
-                paymentStatus: "paid",
-                "items.product": p._id 
-            } },
-            { $unwind: "$items" },
-            { $match: { "items.product": p._id } },
-            { $group: { _id: null, totalSold: { $sum: "$items.quantity" }, revenue: { $sum: { $multiply: ["$items.quantity", "$items.priceAtPurchase"] } } } }
-        ]);
+    // Batch aggregate — one query for ALL out-of-stock products instead of N separate queries.
+    // The previous approach fired one Order.aggregate per out-of-stock product, which generated
+    // N round-trips to Atlas on every admin analytics page load.
+    let stockoutImpact = [];
+    if (outOfStock.length > 0) {
+      const outOfStockIds = outOfStock.map(p => p._id);
+      const salesBatch = await Order.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: thirtyDaysAgo },
+            paymentStatus: "paid",
+            "items.product": { $in: outOfStockIds }
+          }
+        },
+        { $unwind: "$items" },
+        { $match: { "items.product": { $in: outOfStockIds } } },
+        {
+          $group: {
+            _id: "$items.product",
+            totalSold: { $sum: "$items.quantity" },
+            revenue: { $sum: { $multiply: ["$items.quantity", "$items.priceAtPurchase"] } }
+          }
+        }
+      ]);
 
-        const stats = sales[0] || { totalSold: 0, revenue: 0 };
-        const dailyRevenue = stats.revenue / 30;
-        
+      const salesMap = new Map(salesBatch.map(s => [s._id.toString(), s]));
+
+      stockoutImpact = outOfStock.map(p => {
+        const stats = salesMap.get(p._id.toString()) || { totalSold: 0, revenue: 0 };
         return {
-            name: p.name,
-            pid: p.pid,
-            estimatedDailyLoss: parseFloat(dailyRevenue.toFixed(2)),
-            totalSoldLast30: stats.totalSold
+          name: p.name,
+          pid: p.pid,
+          estimatedDailyLoss: parseFloat((stats.revenue / 30).toFixed(2)),
+          totalSoldLast30: stats.totalSold
         };
-    }));
+      }).sort((a, b) => b.estimatedDailyLoss - a.estimatedDailyLoss).slice(0, 10);
+    }
 
     res.json({ 
       success: true, 
@@ -660,7 +673,7 @@ export const getOperationAnalytics = async (req, res) => {
        ]);
     }
 
-    // 3. Cost Analysis (Scatter plot)
+    // 3. Cost Analysis (Scatter plot) — capped at 500 points, scatter charts don't render more usefully
     const costAnalysis = await Order.aggregate([
       { $match: { ...matchQuery, totalAmount: { $gt: 0, $lte: 50000 } } },
       {
@@ -673,7 +686,8 @@ export const getOperationAnalytics = async (req, res) => {
             $multiply: [ { $divide: ["$shippingCost", "$totalAmount"] }, 100 ]
           }
         }
-      }
+      },
+      { $limit: 500 }
     ]);
 
     // 4. RTO Rate

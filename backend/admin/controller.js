@@ -248,8 +248,10 @@ export const getRecentOrders = async (req, res) => {
   try {
     const limit = req.pagination?.limit ?? 5; // Fallback if middleware is skipped
     
-    const orders = await Order.find()
+    const orders = await Order.find({ orderStatus: { $ne: "abandoned" } })
       .populate("user", "name email")
+      .populate("items.product", "name pid images price")
+      .select("user items totalAmount orderStatus paymentStatus paymentMethod createdAt shippingDetails.name shippingDetails.email")
       .sort({ createdAt: -1 })
       .limit(limit);
 
@@ -552,7 +554,8 @@ export const getAllOrdersAdmin = async (req, res) => {
     const { limit, skip } = req.pagination;
     const { search, orderStatus, paymentStatus, startDate, endDate } = req.query;
 
-    const query = {};
+    // Exclude abandoned orders by default — they have their own dedicated section in the admin panel.
+    const query = { orderStatus: { $ne: "abandoned" } };
     if (search) {
       const safeSearch = escapeStringRegexp(search);
       query.$or = [
@@ -794,6 +797,11 @@ export const getAllUsersAdmin = async (req, res) => {
           from: "orders",
           localField: "_id",
           foreignField: "user",
+          // Project only the 3 fields consumed by $addFields — prevents full order docs
+          // from crossing the Atlas→Render wire just to be discarded post-join.
+          pipeline: [
+            { $project: { orderStatus: 1, paymentStatus: 1, totalAmount: 1 } }
+          ],
           as: "userOrders"
         }
       },
@@ -1078,7 +1086,22 @@ export const exportLogsCSV = async (req, res) => {
  */
 export const exportOrdersCSV = async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 }).lean();
+    const { startDate, endDate } = req.query;
+    const exportQuery = { orderStatus: { $ne: "abandoned" } };
+
+    if (startDate || endDate) {
+      exportQuery.createdAt = {};
+      if (startDate) exportQuery.createdAt.$gte = new Date(startDate);
+      if (endDate) exportQuery.createdAt.$lte = new Date(endDate);
+    }
+
+    // Hard cap at 5000 rows — prevents loading the full orders collection into memory
+    // on every export click. Select only the 10 fields written to the CSV.
+    const orders = await Order.find(exportQuery)
+      .sort({ createdAt: -1 })
+      .limit(5000)
+      .select('_id createdAt shippingDetails totalAmount paymentMethod paymentStatus orderStatus awb')
+      .lean();
 
     const sanitizeCsv = (val) => {
       if (typeof val !== "string") val = String(val || "");

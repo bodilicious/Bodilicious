@@ -285,10 +285,25 @@ export const getProductByPid = async (req, res) => {
     // Add Vercel-CDN-Cache-Control for edge caching
     res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
 
+    // Explicit projection — return only fields the product page actually renders.
+    // Omitting seo_keywords (internal), faqs, price_inr (admin-only), slug, createdAt/updatedAt
+    // which collectively add several KB of unused data per request.
+    // reviews: $slice -50 caps to the 50 most recent reviews instead of loading all of them.
+    const PRODUCT_PAGE_PROJECTION = {
+      pid: 1, name: 1, brand: 1, images: 1, description: 1,
+      category: 1, sub_category: 1, product_type: 1, item_form: 1,
+      ingredients: 1, benefits: 1, concerns_targeted: 1, usage: 1,
+      price: 1, stock: 1, product_weight_ml: 1, product_weight_g: 1,
+      skin_type_suitable: 1, skin_type_not_suitable: 1, hair_type_suitable: 1,
+      how_to_use: 1, tips: 1, warnings: 1, texture: 1,
+      rating: 1, ratingCount: 1, isActive: 1,
+      reviews: { $slice: -50 },
+    };
+
     const product = await Product.findOne({
       pid: req.params.pid,
       isActive: true,
-    })
+    }, PRODUCT_PAGE_PROJECTION)
       .populate("reviews.user", "name")
       .lean();
 
