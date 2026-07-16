@@ -208,6 +208,7 @@ export const getAllProducts = async (req, res) => {
       page: numPage,
       totalPages: numLimit ? Math.ceil(total / numLimit) : 1,
       products: transformedProducts,
+      data: transformedProducts, // Restores backward compatibility with AppContext and HomePage which expect res.data
     });
   } catch (err) {
     res.status(500).json({
