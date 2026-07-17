@@ -7,8 +7,7 @@ export function useCurrency() {
 
   const formatPrice = useCallback((priceInINR: number) => {
     if (userCurrency !== 'INR') {
-      const rate = storeSettings?.exchangeRates?.[userCurrency] ||
-                   (userCurrency === 'USD' ? (storeSettings?.usdExchangeRate ? 1 / storeSettings.usdExchangeRate : 0.012) : null);
+      const rate = userCurrency === 'USD' ? (storeSettings?.usdExchangeRate ? 1 / storeSettings.usdExchangeRate : 0.012) : null;
 
       // If we have no rate at all (currency not in exchange map), fall back to INR display
       if (rate == null) {
@@ -41,7 +40,7 @@ export function useCurrency() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(priceInINR);
-  }, [userCurrency, storeSettings?.exchangeRates, storeSettings?.usdExchangeRate]);
+  }, [userCurrency, storeSettings?.usdExchangeRate]);
 
   return { formatPrice, userCurrency };
 }

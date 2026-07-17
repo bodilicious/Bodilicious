@@ -10,18 +10,20 @@ export const listNotifications = async (req, res) => {
     const filter = { recipientRole: "admin" };
     if (req.query.unreadOnly === "true") filter.isRead = false;
 
-    const [notifications, total] = await Promise.all([
+    const [notifications, total, unreadCount] = await Promise.all([
       Notification.find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       Notification.countDocuments(filter),
+      Notification.countDocuments({ recipientRole: "admin", isRead: false })
     ]);
 
     res.json({
       success: true,
       data: notifications,
+      unreadCount,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {

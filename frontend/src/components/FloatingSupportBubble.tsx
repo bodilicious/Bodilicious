@@ -30,17 +30,11 @@ export default function FloatingSupportBubble() {
     const fetchNotificationCount = async () => {
       try {
         const headers = await getAuthHeaders();
-        const res = await fetch(`${API_BASE}/support/tickets/${userUid}`, { headers });
+        // /unread-count returns { count: N } — ~100 bytes vs fetching all tickets with all messages
+        const res = await fetch(`${API_BASE}/support/tickets/${userUid}/unread-count`, { headers });
         const json = await res.json();
         if (json.success) {
-          const count = json.tickets.filter((t: any) => {
-            if (t.status !== 'open') return false;
-            const messages = t.messages || [];
-            if (messages.length === 0) return false;
-            const lastMsg = messages[messages.length - 1];
-            return lastMsg.authorRole === 'admin' || (lastMsg.authorRole === 'system' && lastMsg.visibleToCustomer !== false);
-          }).length;
-          setUnreadTicketsCount(count);
+          setUnreadTicketsCount(json.count);
         }
       } catch (err) {
         console.error('Error fetching ticket notification count:', err);

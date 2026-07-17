@@ -366,7 +366,9 @@ async function aggregateCustomerCohorts() {
  */
 async function aggregateProductIntelligence() {
   // 1. Get all orders to calculate pairings and base revenue
+  // 🚀 OPTIMIZATION: Only select fields needed to avoid huge payloads and bandwidth exhaustion on free tier
   const allOrders = await Order.find({ paymentStatus: { $in: ["paid", "refunded"] } })
+    .select('items user')
     .populate('items.product', 'name')
     .lean();
 

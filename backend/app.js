@@ -83,7 +83,7 @@ const sensitiveLimiter = rateLimit({
 // ⚠️  IMPORTANT: Webhook must use raw body (not JSON-parsed) for HMAC to work correctly.
 // Register BEFORE express.json() so the raw Buffer is preserved for signature verification.
 app.post("/api/v1/payment/webhook",
-  express.raw({ type: "application/json", limit: "1mb" }),
+  express.raw({ type: "application/json", limit: "4mb" }),
   (req, res, next) => {
     // Expose raw buffer as req.rawBody for the controller
     req.rawBody = req.body;
@@ -94,10 +94,10 @@ app.post("/api/v1/payment/webhook",
   razorpayWebhook
 );
 
-// 1 MB is ample for any JSON API payload. Upload routes use multer
+// 4 MB covers larger payloads (e.g. product imports). Upload routes use multer
 // (multipart/form-data) and are unaffected by this limit.
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ limit: "1mb", extended: true }));
+app.use(express.json({ limit: "4mb" }));
+app.use(express.urlencoded({ limit: "4mb", extended: true }));
 // Custom integration for express-mongo-sanitize to avoid read-only getter crash on req.query
 app.use((req, res, next) => {
   if (req.body) mongoSanitize.sanitize(req.body);

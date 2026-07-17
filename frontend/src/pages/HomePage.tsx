@@ -300,11 +300,16 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
   }, [navigate, setShopFilter, isEditing]);
 
   const [fetchedBestSellers, setFetchedBestSellers] = useState<any[]>([]);
+  const bestSellersFetchedRef = useRef(false);
 
   useEffect(() => {
     // If we already have the products in AppContext, we might not need to fetch,
     // but to guarantee we have all 6 regardless of AppContext's limit=24, we fetch them explicitly.
-    if (isEditing) return;
+    if (isEditing || bestSellersFetchedRef.current) return;
+    // Don't mark as fetched until contentData is actually loaded
+    if (!contentData) return;
+    
+    bestSellersFetchedRef.current = true;
 
     if (contentData?.bestSellerMode === 'manual' && contentData.bestSellerPids?.length > 0) {
       Promise.all(

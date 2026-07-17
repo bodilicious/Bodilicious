@@ -145,19 +145,24 @@ export const getAllProducts = async (req, res) => {
     const skip = (numPage - 1) * numLimit;
 
     // Add Vercel-CDN-Cache-Control for edge caching
-    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    // 5 min s-maxage (was 60s) — product lists change infrequently
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
 
-    // slim=true: only card-level fields (no reviews/description/ingredients)
-    // Full fields are only needed on the individual product page (/api/products/:pid)
+    // Use space-separated strings for projection to guarantee Mongoose strictly excludes other fields.
+    // Using $slice in the projection object causes MongoDB to return the entire document (including heavy descriptions and reviews).
     const projection = isSlim
-      ? { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1 }
-      : { pid: 1, name: 1, price: 1, images: 1, rating: 1, ratingCount: 1, stock: 1, category: 1, brand: 1, isActive: 1, description: 1, ingredients: 1, reviews: { $slice: -30 } };
+      ? 'pid name price images rating ratingCount stock category brand isActive'
+      : 'pid name price images rating ratingCount stock category brand isActive description ingredients reviews';
 
-    let productQuery = Product.find(query, projection).sort(sortObj).skip(skip).limit(numLimit);
+    let productQuery = Product.find(query).select(projection).sort(sortObj).skip(skip).limit(numLimit);
 
-    // Only populate reviews.user when we're actually returning reviews
-    if (!isSlim) {
-      productQuery = productQuery.populate("reviews.user", "name");
+    if (isSlim) {
+      // Prevent transferring all images for slim payloads
+      productQuery = productQuery.slice('images', 1);
+    } else {
+      // Only populate reviews.user when we're actually returning reviews
+      // Slice reviews at DB level to prevent massive memory spikes if a product has 1000+ reviews
+      productQuery = productQuery.slice('reviews', -30).populate("reviews.user", "name");
     }
 
     const [products, total] = await Promise.all([
@@ -167,23 +172,20 @@ export const getAllProducts = async (req, res) => {
 
     // Map populated user object to just the name string for the frontend
     // (only needed when reviews are included, i.e. not slim mode)
-    const transformedProducts = isSlim
-      ? products
-      : products.map(product => {
-          if (product.reviews && product.reviews.length > 0) {
-            return {
-              ...product,
-              reviews: (product.reviews || []).slice().reverse().map(r => ({
-                rating: r.rating,
-                comment: r.comment,
-                isVerified: !!r.isVerified,
-                createdAt: r.createdAt,
-                user: r.user?.name || "Customer"
-              }))
-            };
-          }
-          return product;
-        });
+    const transformedProducts = products.map(product => {
+      let modifiedProduct = { ...product };
+
+      if (!isSlim && modifiedProduct.reviews && modifiedProduct.reviews.length > 0) {
+        modifiedProduct.reviews = modifiedProduct.reviews.reverse().map(r => ({
+          rating: r.rating,
+          comment: r.comment,
+          isVerified: !!r.isVerified,
+          createdAt: r.createdAt,
+          user: r.user?.name || "Customer"
+        }));
+      }
+      return modifiedProduct;
+    });
 
     if (search) {
       logAuditEvent({
@@ -289,22 +291,13 @@ export const getProductByPid = async (req, res) => {
     // Explicit projection — return only fields the product page actually renders.
     // Omitting seo_keywords (internal), faqs, price_inr (admin-only), slug, createdAt/updatedAt
     // which collectively add several KB of unused data per request.
-    // reviews: $slice -50 caps to the 50 most recent reviews instead of loading all of them.
-    const PRODUCT_PAGE_PROJECTION = {
-      pid: 1, name: 1, brand: 1, images: 1, description: 1,
-      category: 1, sub_category: 1, product_type: 1, item_form: 1,
-      ingredients: 1, benefits: 1, concerns_targeted: 1, usage: 1,
-      price: 1, stock: 1, product_weight_ml: 1, product_weight_g: 1,
-      skin_type_suitable: 1, skin_type_not_suitable: 1, hair_type_suitable: 1,
-      how_to_use: 1, tips: 1, warnings: 1, texture: 1,
-      rating: 1, ratingCount: 1, isActive: 1,
-      reviews: { $slice: -50 },
-    };
+    const PRODUCT_PAGE_PROJECTION = 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews';
 
     const product = await Product.findOne({
       pid: req.params.pid,
       isActive: true,
     }, PRODUCT_PAGE_PROJECTION)
+      .slice('reviews', -50)
       .populate("reviews.user", "name")
       .lean();
 

@@ -34,7 +34,9 @@ export const getSettings = async (req, res) => {
 
     // Allow browsers/CDN to cache public settings for 60 s.
     // Every page load calls this; a short cache halves traffic from SPA navigation.
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    // Bump to 5 minutes (300 s) — settings change infrequently and this is called on
+    // every SPA page load. stale-while-revalidate lets the CDN serve stale in <1 s.
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
 
     res.json({
       success: true,
@@ -52,7 +54,9 @@ export const getSettings = async (req, res) => {
         internationalCheckoutEnabled: settings.internationalCheckoutEnabled,
         internationalShippingCost: settings.internationalShippingCost,
         internationalShippingThreshold: settings.internationalShippingThreshold,
-        supportedCountries: settings.supportedCountries || COUNTRIES,
+        // NOTE: supportedCountries (195 strings, ~2.6 KB) intentionally omitted.
+        // The storefront only reads internationalShippingEnabled, not the full list.
+        // If a checkout form needs the country list it should fetch a dedicated endpoint.
         reviewSkinTypeTaggingEnabled: settings.reviewSkinTypeTaggingEnabled ?? true,
         reviewBeforeAfterPhotosEnabled: settings.reviewBeforeAfterPhotosEnabled ?? true,
         reviewVerifiedBadgeEnabled: settings.reviewVerifiedBadgeEnabled ?? true,
@@ -62,7 +66,9 @@ export const getSettings = async (req, res) => {
         autoCurrencySwitchingEnabled: settings.autoCurrencySwitchingEnabled ?? true,
         detectedCountryCode,
         usdExchangeRate: settings.usdExchangeRate || 83.5,
-        exchangeRates: settings.exchangeRates || {},
+        // NOTE: exchangeRates (150+ currencies, ~3 KB) intentionally omitted from public
+        // endpoint. The storefront only uses usdExchangeRate for display.
+        // Admin / checkout pages that need full rates should call the admin settings route.
       },
     });
   } catch (err) {

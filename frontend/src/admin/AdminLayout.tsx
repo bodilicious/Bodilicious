@@ -52,6 +52,7 @@ const AdminLayout: React.FC = () => {
     returns: 0
   });
   const [criticalAlerts, setCriticalAlerts] = useState<any[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -85,6 +86,9 @@ const AdminLayout: React.FC = () => {
         if (notifData.success && isMounted) {
           const critical = notifData.data.filter((n: any) => !n.isRead && (n.type === 'critical' || n.type === 'warning'));
           setCriticalAlerts(critical);
+          // Get the exact unread count from the backend response payload
+          const unread = notifData.unreadCount ?? notifData.data.filter((n: any) => !n.isRead).length;
+          setUnreadNotifCount(unread);
         }
       } catch (err) {
         console.error("Failed to fetch notification counts", err);
@@ -351,7 +355,7 @@ const AdminLayout: React.FC = () => {
               <Store size={18} />
               <span className="hidden sm:inline">Back to Store</span>
             </Link>
-            <NotificationsDrawer />
+            <NotificationsDrawer initialUnreadCount={unreadNotifCount} />
             <div className="flex flex-col items-end">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden">
                 {user?.photoURL ? (

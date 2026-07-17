@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { User, Address } from '../../types';
 import toast from 'react-hot-toast';
 import { Plus, Edit2, Trash2, CheckCircle, X, MapPin, User as UserIcon, Phone, Map, Building, Loader2, Globe, ChevronRight, Search, ChevronDown } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
-import { getCountryFlag, COUNTRY_ISO_MAP } from '../../utils/countries';
+
+import { getCountryFlag, COUNTRY_ISO_MAP, COUNTRIES } from '../../utils/countries';
 
 const INDIA_ALIASES = new Set(['india', 'in', 'bharat', 'ind']);
 function isIndiaCountry(c: string) {
@@ -23,7 +23,7 @@ interface Props {
 }
 
 export default function SavedAddressesSection({ user, addAddress, updateAddress, deleteAddress, setDefaultAddress }: Props) {
-    const { storeSettings } = useApp();
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -465,7 +465,7 @@ export default function SavedAddressesSection({ user, addAddress, updateAddress,
                                                     </div>
                                                 </div>
                                                 <ul className="max-h-60 overflow-y-auto py-1" role="listbox">
-                                                    {(storeSettings?.supportedCountries?.length > 0 ? storeSettings.supportedCountries : ['India'])
+                                                    {COUNTRIES
                                                         .filter((c: string) => c.toLowerCase().includes(countrySearchQuery.toLowerCase()))
                                                         .map((c: string) => (
                                                             <li

@@ -20,39 +20,6 @@ import NotificationService from "./procurement/notificationService.js";
 const gracefulShutdown = async (signal) => {
   console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
   try {
-    const version = new Date().getTime();
-    console.log(`🧹 Cache-busting images with version v=${version}...`);
-
-    const cursor = Product.find({ images: { $exists: true, $not: { $size: 0 } } }).cursor();
-    const bulkOps = [];
-    let updatedCount = 0;
-
-    for await (const product of cursor) {
-      const newImages = product.images.map(img => {
-        const baseUrl = img.split('?')[0];
-        return `${baseUrl}?v=${version}`;
-      });
-
-      bulkOps.push({
-        updateOne: {
-          filter: { _id: product._id },
-          update: { $set: { images: newImages } }
-        }
-      });
-
-      updatedCount++;
-
-      if (bulkOps.length === 500) {
-        await Product.bulkWrite(bulkOps);
-        bulkOps.length = 0;
-      }
-    }
-
-    if (bulkOps.length > 0) {
-      await Product.bulkWrite(bulkOps);
-    }
-
-    console.log(`✅ Successfully updated ${updatedCount} products.`);
     await shutdownPosthog();
 
     await mongoose.connection.close();

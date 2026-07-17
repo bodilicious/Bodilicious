@@ -6,6 +6,7 @@ import { createOrderSchema } from "./schema.js";
 import {
   createOrder,
   getMyOrders,
+  getOrderStatusLite,
   getSingleOrder,
   cancelOrder,
   deleteOrder,
@@ -50,6 +51,12 @@ router.post("/webhook/shipping", shiprocketWebhook);
 // ⚠ Must be ABOVE :orderId route
 // =============================
 router.get("/shiprocket/:awb", protect, trackShiprocketOrder);
+
+// =============================
+// GET ORDER STATUS LITE
+// GET /api/orders/:orderId/status
+// =============================
+router.get("/:orderId/status", protect, getOrderStatusLite);
 
 // =============================
 // GET SINGLE ORDER

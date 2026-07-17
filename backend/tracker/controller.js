@@ -116,6 +116,32 @@ export const handleOrderCancellationSideEffects = async (order) => {
 };
 
 /* =========================================================
+   GET ORDER STATUS LITE
+   Lightweight endpoint for polling order confirmation status
+   Returns just ~100 bytes instead of the full profile payload
+========================================================= */
+export const getOrderStatusLite = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    // Minimal query: only fetch fields needed for ConfirmationPage
+    const order = await Order.findOne({ 
+      _id: orderId, 
+      user: req.user._id 
+    }).select("paymentStatus orderStatus totalAmount").lean();
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    return res.status(200).json({ success: true, order });
+  } catch (error) {
+    console.error("Error fetching order status lite:", error.message);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/* =========================================================
    CREATE ORDER (Transaction + Shiprocket/Razorpay Integration)
 ========================================================= */
 
@@ -489,6 +515,18 @@ export const getMyOrders = async (req, res) => {
       .populate("items.product", "name images price pid slug")
       .lean();
 
+    if (orders) {
+      orders.forEach(order => {
+        if (order.items) {
+          order.items.forEach(item => {
+            if (item.product && item.product.images && item.product.images.length > 0) {
+              item.product.images = item.product.images.slice(0, 1);
+            }
+          });
+        }
+      });
+    }
+
     return res.json({
       success: true,
       data: orders,
@@ -525,6 +563,14 @@ export const getSingleOrder = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Order not found",
+      });
+    }
+
+    if (order.items) {
+      order.items.forEach(item => {
+        if (item.product && item.product.images && item.product.images.length > 0) {
+          item.product.images = item.product.images.slice(0, 1);
+        }
       });
     }
 

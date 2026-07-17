@@ -11,6 +11,7 @@ import { logAuditEvent } from "../audit/logger.js";
  */
 export const getExecutiveSummary = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const limit = parseInt(req.query.days || "30", 10);
     
     const dailyData = await DailySalesView.find()
@@ -51,6 +52,7 @@ export const getExecutiveSummary = async (req, res) => {
  */
 export const getTrendingProducts = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const limitDays = parseInt(req.query.days || "30", 10);
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - limitDays);
@@ -102,6 +104,7 @@ export const getTrendingProducts = async (req, res) => {
  */
 export const getProductFunnel = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const limitDays = parseInt(req.query.days || "30", 10);
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - limitDays);
@@ -197,6 +200,7 @@ export const getProductFunnel = async (req, res) => {
  */
 export const getCohorts = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const cohorts = await CustomerCohortView.find()
       .sort({ cohort_month: -1, month_index: 1 })
       .lean();
@@ -232,6 +236,7 @@ export const getCohorts = async (req, res) => {
  */
 export const getLowStock = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const products = await Product.find({
       isActive: true,
       $expr: { $lte: ["$stock", "$lowStockThreshold"] },
@@ -301,6 +306,7 @@ export const trackEvent = async (req, res) => {
  */
 export const getBehavioralAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const peakOrders = await Order.aggregate([
       { $match: { paymentStatus: { $in: ["paid", "refunded"] } } },
       {
@@ -339,6 +345,7 @@ export const getBehavioralAnalytics = async (req, res) => {
  */
 export const getCustomersAtRisk = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const atRiskCustomers = await UserProfile.aggregate([
       { $match: { orders: { $exists: true, $not: { $size: 0 } } } },
       {
@@ -370,7 +377,7 @@ export const getCustomersAtRisk = async (req, res) => {
           as: "productData"
         }
       },
-      { $unwind: { path: "$productData", preserveNullAndEmpty: true } },
+      { $unwind: { path: "$productData", preserveNullAndEmptyArrays: true } },
       {
         $group: {
           _id: "$_id",
@@ -405,6 +412,7 @@ export const getCustomersAtRisk = async (req, res) => {
  */
 export const getProductIntelligence = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const intelligence = await ProductIntelligenceView.find()
       .sort({ revenue_generated: -1 })
       .lean();
@@ -417,6 +425,7 @@ export const getProductIntelligence = async (req, res) => {
 
 export const getMarketingAttribution = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const pipeline = [
       {
         $group: {
@@ -451,6 +460,7 @@ export const getMarketingAttribution = async (req, res) => {
 
 export const getSearchAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     // top searches
     const topSearches = await AuditLogV2.aggregate([
       { $match: { event_type: "SEARCH" } },
@@ -478,6 +488,7 @@ export const getSearchAnalytics = async (req, res) => {
 
 export const getInventoryForecast = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     

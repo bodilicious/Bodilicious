@@ -6,6 +6,7 @@ import { protect, adminOnly } from "../middleware/auth.js";
 import {
   createTicket,
   getUserTickets,
+  getUserTicketUnreadCount,
   updateTicketStatus,
   getFaqs,
   getAllTickets,
@@ -71,6 +72,9 @@ router.get("/tickets", protect, adminOnly, getAllTickets);
 
 // Customer: create ticket
 router.post("/tickets", protect, createTicket);
+
+// Customer: lightweight unread count (MUST be before /:userId to avoid param conflict)
+router.get("/tickets/:userId/unread-count", protect, getUserTicketUnreadCount);
 
 // Customer (or admin): fetch tickets by userId
 router.get("/tickets/:userId", protect, getUserTickets);

@@ -12,9 +12,10 @@ const PLACEHOLDER_VIDEOS = [
     { url: '/snipets/instant-glow.webm', caption: 'Instant Glow', order: 4 },
 ];
 
-function LazyVideo({ src, className }: { src: string; className: string }) {
+function LazyVideo({ src, className, poster }: { src: string; className: string; poster?: string }) {
     const isInstagram = src.includes('instagram.com/reel/') || src.includes('instagram.com/p/');
     const [inView, setInView] = useState(false);
+    const [loaded, setLoaded] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Handle Instagram iframe URL formatting
@@ -73,18 +74,42 @@ function LazyVideo({ src, className }: { src: string; className: string }) {
     }
 
     return (
-        <video
-            ref={videoRef}
-            id={`video-container-${src}`}
-            className={className}
-            loop
-            muted
-            playsInline
-            preload="none"
-            disablePictureInPicture
-            controlsList="nodownload nofullscreen noremoteplayback"
-            src={inView ? src : undefined}
-        />
+        <div className="absolute inset-0 w-full h-full">
+            {/* Shimmer placeholder — visible until the video has buffered its first frame.
+                Fades out once onLoadedData fires. Prevents the jarring black-box flash. */}
+            {!loaded && (
+                <div
+                    className="absolute inset-0 z-10 overflow-hidden"
+                    style={{
+                        background: 'linear-gradient(135deg, #f5e6e8 0%, #e8d5d8 40%, #f0e0e2 60%, #f5e6e8 100%)',
+                        backgroundSize: '200% 200%',
+                        animation: 'shimmer-pan 1.8s ease-in-out infinite',
+                    }}
+                >
+                    <style>{`
+                        @keyframes shimmer-pan {
+                            0% { background-position: 0% 50%; }
+                            50% { background-position: 100% 50%; }
+                            100% { background-position: 0% 50%; }
+                        }
+                    `}</style>
+                </div>
+            )}
+            <video
+                ref={videoRef}
+                id={`video-container-${src}`}
+                className={`${className} transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+                loop
+                muted
+                playsInline
+                preload="none"
+                disablePictureInPicture
+                controlsList="nodownload nofullscreen noremoteplayback"
+                poster={poster}
+                src={inView ? src : undefined}
+                onLoadedData={() => setLoaded(true)}
+            />
+        </div>
     );
 }
 

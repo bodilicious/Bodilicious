@@ -10,6 +10,7 @@ import AuditLogV2 from "../audit/models.js";
  */
 export const getSalesAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const { startDate, endDate } = req.query;
 
     const query = {};
@@ -120,6 +121,7 @@ export const getSalesAnalytics = async (req, res) => {
  */
 export const getProductAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const { startDate, endDate } = req.query;
     const query = {};
     if (startDate || endDate) {
@@ -293,6 +295,7 @@ export const getProductAnalytics = async (req, res) => {
  */
 export const getInventoryAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -379,6 +382,8 @@ export const getInventoryAnalytics = async (req, res) => {
  */
 export const getCustomerAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const { startDate, endDate } = req.query;
     const query = {};
     if (startDate || endDate) {
@@ -586,6 +591,7 @@ export const getCustomerAnalytics = async (req, res) => {
  */
 export const getOperationAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const { startDate, endDate, pincodeState } = req.query;
     const matchQuery = { orderStatus: { $nin: ["abandoned", "pending"] } };
     if (startDate || endDate) {
@@ -772,6 +778,7 @@ export const getOperationAnalytics = async (req, res) => {
  */
 export const getOrderAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const [statusDist, paymentDist] = await Promise.all([
       Order.aggregate([
         { $group: { _id: "$orderStatus", count: { $sum: 1 } } }
@@ -796,6 +803,7 @@ export const getOrderAnalytics = async (req, res) => {
  */
 export const getBehavioralAnalytics = async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const { startDate, endDate } = req.query;
     
     const query = {};

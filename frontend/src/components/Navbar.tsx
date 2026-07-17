@@ -159,22 +159,8 @@ export default function Navbar() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      const resultsCount = products.filter((p: any) => 
-        p.name.toLowerCase().includes(q) || 
-        (p.description && p.description.toLowerCase().includes(q))
-      ).length;
-
-      // Log to analytics backend
-      fetch(`${import.meta.env.VITE_API_BASE}/admin/analytics/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'search',
-          metadata: { query: searchQuery.trim(), resultsCount }
-        })
-      }).catch(err => console.error("Search tracking failed:", err));
-
+      // Note: search tracking is handled server-side in getAllProducts (logAuditEvent SEARCH).
+      // The backend logs with the accurate DB result count; no need for a duplicate client POST.
       setShopFilter('all');
       navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
       setSearchOpen(false);

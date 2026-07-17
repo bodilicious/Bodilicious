@@ -39,6 +39,32 @@ export const getProfile = async (req, res) => {
       .populate('items.product', productCardFields)
       .lean();
 
+    // Trim populated product images to prevent massive bandwidth payloads
+    if (user.wishlist) {
+      user.wishlist.forEach(p => {
+        if (p && p.images && p.images.length > 0) {
+          p.images = p.images.slice(0, 1);
+        }
+      });
+    }
+    if (user.cart) {
+      user.cart.forEach(item => {
+        if (item.product && item.product.images && item.product.images.length > 0) {
+          item.product.images = item.product.images.slice(0, 1);
+        }
+      });
+    }
+
+    recentOrders.forEach(order => {
+      if (order.items) {
+        order.items.forEach(item => {
+          if (item.product && item.product.images && item.product.images.length > 0) {
+            item.product.images = item.product.images.slice(0, 1);
+          }
+        });
+      }
+    });
+
     res.json({
       success: true,
       data: { ...user, orders: recentOrders },
@@ -318,7 +344,16 @@ export const syncCart = async (req, res) => {
 
     const productCardFields = 'pid name price images rating ratingCount stock category brand';
     const userWithPopulatedCart = await UserProfile.findById(user._id)
-      .populate('cart.product', productCardFields);
+      .populate('cart.product', productCardFields)
+      .lean();
+    
+    if (userWithPopulatedCart.cart) {
+      userWithPopulatedCart.cart.forEach(item => {
+        if (item.product && item.product.images && item.product.images.length > 0) {
+          item.product.images = item.product.images.slice(0, 1);
+        }
+      });
+    }
     // Return only the updated cart — client manages wishlist state independently
     // and re-populating the full wishlist on every cart sync is a significant bandwidth waste.
     res.json({ success: true, cart: userWithPopulatedCart.cart });
@@ -335,7 +370,20 @@ export const getMyOrders = async (req, res) => {
     const orders = await Order.find({ user: req.user._id, orderStatus: { $ne: "abandoned" } })
       .sort({ createdAt: -1 })
       .select('items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb shippingCost discountAmount originalAmount currency')
-      .populate('items.product', 'name images price pid slug');
+      .populate('items.product', 'name images price pid slug')
+      .lean();
+
+    if (orders) {
+      orders.forEach(order => {
+        if (order.items) {
+          order.items.forEach(item => {
+            if (item.product && item.product.images && item.product.images.length > 0) {
+              item.product.images = item.product.images.slice(0, 1);
+            }
+          });
+        }
+      });
+    }
 
     res.json({ success: true, data: orders });
   } catch (err) {
@@ -350,10 +398,19 @@ export const getRecentlyBought = async (req, res) => {
   try {
     const productCardFields = 'pid name price images rating ratingCount stock category brand';
     const user = await UserProfile.findById(req.user._id)
-      .populate('recentlyBought', productCardFields);
+      .populate('recentlyBought', productCardFields)
+      .lean();
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.recentlyBought) {
+      user.recentlyBought.forEach(p => {
+        if (p && p.images && p.images.length > 0) {
+          p.images = p.images.slice(0, 1);
+        }
+      });
     }
 
     res.json({ success: true, data: user.recentlyBought });

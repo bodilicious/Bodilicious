@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import RequireAuth from '../components/RequireAuth';
-import { getCountryFlag } from '../utils/countries';
+import { getCountryFlag, COUNTRIES } from '../utils/countries';
 import { formatCurrency } from '../utils/currencies';
 
 import { useCurrency } from '../hooks/useCurrency';
@@ -870,7 +870,7 @@ export default function ShippingPage() {
                                                         </div>
                                                     </div>
                                                     <ul className="max-h-60 overflow-y-auto py-1" role="listbox">
-                                                        {(storeSettings.supportedCountries?.length > 0 ? storeSettings.supportedCountries : ['India'])
+                                                        {COUNTRIES
                                                             .filter((c: string) => c.toLowerCase().includes(countrySearchQuery.toLowerCase()))
                                                             .map((c: string) => (
                                                                 <li
@@ -888,7 +888,7 @@ export default function ShippingPage() {
                                                                     {c}
                                                                 </li>
                                                             ))}
-                                                        {(storeSettings.supportedCountries?.length > 0 ? storeSettings.supportedCountries : ['India'])
+                                                        {COUNTRIES
                                                             .filter((c: string) => c.toLowerCase().includes(countrySearchQuery.toLowerCase()))
                                                             .length === 0 && (
                                                                 <li className="px-4 py-3 text-sm text-gray-400 text-center">No countries found.</li>

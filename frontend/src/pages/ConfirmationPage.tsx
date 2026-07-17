@@ -19,7 +19,7 @@ export default function ConfirmationPage() {
 
     const location = useLocation();
     const navigate = useNavigate();
-    const { orders, refreshProfile } = useApp();
+    const { orders, refreshProfile, getAuthHeaders } = useApp();
 
     // ── Recover state from router OR sessionStorage (survives page refresh) ──
     const routerState = location.state as ConfirmationState | undefined;
@@ -67,7 +67,22 @@ export default function ConfirmationPage() {
 
         const run = async () => {
             if (document.visibilityState === 'hidden') return;
-            await refreshProfile();
+            try {
+                const headers = await getAuthHeaders();
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/orders/${resolvedState.orderId}/status`, { headers });
+                const json = await res.json();
+                
+                if (json.success && json.order) {
+                    // Once we confirm the order exists on the server, fetch full profile just once to sync UI state
+                    await refreshProfile();
+                    if (pollRef.current) {
+                        clearInterval(pollRef.current);
+                        pollRef.current = null;
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to poll order status", err);
+            }
             setPollCount(c => c + 1);
         };
 

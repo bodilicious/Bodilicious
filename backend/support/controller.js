@@ -86,6 +86,54 @@ export const createTicket = async (req, res) => {
   }
 };
 
+// GET /api/v1/support/tickets/:userId/unread-count
+// Lightweight alternative to fetching all tickets just to count unread ones.
+// Returns { count: N } — ~100 bytes vs the full ticket payload with all messages.
+export const getUserTicketUnreadCount = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const isOwner = req.user._id.toString() === userId || req.user.firebaseUID === userId;
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: "Access denied" });
+    }
+
+    let queryUserId = userId;
+    if (userId === req.user.firebaseUID) {
+      queryUserId = req.user._id;
+    }
+
+    // Count open tickets where the last message was sent by an admin or system
+    // (meaning the customer has an unread admin reply waiting)
+    const result = await Ticket.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(String(queryUserId)), status: "open" } },
+      {
+        $addFields: {
+          lastMessage: { $arrayElemAt: ["$messages", -1] }
+        }
+      },
+      {
+        $match: {
+          "lastMessage.authorRole": { $in: ["admin", "system"] },
+          $or: [
+            { "lastMessage.visibleToCustomer": { $ne: false } },
+            { "lastMessage.visibleToCustomer": { $exists: false } }
+          ]
+        }
+      },
+      { $count: "count" }
+    ]);
+
+    const count = result[0]?.count ?? 0;
+    return res.status(200).json({ success: true, count });
+  } catch (error) {
+    console.error("Error fetching ticket unread count:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 // GET /api/v1/support/tickets/:userId  (customer or admin fetching by userId)
 export const getUserTickets = async (req, res) => {
   try {

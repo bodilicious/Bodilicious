@@ -384,7 +384,9 @@ export default function ProductPage() {
   }, [product?.category, product?.pid]);
 
   // ── Product View Tracking ──
-  // Fire once per product per session (deduped via sessionStorage)
+  // Handled server-side: getProductByPid already creates a UserInteractionLog('view')
+  // for authenticated users and logs the event via logAuditEvent.
+  // PostHog client-side tracking is kept for funnel analysis.
   const viewTracked = useRef(false);
   useEffect(() => {
     if (!product?.pid || viewTracked.current) return;
@@ -392,17 +394,6 @@ export default function ProductPage() {
     if (sessionStorage.getItem(sessionKey)) return;
     viewTracked.current = true;
     sessionStorage.setItem(sessionKey, '1');
-
-    // Fire and forget — silent failure is intentional
-    fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/analytics/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: 'product_viewed',
-        productId: product.pid,
-        productName: product.name,
-      }),
-    }).catch(() => { /* silent */ });
 
     // 🚀 PostHog Client-Side Tracking
     if (posthog) {

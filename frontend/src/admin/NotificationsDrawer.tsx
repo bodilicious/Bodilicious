@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Bell, X, CheckCheck, Info, AlertTriangle, AlertOctagon, Sparkles, Circle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -29,25 +29,24 @@ const timeAgo = (dateStr: string) => {
   return `${Math.floor(hrs / 24)}d ago`;
 };
 
-const NotificationsDrawer: React.FC = () => {
+interface NotificationsDrawerProps {
+  /** Unread count derived by the parent (AdminLayout) from its own notifications fetch.
+   *  Eliminates a separate /unread-count poll on every mount — saves 1 API call/hour. */
+  initialUnreadCount?: number;
+}
+
+const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ initialUnreadCount = 0 }) => {
   const { getAuthHeaders } = useApp();
   const API = import.meta.env.VITE_API_URL || '';
 
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Seed from the prop so the bell badge is correct before the drawer is ever opened.
+  // No separate polling needed — AdminLayout handles the periodic refresh.
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch(`${API}/api/v1/admin/notifications/unread-count`, { headers });
-      const data = await res.json();
-      if (data.success) setUnreadCount(data.data.count);
-    } catch { /* silent */ }
-  }, [getAuthHeaders, API]);
 
   const fetchNotifications = useCallback(async (p = 1) => {
     setLoading(true);
@@ -63,15 +62,6 @@ const NotificationsDrawer: React.FC = () => {
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [getAuthHeaders, API]);
-
-  // Poll unread count every 1h to conserve bandwidth
-  useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(() => {
-        if (document.visibilityState === 'visible') fetchUnreadCount();
-    }, 3600000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
 
   const onOpen = () => {
     setOpen(true);
