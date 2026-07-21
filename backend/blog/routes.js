@@ -83,5 +83,6 @@ publicRouter.get("/:slug",  blogCtrl.getPublicBlogBySlug);
 publicRouter.get("/:slug/related", blogCtrl.getRelatedBlogs);
 publicRouter.get("/:id/comments", blogCtrl.getComments);
 publicRouter.post("/:id/comments", protect, commentLimiter, blogCtrl.addComment);
+publicRouter.post("/:id/like", protect, blogCtrl.toggleLike);
 
 export { adminRouter, categoryRouter, publicRouter };

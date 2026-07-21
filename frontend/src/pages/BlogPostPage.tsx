@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useSEO } from '../hooks/useSEO';
 import { useApp } from '../context/useApp';
-import { ArrowLeft, Calendar, User, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Loader2, AlertCircle, Heart } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface BlogPost {
   _id: string;
@@ -20,6 +21,7 @@ interface BlogPost {
   seo_keywords: any;
   readingTime?: number;
   publishedAt: string;
+  likes?: string[];
 }
 
 interface Comment {
@@ -41,6 +43,10 @@ const BlogPostPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError]   = useState('');
+
+  const [likesCount, setLikesCount] = useState(0);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [likeLoading, setLikeLoading] = useState(false);
 
   const blogKeywords = (() => {
     if (!post) return undefined;
@@ -116,6 +122,8 @@ const BlogPostPage: React.FC = () => {
         
         if (cancelled) return;
         setPost(data.data);
+        setLikesCount(data.data.likes?.length || 0);
+        setHasLiked(user ? data.data.likes?.includes(user._id) : false);
 
         const [relatedRes, commentsRes] = await Promise.allSettled([
           fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${slug}/related`),
@@ -138,7 +146,31 @@ const BlogPostPage: React.FC = () => {
     };
     load();
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, user]);
+
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please sign in to like this post');
+      return;
+    }
+    if (!post) return;
+    setLikeLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${post._id}/like`, {
+        method: 'POST',
+        headers
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setHasLiked(data.hasLiked);
+      setLikesCount(data.likesCount);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to like post');
+    } finally {
+      setLikeLoading(false);
+    }
+  };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,11 +275,6 @@ const BlogPostPage: React.FC = () => {
 
           {/* Meta */}
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-b-text-secondary pb-8 border-b border-silk/60">
-            {post.author?.name && (
-              <span className="flex items-center gap-2">
-                <User size={16} /> {post.author.name}
-              </span>
-            )}
             {post.publishedAt && (
               <span className="flex items-center gap-2">
                 <Calendar size={16} />
@@ -300,8 +327,17 @@ const BlogPostPage: React.FC = () => {
           </div>
         )}
 
-        {/* Back link */}
-        <div className="mt-16 text-center pb-8 border-b border-silk/60">
+        {/* Actions & Back link */}
+        <div className="mt-16 pb-8 border-b border-silk/60 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <button 
+            onClick={handleLike}
+            disabled={likeLoading}
+            className={`inline-flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-sm ${hasLiked ? 'bg-[#8B2E2E] text-white border-[#8B2E2E]' : 'bg-white text-[#8B2E2E] border-[#8B2E2E]/20 hover:border-[#8B2E2E]/40 hover:text-ruby-red'} disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <Heart size={18} className={hasLiked ? 'fill-current' : ''} />
+            <span className="font-medium">{likesCount} {likesCount === 1 ? 'Like' : 'Likes'}</span>
+          </button>
+          
           <Link to="/blogs" className="inline-flex items-center gap-2 text-b-burgundy font-medium hover:text-ruby-red transition-colors text-sm border border-b-burgundy/20 hover:border-ruby-red/40 px-6 py-3 rounded-full hover:shadow-sm">
             <ArrowLeft size={16} /> Back to Blogs
           </Link>

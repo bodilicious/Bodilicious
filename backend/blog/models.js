@@ -80,6 +80,9 @@ const blogSchema = new mongoose.Schema(
 
     // Stamped automatically on first draft → published transition. Never manually editable.
     publishedAt: { type: Date, default: null },
+
+    // Users who have liked this blog
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "UserProfile" }],
   },
   { 
     timestamps: true,

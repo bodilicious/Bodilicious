@@ -506,3 +506,42 @@ export const addComment = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to add comment" });
   }
 };
+
+/**
+ * POST /api/v1/blogs/:id/like
+ * Toggles a like on a blog post for the authenticated user
+ */
+export const toggleLike = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid blog ID" });
+    }
+
+    const blog = await Blog.findById(id);
+    if (!blog) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+
+    const hasLiked = blog.likes && blog.likes.includes(userId);
+    if (hasLiked) {
+      blog.likes = blog.likes.filter(id => id.toString() !== userId.toString());
+    } else {
+      if (!blog.likes) blog.likes = [];
+      blog.likes.push(userId);
+    }
+
+    await blog.save();
+
+    res.json({
+      success: true,
+      hasLiked: !hasLiked,
+      likesCount: blog.likes.length
+    });
+  } catch (err) {
+    console.error("toggleLike error:", err);
+    res.status(500).json({ success: false, message: "Failed to toggle like" });
+  }
+};
