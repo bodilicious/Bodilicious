@@ -151,7 +151,7 @@ export const getAllProducts = async (req, res) => {
     // Use space-separated strings for projection to guarantee Mongoose strictly excludes other fields.
     // Using $slice in the projection object causes MongoDB to return the entire document (including heavy descriptions and reviews).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive createdAt concerns_targeted'
+      ? 'pid name price images rating ratingCount stock category brand isActive'
       : 'pid name price images rating ratingCount stock category brand isActive description ingredients reviews';
 
     let productQuery = Product.find(query).select(projection).sort(sortObj).skip(skip).limit(numLimit);
@@ -293,7 +293,7 @@ export const getProductByPid = async (req, res) => {
     // Slim mode: only return card-level fields — used by pages that don't render
     // reviews, description, or ingredients (e.g. homepage best-seller section).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive createdAt concerns_targeted'
+      ? 'pid name price images rating ratingCount stock category brand isActive'
       : 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews';
 
     let productQuery = Product.findOne({
