@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { fileTypeFromBuffer } from "file-type";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { protect, adminOnly } from "../middleware/auth.js";
 import { adminLimiter } from "../middleware/admin.js";
 import * as blogCtrl from "./controller.js";
@@ -62,7 +62,7 @@ adminRouter.delete("/:id", blogCtrl.deleteBlog);
 const commentLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute window
   max: 5,              // max 5 comments per user per minute
-  keyGenerator: (req) => (req.user?._id?.toString() || req.ip),
+  keyGenerator: (req, res) => (req.user?._id?.toString() || ipKeyGenerator(req, res)),
   message: { success: false, message: "Too many comments. Please wait before posting again." },
   standardHeaders: true,
   legacyHeaders: false,

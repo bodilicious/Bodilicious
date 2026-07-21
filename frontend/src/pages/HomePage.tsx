@@ -336,7 +336,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
         "peptide ceramide collagen"
       ];
 
-      fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products?slim=true&limit=24`)
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products?slim=true&limit=100`)
         .then(res => res.json())
         .then(res => {
           const all: any[] = res.data || [];
