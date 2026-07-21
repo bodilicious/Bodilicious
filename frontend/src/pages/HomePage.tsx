@@ -342,9 +342,13 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
           const all: any[] = res.data || [];
           // Re-order results to match the priority order defined in defaultAutoNames
           const ordered = defaultAutoNames
-            .map(targetName =>
-              all.find((p: any) => (p?.name || '').toLowerCase().includes(targetName))
-            )
+            .map(targetName => {
+              const targetWords = targetName.toLowerCase().split(/\s+/);
+              return all.find((p: any) => {
+                const nameLower = (p?.name || '').toLowerCase();
+                return targetWords.every(word => nameLower.includes(word));
+              });
+            })
             .filter(Boolean);
           setFetchedBestSellers(ordered.length > 0 ? ordered : all.slice(0, 6));
         })
@@ -376,15 +380,24 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
 
     const autoBestSellers = products.filter(p => {
       const pName = (p?.name || "").toLowerCase().trim();
-      return defaultAutoNames.some(targetName => pName.includes(targetName));
+      return defaultAutoNames.some(targetName => {
+        const targetWords = targetName.toLowerCase().split(/\s+/);
+        return targetWords.every(word => pName.includes(word));
+      });
     });
 
     if (autoBestSellers.length > 0) {
       return autoBestSellers.sort((a, b) => {
         const aName = (a?.name || "").toLowerCase().trim();
         const bName = (b?.name || "").toLowerCase().trim();
-        const aIndex = defaultAutoNames.findIndex(n => aName.includes(n));
-        const bIndex = defaultAutoNames.findIndex(n => bName.includes(n));
+        const aIndex = defaultAutoNames.findIndex(n => {
+          const targetWords = n.toLowerCase().split(/\s+/);
+          return targetWords.every(word => aName.includes(word));
+        });
+        const bIndex = defaultAutoNames.findIndex(n => {
+          const targetWords = n.toLowerCase().split(/\s+/);
+          return targetWords.every(word => bName.includes(word));
+        });
         return aIndex - bIndex;
       });
     }
