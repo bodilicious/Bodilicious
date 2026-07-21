@@ -198,7 +198,7 @@ export default function TrackingPage() {
                         <div
                             className={`absolute left-4 top-1/2 -translate-y-1/2 h-1 ${activeColor} -z-10 transition-all duration-500`}
                             style={{
-                                width: `calc(${(timeline.filter(t => t.completed).length - 1) / (timeline.length - 1) * 100}% - 2rem)`
+                                width: `calc(${Math.max(0, timeline.filter(t => t.completed).length - 1) / Math.max(1, timeline.length - 1) * 100}% - 2rem)`
                             }}
                         ></div>
                     )}
