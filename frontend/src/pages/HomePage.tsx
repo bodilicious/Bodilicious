@@ -312,9 +312,11 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     bestSellersFetchedRef.current = true;
 
     if (contentData?.bestSellerMode === 'manual' && contentData.bestSellerPids?.length > 0) {
+      // Use slim=true to fetch only the product card fields — avoids pulling
+      // reviews, description, and ingredients which are unused on the homepage.
       Promise.all(
         contentData.bestSellerPids.map((pid: string) =>
-          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products/${pid}`)
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products/${pid}?slim=true`)
             .then(res => res.json())
             .then(res => res.data)
             .catch(() => null)
@@ -323,6 +325,8 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
         setFetchedBestSellers(results.filter(Boolean));
       });
     } else {
+      // Single batched request — fetch slim products matching our auto best-seller
+      // names in one round-trip instead of 6 individual requests.
       const defaultAutoNames = [
         "coenzyme q10 serum",
         "glow boost serum",
@@ -331,17 +335,20 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
         "hydrating sunscreen spray",
         "peptide ceramide collagen"
       ];
-      
-      Promise.all(
-        defaultAutoNames.map(name =>
-          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products?name=${encodeURIComponent(name)}&slim=true`)
-            .then(res => res.json())
-            .then(res => res.data?.[0])
-            .catch(() => null)
-        )
-      ).then(results => {
-        setFetchedBestSellers(results.filter(Boolean));
-      });
+
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/products?slim=true&limit=24`)
+        .then(res => res.json())
+        .then(res => {
+          const all: any[] = res.data || [];
+          // Re-order results to match the priority order defined in defaultAutoNames
+          const ordered = defaultAutoNames
+            .map(targetName =>
+              all.find((p: any) => (p?.name || '').toLowerCase().includes(targetName))
+            )
+            .filter(Boolean);
+          setFetchedBestSellers(ordered.length > 0 ? ordered : all.slice(0, 6));
+        })
+        .catch(() => null);
     }
   }, [contentData?.bestSellerMode, contentData?.bestSellerPids, isEditing]);
 

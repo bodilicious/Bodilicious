@@ -279,7 +279,8 @@ export default function ShopPage() {
       return;
     }
     let active = true;
-    const fetchDynamicFilters = async () => {
+    // 300ms debounce — rapid category toggles should only fire one request
+    const timer = setTimeout(async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/products/filters?category=${categoriesString}`);
         const json = await res.json();
@@ -289,9 +290,8 @@ export default function ShopPage() {
       } catch (err) {
         console.error("Failed to fetch dynamic filters", err);
       }
-    };
-    fetchDynamicFilters();
-    return () => { active = false; };
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
   }, [categoriesString]); // only fires when a category is actually selected
 
   useEffect(() => {

@@ -18,9 +18,13 @@ export const getProfile = async (req, res) => {
       // Exclude heavy analytics arrays that the frontend never reads
       cartHistory: 0,
       productViewCounts: 0,
+      // Cap recentlyBought at DB level to avoid inflating the profile payload
+      // for long-time customers who have bought many different products.
+      recentlyBought: { $slice: -6 },
     })
       .populate('wishlist', productCardFields)
       .populate('cart.product', productCardFields)
+      .populate('recentlyBought', productCardFields)
       .lean();
 
     if (!user) {
@@ -51,6 +55,13 @@ export const getProfile = async (req, res) => {
       user.cart.forEach(item => {
         if (item.product && item.product.images && item.product.images.length > 0) {
           item.product.images = item.product.images.slice(0, 1);
+        }
+      });
+    }
+    if (user.recentlyBought) {
+      user.recentlyBought.forEach(p => {
+        if (p && p.images && p.images.length > 0) {
+          p.images = p.images.slice(0, 1);
         }
       });
     }

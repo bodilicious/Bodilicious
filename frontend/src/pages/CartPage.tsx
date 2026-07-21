@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../hooks/useCurrency';
 import Footer from '../components/Footer';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSEO } from '../hooks/useSEO';
 
 export default function CartPage() {
@@ -14,6 +14,11 @@ export default function CartPage() {
   });
 
   const { cartItems, removeFromCart, updateQuantity, cartTotal, navigateTo, isAuthenticated, user, storeSettings, fetchShippingQuote, appliedCoupon, setAppliedCoupon } = useApp();
+  // Keep storeSettings in a ref so we can read the latest value inside the
+  // quote-fetch effect without adding it to the dep array (which would cause
+  // an extra quote API call every time settings load from the server).
+  const storeSettingsRef = useRef(storeSettings);
+  storeSettingsRef.current = storeSettings;
   const { formatPrice, userCurrency } = useCurrency();
   const navigate = useNavigate();
 
@@ -60,11 +65,12 @@ export default function CartPage() {
     fetchShippingQuote(itemsForQuote, { country: guessCountry }, appliedCoupon || undefined)
       .then(data => {
         if (isMounted) {
+          const s = storeSettingsRef.current;
           setQuoteData({
             shippingCost: data.shippingCost,
             discountAmount: data.discountAmount,
             total: data.totalAmount,
-            threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold,
+            threshold: guessCountry === 'IN' ? s.shippingThreshold : s.internationalShippingThreshold,
             isWelcomeOfferApplied: data.isWelcomeOfferApplied,
             isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
           });
@@ -83,13 +89,19 @@ export default function CartPage() {
             setCouponError(err.message || "Invalid coupon");
             // Re-fetch without the invalid coupon
             fetchShippingQuote(itemsForQuote, { country: guessCountry }).then(d => {
-              if (isMounted) setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
+              if (isMounted) {
+                const s = storeSettingsRef.current;
+                setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, threshold: guessCountry === 'IN' ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
+              }
             }).catch(e => console.error("Fallback quote failed:", e));
          }
       });
       
     return () => { isMounted = false; };
-  }, [validCartItems, userCurrency, fetchShippingQuote, appliedCoupon, storeSettings.shippingThreshold, storeSettings.internationalShippingThreshold]);
+  // storeSettings intentionally excluded — use storeSettingsRef inside to avoid
+  // a double quote fetch when settings load from the server after initial render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validCartItems, userCurrency, fetchShippingQuote, appliedCoupon]);
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;

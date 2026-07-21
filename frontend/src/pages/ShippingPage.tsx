@@ -54,6 +54,10 @@ export default function ShippingPage() {
     });
 
     const { cartItems, cartTotal, user, authLoading, cartLoading, storeSettings, fetchShippingQuote, appliedCoupon, setAppliedCoupon } = useApp();
+    // Ref so quote effect can read latest settings without re-triggering a fetch
+    // every time the settings response arrives from the server.
+    const storeSettingsRef = useRef(storeSettings);
+    storeSettingsRef.current = storeSettings;
     const { formatPrice, userCurrency } = useCurrency();
     const navigate = useNavigate();
 

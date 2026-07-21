@@ -288,18 +288,26 @@ export const getProductByPid = async (req, res) => {
     // Add Vercel-CDN-Cache-Control for edge caching
     res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
 
-    // Explicit projection — return only fields the product page actually renders.
-    // Omitting seo_keywords (internal), faqs, price_inr (admin-only), slug, createdAt/updatedAt
-    // which collectively add several KB of unused data per request.
-    const PRODUCT_PAGE_PROJECTION = 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews';
+    const isSlim = req.query.slim === 'true';
 
-    const product = await Product.findOne({
+    // Slim mode: only return card-level fields — used by pages that don't render
+    // reviews, description, or ingredients (e.g. homepage best-seller section).
+    const projection = isSlim
+      ? 'pid name price images rating ratingCount stock category brand isActive'
+      : 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews';
+
+    let productQuery = Product.findOne({
       pid: req.params.pid,
       isActive: true,
-    }, PRODUCT_PAGE_PROJECTION)
-      .slice('reviews', -50)
-      .populate("reviews.user", "name")
-      .lean();
+    }, projection);
+
+    if (isSlim) {
+      productQuery = productQuery.slice('images', 1);
+    } else {
+      productQuery = productQuery.slice('reviews', -50).populate("reviews.user", "name");
+    }
+
+    const product = await productQuery.lean();
 
     if (!product) {
       return res.status(404).json({
@@ -308,8 +316,8 @@ export const getProductByPid = async (req, res) => {
       });
     }
 
-    // 🚀 NEW: Update UserProfile productViewCounts if user is logged in
-    if (req.user && req.user._id) {
+    // 🚀 NEW: Update UserProfile productViewCounts if user is logged in (skip for slim requests)
+    if (!isSlim && req.user && req.user._id) {
       import("../analytics/interactionModel.js").then(({ default: UserInteractionLog }) => {
          UserInteractionLog.create({
             userId: req.user._id,
@@ -354,7 +362,7 @@ export const getProductByPid = async (req, res) => {
     }
 
     // Map populated user object to just the name string for the frontend
-    if (product.reviews && product.reviews.length > 0) {
+    if (!isSlim && product.reviews && product.reviews.length > 0) {
       product.reviews = product.reviews.map(r => ({
         rating: r.rating,
         comment: r.comment,
