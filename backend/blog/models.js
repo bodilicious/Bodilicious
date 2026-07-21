@@ -1,5 +1,18 @@
 import mongoose from "mongoose";
 
+const AVERAGE_WPM = 200;
+
+function stripHtml(html = "") {
+  return html.replace(/<[^>]*>/g, " ");
+}
+
+function calculateReadingTime(content) {
+  if (!content) return 1;
+  const words = stripHtml(content).trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / AVERAGE_WPM));
+}
+
+
 // ────────────────────────────────────────────────────────────────────────────
 // BlogCategory — controlled list (not freeform strings)
 // ────────────────────────────────────────────────────────────────────────────
@@ -68,8 +81,17 @@ const blogSchema = new mongoose.Schema(
     // Stamped automatically on first draft → published transition. Never manually editable.
     publishedAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { 
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+  }
 );
+
+// Virtual: derived from content length, never persisted
+blogSchema.virtual("readingTime").get(function () {
+  return calculateReadingTime(this.content);
+});
 
 // Unique slug index (already enforced by schema field, explicit index here for clarity)
 blogSchema.index({ slug: 1 }, { unique: true });
@@ -78,10 +100,24 @@ blogSchema.index({ slug: 1 }, { unique: true });
 blogSchema.index({ status: 1, publishedAt: -1 });
 
 // Optional: text index for future on-site blog search
-blogSchema.index({ title: "text", content: "text" });
+blogSchema.index({ title: "text", excerpt: "text" });
 
 blogSchema.set("autoCreate", true);
+
+const blogCommentSchema = new mongoose.Schema(
+  {
+    blog: { type: mongoose.Schema.Types.ObjectId, ref: "Blog", required: true, index: true },
+    author: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile", required: true },
+    content: { type: String, required: true, trim: true, maxlength: 2000 },
+  },
+  { timestamps: true, toJSON: { virtuals: true } }
+);
+
+blogCommentSchema.index({ blog: 1, createdAt: -1 });
+
+const BlogComment = mongoose.models.BlogComment || mongoose.model("BlogComment", blogCommentSchema);
 
 const Blog = mongoose.models.Blog || mongoose.model("Blog", blogSchema);
 
 export default Blog;
+export { BlogComment };

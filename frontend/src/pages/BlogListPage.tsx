@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSEO } from '../hooks/useSEO';
-import { ChevronLeft, ChevronRight, BookOpen, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, AlertCircle, Search } from 'lucide-react';
 
 interface BlogPost {
   _id: string;
@@ -11,7 +11,17 @@ interface BlogPost {
   coverImage: string;
   categories: { _id: string; name: string; slug: string }[];
   tags: string[];
+  readingTime?: number;
   publishedAt: string;
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
 }
 
 interface Category { _id: string; name: string; slug: string; }
@@ -26,6 +36,27 @@ const BlogListPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryFilter = searchParams.get('category') || '';
   const pageParam = parseInt(searchParams.get('page') || '1');
+  
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
+  const debouncedSearch = useDebouncedValue(searchInput, 400);
+
+  // Sync debounced input -> URL (shareable link)
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (debouncedSearch.trim()) next.set('search', debouncedSearch.trim());
+        else next.delete('search');
+        if (debouncedSearch.trim() !== (prev.get('search') || '')) {
+          next.set('page', '1'); // reset page on new search
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  }, [debouncedSearch, setSearchParams]);
+
+  const currentSearch = searchParams.get('search') || '';
 
   const [posts, setPosts]         = useState<BlogPost[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -39,6 +70,7 @@ const BlogListPage: React.FC = () => {
     try {
       const params = new URLSearchParams({ page: String(pageParam), limit: '12' });
       if (categoryFilter) params.set('category', categoryFilter);
+      if (currentSearch) params.set('search', currentSearch);
       const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs?${params}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
@@ -49,7 +81,7 @@ const BlogListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [pageParam, categoryFilter]);
+  }, [pageParam, categoryFilter, currentSearch]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -105,6 +137,20 @@ const BlogListPage: React.FC = () => {
             ))}
           </div>
         )}
+
+        {/* Search Bar */}
+        <div className="max-w-xl mx-auto mb-12 relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 group-focus-within:text-b-burgundy transition-colors">
+            <Search size={20} />
+          </div>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search posts..."
+            className="w-full pl-11 pr-4 py-3.5 bg-white border border-silk-light rounded-full shadow-sm outline-none focus:border-b-burgundy/50 focus:ring-4 focus:ring-b-burgundy/10 transition-all text-b-text-primary placeholder:text-gray-400"
+          />
+        </div>
 
         {/* Content */}
         {loading ? (
@@ -174,9 +220,19 @@ const BlogListPage: React.FC = () => {
                     <p className="text-sm text-b-text-secondary line-clamp-3 mb-4 leading-relaxed font-sans">{post.excerpt}</p>
                   )}
                   {post.publishedAt && (
-                    <p className="text-xs text-gray-400 mt-auto uppercase tracking-wider font-medium">
-                      {new Date(post.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
+                    <div className="flex items-center gap-2 mt-auto">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+                        {new Date(post.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      {post.readingTime && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+                            {post.readingTime} min read
+                          </p>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </Link>

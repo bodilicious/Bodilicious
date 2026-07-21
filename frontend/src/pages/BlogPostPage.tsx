@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useSEO } from '../hooks/useSEO';
+import { useApp } from '../context/useApp';
 import { ArrowLeft, Calendar, User, Loader2, AlertCircle } from 'lucide-react';
 
 interface BlogPost {
@@ -17,12 +18,26 @@ interface BlogPost {
   seo_title: string;
   seo_description: string;
   seo_keywords: any;
+  readingTime?: number;
   publishedAt: string;
+}
+
+interface Comment {
+  _id: string;
+  content: string;
+  author: { name: string; avatar?: string };
+  createdAt: string;
 }
 
 const BlogPostPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const { user, isAuthenticated, getAuthHeaders } = useApp();
   const [post, setPost]     = useState<BlogPost | null>(null);
+  const [related, setRelated] = useState<BlogPost[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError]   = useState('');
@@ -87,6 +102,8 @@ const BlogPostPage: React.FC = () => {
 
   useEffect(() => {
     if (!slug) return;
+    let cancelled = false;
+
     const load = async () => {
       setLoading(true);
       setNotFound(false);
@@ -96,15 +113,60 @@ const BlogPostPage: React.FC = () => {
         if (res.status === 404) { setNotFound(true); return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
+        
+        if (cancelled) return;
         setPost(data.data);
+
+        const [relatedRes, commentsRes] = await Promise.allSettled([
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${slug}/related`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${data.data._id}/comments`)
+        ]);
+
+        if (!cancelled && relatedRes.status === "fulfilled") {
+          const rData = await relatedRes.value.json();
+          if (rData.success) setRelated(rData.data);
+        }
+        if (!cancelled && commentsRes.status === "fulfilled") {
+          const cData = await commentsRes.value.json();
+          if (cData.success) setComments(cData.data);
+        }
       } catch (err: any) {
-        setError(err.message || 'Failed to load post');
+        if (!cancelled) setError(err.message || 'Failed to load post');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     load();
+    return () => { cancelled = true; };
   }, [slug]);
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!post) return;
+    const trimmed = newComment.trim();
+    if (!trimmed) {
+      setCommentError("Comment can't be empty.");
+      return;
+    }
+    setSubmitting(true);
+    setCommentError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${post._id}/comments`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setComments((prev) => [data.data, ...prev]);
+      setNewComment("");
+    } catch (err: any) {
+      setCommentError(err.message || "Failed to post comment.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -192,6 +254,12 @@ const BlogPostPage: React.FC = () => {
                 {new Date(post.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
             )}
+            {post.readingTime && (
+              <span className="flex items-center gap-2">
+                <span className="text-gray-300">•</span>
+                {post.readingTime} min read
+              </span>
+            )}
           </div>
         </div>
 
@@ -233,10 +301,89 @@ const BlogPostPage: React.FC = () => {
         )}
 
         {/* Back link */}
-        <div className="mt-16 text-center">
+        <div className="mt-16 text-center pb-8 border-b border-silk/60">
           <Link to="/blogs" className="inline-flex items-center gap-2 text-b-burgundy font-medium hover:text-ruby-red transition-colors text-sm border border-b-burgundy/20 hover:border-ruby-red/40 px-6 py-3 rounded-full hover:shadow-sm">
             <ArrowLeft size={16} /> Back to Blogs
           </Link>
+        </div>
+
+        {/* Related Posts */}
+        {related.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-serif font-bold text-b-text-primary mb-6">Related Posts</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {related.map(r => (
+                <Link key={r._id} to={`/blogs/${r.slug}`} className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-silk-light flex flex-col">
+                  {r.coverImage && (
+                    <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                      <img src={r.coverImage} alt={r.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    </div>
+                  )}
+                  <div className="p-4 flex flex-col flex-grow">
+                    <h4 className="font-serif font-bold text-b-text-primary text-lg mb-2 line-clamp-2 group-hover:text-b-burgundy transition-colors">{r.title}</h4>
+                    {r.readingTime && <span className="text-xs text-gray-400 mt-auto">{r.readingTime} min read</span>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Comments Section */}
+        <div className="mt-16 bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-silk-light">
+          <h2 className="text-2xl font-serif font-bold text-b-text-primary mb-8">Comments ({comments.length})</h2>
+          
+          {isAuthenticated ? (
+            <form onSubmit={handleSubmitComment} className="mb-10">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Share your thoughts..."
+                maxLength={2000}
+                rows={3}
+                className="w-full p-4 rounded-xl border border-silk-light focus:border-b-burgundy focus:ring-1 focus:ring-b-burgundy outline-none resize-none bg-gray-50 mb-3"
+              />
+              {commentError && <p className="text-red-500 text-sm mb-3">{commentError}</p>}
+              <div className="flex justify-end">
+                <button 
+                  type="submit" 
+                  disabled={submitting || !newComment.trim()}
+                  className="bg-b-burgundy text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-ruby-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Posting...' : 'Post Comment'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="bg-gray-50 rounded-xl p-6 text-center mb-10 border border-silk-light">
+              <p className="text-b-text-secondary mb-4">You must be logged in to leave a comment.</p>
+              {/* Note: In Bodilicious, auth page is usually handled or we might use SignInPage or a modal. 
+                  If '/auth' isn't correct, it might be '/account' or '/sign-in' */}
+              <Link to="/sign-in" className="inline-block bg-b-text-primary text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-black transition-colors">
+                Log In
+              </Link>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {comments.map((c) => (
+              <div key={c._id} className="flex gap-4">
+                <div className="w-10 h-10 rounded-full bg-b-burgundy/10 flex items-center justify-center text-b-burgundy font-bold uppercase shrink-0">
+                  {c.author.name.charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-b-text-primary text-sm">{c.author.name}</span>
+                    <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-sm text-b-text-secondary leading-relaxed">{c.content}</p>
+                </div>
+              </div>
+            ))}
+            {comments.length === 0 && (
+              <p className="text-center text-gray-400 italic">No comments yet — be the first to share your thoughts.</p>
+            )}
+          </div>
         </div>
       </div>
     </main>

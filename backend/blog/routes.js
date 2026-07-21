@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { fileTypeFromBuffer } from "file-type";
+import rateLimit from "express-rate-limit";
 import { protect, adminOnly } from "../middleware/auth.js";
 import { adminLimiter } from "../middleware/admin.js";
 import * as blogCtrl from "./controller.js";
@@ -55,6 +56,18 @@ adminRouter.get("/:id",    blogCtrl.getAdminBlogById);
 adminRouter.put("/:id",    blogCtrl.updateBlog);
 adminRouter.delete("/:id", blogCtrl.deleteBlog);
 
+// ── Public rate limiters ─────────────────────────────────────────────────────
+// Per-user limiter for comment posting — keyed by user ID to avoid
+// shared-IP false positives (e.g. corporate NAT users)
+const commentLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 5,              // max 5 comments per user per minute
+  keyGenerator: (req) => (req.user?._id?.toString() || req.ip),
+  message: { success: false, message: "Too many comments. Please wait before posting again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ── Admin category routes ───────────────────────────────────────────────────
 const categoryRouter = Router();
 categoryRouter.use(protect, adminOnly, adminLimiter);
@@ -67,5 +80,8 @@ const publicRouter = Router();
 publicRouter.get("/",       blogCtrl.getPublicBlogs);
 publicRouter.get("/categories", blogCtrl.getCategories);
 publicRouter.get("/:slug",  blogCtrl.getPublicBlogBySlug);
+publicRouter.get("/:slug/related", blogCtrl.getRelatedBlogs);
+publicRouter.get("/:id/comments", blogCtrl.getComments);
+publicRouter.post("/:id/comments", protect, commentLimiter, blogCtrl.addComment);
 
 export { adminRouter, categoryRouter, publicRouter };

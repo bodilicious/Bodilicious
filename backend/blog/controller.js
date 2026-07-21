@@ -1,6 +1,7 @@
-import Blog, { BlogCategory } from "./models.js";
+import Blog, { BlogCategory, BlogComment } from "./models.js";
 import { v2 as cloudinary } from "cloudinary";
 import escapeStringRegexp from "escape-string-regexp";
+import mongoose from "mongoose";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -66,7 +67,7 @@ export const createBlog = async (req, res) => {
       slug,
       content: content || "",
       excerpt: excerpt || "",
-      coverImage: coverImage || "",
+      coverImage: (coverImage && coverImage.startsWith("https://")) ? coverImage : "",
       author: req.user._id,
       categories: categories || [],
       tags: tags || [],
@@ -144,6 +145,10 @@ export const getAdminBlogs = async (req, res) => {
  */
 export const getAdminBlogById = async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid blog ID" });
+    }
+
     const blog = await Blog.findById(req.params.id)
       .populate("author", "name email")
       .populate("categories", "name slug");
@@ -152,7 +157,7 @@ export const getAdminBlogById = async (req, res) => {
     res.json({ success: true, data: blog });
   } catch (err) {
     console.error("Blog getAdminBlogById Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: "Failed to fetch blog" });
   }
 };
 
@@ -177,7 +182,12 @@ export const updateBlog = async (req, res) => {
     if (title !== undefined) updates.title = title;
     if (content !== undefined) updates.content = content;
     if (excerpt !== undefined) updates.excerpt = excerpt;
-    if (coverImage !== undefined) updates.coverImage = coverImage;
+    if (coverImage !== undefined) {
+      if (coverImage && !coverImage.startsWith("https://")) {
+        return res.status(400).json({ success: false, message: "Invalid cover image URL. Must be a secure https:// URL." });
+      }
+      updates.coverImage = coverImage;
+    }
     if (categories !== undefined) updates.categories = categories;
     if (tags !== undefined) updates.tags = tags;
     if (seo_title !== undefined) updates.seo_title = seo_title;
@@ -348,6 +358,14 @@ export const getPublicBlogs = async (req, res) => {
     if (req.query.category) filter.categories = req.query.category;
     if (req.query.tag) filter.tags = req.query.tag;
 
+    // Slice to 200 chars before escaping to prevent huge regex payloads wasting CPU
+    const rawSearch = String(req.query.search || "").slice(0, 200).trim();
+    if (rawSearch) {
+      const safe = escapeStringRegexp(rawSearch);
+      const pattern = new RegExp(safe, "i");
+      filter.$or = [{ title: pattern }, { excerpt: pattern }];
+    }
+
     const [blogs, total] = await Promise.all([
       Blog.find(filter)
         .sort({ publishedAt: -1 })
@@ -385,6 +403,106 @@ export const getPublicBlogBySlug = async (req, res) => {
     res.json({ success: true, data: blog });
   } catch (err) {
     console.error("Blog getPublicBlogBySlug Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: "Failed to fetch post" });
+  }
+};
+
+/**
+ * GET /api/v1/blogs/:slug/related
+ */
+export const getRelatedBlogs = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const current = await Blog.findOne({ slug, status: "published" });
+    if (!current) return res.status(404).json({ success: false, message: "Blog not found" });
+
+    const related = await Blog.find({
+      _id: { $ne: current._id },
+      status: "published",
+      categories: { $in: current.categories },
+    })
+      .sort({ publishedAt: -1 })
+      .limit(3)
+      .populate("categories", "name slug")
+      .select("title slug excerpt coverImage categories tags publishedAt");
+
+    res.json({ success: true, data: related });
+  } catch (err) {
+    console.error("getRelatedBlogs error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch related blogs" });
+  }
+};
+
+/**
+ * GET /api/v1/blogs/:id/comments
+ */
+export const getComments = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate before querying — invalid ObjectId causes a Mongoose CastError
+    // that would otherwise propagate as a 500 with internal DB details exposed
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid blog ID" });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+
+    const [comments, total] = await Promise.all([
+      BlogComment.find({ blog: id })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("author", "name avatar"),
+      BlogComment.countDocuments({ blog: id }),
+    ]);
+
+    res.json({
+      success: true,
+      data: comments,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    console.error("getComments error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch comments" });
+  }
+};
+
+/**
+ * POST /api/v1/blogs/:id/comments
+ */
+export const addComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    // Validate ObjectId before querying — prevents CastError → 500 with internal DB info
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid blog ID" });
+    }
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: "Comment content is required" });
+    }
+    if (content.length > 2000) {
+      return res.status(400).json({ success: false, message: "Comment is too long (max 2000 characters)" });
+    }
+
+    const blog = await Blog.findById(id);
+    if (!blog) return res.status(404).json({ success: false, message: "Blog not found" });
+
+    // req.user is set by the `protect` middleware — never trust author from req.body
+    const comment = await BlogComment.create({
+      blog: id,
+      author: req.user._id,
+      content: content.trim(),
+    });
+
+    await comment.populate("author", "name avatar");
+    res.status(201).json({ success: true, data: comment });
+  } catch (err) {
+    console.error("addComment error:", err);
+    res.status(500).json({ success: false, message: "Failed to add comment" });
   }
 };

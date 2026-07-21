@@ -55,6 +55,14 @@ export const protect = async (req, res, next) => {
 
       const user = result.value;
 
+      // Blocked users must not be able to authenticate, even with a valid token
+      if (user.isBlocked) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended. Please contact support.",
+        });
+      }
+
       if (result.lastErrorObject?.upserted) {
         logAction(req, "new_customer", "user", user._id.toString(), {
           email: user.email,
@@ -140,6 +148,9 @@ export const tryProtect = async (req, res, next) => {
       );
 
       const user = result.value;
+
+      // Even in tryProtect, blocked users should not receive req.user
+      if (user.isBlocked) return next();
 
       if (result.lastErrorObject?.upserted) {
         logAction(req, "new_customer", "user", user._id.toString(), {
