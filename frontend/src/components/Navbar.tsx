@@ -337,7 +337,11 @@ export default function Navbar() {
             {authStatus === 'authenticated' && (user?.role === 'admin' || user?.role === 'primary_admin') && (
               <Link
                 to="/admin"
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-ruby-red/5 hover:bg-ruby-red/10 text-ruby-red rounded-full transition-all duration-300 group"
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-300 group ${
+                  isTransparent 
+                    ? 'bg-white/10 hover:bg-white/20 text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' 
+                    : 'bg-ruby-red/5 hover:bg-ruby-red/10 text-ruby-red'
+                }`}
                 title="Admin Dashboard"
               >
                 <ShieldCheck size={16} className="group-hover:scale-110 transition-transform" />
