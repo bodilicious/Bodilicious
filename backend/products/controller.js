@@ -294,7 +294,7 @@ export const getProductByPid = async (req, res) => {
     // reviews, description, or ingredients (e.g. homepage best-seller section).
     const projection = isSlim
       ? 'pid name price images rating ratingCount stock category brand isActive'
-      : 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews';
+      : 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords';
 
     let productQuery = Product.findOne({
       pid: req.params.pid,
