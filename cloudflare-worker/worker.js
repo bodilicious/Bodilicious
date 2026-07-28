@@ -27,20 +27,30 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
+    // Helper to bypass Cloudflare Orange-to-Orange conflict by fetching the raw Render URL
+    const fetchFromOrigin = () => {
+      const originUrl = new URL(request.url);
+      originUrl.hostname = 'bodilicious-front.onrender.com';
+      // Create a new request to avoid mutating the original
+      const modifiedRequest = new Request(originUrl, request);
+      // Ensure we don't pass Cloudflare headers that might confuse Render's Cloudflare
+      modifiedRequest.headers.delete('cf-connecting-ip');
+      return fetch(modifiedRequest);
+    };
+
     // BUG FIX 1: Sitemap must bypass the kill-switch — it is always valid public content.
-    // Moving it before the kill-switch check so it is always served correctly.
     if (pathname === '/sitemap.xml') {
       return handleSitemap(env);
     }
 
     // 1. Check if SEO rendering is enabled (kill-switch)
     if (env.SEO_BOT_RENDER_ENABLED !== 'true') {
-      return fetch(request); // Fall through to origin
+      return fetchFromOrigin(); 
     }
 
     // 2. Only intercept for bots
     if (!isBot(request)) {
-      return fetch(request);
+      return fetchFromOrigin();
     }
 
     // 3. Handle Product pages
@@ -57,7 +67,7 @@ export default {
 
     // For now, only product pages and sitemap are handled.
     // Shop / collection / blog handling can be added similarly.
-    return fetch(request);
+    return fetchFromOrigin();
   }
 };
 
