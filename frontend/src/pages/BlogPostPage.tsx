@@ -97,6 +97,69 @@ const BlogPostPage: React.FC = () => {
     ? (secondaryKw ? `${post.title} - ${secondaryKw}` : `${post.title}`)
     : undefined;
 
+  // ── Article + BreadcrumbList JSON-LD ──────────────────────────────────────
+  // Only built once post data is loaded. Schema is withheld entirely if
+  // headline is absent (would fail Google's required-field validation).
+  // dateModified omitted when datePublished is null (explicit null chain).
+  const blogJsonLd = (() => {
+    if (!post) return undefined;
+
+    const headline = post.seo_title || post.title;
+    if (!headline) return undefined; // required — skip schema entirely if missing
+
+    const publishedIso = post.publishedAt ? new Date(post.publishedAt).toISOString() : null;
+    // updatedAt may come from the API; fall back to publishedAt; omit if both null
+    const modifiedIso = (post as any).updatedAt
+      ? new Date((post as any).updatedAt).toISOString()
+      : publishedIso;
+
+    const articleSchema: Record<string, unknown> = {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline,
+      author: {
+        '@type': 'Person',
+        name: post.author?.name || 'Bodilicious Team',
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Bodilicious',
+        url: 'https://bodilicious.in',
+        logo: {
+          '@type': 'ImageObject',
+          url: 'https://bodilicious.in/logo.webp',
+        },
+      },
+      url: `https://bodilicious.in/blogs/${post.slug}`,
+    };
+
+    // Optional fields — omit rather than inject null/empty strings
+    if (post.coverImage) {
+      articleSchema.image = post.coverImage;
+    }
+    if (publishedIso) {
+      articleSchema.datePublished = publishedIso;
+    }
+    if (modifiedIso) {
+      articleSchema.dateModified = modifiedIso;
+    }
+    if (post.excerpt) {
+      articleSchema.description = post.excerpt;
+    }
+
+    const breadcrumbSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://bodilicious.in/' },
+        { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://bodilicious.in/blogs' },
+        { '@type': 'ListItem', position: 3, name: headline, item: `https://bodilicious.in/blogs/${post.slug}` },
+      ],
+    };
+
+    return [articleSchema, breadcrumbSchema];
+  })();
+
   useSEO({
     title: pageTitle,
     description: post?.seo_description || post?.excerpt || 'Read on the Bodilicious blog.',
@@ -104,6 +167,7 @@ const BlogPostPage: React.FC = () => {
     canonical: post ? `/blogs/${post.slug}` : '/blogs',
     ogImage: post?.coverImage || undefined,
     ogImageAlt: ogAlt,
+    jsonLd: blogJsonLd,
   });
 
   useEffect(() => {

@@ -115,13 +115,15 @@ services:
       - type: redirect
         source: /pages/*
         destination: /
-      - type: redirect
-        source: /blogs/*
-        destination: /
+      # /blogs/* intentionally NOT redirected — SPA rewrite below handles client-side routing
       - type: rewrite
         source: /*
         destination: /index.html
     headers:
+      # ── Sitemap — always fresh so crawlers pick up new blog posts after each deploy
+      - path: /sitemap.xml
+        name: Cache-Control
+        value: "no-cache, must-revalidate"
       # ── Vite hashed bundles (JS/CSS) — safe to cache forever, hash changes on every build
       - path: /assets/*.js
         name: Cache-Control

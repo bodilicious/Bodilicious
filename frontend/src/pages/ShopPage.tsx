@@ -169,6 +169,39 @@ const FilterAccordion = ({
   );
 };
 
+// ─── Category / Concern SEO intro blurbs ─────────────────────────────────────
+// Each entry is genuinely distinct copy — not a template.
+// Precedence (resolved in render): concern > category > generic.
+const CATEGORY_INTRO: Record<string, string> = {
+  // ── Concerns ──────────────────────────────────────────────────────────────
+  acne:
+    'Breakouts happen for many reasons — excess sebum, clogged pores, bacteria, or hormonal shifts. Our acne-targeted range works differently at each stage: salicylic acid and azelaic acid formulas cut through congestion at the follicle level, while niacinamide and zinc PCA dial down redness and oil production without stripping the skin barrier. Every product is non-comedogenic, dermatologically tested, and free of heavy fragrances that can trigger flare-ups. Pair a BHA serum with our saf-gel moisturiser for a full routine that tackles active breakouts and prevents new ones from forming.',
+  brightening:
+    'Dull skin is usually a surface story — dead cells, uneven melanin, and post-acne marks that stick around long after the blemish heals. Our brightening products use a layered approach: vitamin C to intercept melanin production, kojic acid and glycolic acid to resurface and reveal, and hyaluronic acid to keep the newly exposed skin hydrated and plump. Unlike bleaching products, everything here works with your skin\'s natural renewal cycle — consistent use over four to eight weeks delivers a genuinely brighter, more even complexion without sensitising the skin.',
+  'anti-aging':
+    'Visible ageing is largely collagen loss, moisture depletion, and cumulative UV damage playing out together. Our anti-ageing lineup addresses all three simultaneously: retinol and peptide serums stimulate collagen synthesis and accelerate cell turnover; hyaluronic acid at multiple molecular weights draws water into every layer of the dermis; and broad-spectrum sunscreens stop new damage before it starts. The result isn\'t a masked surface — it\'s skin that\'s genuinely more resilient and reflective because the structural proteins underneath it are being actively supported.',
+  hyperpigmentation:
+    'Hyperpigmentation — whether from sun exposure, post-inflammatory marks, or melasma — responds best to a combination of melanin inhibition and gentle exfoliation. Our targeted collection pairs kojic acid and vitamin C, which interrupt tyrosinase at the source, with AHA and BHA exfoliants that remove the pigmented cells already sitting on the surface. Critically, these formulas are paired with SPF-first guidance because no brightening active works well if UV is continuing to trigger melanin production simultaneously.',
+  'hair growth':
+    'Healthy hair growth starts with a healthy scalp. Our hair growth products — from the herbal oil blend to the scalp-stimulating growth serum — work by improving blood circulation, reducing follicle-blocking DHT, and delivering biotin and botanical extracts directly to the root zone. Unlike thickening shampoos that coat the shaft, these treatments address the underlying environment the follicle lives in. Consistent twice-weekly use alongside our protein-rich conditioner produces measurable density improvements over eight to twelve weeks.',
+  dandruff:
+    'Dandruff is a fungal and inflammatory issue, not a hygiene one — so the fix is antifungal actives combined with scalp-soothing botanicals, not stronger cleansing. Our anti-dandruff shampoo uses ketoconazole to target the Malassezia fungus responsible for flaking, alongside zinc pyrithione to reduce scalp inflammation and prevent recurrence. It\'s formulated to be gentle enough for twice-weekly use without drying out the lengths, and pairs well with our herbal oil treatment for scalps that are both flaky and dry.',
+  // ── Categories ────────────────────────────────────────────────────────────
+  skin:
+    'Bodilicious skin care is built around clinically studied actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, and BHAs — formulated at concentrations that actually move the needle, not token amounts added for label appeal. Every product is dermatologically tested for Indian skin tones and the specific concerns that come with a humid, high-UV climate: acne, post-inflammatory hyperpigmentation, and dehydration. Whether you\'re building a first routine or layering targeted treatments, you\'ll find single-active serums, balanced moisturisers, and SPF you\'ll actually want to wear daily.',
+  hair:
+    'Hair health is scalp health — which is why the Bodilicious hair range starts at the root, not the shaft. Our shampoos, conditioners, oils, and serums are formulated to work together: antifungal and DHT-blocking actives for the scalp, protein and keratin for the lengths, and lightweight moisture-sealing ingredients that don\'t weigh fine hair down. Whether your concern is hair fall, dandruff, frizz, or slow growth, there\'s a dedicated product here with a specific mechanism of action behind every claim.',
+  body:
+    'Body skin is thicker and more resilient than facial skin, but it still needs targeted care — especially for concerns like KP, uneven tone, dryness, and stretch marks. Our body range uses the same science-backed actives as our face products — goat milk, olive oil, and exfoliating acids — but in rinse-off and leave-on formats optimised for larger surface areas and faster absorption. Nothing heavy, nothing greasy; formulas that feel good the moment you apply them and show real results over consistent use.',
+  lip:
+    'Lips lack sebaceous glands, so they can\'t moisturise themselves — every bit of moisture they retain has to come from what you put on them. Our lip products go beyond basic petroleum jelly: natural waxes and butters for an occlusive seal, antioxidant-rich ingredients like beetroot and carrot for colour and protection, and SPF-infused formulas for the lower lip, which is the most UV-exposed area of the face. Long-wearing, non-sticky, and genuinely nourishing — even under matte lip colour.',
+  makeup:
+    'Bodilicious makeup is formulated with skin care principles in mind — so you\'re not undoing your serum routine with a foundation that clogs pores. Our range is non-comedogenic, long-wear, and suited to warm, humid Indian conditions where most imported formulas transfer or oxidise by midday. Ingredients like niacinamide in the foundation and SPF in the tinted products mean your colour is doing something useful for your skin, not just sitting on top of it.',
+  // ── Default (no or multiple filters active) ───────────────────────────────
+  default:
+    'Bodilicious is an Indian science-backed beauty brand offering dermatologically tested skincare, haircare, lip care, and makeup. Every formula is built around proven actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, BHAs, and keratin — at concentrations that work for Indian skin types and India\'s climate. Free shipping on orders over ₹1500. All products are non-comedogenic, cruelty-free, and made without harmful fillers.',
+};
+
 export default function ShopPage() {
   const { products, isLoading, filters, totalProducts } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -674,6 +707,22 @@ export default function ShopPage() {
             )}
           </button>
         </div>
+
+        {/* Category / Concern SEO intro — visible text Google can index */}
+        {!searchQuery && (() => {
+          // Precedence: single concern → concern blurb; single category → category blurb; else generic
+          let introKey = 'default';
+          if (selectedConcerns.length === 1) introKey = selectedConcerns[0];
+          else if (selectedCategories.length === 1) introKey = selectedCategories[0];
+          const blurb = CATEGORY_INTRO[introKey] ?? CATEGORY_INTRO['default'];
+          return (
+            <section aria-label="category-description" className="mb-8">
+              <p className="text-xs font-sans text-gray-400 leading-relaxed max-w-3xl">
+                {blurb}
+              </p>
+            </section>
+          );
+        })()}
 
         {/* Active Filter Pills (Mobile Only) */}
         {totalActiveFilters > 0 && (

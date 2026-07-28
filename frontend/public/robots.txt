@@ -1,41 +1,4 @@
 User-agent: *
 Allow: /
 
-# Explicitly allow public policy page BEFORE the /shipping prefix disallow
-# (robots.txt uses longest-match wins — this 17-char rule beats the 9-char Disallow below)
-Allow: /shipping-refund
-
-# Disallow private, transactional, and user-specific pages
-Disallow: /account
-Disallow: /account/tickets
-Disallow: /cart
-Disallow: /wishlist
-Disallow: /payment
-Disallow: /shipping
-Disallow: /confirmation
-Disallow: /signin
-Disallow: /admin
-Disallow: /admin/
-Disallow: /internal/
-Disallow: /tracking
-Disallow: /order-details
-Disallow: /orders/
-Disallow: /track/
-Disallow: /auth/
-
-# Disallow low-value, transient, or duplicate-content shop URL params
-Disallow: /shop?page=
-Disallow: /shop?sort=
-Disallow: /shop?inStock=
-Disallow: /shop?priceMax=
-Disallow: /shop?priceMin=
-
-# Allow SEO-meaningful shop filter pages (explicit, for crawlers that support param matching)
-Allow: /shop?category=
-Allow: /shop?sub_category=
-Allow: /shop?type=
-Allow: /shop?concern=
-Allow: /shop?ingredient=
-
-# Sitemap location
 Sitemap: https://bodilicious.in/sitemap.xml

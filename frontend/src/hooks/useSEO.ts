@@ -4,6 +4,52 @@ const BASE_URL = 'https://bodilicious.in';
 const DEFAULT_IMAGE = `${BASE_URL}/og-image.png`;
 const BRAND = 'Bodilicious';
 
+/** Attribute used to scope page-level JSON-LD tags — never touches global org/website schemas */
+const LD_ATTR = 'data-bodilicious-ld';
+
+/**
+ * Safely serialize a JSON-LD object.
+ *
+ * Escapes characters that could break out of an inline <script> context:
+ *   <  →  \u003c   (closes script tag)
+ *   >  →  \u003e   (SGML comment end)
+ *   &  →  \u0026   (entity injection)
+ *   "  →  \u0022   (attribute injection)
+ *   U+2028 → \u2028  (line separator — invalid in raw JS strings)
+ *   U+2029 → \u2029  (paragraph separator — same)
+ */
+function safeStringify(obj: object): string {
+  return JSON.stringify(obj)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/"/g, '\\u0022')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/** Remove all page-level LD script tags (both new attr and legacy id) synchronously */
+function removePageLdTags(): void {
+  // New scoped tags
+  document.querySelectorAll(`script[${LD_ATTR}]`).forEach(el => el.remove());
+  // Legacy single-tag from previous implementation
+  document.getElementById('bodilicious-page-jsonld')?.remove();
+}
+
+/** Inject one <script type="application/ld+json"> per schema object */
+function injectLdTags(schemas: object[]): HTMLScriptElement[] {
+  return schemas
+    .filter((s): s is object => s !== null && typeof s === 'object')
+    .map(schema => {
+      const el = document.createElement('script');
+      el.type = 'application/ld+json';
+      el.setAttribute(LD_ATTR, '');
+      el.textContent = safeStringify(schema);
+      document.head.appendChild(el);
+      return el;
+    });
+}
+
 export interface SEOConfig {
   title: string;
   description: string;
@@ -16,10 +62,17 @@ export interface SEOConfig {
 }
 
 /**
- * useSEO — lightweight client-side meta tag manager for Bodilicious SPA.
+ * useSEO — client-side meta tag manager for Bodilicious SPA.
  *
- * Updates document.title, meta description, OG/Twitter tags, and canonical link.
- * Optionally injects a JSON-LD script block for structured data.
+ * Updates document.title, meta description, OG/Twitter tags, canonical link,
+ * and safely injects per-page JSON-LD structured data (one script tag per schema).
+ *
+ * JSON-LD scope: only tags carrying [data-bodilicious-ld] are managed here.
+ * The static Organization and WebSite schemas in index.html are left untouched.
+ *
+ * NOTE: If a Content-Security-Policy with script-src is ever added to render.yaml,
+ * these inline script tags will need a nonce or sha256 hash to remain functional.
+ *
  * Reverts to homepage defaults on unmount.
  */
 export function useSEO({
@@ -34,9 +87,7 @@ export function useSEO({
 }: SEOConfig) {
   useEffect(() => {
     const fullTitle = title.includes(BRAND) ? title : `${title} — ${BRAND}`;
-    const canonicalUrl = canonical
-      ? `${BASE_URL}${canonical}`
-      : BASE_URL + '/';
+    const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : `${BASE_URL}/`;
     const image = ogImage || DEFAULT_IMAGE;
 
     // ── 1. Title ───────────────────────────────────────────────
@@ -106,37 +157,22 @@ export function useSEO({
     const prevCanonical = canonicalEl.href;
     canonicalEl.href = canonicalUrl;
 
-    // ── 8. JSON-LD ─────────────────────────────────────────────
-    const JSON_LD_ID = 'bodilicious-page-jsonld';
-    let ldEl = document.getElementById(JSON_LD_ID) as HTMLScriptElement | null;
-    let prevLd: string | null = null;
+    // ── 8. JSON-LD — synchronous remove-then-insert ────────────
+    // Remove all stale page-level LD tags first (includes legacy id= tag)
+    removePageLdTags();
 
+    // Inject new schemas — one <script> per schema object
     if (jsonLd) {
-      if (!ldEl) {
-        ldEl = document.createElement('script');
-        ldEl.type = 'application/ld+json';
-        ldEl.id = JSON_LD_ID;
-        document.head.appendChild(ldEl);
-      }
-      prevLd = ldEl.textContent;
-      ldEl.textContent = JSON.stringify(
-        Array.isArray(jsonLd) ? jsonLd : jsonLd
-      );
+      const schemas = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
+      injectLdTags(schemas);
     }
 
     // ── Cleanup: restore defaults on unmount ───────────────────
     return () => {
       document.title = prevTitle;
-      // Restore canonical to homepage default
       if (canonicalEl) canonicalEl.href = prevCanonical;
-      // Remove page-level JSON-LD or restore previous
-      if (ldEl) {
-        if (prevLd) {
-          ldEl.textContent = prevLd;
-        } else {
-          ldEl.remove();
-        }
-      }
+      // Remove page-level LD tags on route change
+      removePageLdTags();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, canonical, ogImage, ogImageAlt, noIndex, jsonLd, keywords]);

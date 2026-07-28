@@ -1,0 +1,17 @@
+name = "bodilicious-seo"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# CRITICAL: Without routes, wrangler deploy puts the worker on
+# *.workers.dev only and it will NEVER intercept bodilicious.in traffic.
+# These routes tell Cloudflare to run this worker for ALL requests on
+# your domain. The zone_name must match your domain in Cloudflare.
+routes = [
+  { pattern = "bodilicious.in/*", zone_name = "bodilicious.in" },
+  { pattern = "www.bodilicious.in/*", zone_name = "bodilicious.in" }
+]
+
+[vars]
+SEO_BOT_RENDER_ENABLED = "true"
+API_BASE_URL = "https://bodilicious.onrender.com"
+FRONTEND_URL = "https://bodilicious.in"
