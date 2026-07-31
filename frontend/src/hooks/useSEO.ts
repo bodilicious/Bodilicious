@@ -174,6 +174,5 @@ export function useSEO({
       // Remove page-level LD tags on route change
       removePageLdTags();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, canonical, ogImage, ogImageAlt, noIndex, jsonLd, keywords]);
 }

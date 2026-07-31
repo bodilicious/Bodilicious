@@ -18,13 +18,8 @@ export const handleWebhook = (req, res) => {
   const body = req.body;
 
   if (body.object === "whatsapp_business_account") {
-    if (
-      body.entry &&
-      body.entry[0].changes &&
-      body.entry[0].changes[0] &&
-      body.entry[0].changes[0].value.statuses
-    ) {
-      const status = body.entry[0].changes[0].value.statuses[0];
+    const status = body.entry?.[0]?.changes?.[0]?.value?.statuses?.[0];
+    if (status) {
       console.log(`[WhatsApp Webhook] Message ${status.id} updated to status: ${status.status}`);
     }
 

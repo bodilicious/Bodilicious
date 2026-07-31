@@ -279,11 +279,37 @@ export default function ShopPage() {
     return itemList ? [itemList, breadcrumb] : breadcrumb;
   }, [products, seoTitle, selectedCategories]);
 
+  // Self-canonicalize the single-facet URLs the sitemap targets
+  // (e.g. /shop?category=skin, /shop?type=serum, /shop?concern=acne).
+  // Any other combination (multiple filters, sort, price, search, page > 1)
+  // still canonicalizes back to /shop to avoid duplicate-content bloat.
+  const canonicalPath = useMemo(() => {
+    const noOtherParams =
+      selectedSubCategories.length === 0 &&
+      selectedIngredients.length === 0 &&
+      !searchParams.get('search') &&
+      !searchParams.get('sort') &&
+      !searchParams.get('inStock') &&
+      !searchParams.get('priceMin') &&
+      !searchParams.get('priceMax') &&
+      (searchParams.get('page') ?? '1') === '1';
+
+    if (!noOtherParams) return '/shop';
+
+    const activeFacets = [selectedCategories, selectedTypes, selectedConcerns].filter(f => f.length > 0);
+    if (activeFacets.length !== 1) return '/shop';
+
+    if (selectedCategories.length === 1) return `/shop?category=${encodeURIComponent(selectedCategories[0])}`;
+    if (selectedTypes.length === 1) return `/shop?type=${encodeURIComponent(selectedTypes[0])}`;
+    if (selectedConcerns.length === 1) return `/shop?concern=${encodeURIComponent(selectedConcerns[0])}`;
+    return '/shop';
+  }, [selectedCategories, selectedTypes, selectedConcerns, selectedSubCategories, selectedIngredients, searchParams]);
+
   useSEO({
     title: seoTitle,
     description: seoDescription,
     keywords: seoKeywords,
-    canonical: '/shop',
+    canonical: canonicalPath,
     jsonLd: shopJsonLd,
   });
   const sort = searchParams.get('sort') || 'best_selling';

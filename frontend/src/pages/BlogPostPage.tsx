@@ -135,7 +135,9 @@ const BlogPostPage: React.FC = () => {
 
     // Optional fields — omit rather than inject null/empty strings
     if (post.coverImage) {
-      articleSchema.image = post.coverImage;
+      articleSchema.image = post.coverImage.startsWith('http') 
+        ? post.coverImage 
+        : `https://bodilicious.in${post.coverImage.startsWith('/') ? '' : '/'}${post.coverImage}`;
     }
     if (publishedIso) {
       articleSchema.datePublished = publishedIso;

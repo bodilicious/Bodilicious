@@ -31,19 +31,20 @@ export const initWhatsAppCrons = () => {
         ]
       };
 
-      let skip = 0;
+      let lastId = null;
       while (true) {
         const currentSettings = await getSettings();
         if (!currentSettings.waAllEnabled || !currentSettings.waStaleCartEnabled) break;
 
-        const users = await UserProfile.find(filter).skip(skip).limit(BATCH).lean();
+        const currentFilter = lastId ? { ...filter, _id: { $gt: lastId } } : filter;
+        const users = await UserProfile.find(currentFilter).sort({ _id: 1 }).limit(BATCH).lean();
+        
         if (!users.length) break;
-        for (const [i, u] of users.entries()) {
-          // Stagger: 2 s gap between jobs so BullMQ enqueue commands don't burst
-          await enqueueWhatsApp("stale_cart", { userId: u._id.toString() }, { delay: i * 2000 });
+        
+        for (const u of users) {
+          await enqueueWhatsApp("stale_cart", { userId: u._id.toString() });
         }
-        skip += BATCH;
-        await sleep(500); // brief pause between batches
+        lastId = users[users.length - 1]._id;
       }
     } catch (err) {
       console.error("[WhatsApp Cron] Stale cart error:", err);
@@ -75,18 +76,20 @@ export const initWhatsAppCrons = () => {
         ]
       };
 
-      let skip = 0;
+      let lastId = null;
       while (true) {
         const currentSettings = await getSettings();
         if (!currentSettings.waAllEnabled || !currentSettings.waReEngagementEnabled) break;
 
-        const users = await UserProfile.find(filter).skip(skip).limit(BATCH).lean();
+        const currentFilter = lastId ? { ...filter, _id: { $gt: lastId, $nin: recentOrderUsers } } : filter;
+        const users = await UserProfile.find(currentFilter).sort({ _id: 1 }).limit(BATCH).lean();
+        
         if (!users.length) break;
-        for (const [i, u] of users.entries()) {
-          await enqueueWhatsApp("reengagement", { userId: u._id.toString() }, { delay: i * 2000 });
+        
+        for (const u of users) {
+          await enqueueWhatsApp("reengagement", { userId: u._id.toString() });
         }
-        skip += BATCH;
-        await sleep(500);
+        lastId = users[users.length - 1]._id;
       }
     } catch (err) {
       console.error("[WhatsApp Cron] Re-engagement error:", err);
@@ -149,19 +152,20 @@ export const initWhatsAppCrons = () => {
            phone: { $exists: true, $ne: null, $ne: "" },
          };
 
-         let skip = 0;
+         let lastId = null;
          while (true) {
-           const users = await UserProfile.find(filter).skip(skip).limit(BATCH).lean();
+           const currentFilter = lastId ? { ...filter, _id: { $gt: lastId } } : filter;
+           const users = await UserProfile.find(currentFilter).sort({ _id: 1 }).limit(BATCH).lean();
+           
            if (!users.length) break;
 
            const currentSettings = await getSettings();
            if (!currentSettings.waAllEnabled || !currentSettings.waTrendingProductsEnabled) break;
 
-           for (const [i, u] of users.entries()) {
-             await enqueueWhatsApp("trending", { userId: u._id.toString(), productId: product._id.toString() }, { delay: i * 2000 });
+           for (const u of users) {
+             await enqueueWhatsApp("trending", { userId: u._id.toString(), productId: product._id.toString() });
            }
-           skip += BATCH;
-           await sleep(500);
+           lastId = users[users.length - 1]._id;
          }
       }, delay);
 

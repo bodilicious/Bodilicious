@@ -51,8 +51,8 @@ const processJob = async (job) => {
 
         await sendOrderPlaced(phone, {
           name: user.name || order.shippingDetails?.name,
-          order_id: order._id.toString(),
-          amount: `₹${order.totalAmount}`,
+          order_id: `#${order._id.toString().slice(-8).toUpperCase()}`,
+          amount: order.totalAmount !== undefined ? `₹${order.totalAmount}` : "N/A",
           edd: order.estimatedDeliveryDate 
             ? new Date(order.estimatedDeliveryDate).toLocaleDateString() 
             : `${order.estimatedDeliveryDays || 3}-5 business days`,
@@ -76,6 +76,12 @@ const processJob = async (job) => {
         await sendStaleCart(phone, {
           name: user.name,
           product_name: firstProductName,
+          cart_url: "cart",
+        });
+
+        // Bump cartUpdatedAt to prevent spamming the user every 30 minutes
+        await UserProfile.findByIdAndUpdate(user._id, {
+          $set: { cartUpdatedAt: new Date() }
         });
         break;
       }
@@ -94,7 +100,7 @@ const processJob = async (job) => {
 
         await sendOutForDelivery(phone, {
           name: order.shippingDetails?.name || user?.name,
-          order_id: order._id.toString(),
+          order_id: `#${order._id.toString().slice(-8).toUpperCase()}`,
           courier: order.estimatedCourierName || "Delivery Partner",
           awb: data.awb || order.awb,
         });
@@ -114,7 +120,7 @@ const processJob = async (job) => {
 
         await sendTicketRaised(phone, {
           name: ticket.userId.name,
-          ticket_id: ticket._id.toString(),
+          ticket_id: `#${ticket._id.toString().slice(-6).toUpperCase()}`,
           type: ticket.type,
         });
         break;
@@ -133,7 +139,7 @@ const processJob = async (job) => {
 
         await sendTicketResolved(phone, {
           name: ticket.userId.name,
-          ticket_id: ticket._id.toString(),
+          ticket_id: `#${ticket._id.toString().slice(-6).toUpperCase()}`,
         });
         break;
       }
@@ -153,7 +159,7 @@ const processJob = async (job) => {
         await sendTrendingProduct(phone, {
           name: user.name,
           product_name: product.name,
-          price: `₹${product.price}`,
+          price: product.price !== undefined ? `₹${product.price}` : "N/A",
         });
         break;
       }
@@ -206,10 +212,12 @@ const processJob = async (job) => {
           const expireBy = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
 
           const customerObj = {
-            name: order.user?.name || order.shippingDetails?.name || "Customer",
-            contact: phone.replace("+91", ""),
+            name: user?.name || order.shippingDetails?.name || "Customer",
+            // `phone` is bare digits from getPhone() (e.g. "919876543210"), not "+91"-prefixed —
+            // strip the leading "91" country code to leave a 10-digit local number for Razorpay.
+            contact: phone.replace(/^91/, ""),
           };
-          const userEmail = order.user?.email || order.shippingDetails?.email;
+          const userEmail = user?.email || order.shippingDetails?.email;
           if (userEmail) customerObj.email = userEmail;
 
           const paymentLinkReq = {
@@ -243,7 +251,7 @@ const processJob = async (job) => {
 
         await sendPaymentFailure(phone, {
           name: user?.name || order.shippingDetails?.name,
-          amount: `₹${data.amount}`,
+          amount: data.amount !== undefined ? `₹${data.amount}` : "N/A",
           retry_url_suffix: suffix,
         });
         break;
@@ -252,6 +260,10 @@ const processJob = async (job) => {
       default:
         console.warn(`[WhatsApp Worker] Unknown job type: ${name}`);
     }
+    
+    // Strict 2-second rate limit between all WhatsApp API calls
+    await new Promise(r => setTimeout(r, 2000));
+    
   } catch (error) {
     console.error(`[WhatsApp Worker] Job failed: ${error.message}`);
     throw error;

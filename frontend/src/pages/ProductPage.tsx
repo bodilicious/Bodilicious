@@ -139,7 +139,11 @@ export default function ProductPage() {
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: product.name,
-        image: product.images[0] || '',
+        image: (() => {
+          const img = product.images[0];
+          if (!img) return '';
+          return img.startsWith('http') ? img : `https://bodilicious.in${img.startsWith('/') ? '' : '/'}${img}`;
+        })(),
         description: product.description || '',
         brand: { '@type': 'Brand', name: 'Bodilicious' },
         offers: {
@@ -404,7 +408,7 @@ export default function ProductPage() {
         price: product.price
       });
     }
-  }, [product?.pid]); // pid is the only meaningful dep; viewTracked ref + sessionStorage deduplicate
+  }, [product?.pid, product?.name, product?.category, product?.price, posthog]); // pid is the primary dep; viewTracked ref + sessionStorage deduplicate
 
   const prevImage = useCallback(() => {
     setActiveImage((i) => (i === 0 ? (product?.images.length || 1) - 1 : i - 1));

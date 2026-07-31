@@ -20,6 +20,29 @@ import { validateCouponAtCheckout } from "../coupons/controller.js";
 import { Coupon, CouponUse } from "../coupons/models.js";
 
 /* =========================================================
+   PERMANENT ERROR — throw this inside processPaidOrder for errors
+   where retrying is guaranteed to fail. withRetry detects .isPermanent
+   and short-circuits immediately without backoff.
+========================================================= */
+class PermanentError extends Error {
+    constructor(message) {
+        super(message);
+        this.isPermanent = true;
+        this.name = "PermanentError";
+    }
+}
+
+// Legacy substring fallback for permanent errors that pre-date PermanentError.
+// Keep entries specific — substring matching is inherently fragile.
+// For new permanent-failure throws, use `new PermanentError(...)` instead.
+const PERMANENT_ERRORS = [
+    "order not found",
+    "invalid payment signature",
+    "product not found",
+    "order cancelled and auto-refunded due to insufficient stock",
+];
+
+/* =========================================================
    PROCESS PAID ORDER (Helper)
    Handles stock deduction, EDD, clearing cart, emails for successful payments
 ========================================================= */
@@ -42,7 +65,7 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             ]
         },
         { $set: { paymentStatus: "paid", razorpayPaymentId: paymentId, paymentClaimedAt: new Date() } },
-        { returnDocument: "before" }
+        { new: false } // Mongoose standard: returns the pre-update document
     );
     const priorPaymentStatus = priorDoc?.paymentStatus ?? "pending";
     const priorPaymentId = priorDoc?.razorpayPaymentId ?? null;
@@ -783,30 +806,9 @@ export const initRazorpayOrder = async (req, res) => {
  * Permanent errors (those that will NEVER succeed on retry) are thrown
  * immediately without waiting for backoff, to avoid making the customer
  * wait 3+ seconds for a retry that cannot possibly help.
+ * PermanentError class and PERMANENT_ERRORS are declared before processPaidOrder
+ * at the top of this file so they are always in scope.
  */
-/**
- * PermanentError — throw this for errors where retrying is guaranteed to fail.
- * withRetry detects `.isPermanent` and short-circuits immediately without backoff,
- * avoiding making the customer wait 3+ seconds for a retry that cannot possibly help.
- * Prefer this over adding to PERMANENT_ERRORS for new code.
- */
-class PermanentError extends Error {
-    constructor(message) {
-        super(message);
-        this.isPermanent = true;
-        this.name = "PermanentError";
-    }
-}
-
-// Legacy substring fallback for permanent errors that pre-date PermanentError.
-// Keep entries specific — substring matching is inherently fragile.
-// For new permanent-failure throws, use `new PermanentError(...)` instead.
-const PERMANENT_ERRORS = [
-    "order not found",
-    "invalid payment signature",
-    "product not found",
-    "order cancelled and auto-refunded due to insufficient stock",
-];
 
 const withRetry = async (fn, attempts = 3, backoffMs = 500) => {
     let lastErr;

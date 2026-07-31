@@ -723,7 +723,23 @@ const triggerPasswordReset = async (email: string) => {
       const json = await res.json();
       if (json.success && json.data) {
         setStoreSettings(json.data);
-        
+
+        // ── Bot guard ──────────────────────────────────────────────────────
+        // Search engine crawlers (Googlebot, Bingbot, etc.) always visit from
+        // their own IP addresses, which are often geo-detected as US/non-IN.
+        // This causes the site to render prices in USD, which Google then picks
+        // up as the snippet text — showing "$4.13" instead of "₹699".
+        // Fix: if the visitor is a known bot, always display prices in INR
+        // so the page content matches the INR price in the JSON-LD schema.
+        const ua = navigator.userAgent.toLowerCase();
+        const isBot = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver|semrush|ahrefsbot|mj12bot|dotbot/.test(ua);
+
+        if (isBot) {
+          _setUserCurrency('INR');
+          return;
+        }
+        // ──────────────────────────────────────────────────────────────────
+
         // Handle currency detection
         if (json.data.autoCurrencySwitchingEnabled === false) {
           _setUserCurrency('INR');

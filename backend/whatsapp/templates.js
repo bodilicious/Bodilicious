@@ -1,7 +1,10 @@
 import { sendWhatsAppTemplate } from "./service.js";
 
 // Helper to construct a standard text parameter
-const textParam = (text) => ({ type: "text", text: String(text) });
+const textParam = (text) => {
+  const str = (text === null || text === undefined) ? "" : String(text);
+  return { type: "text", text: str || "N/A" };
+};
 
 export const sendOrderPlaced = async (phone, data) => {
   // variables: name, order_id, amount, edd
@@ -29,8 +32,17 @@ export const sendStaleCart = async (phone, data) => {
         textParam(data.product_name)
       ]
     }
-    // Add button components if needed based on Meta template configuration
   ];
+  if (data.cart_url) {
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: "0",
+      parameters: [
+        textParam(data.cart_url)
+      ]
+    });
+  }
   return sendWhatsAppTemplate(phone, "stale_cart_nudge", components);
 };
 
