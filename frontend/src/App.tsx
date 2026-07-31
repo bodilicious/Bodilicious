@@ -26,7 +26,6 @@ const PaymentPage = lazy(() => import('./pages/PaymentPage'));
 const ShippingPage = lazy(() => import('./pages/ShippingPage'));
 
 const ConfirmationPage = lazy(() => import('./pages/ConfirmationPage'));
-const GenericStaticPage = lazy(() => import('./pages/GenericStaticPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
@@ -151,10 +150,6 @@ function AppRoutes() {
             {/* Static Pages */}
             <Route path="/contact" element={<PageTransition><ContactPage /></PageTransition>} />
             <Route path="/faqs" element={<PageTransition><FaqPage /></PageTransition>} />
-            <Route path="/stores" element={<PageTransition><GenericStaticPage /></PageTransition>} />
-            <Route path="/accessibility" element={<PageTransition><GenericStaticPage /></PageTransition>} />
-            <Route path="/careers" element={<PageTransition><GenericStaticPage /></PageTransition>} />
-            <Route path="/students" element={<PageTransition><GenericStaticPage /></PageTransition>} />
 
             {/* Luxury Custom Policies */}
             <Route path="/privacy" element={<PageTransition><PrivacyPage /></PageTransition>} />
@@ -202,7 +197,6 @@ function AppRoutes() {
             {/* Internal tools/sandboxes */}
             <Route path="/internal/homepage-preview" element={<HomepagePreviewFrame />} />
 
-            {/* /students route is defined above — duplicate removed */}
             <Route path="*" element={<PageTransition><NotFoundPage /></PageTransition>} />
           </Routes>
         </AnimatePresence>
