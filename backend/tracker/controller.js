@@ -182,8 +182,16 @@ export const createOrder = async (req, res) => {
 
     const country = shippingDetails.country?.trim() || "India";
     const isIndia = ["india", "in", "bharat", "ind"].includes(country.toLowerCase());
-    
-    if (!isIndia) {
+
+    // ── COD availability ──────────────────────────────────────────────────────
+    // Read from settings rather than hardcoding, so the admin toggles control it.
+    // International COD is OFF by default: no international courier can collect cash
+    // on delivery, so such an order has to be settled out of band before dispatch.
+    const codSettings = await getSettings();
+    if (codSettings?.codEnabled === false) {
+        throw new Error("Cash on Delivery is currently unavailable. Please use online payment.");
+    }
+    if (!isIndia && !codSettings?.codInternationalEnabled) {
         throw new Error("Cash on Delivery (COD) is only available within India. Please use online payment for international orders.");
     }
 
@@ -216,8 +224,16 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
-    const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
+    const settings = await StoreSettings.findOne().session(session) || {
+      shippingThreshold: 999, shippingCost: 99,
+      internationalShippingThreshold: 10000, internationalShippingCost: 2000
+    };
+    // Pick the matching rate card. This only ever computed domestic rates, which was
+    // harmless while COD was India-only — but with international COD enabled it would
+    // charge ₹99 for a parcel that costs ₹2000 to ship. Mirrors getOrderQuote.
+    const shippingCost = isIndia
+      ? (totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost)
+      : (totalAmount >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost);
     // 🔹 Verify Welcome Offer Eligibility
     // Only eligible if there are no past orders in an active/successful state
     const userProfile = await UserProfile.findById(userId).select("welcomeOfferUsed").session(session);

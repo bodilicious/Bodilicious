@@ -372,7 +372,22 @@ export default function PaymentPage() {
 
     // ── Billing validation logic ──────────────────────────────────────────────
     const isIndiaCountry = (c: string) => ['india', 'in', 'bharat', 'ind'].includes((c || '').toLowerCase().trim());
-    
+
+    // ── COD availability ──────────────────────────────────────────────────────
+    // Mirrors the server-side gate in tracker/controller.js → createOrder, so the UI
+    // never offers an option the backend will reject. The server remains the authority;
+    // this only avoids a dead-end at submit time.
+    const isDomesticOrder = isIndiaCountry(shippingDetails.country);
+    const codAvailable =
+        storeSettings.codEnabled !== false &&
+        (isDomesticOrder || !!storeSettings.codInternationalEnabled);
+    const codUnavailableReason = codAvailable
+        ? null
+        : storeSettings.codEnabled === false
+            ? 'Cash on Delivery is currently unavailable'
+            : 'Not available for international shipping';
+
+
     const billingErrors: Partial<BillingForm> = {};
     if (billingTouched.name && !billingDetails.name.trim()) billingErrors.name = 'Name is required.';
     if (billingTouched.address && !billingDetails.address.trim()) billingErrors.address = 'Address is required.';
@@ -418,6 +433,15 @@ export default function PaymentPage() {
             const finalBillingDetails = billingSameAsShipping ? null : billingDetails;
 
             if (paymentMethod === 'cod') {
+                // Defensive: the radio is disabled when COD is unavailable, but settings
+                // can change between page load and submit. Fail here with a clear message
+                // rather than letting the server reject the order.
+                if (!codAvailable) {
+                    toast.error(codUnavailableReason || 'Cash on Delivery is not available for this order.');
+                    submittingRef.current = false;
+                    setIsProcessing(false);
+                    return;
+                }
                 setOverlay('cod_processing');
                 try {
                     const { order } = await checkout(shippingDetails, finalBillingDetails as any);
@@ -860,24 +884,22 @@ export default function PaymentPage() {
                                         )}
 
                                         <div>
-                                            <label className={`flex items-center px-4 py-4 ${!isIndiaCountry(shippingDetails.country) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50'} transition-colors`}>
+                                            <label className={`flex items-center px-4 py-4 ${!codAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50'} transition-colors`}>
                                                 <input
                                                     type="radio"
                                                     name="payment"
                                                     value="cod"
                                                     checked={paymentMethod === 'cod'}
                                                     onChange={() => {
-                                                        if (isIndiaCountry(shippingDetails.country)) {
-                                                            setPaymentMethod('cod');
-                                                        }
+                                                        if (codAvailable) setPaymentMethod('cod');
                                                     }}
-                                                    disabled={!isIndiaCountry(shippingDetails.country) || isLocked}
+                                                    disabled={!codAvailable || isLocked}
                                                     className="w-4 h-4 text-dark-red focus:ring-dark-red disabled:bg-gray-200"
                                                 />
                                                 <div className="ml-4 flex flex-col w-full">
                                                     <span className="font-sans text-sm tracking-wide text-gray-800">Cash on Delivery</span>
-                                                    {!isIndiaCountry(shippingDetails.country) && (
-                                                        <span className="font-sans text-[10px] text-gray-500 mt-0.5">Not available for international shipping</span>
+                                                    {codUnavailableReason && (
+                                                        <span className="font-sans text-[10px] text-gray-500 mt-0.5">{codUnavailableReason}</span>
                                                     )}
                                                 </div>
                                             </label>

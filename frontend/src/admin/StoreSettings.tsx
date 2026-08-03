@@ -353,6 +353,25 @@ export default function StoreSettings() {
               <Toggle checked={!!s.codEnabled} onChange={v => update('codEnabled', v)} label="Enable Cash on Delivery" />
               <Field label="COD Extra Charge (₹)" description="Additional fee for COD orders (0 = free)"><Input value={s.codExtraCharge} onChange={(v: number) => update('codExtraCharge', v)} type="number" /></Field>
               <Field label="Minimum Order Value for COD (₹)" description="COD not available below this amount"><Input value={s.minOrderValueForCOD} onChange={(v: number) => update('minOrderValueForCOD', v)} type="number" /></Field>
+
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                <Toggle
+                  checked={!!s.codInternationalEnabled}
+                  onChange={v => update('codInternationalEnabled', v)}
+                  label="Enable COD for International Orders"
+                  description="Offers Cash on Delivery outside India. Requires 'Enable Cash on Delivery' above to also be on."
+                />
+                {!!s.codInternationalEnabled && (
+                  <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                    <span className="text-amber-600 text-sm leading-none mt-0.5">⚠</span>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      International couriers cannot collect cash on delivery. Orders placed
+                      this way arrive unpaid, are flagged for manual review, and must be
+                      settled before dispatch. Intended for testing.
+                    </p>
+                  </div>
+                )}
+              </div>
             </SettingsCard>
 
             <SettingsCard id="notifications" title="Notifications & Messaging" description="Manage Email and WhatsApp automated triggers.">

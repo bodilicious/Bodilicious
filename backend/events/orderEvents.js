@@ -46,27 +46,56 @@ orderEvents.on("order_placed", async (order) => {
         });
 
         // 2. Fulfilment
-        if (isDomestic) {
-            // India → Shiprocket handles it automatically.
+        // Shiprocket accepts international orders on the same create endpoint
+        // (verified: is_international=1 in the dashboard), but only once the payload
+        // carries the real address. That path is gated by SHIPROCKET_INTERNATIONAL_ENABLED
+        // and enforced inside pushOrderToShiprocket, which fails closed.
+        const internationalAutoPush = process.env.SHIPROCKET_INTERNATIONAL_ENABLED === "true";
+
+        if (isDomestic || internationalAutoPush) {
             pushOrderToShiprocket(order).catch(err => {
                 console.error("[Order Events] Shiprocket push failed:", err.message);
             });
-        } else {
-            // International → no carrier integration exists. Without this the order
-            // would sit at "pending" with no shipment, no AWB and no signal to ops.
-            // Flag it and raise a notification so it enters the manual queue.
-            const country = order.shippingDetails?.country || "Unknown";
-            await Order.updateOne(
-                { _id: order._id },
-                { $set: {
-                    needsManualReview: true,
-                    reviewReason: `International order (${country}) — no automated carrier. Arrange shipment manually.`
-                }}
-            ).catch(err => console.error("[Order Events] Failed to flag international order:", err.message));
+        }
 
+        if (!isDomestic) {
+            const country = order.shippingDetails?.country || "Unknown";
+
+            // International COD always needs a human: no international courier collects
+            // cash on delivery, so the money has to be settled out of band before dispatch.
+            const isInternationalCOD = order.paymentMethod === "cod";
+            if (isInternationalCOD) {
+                await Order.updateOne(
+                    { _id: order._id },
+                    { $set: {
+                        needsManualReview: true,
+                        reviewReason: `International COD order (${country}) — no courier can collect cash abroad. Confirm payment before dispatch.`
+                    }}
+                ).catch(err => console.error("[Order Events] Failed to flag international COD order:", err.message));
+            }
+
+            // Only hard-flag when nothing is going to ship it. When auto-push is on,
+            // pushOrderToShiprocket flags it itself if the call actually fails —
+            // flagging here too would mark every successful international order as broken.
+            else if (!internationalAutoPush) {
+                await Order.updateOne(
+                    { _id: order._id },
+                    { $set: {
+                        needsManualReview: true,
+                        reviewReason: `International order (${country}) — automated international push is disabled. Arrange shipment manually.`
+                    }}
+                ).catch(err => console.error("[Order Events] Failed to flag international order:", err.message));
+            }
+
+            // Notify either way: even an auto-pushed international parcel needs a human
+            // for customs paperwork and duties.
             await NotificationService.emit({
-                title: "International Order — Manual Fulfilment Required",
-                body: `Order ${order._id.toString().slice(-6).toUpperCase()} ships to ${country} (${order.currency || "INR"} ${order.totalAmount}). Shiprocket does not cover this destination — book a carrier manually.`,
+                title: internationalAutoPush
+                    ? "International Order — Pushed to Shiprocket"
+                    : "International Order — Manual Fulfilment Required",
+                body: internationalAutoPush
+                    ? `Order ${order._id.toString().slice(-6).toUpperCase()} ships to ${country} (${order.currency || "INR"} ${order.totalAmount}) and has been sent to Shiprocket's international queue. Check customs paperwork and duties before dispatch.`
+                    : `Order ${order._id.toString().slice(-6).toUpperCase()} ships to ${country} (${order.currency || "INR"} ${order.totalAmount}). Automated international push is disabled — book a carrier manually.`,
                 type: "warning",
                 sourceModule: "orders",
                 sourceModel: "Order",

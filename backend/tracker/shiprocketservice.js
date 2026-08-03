@@ -197,8 +197,12 @@ export const pushOrderToShiprocket = async (order) => {
       billing_phone: finalPhone,
       shipping_is_billing: true,
       order_items: shiprocketItems,
-      // COD does not exist on international lanes — always Prepaid there.
-      payment_method: (domestic && order.paymentMethod === "cod") ? "COD" : "Prepaid",
+      // Declare what the order actually is. Previously this forced "Prepaid" on every
+      // international order, which would have told Shiprocket the parcel was already
+      // paid for when international COD is enabled — shipping goods with nothing
+      // collected. If a courier cannot support COD on the lane, we want Shiprocket to
+      // reject it loudly rather than us quietly mislabelling it.
+      payment_method: order.paymentMethod === "cod" ? "COD" : "Prepaid",
       sub_total: order.totalAmount,
       length: 10,
       breadth: 10,
@@ -224,6 +228,13 @@ export const pushOrderToShiprocket = async (order) => {
         // on Shiprocket, allowing the user to select the courier manually.
 
         await Order.findByIdAndUpdate(order._id, updateData);
+
+        // The order shipped, so any earlier "needs manual fulfilment" flag is stale.
+        // Scoped to fulfilment reasons only — a payment-related review flag must survive.
+        await Order.updateOne(
+          { _id: order._id, reviewReason: /International order|Shiprocket/i },
+          { $set: { needsManualReview: false, reviewReason: null } }
+        ).catch(e => console.error("Failed to clear stale review flag:", e.message));
       }
     } else {
       const errText = await createRes.text();

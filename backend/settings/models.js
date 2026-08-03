@@ -56,6 +56,12 @@ const storeSettingsSchema = new mongoose.Schema(
     codEnabled: { type: Boolean, default: true },
     codExtraCharge: { type: Number, default: 0 },
     minOrderValueForCOD: { type: Number, default: 0 },
+    // Allow Cash on Delivery on non-India orders.
+    // Defaults OFF: international couriers (including Shiprocket's SRX lanes) generally
+    // cannot collect cash abroad, so an international COD order has no automated way to
+    // be paid. Enabling this is a deliberate, testing-oriented choice — see the guard in
+    // tracker/controller.js → createOrder and the manual-review flag it sets.
+    codInternationalEnabled: { type: Boolean, default: false },
 
     // 6. Store Preferences
     returnWindowDays: { type: Number, default: 7 },
