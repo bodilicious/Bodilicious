@@ -350,8 +350,7 @@ export default function StoreSettings() {
             </SettingsCard>
 
             <SettingsCard id="payments" title="Payments" description="Configure Cash on Delivery and payment gateways.">
-              <Toggle checked={!!s.codEnabled} onChange={v => update('codEnabled', v)} label="Enable Cash on Delivery" description="Allow COD for domestic (India) orders" />
-              <Toggle checked={!!s.codInternationalEnabled} onChange={v => update('codInternationalEnabled', v)} label="COD for International Orders" description="Allow Cash on Delivery for non-India shipping addresses. Enable only if your courier partner supports it." />
+              <Toggle checked={!!s.codEnabled} onChange={v => update('codEnabled', v)} label="Enable Cash on Delivery" />
               <Field label="COD Extra Charge (₹)" description="Additional fee for COD orders (0 = free)"><Input value={s.codExtraCharge} onChange={(v: number) => update('codExtraCharge', v)} type="number" /></Field>
               <Field label="Minimum Order Value for COD (₹)" description="COD not available below this amount"><Input value={s.minOrderValueForCOD} onChange={(v: number) => update('minOrderValueForCOD', v)} type="number" /></Field>
             </SettingsCard>
