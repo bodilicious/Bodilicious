@@ -121,11 +121,17 @@ export const pushOrderToShiprocket = async (order) => {
     if (!process.env.SHIPROCKET_EMAIL || !process.env.SHIPROCKET_PASSWORD) return;
     if (order.shiprocketOrderId || order.shipmentId) return; // Already created
 
-    // Hard guard — callers should already gate on this, but a stray international
-    // order reaching here would be shipped to a placeholder Delhi address.
-    if (!isIndiaOrder(order)) {
-      console.warn(`[Shiprocket] Refusing to push international order ${order._id} (${order.shippingDetails?.country}). Requires manual fulfilment.`);
-      await flagForManualReview(order._id, `International order (${order.shippingDetails?.country}) — Shiprocket cannot fulfil; arrange carrier manually.`);
+    const domestic = isIndiaOrder(order);
+
+    // ── International gate ────────────────────────────────────────────────────
+    // Fails CLOSED. The domestic payload below sanitises addresses for Indian
+    // couriers (6-digit pincode, 10-digit phone) and would turn a Boston order
+    // into a Delhi one, so international must never fall through to it by accident.
+    // Flip SHIPROCKET_INTERNATIONAL_ENABLED=true only once a live test order has
+    // been confirmed landing in the dashboard's International tab.
+    if (!domestic && process.env.SHIPROCKET_INTERNATIONAL_ENABLED !== "true") {
+      console.warn(`[Shiprocket] International auto-push disabled — order ${order._id} (${order.shippingDetails?.country}) flagged for manual fulfilment. Set SHIPROCKET_INTERNATIONAL_ENABLED=true to enable.`);
+      await flagForManualReview(order._id, `International order (${order.shippingDetails?.country}) — automated international push is disabled; arrange carrier manually.`);
       return;
     }
 
@@ -145,10 +151,22 @@ export const pushOrderToShiprocket = async (order) => {
       };
     });
 
-    const safePhone = (shippingDetails.phone || "").replace(/\D/g, "");
-    const finalPhone = safePhone.length >= 10 ? safePhone.slice(-10) : "9999999999";
-    const safePincode = (shippingDetails.pincode || "").replace(/\D/g, "");
-    const finalPincode = safePincode.length === 6 ? safePincode : "110001";
+    // ── Address normalisation ─────────────────────────────────────────────────
+    // Domestic: Indian couriers demand exactly 6 digits and a 10-digit local number,
+    // so out-of-range values are coerced to keep the API from rejecting the order.
+    // International: those same coercions are actively harmful — "02108" is a valid
+    // Boston ZIP, and coercing it to "110001" ships the parcel to Delhi. Send the
+    // real address and let Shiprocket validate it.
+    const rawPhone = (shippingDetails.phone || "").replace(/\D/g, "");
+    const rawPincode = (shippingDetails.pincode || "").trim();
+
+    const finalPhone = domestic
+      ? (rawPhone.length >= 10 ? rawPhone.slice(-10) : "9999999999")
+      : rawPhone;                                    // keep the country code
+    const finalPincode = domestic
+      ? (rawPincode.replace(/\D/g, "").length === 6 ? rawPincode.replace(/\D/g, "") : "110001")
+      : rawPincode;                                  // keep alphanumerics (UK/CA postcodes)
+
     const nameParts = (shippingDetails.name || "").trim().split(" ");
     const firstName = nameParts[0] || "Customer";
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "User";
@@ -169,15 +187,18 @@ export const pushOrderToShiprocket = async (order) => {
       billing_customer_name: firstName,
       billing_last_name: lastName,
       billing_address: shippingDetails.address || "No Address Provided",
-      billing_city: shippingDetails.city || "Delhi",
+      // "Delhi" is a sane last resort for a domestic order with a missing field;
+      // for an international one it would silently relabel the destination.
+      billing_city: shippingDetails.city || (domestic ? "Delhi" : ""),
       billing_pincode: finalPincode,
-      billing_state: shippingDetails.state || "Delhi",
+      billing_state: shippingDetails.state || (domestic ? "Delhi" : ""),
       billing_country: shippingDetails.country || "India",
       billing_email: shippingDetails.email || "customer@bodilicious.in",
       billing_phone: finalPhone,
       shipping_is_billing: true,
       order_items: shiprocketItems,
-      payment_method: order.paymentMethod === "cod" ? "COD" : "Prepaid",
+      // COD does not exist on international lanes — always Prepaid there.
+      payment_method: (domestic && order.paymentMethod === "cod") ? "COD" : "Prepaid",
       sub_total: order.totalAmount,
       length: 10,
       breadth: 10,
