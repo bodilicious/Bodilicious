@@ -88,6 +88,9 @@ export const getSettings = async (req, res) => {
         checkoutExchangeRates,
         // NOTE: the FULL exchangeRates map (150+ currencies, ~3 KB) is still omitted from
         // this public endpoint. Admin pages that need every rate use the admin settings route.
+        // COD availability — needed by the checkout page
+        codEnabled: settings.codEnabled ?? true,
+        codInternationalEnabled: settings.codInternationalEnabled ?? false,
       },
     });
   } catch (err) {
@@ -142,7 +145,7 @@ export const updateSettings = async (req, res) => {
       "emailReturnApproved", "emailReturnRejected", "emailTicketRaised",
       "emailTicketReply", "emailTicketResolved", "emailTicketCancelled",
       // Payments
-      "codEnabled", "codExtraCharge", "minOrderValueForCOD",
+      "codEnabled", "codExtraCharge", "minOrderValueForCOD", "codInternationalEnabled",
       // Store Preferences
       "returnWindowDays", "lowStockThreshold",
       // System

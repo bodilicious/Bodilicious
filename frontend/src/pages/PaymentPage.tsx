@@ -68,6 +68,8 @@ export default function PaymentPage() {
     });
 
     const { cartItems, cartTotal, checkout, initRazorpayOrder, verifyPayment, user, products, storeSettings, cartLoading, fetchShippingQuote, appliedCoupon } = useApp();
+    const codEnabled = storeSettings?.codEnabled !== false; // default true
+    const codInternationalEnabled = storeSettings?.codInternationalEnabled === true;
     const { formatPrice, userCurrency } = useCurrency();
     const location = useLocation();
     const navigate = useNavigate();
@@ -372,6 +374,8 @@ export default function PaymentPage() {
 
     // ── Billing validation logic ──────────────────────────────────────────────
     const isIndiaCountry = (c: string) => ['india', 'in', 'bharat', 'ind'].includes((c || '').toLowerCase().trim());
+    // COD is available when: global codEnabled is on AND (India order OR admin enabled international COD)
+    const isCodAvailable = codEnabled && (isIndiaCountry(shippingDetails?.country || '') || codInternationalEnabled);
     
     const billingErrors: Partial<BillingForm> = {};
     if (billingTouched.name && !billingDetails.name.trim()) billingErrors.name = 'Name is required.';
@@ -860,23 +864,23 @@ export default function PaymentPage() {
                                         )}
 
                                         <div>
-                                            <label className={`flex items-center px-4 py-4 ${!isIndiaCountry(shippingDetails.country) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50'} transition-colors`}>
+                                            <label className={`flex items-center px-4 py-4 ${!isCodAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50'} transition-colors`}>
                                                 <input
                                                     type="radio"
                                                     name="payment"
                                                     value="cod"
                                                     checked={paymentMethod === 'cod'}
                                                     onChange={() => {
-                                                        if (isIndiaCountry(shippingDetails.country)) {
+                                                        if (isCodAvailable) {
                                                             setPaymentMethod('cod');
                                                         }
                                                     }}
-                                                    disabled={!isIndiaCountry(shippingDetails.country) || isLocked}
+                                                    disabled={!isCodAvailable || isLocked}
                                                     className="w-4 h-4 text-dark-red focus:ring-dark-red disabled:bg-gray-200"
                                                 />
                                                 <div className="ml-4 flex flex-col w-full">
                                                     <span className="font-sans text-sm tracking-wide text-gray-800">Cash on Delivery</span>
-                                                    {!isIndiaCountry(shippingDetails.country) && (
+                                                    {!isIndiaCountry(shippingDetails.country) && !codInternationalEnabled && (
                                                         <span className="font-sans text-[10px] text-gray-500 mt-0.5">Not available for international shipping</span>
                                                     )}
                                                 </div>

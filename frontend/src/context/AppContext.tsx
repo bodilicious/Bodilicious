@@ -104,6 +104,8 @@ interface AppContextType {
     internationalShippingEnabled: boolean;
     internationalShippingCost: number;
     internationalShippingThreshold: number;
+    codEnabled: boolean;
+    codInternationalEnabled: boolean;
     // supportedCountries and exchangeRates intentionally removed — no longer
     // included in the public settings response to save bandwidth.
   };
@@ -236,6 +238,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     internationalShippingEnabled: false,
     internationalShippingCost: 2000,
     internationalShippingThreshold: 10000,
+    codEnabled: true,
+    codInternationalEnabled: false,
     // supportedCountries and exchangeRates removed from public API response to save bandwidth.
   });
 

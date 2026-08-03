@@ -56,6 +56,8 @@ const storeSettingsSchema = new mongoose.Schema(
     codEnabled: { type: Boolean, default: true },
     codExtraCharge: { type: Number, default: 0 },
     minOrderValueForCOD: { type: Number, default: 0 },
+    // Whether COD is available for international (non-India) orders
+    codInternationalEnabled: { type: Boolean, default: false },
 
     // 6. Store Preferences
     returnWindowDays: { type: Number, default: 7 },
