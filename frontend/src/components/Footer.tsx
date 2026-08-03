@@ -24,8 +24,8 @@ export default function Footer() {
               {[
                 { label: 'How to Order', path: '/how-to-order' },
                 { label: 'Contact Us', path: '/contact' },
-                { label: 'Shipping & Returns', path: '/tracking' },
-                { label: 'FAQs', path: '/#faq' }
+                { label: 'Shipping & Returns', path: '/shipping-refund' },
+                { label: 'FAQs', path: '/faqs' }
               ].map(item => (
                 <li key={item.label}>
                   <Link

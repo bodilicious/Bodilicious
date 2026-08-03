@@ -1,4 +1,4 @@
-import { isBot, renderProductHtml } from './seoUtils.js';
+import { isBot, renderProductHtml, renderShopHtml } from './seoUtils.js';
 
 // Cache for bot rendered HTML
 const cache = new Map();
@@ -65,11 +65,80 @@ export default {
       }
     }
 
-    // For now, only product pages and sitemap are handled.
-    // Shop / collection / blog handling can be added similarly.
+    // 4. Handle Shop / category filter pages — these were previously served as
+    // plain index.html to bots, causing Google to read the hardcoded homepage
+    // canonical and ignore the facet page entirely.
+    if (pathname === '/shop') {
+      const category = url.searchParams.get('category');
+      const type = url.searchParams.get('type');
+      const concern = url.searchParams.get('concern');
+      // Only intercept single-facet URLs (what the sitemap targets).
+      // Multi-param or no-param requests fall through to origin.
+      const facetCount = [category, type, concern].filter(Boolean).length;
+      const hasOtherParams = url.searchParams.has('search') || url.searchParams.has('sort')
+        || url.searchParams.has('ingredient') || url.searchParams.has('priceMin')
+        || url.searchParams.has('priceMax') || url.searchParams.has('sub_category')
+        || (url.searchParams.get('page') && url.searchParams.get('page') !== '1');
+      if (facetCount <= 1 && !hasOtherParams) {
+        return handleShop({ category, type, concern }, request, env, ctx);
+      }
+    }
+
+    // For everything else, pass through to origin.
     return fetchFromOrigin();
   }
 };
+
+async function handleShop({ category, type, concern }, request, env, ctx) {
+  try {
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+
+    // Build the cache key from the active facet
+    const cacheKey = `shop:${category || ''}:${type || ''}:${concern || ''}`;
+    const now = Date.now();
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return new Response(cached.html, {
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+          'Cache-Control': 'public, max-age=300, s-maxage=300',
+          'X-Cache': 'HIT',
+        }
+      });
+    }
+
+    // Fetch filtered products from the API
+    const params = new URLSearchParams({ limit: '30' });
+    if (category) params.set('category', category);
+    if (type) params.set('type', type);
+    if (concern) params.set('concern', concern);
+
+    let products = [];
+    try {
+      const res = await fetchWithTimeout(`${apiUrl}/api/v1/products?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        products = data.data || [];
+      }
+    } catch (_) {
+      // If API is down, render the page with an empty product list — still serves correct canonical
+    }
+
+    const html = renderShopHtml({ category, type, concern }, products, frontendUrl);
+    cache.set(cacheKey, { html, expiresAt: now + TTL_MS });
+
+    return new Response(html, {
+      headers: {
+        'Content-Type': 'text/html;charset=UTF-8',
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
+      }
+    });
+  } catch (error) {
+    console.error(`[SEO Worker] Error rendering shop page:`, error.message);
+    return fetch(request);
+  }
+}
 
 async function handleProduct(pid, request, env, ctx) {
   try {

@@ -1,0 +1,290 @@
+﻿[dotenv@17.3.1] injecting env (27) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+
+Γ£à  Connected to: myappdb
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  DATABASE OVERVIEW
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  Data size    : 7.60 MB
+  Storage size : 3.08 MB
+  Index size   : 5.58 MB
+  Collections  : 29
+  Objects      : 16,242
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  COLLECTION BREAKDOWN  (sorted by data size)
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  user_sessions                     [ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûæΓûæΓûæΓûæΓûæΓûæ]   75.9%      5.77 MB  docs:  13341  avgDoc: 453.00 B  idx:  1.56 MB
+  audit_logs_v2                     [ΓûêΓûêΓûêΓûêΓûêΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]   18.5%      1.40 MB  docs:   1937  avgDoc: 760.00 B  idx: 944.00 KB
+  products                          [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    1.4%    111.27 KB  docs:     42  avgDoc:  2.65 KB  idx: 416.00 KB
+  productvelocityviews              [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    1.4%    105.52 KB  docs:    517  avgDoc: 209.00 B  idx: 168.00 KB
+  orders                            [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.9%     72.19 KB  docs:     46  avgDoc:  1.57 KB  idx: 612.00 KB
+  userprofiles                      [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.6%     48.87 KB  docs:     91  avgDoc: 549.00 B  idx: 360.00 KB
+  blogs                             [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.3%     24.42 KB  docs:      3  avgDoc:  8.14 KB  idx: 180.00 KB
+  auditlogs                         [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.2%     17.66 KB  docs:     50  avgDoc: 361.00 B  idx: 216.00 KB
+  analytics_interaction_logs        [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.2%     15.86 KB  docs:    108  avgDoc: 150.00 B  idx: 180.00 KB
+  notifications                     [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.1%     11.12 KB  docs:     37  avgDoc: 307.00 B  idx: 72.00 KB
+  dailysalesviews                   [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.1%      9.50 KB  docs:     44  avgDoc: 221.00 B  idx: 72.00 KB
+  storesettings                     [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.1%      8.24 KB  docs:      1  avgDoc:  8.24 KB  idx: 36.00 KB
+  analytics_product_intelligence    [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%      3.00 KB  docs:     12  avgDoc: 256.00 B  idx: 72.00 KB
+  tickets                           [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%      2.67 KB  docs:      4  avgDoc: 684.00 B  idx: 108.00 KB
+  homepagecontents                  [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%      2.40 KB  docs:      1  avgDoc:  2.40 KB  idx: 36.00 KB
+  analytics_cohort_view             [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%     828.00 B  docs:      4  avgDoc: 207.00 B  idx: 108.00 KB
+  coupons                           [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%     491.00 B  docs:      2  avgDoc: 245.00 B  idx: 144.00 KB
+  blogcategories                    [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%     121.00 B  docs:      1  avgDoc: 121.00 B  idx: 108.00 KB
+  systemlocks                       [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%      48.00 B  docs:      1  avgDoc:  48.00 B  idx: 72.00 KB
+  purchasereceiptlines              [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 12.00 KB
+  couponuses                        [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 28.00 KB
+  stockhistories                    [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 12.00 KB
+  blogcomments                      [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 80.00 KB
+  suppliers                         [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 12.00 KB
+  ritualresponses                   [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 20.00 KB
+  faqs                              [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx:  4.00 KB
+  purchasereceipts                  [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx:  8.00 KB
+  purchaseorders                    [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 16.00 KB
+  purchaseorderlines                [ΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæΓûæ]    0.0%          0 B  docs:      0  avgDoc:      0 B  idx: 16.00 KB
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  FIELD-LEVEL BLOAT ANALYSIS  (top collections)
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+  ΓöÇΓöÇ USER_SESSIONS ΓöÇΓöÇ
+     Docs in DB: 13341  |  Sample: 200  |  AvgDoc: 453.00 B
+     Top fields by avg byte size:
+       network                                  avg:  207.85 B  ( 45.9% of avg doc)  in 100% of docs
+       network.user_agent                       avg:  164.07 B  ( 36.2% of avg doc)  in 100% of docs
+       session_id                               avg:   37.88 B  (  8.4% of avg doc)  in 100% of docs
+       _id                                      avg:   26.00 B  (  5.7% of avg doc)  in 100% of docs
+       start_time                               avg:   26.00 B  (  5.7% of avg doc)  in 100% of docs
+       last_ping                                avg:   26.00 B  (  5.7% of avg doc)  in 100% of docs
+       createdAt                                avg:   26.00 B  (  5.7% of avg doc)  in 100% of docs
+       updatedAt                                avg:   26.00 B  (  5.7% of avg doc)  in 100% of docs
+       network.ip_address                       avg:   14.78 B  (  3.3% of avg doc)  in 100% of docs
+       end_time                                 avg:    8.84 B  (  2.0% of avg doc)  in 100% of docs
+       user_id                                  avg:    6.97 B  (  1.5% of avg doc)  in 100% of docs
+       durationMs                               avg:    2.02 B  (  0.4% of avg doc)  in 100% of docs
+       __v                                      avg:    1.00 B  (  0.2% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       6a28cafe7714af60fdcf22d6                             664.00 B
+       6a28b79f7714af60fdcf1fdd                             571.00 B
+       6a2945ec7714af60fdcf3841                             571.00 B
+       6a28e5f27714af60fdcf2758                             569.00 B
+       6a28e8607714af60fdcf27ce                             568.00 B
+
+  ΓöÇΓöÇ AUDIT_LOGS_V2 ΓöÇΓöÇ
+     Docs in DB: 1937  |  Sample: 200  |  AvgDoc: 760.00 B
+     Top fields by avg byte size:
+       network                                  avg:  187.19 B  ( 24.6% of avg doc)  in 100% of docs
+       network.user_agent                       avg:  121.94 B  ( 16.0% of avg doc)  in 100% of docs
+       metadata                                 avg:   98.80 B  ( 13.0% of avg doc)  in 100% of docs
+       flags                                    avg:   58.00 B  (  7.6% of avg doc)  in 100% of docs
+       metadata.productName                     avg:   35.38 B  (  4.7% of avg doc)  in 77% of docs
+       _id                                      avg:   26.00 B  (  3.4% of avg doc)  in 100% of docs
+       timestamp_utc                            avg:   26.00 B  (  3.4% of avg doc)  in 100% of docs
+       event_id                                 avg:   23.00 B  (  3.0% of avg doc)  in 100% of docs
+       session_id                               avg:   23.00 B  (  3.0% of avg doc)  in 100% of docs
+       timestamp_ist                            avg:   22.67 B  (  3.0% of avg doc)  in 100% of docs
+       metadata.query                           avg:   18.13 B  (  2.4% of avg doc)  in 4% of docs
+       metadata.targetId                        avg:   16.83 B  (  2.2% of avg doc)  in 96% of docs
+       correlation_id                           avg:   16.32 B  (  2.1% of avg doc)  in 100% of docs
+       event_type                               avg:   15.76 B  (  2.1% of avg doc)  in 100% of docs
+       network.ip_address                       avg:   15.26 B  (  2.0% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       6a1d1938b1735ccf0ed7454a                             862.00 B
+       6a1d1938b1735ccf0ed74549                             861.00 B
+       6a1c6405329c7cfa61365a43                             794.00 B
+       6a1be53d5d2b451c442b2144                             793.00 B
+       6a1e65b0b1735ccf0ed762ee                             791.00 B
+
+  ΓöÇΓöÇ PRODUCTS ΓöÇΓöÇ
+     Docs in DB: 42  |  Sample: 42  |  AvgDoc: 2.65 KB
+     Top fields by avg byte size:
+       seo_keywords                             avg:  653.43 B  ( 24.1% of avg doc)  in 100% of docs
+       reviews                                  avg:  613.95 B  ( 22.6% of avg doc)  in 100% of docs
+       seo_keywords.tertiary                    avg:  301.05 B  ( 11.1% of avg doc)  in 100% of docs
+       seo_keywords.secondary                   avg:  191.88 B  (  7.1% of avg doc)  in 100% of docs
+       images                                   avg:  185.76 B  (  6.8% of avg doc)  in 100% of docs
+       seo_keywords.primary                     avg:  123.50 B  (  4.6% of avg doc)  in 100% of docs
+       description                              avg:  108.33 B  (  4.0% of avg doc)  in 100% of docs
+       ingredients                              avg:  101.83 B  (  3.8% of avg doc)  in 100% of docs
+       benefits                                 avg:   81.64 B  (  3.0% of avg doc)  in 100% of docs
+       usage                                    avg:   65.57 B  (  2.4% of avg doc)  in 100% of docs
+       how_to_use                               avg:   42.07 B  (  1.6% of avg doc)  in 100% of docs
+       concerns_targeted                        avg:   38.10 B  (  1.4% of avg doc)  in 100% of docs
+       name                                     avg:   36.74 B  (  1.4% of avg doc)  in 100% of docs
+       slug                                     avg:   26.34 B  (  1.0% of avg doc)  in 98% of docs
+       _id                                      avg:   26.00 B  (  1.0% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       Bodilicious Peptide Ceramide Collagen Complex Mois   3.62 KB
+       Bodilicious Hydrating Sunscreen Spray SPF 50++++     3.22 KB
+       Bodilicious AHA & BHA Serum                          3.06 KB
+       Bodilicious Coenzyme Q10 Serum                       3.02 KB
+       Bodilicious Retinol Night Repair Serum               2.99 KB
+
+  ΓöÇΓöÇ PRODUCTVELOCITYVIEWS ΓöÇΓöÇ
+     Docs in DB: 517  |  Sample: 200  |  AvgDoc: 209.00 B
+     Top fields by avg byte size:
+       _id                                      avg:   26.00 B  ( 12.4% of avg doc)  in 100% of docs
+       product_id                               avg:   26.00 B  ( 12.4% of avg doc)  in 100% of docs
+       createdAt                                avg:   26.00 B  ( 12.4% of avg doc)  in 100% of docs
+       last_aggregated_at                       avg:   26.00 B  ( 12.4% of avg doc)  in 100% of docs
+       updatedAt                                avg:   26.00 B  ( 12.4% of avg doc)  in 100% of docs
+       date_string                              avg:   12.00 B  (  5.7% of avg doc)  in 100% of docs
+       revenue_generated                        avg:    1.09 B  (  0.5% of avg doc)  in 100% of docs
+       views                                    avg:    1.02 B  (  0.5% of avg doc)  in 100% of docs
+       carts                                    avg:    1.01 B  (  0.5% of avg doc)  in 100% of docs
+       __v                                      avg:    1.00 B  (  0.5% of avg doc)  in 100% of docs
+       purchases                                avg:    1.00 B  (  0.5% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       6a1b074c38ead5c92b41a444                             293.00 B
+       6a1b074c38ead5c92b41a445                             293.00 B
+       6a1b074c38ead5c92b41a446                             293.00 B
+       6a1b074c38ead5c92b41a447                             293.00 B
+       6a1b074c38ead5c92b41a448                             293.00 B
+
+  ΓöÇΓöÇ ORDERS ΓöÇΓöÇ
+     Docs in DB: 46  |  Sample: 46  |  AvgDoc: 1.57 KB
+     Top fields by avg byte size:
+       items                                    avg:  242.74 B  ( 15.1% of avg doc)  in 100% of docs
+       shippingDetails                          avg:  213.39 B  ( 13.3% of avg doc)  in 100% of docs
+       statusHistory                            avg:  149.56 B  (  9.3% of avg doc)  in 98% of docs
+       shippingDetails.address                  avg:   53.76 B  (  3.3% of avg doc)  in 100% of docs
+       marketing                                avg:   46.10 B  (  2.9% of avg doc)  in 63% of docs
+       shippingDetails.email                    avg:   26.46 B  (  1.6% of avg doc)  in 100% of docs
+       _id                                      avg:   26.00 B  (  1.6% of avg doc)  in 100% of docs
+       user                                     avg:   26.00 B  (  1.6% of avg doc)  in 100% of docs
+       createdAt                                avg:   26.00 B  (  1.6% of avg doc)  in 100% of docs
+       updatedAt                                avg:   26.00 B  (  1.6% of avg doc)  in 100% of docs
+       invoiceNumber                            avg:   25.96 B  (  1.6% of avg doc)  in 100% of docs
+       estimatedDeliveryDate                    avg:   24.57 B  (  1.5% of avg doc)  in 100% of docs
+       eddCalculatedAt                          avg:   24.57 B  (  1.5% of avg doc)  in 100% of docs
+       estimatedCourierName                     avg:   15.89 B  (  1.0% of avg doc)  in 100% of docs
+       shippingDetails.name                     avg:   13.91 B  (  0.9% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       6a6c4319c125a450aad74fa6                             2.43 KB
+       6a33f0cb5bdc8bf43bc4a12f                             2.36 KB
+       6a4a1fcaaf279c85a9a26700                             2.34 KB
+       6a3f6548d6faa44b633bb207                             2.32 KB
+       6a622ae8b159508db74bb858                             2.29 KB
+
+  ΓöÇΓöÇ USERPROFILES ΓöÇΓöÇ
+     Docs in DB: 91  |  Sample: 91  |  AvgDoc: 549.00 B
+     Top fields by avg byte size:
+       cartHistory                              avg:  387.47 B  ( 70.6% of avg doc)  in 35% of docs
+       cart                                     avg:   35.41 B  (  6.4% of avg doc)  in 100% of docs
+       orders                                   avg:   28.92 B  (  5.3% of avg doc)  in 100% of docs
+       _id                                      avg:   26.00 B  (  4.7% of avg doc)  in 100% of docs
+       createdAt                                avg:   26.00 B  (  4.7% of avg doc)  in 100% of docs
+       updatedAt                                avg:   26.00 B  (  4.7% of avg doc)  in 100% of docs
+       lastLoginAt                              avg:   26.00 B  (  4.7% of avg doc)  in 60% of docs
+       firebaseUID                              avg:   25.88 B  (  4.7% of avg doc)  in 100% of docs
+       email                                    avg:   25.62 B  (  4.7% of avg doc)  in 100% of docs
+       cartUpdatedAt                            avg:   22.67 B  (  4.1% of avg doc)  in 36% of docs
+       name                                     avg:   13.00 B  (  2.4% of avg doc)  in 100% of docs
+       addresses                                avg:   12.19 B  (  2.2% of avg doc)  in 100% of docs
+       role                                     avg:    6.35 B  (  1.2% of avg doc)  in 60% of docs
+       isBlocked                                avg:    5.00 B  (  0.9% of avg doc)  in 58% of docs
+       whatsappOptIn                            avg:    5.00 B  (  0.9% of avg doc)  in 36% of docs
+     Top 5 largest individual documents:
+       Jack                                                 3.31 KB
+       Kondeti Vijaya laxmi                                 1.81 KB
+       Vanga Harika                                         1.67 KB
+       Suneetha S                                           1.64 KB
+       Monisha Elango                                       1.55 KB
+
+  ΓöÇΓöÇ BLOGS ΓöÇΓöÇ
+     Docs in DB: 3  |  Sample: 3  |  AvgDoc: 8.14 KB
+     Top fields by avg byte size:
+       content                                  avg:   7.14 KB  ( 87.7% of avg doc)  in 100% of docs
+       seo_keywords                             avg:  208.67 B  (  2.5% of avg doc)  in 100% of docs
+       seo_description                          avg:  165.33 B  (  2.0% of avg doc)  in 100% of docs
+       coverImage                               avg:  161.00 B  (  1.9% of avg doc)  in 100% of docs
+       seo_keywords.secondary                   avg:  117.33 B  (  1.4% of avg doc)  in 100% of docs
+       title                                    avg:   77.00 B  (  0.9% of avg doc)  in 100% of docs
+       tags                                     avg:   58.67 B  (  0.7% of avg doc)  in 100% of docs
+       seo_keywords.primary                     avg:   52.33 B  (  0.6% of avg doc)  in 100% of docs
+       slug                                     avg:   30.33 B  (  0.4% of avg doc)  in 100% of docs
+       categories                               avg:   28.00 B  (  0.3% of avg doc)  in 100% of docs
+       _id                                      avg:   26.00 B  (  0.3% of avg doc)  in 100% of docs
+       author                                   avg:   26.00 B  (  0.3% of avg doc)  in 100% of docs
+       publishedAt                              avg:   26.00 B  (  0.3% of avg doc)  in 100% of docs
+       createdAt                                avg:   26.00 B  (  0.3% of avg doc)  in 100% of docs
+       updatedAt                                avg:   26.00 B  (  0.3% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       6a6053afe99fa99f58599129                             9.77 KB
+       6a5f67c768347c5810841a34                             7.80 KB
+       6a605635e99fa99f58599497                             7.11 KB
+
+  ΓöÇΓöÇ AUDITLOGS ΓöÇΓöÇ
+     Docs in DB: 50  |  Sample: 50  |  AvgDoc: 361.00 B
+     Top fields by avg byte size:
+       details                                  avg:   51.00 B  ( 14.1% of avg doc)  in 100% of docs
+       meta                                     avg:   33.12 B  (  9.2% of avg doc)  in 100% of docs
+       details.meta                             avg:   28.00 B  (  7.8% of avg doc)  in 4% of docs
+       details.ids                              avg:   28.00 B  (  7.8% of avg doc)  in 8% of docs
+       details.synced                           avg:   27.33 B  (  7.6% of avg doc)  in 6% of docs
+       _id                                      avg:   26.00 B  (  7.2% of avg doc)  in 100% of docs
+       admin                                    avg:   26.00 B  (  7.2% of avg doc)  in 36% of docs
+       createdAt                                avg:   26.00 B  (  7.2% of avg doc)  in 100% of docs
+       updatedAt                                avg:   26.00 B  (  7.2% of avg doc)  in 100% of docs
+       user                                     avg:   26.00 B  (  7.2% of avg doc)  in 24% of docs
+       details.email                            avg:   25.45 B  (  7.0% of avg doc)  in 40% of docs
+       targetId                                 avg:   24.08 B  (  6.7% of avg doc)  in 100% of docs
+       entityId                                 avg:   24.08 B  (  6.7% of avg doc)  in 100% of docs
+       details.after                            avg:   22.00 B  (  6.1% of avg doc)  in 4% of docs
+       action                                   avg:   16.60 B  (  4.6% of avg doc)  in 100% of docs
+     Top 5 largest individual documents:
+       69d4b6cacac712fc534f4aca                             458.00 B
+       69beaa5e9d861cd0a1076ed0                             455.00 B
+       69fdafcf38ff91cf4ba6c79e                             449.00 B
+       69c5325a48d9138c2521dfcb                             448.00 B
+       69d3c14e22fadca37d1954be                             448.00 B
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  INDEX OVERHEAD
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  user_sessions                     idx/data:   27%  (idx: 1.56 MB  data: 5.77 MB)
+  audit_logs_v2                     idx/data:   66%  (idx: 944.00 KB  data: 1.40 MB)
+  products                          idx/data:  374%  (idx: 416.00 KB  data: 111.27 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  productvelocityviews              idx/data:  159%  (idx: 168.00 KB  data: 105.52 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  orders                            idx/data:  848%  (idx: 612.00 KB  data: 72.19 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  userprofiles                      idx/data:  737%  (idx: 360.00 KB  data: 48.87 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  blogs                             idx/data:  737%  (idx: 180.00 KB  data: 24.42 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  auditlogs                         idx/data: 1223%  (idx: 216.00 KB  data: 17.66 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  analytics_interaction_logs        idx/data: 1135%  (idx: 180.00 KB  data: 15.86 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  notifications                     idx/data:  648%  (idx: 72.00 KB  data: 11.12 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  dailysalesviews                   idx/data:  758%  (idx: 72.00 KB  data: 9.50 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  storesettings                     idx/data:  437%  (idx: 36.00 KB  data: 8.24 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  analytics_product_intelligence    idx/data: 2398%  (idx: 72.00 KB  data: 3.00 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  tickets                           idx/data: 4038%  (idx: 108.00 KB  data: 2.67 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  homepagecontents                  idx/data: 1503%  (idx: 36.00 KB  data: 2.40 KB) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  analytics_cohort_view             idx/data: 13357%  (idx: 108.00 KB  data: 828.00 B) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  coupons                           idx/data: 30032%  (idx: 144.00 KB  data: 491.00 B) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  blogcategories                    idx/data: 91398%  (idx: 108.00 KB  data: 121.00 B) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  systemlocks                       idx/data: 153600%  (idx: 72.00 KB  data: 48.00 B) ΓÜá∩╕Å  INDEX > DATA (possible over-indexing)
+  purchasereceiptlines              idx/data:    0%  (idx: 12.00 KB  data: 0 B)
+  couponuses                        idx/data:    0%  (idx: 28.00 KB  data: 0 B)
+  stockhistories                    idx/data:    0%  (idx: 12.00 KB  data: 0 B)
+  blogcomments                      idx/data:    0%  (idx: 80.00 KB  data: 0 B)
+  suppliers                         idx/data:    0%  (idx: 12.00 KB  data: 0 B)
+  ritualresponses                   idx/data:    0%  (idx: 20.00 KB  data: 0 B)
+  faqs                              idx/data:    0%  (idx: 4.00 KB  data: 0 B)
+  purchasereceipts                  idx/data:    0%  (idx: 8.00 KB  data: 0 B)
+  purchaseorders                    idx/data:    0%  (idx: 16.00 KB  data: 0 B)
+  purchaseorderlines                idx/data:    0%  (idx: 16.00 KB  data: 0 B)
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  SUMMARY & RECOMMENDATIONS
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  ΓÇó Biggest collection: "user_sessions" uses 5.77 MB (75.9% of DB)
+  ΓÇó Over-indexed collections (index > data): products, productvelocityviews, orders, userprofiles, blogs, auditlogs, analytics_interaction_logs, notifications, dailysalesviews, storesettings, analytics_product_intelligence, tickets, homepagecontents, analytics_cohort_view, coupons, blogcategories, systemlocks
+
+  Common causes of MongoDB bloat:
+    1. Embedded arrays that grow unbounded (cart history, audit logs, events)
+    2. Storing large strings/binary data (base64 images, HTML, JSON blobs)
+    3. Duplicate data across collections (user info copied into every order)
+    4. Old/abandoned sessions, analytics events, or temp records piling up
+    5. Indexes on high-cardinality or rarely-queried fields
+
+Γ£à  Analysis complete. No data was modified.
+

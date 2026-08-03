@@ -1,4 +1,5 @@
-export const BOT_UA_PATTERNS = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|twitterbot|linkedinbot|applebot|semrushbot|ahrefsbot|pinterest/i;
+// Includes major search engines + AI crawlers (GPTBot, ClaudeBot, Google-Extended, Perplexity)
+export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|twitterbot|linkedinbot|applebot|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|claudebot|claude-web|perplexitybot|amazonbot|applebot-extended/i;
 
 export function isBot(request) {
   const userAgent = request.headers.get("user-agent") || "";
@@ -124,6 +125,106 @@ export function renderProductHtml(product, frontendUrl) {
   <h1>${escapeHtml(product.name)}</h1>
   <p>${escapeHtml(product.description || '')}</p>
   <p>Price: ₹${escapeHtml(String(product.price))}</p>
+</body>
+</html>`;
+}
+
+// ─── Shop / Category Page Bot Renderer ──────────────────────────────────────
+// These category intro blurbs must stay in sync with CATEGORY_INTRO in ShopPage.tsx
+const CATEGORY_INTRO = {
+  // Concerns
+  acne: 'Breakouts happen for many reasons — excess sebum, clogged pores, bacteria, or hormonal shifts. Our acne-targeted range works differently at each stage: salicylic acid and azelaic acid formulas cut through congestion at the follicle level, while niacinamide and zinc PCA dial down redness and oil production without stripping the skin barrier.',
+  brightening: 'Dull skin is usually a surface story — dead cells, uneven melanin, and post-acne marks that stick around long after the blemish heals. Our brightening products use a layered approach: vitamin C to intercept melanin production, kojic acid and glycolic acid to resurface and reveal, and hyaluronic acid to keep the newly exposed skin hydrated and plump.',
+  'anti-aging': 'Visible ageing is largely collagen loss, moisture depletion, and cumulative UV damage playing out together. Our anti-ageing lineup addresses all three simultaneously: retinol and peptide serums stimulate collagen synthesis; hyaluronic acid at multiple molecular weights draws water into every layer of the dermis; and broad-spectrum sunscreens stop new damage before it starts.',
+  hyperpigmentation: 'Hyperpigmentation — whether from sun exposure, post-inflammatory marks, or melasma — responds best to a combination of melanin inhibition and gentle exfoliation. Our targeted collection pairs kojic acid and vitamin C with AHA and BHA exfoliants that remove the pigmented cells already sitting on the surface.',
+  'hair growth': 'Healthy hair growth starts with a healthy scalp. Our hair growth products — from the herbal oil blend to the scalp-stimulating growth serum — work by improving blood circulation, reducing follicle-blocking DHT, and delivering biotin and botanical extracts directly to the root zone.',
+  dandruff: 'Dandruff is a fungal and inflammatory issue, not a hygiene one — so the fix is antifungal actives combined with scalp-soothing botanicals. Our anti-dandruff shampoo uses ketoconazole to target the Malassezia fungus responsible for flaking, alongside zinc pyrithione to reduce scalp inflammation and prevent recurrence.',
+  // Categories
+  skin: 'Bodilicious skin care is built around clinically studied actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, and BHAs — formulated at concentrations that actually work for Indian skin tones and the specific concerns that come with a humid, high-UV climate: acne, post-inflammatory hyperpigmentation, and dehydration.',
+  hair: 'Hair health is scalp health — which is why the Bodilicious hair range starts at the root, not the shaft. Our shampoos, conditioners, oils, and serums are formulated to work together: antifungal and DHT-blocking actives for the scalp, protein and keratin for the lengths, and lightweight moisture-sealing ingredients that do not weigh fine hair down.',
+  body: 'Body skin is thicker and more resilient than facial skin, but it still needs targeted care — especially for concerns like KP, uneven tone, dryness, and stretch marks. Our body range uses the same science-backed actives as our face products — goat milk, olive oil, and exfoliating acids — in formats optimised for larger surface areas.',
+  lip: 'Lips lack sebaceous glands, so they cannot moisturise themselves — every bit of moisture they retain has to come from what you put on them. Our lip products go beyond basic petroleum jelly: natural waxes and butters for an occlusive seal, antioxidant-rich ingredients like beetroot and carrot for colour and protection.',
+  makeup: 'Bodilicious makeup is formulated with skin care principles in mind — so you are not undoing your serum routine with a foundation that clogs pores. Our range is non-comedogenic, long-wear, and suited to warm, humid Indian conditions where most imported formulas transfer or oxidise by midday.',
+  default: 'Bodilicious is an Indian science-backed beauty brand offering dermatologically tested skincare, haircare, lip care, and makeup. Every formula is built around proven actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, BHAs, and keratin — at concentrations that work for Indian skin types. Free shipping on orders over ₹1500.',
+};
+
+function titleCase(s) {
+  return s.replace(/[_\-/]+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
+ * Render a bot-readable HTML page for /shop?category=X, /shop?type=X, /shop?concern=X.
+ * Sets a correct self-canonical so Google indexes the facet page, not the homepage.
+ */
+export function renderShopHtml({ category, type, concern }, products, frontendUrl) {
+  // Determine canonical facet
+  const facetParam = category ? `category=${encodeURIComponent(category)}`
+    : type ? `type=${encodeURIComponent(type)}`
+    : concern ? `concern=${encodeURIComponent(concern)}`
+    : null;
+  const canonicalUrl = facetParam
+    ? `${frontendUrl}/shop?${facetParam}`
+    : `${frontendUrl}/shop`;
+
+  // Title & description
+  const label = category ? titleCase(category) : type ? titleCase(type) : concern ? titleCase(concern) : null;
+  const pageTitle = label
+    ? (concern ? `Best Products for ${label}` : `${label} Products`) + ' — Bodilicious'
+    : 'Shop Skincare & Haircare — Bodilicious';
+  const introKey = concern || category || type || 'default';
+  const description = `Shop Bodilicious ${label || 'skincare & haircare'} products. Dermatologically tested, science-backed formulas made for Indian skin. Free shipping on orders over ₹1500.`;
+  const intro = CATEGORY_INTRO[introKey] || CATEGORY_INTRO['default'];
+
+  // Breadcrumb JSON-LD
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${frontendUrl}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${frontendUrl}/shop` },
+      ...(label ? [{ '@type': 'ListItem', position: 3, name: label, item: canonicalUrl }] : []),
+    ],
+  };
+
+  // ItemList JSON-LD (first 20 products)
+  const itemList = products.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: pageTitle,
+    itemListElement: products.slice(0, 20).map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: p.name,
+      url: `${frontendUrl}/product/${p.pid}`,
+    })),
+  } : null;
+
+  const schemas = [breadcrumb, ...(itemList ? [itemList] : [])];
+
+  // Product list HTML for body
+  const productListHtml = products.slice(0, 30).map(p =>
+    `<article><h2><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a></h2><p>₹${escapeHtml(String(p.price))}</p></article>`
+  ).join('');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${canonicalUrl}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${canonicalUrl}">
+  <meta property="og:title" content="${escapeHtml(pageTitle)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <script type="application/ld+json">${safeJsonLd(schemas)}</script>
+</head>
+<body>
+  <nav aria-label="breadcrumb"><a href="${frontendUrl}/">Home</a> › <a href="${frontendUrl}/shop">Shop</a>${label ? ` › ${escapeHtml(label)}` : ''}</nav>
+  <h1>${escapeHtml(pageTitle.replace(' — Bodilicious', ''))}</h1>
+  <p>${escapeHtml(intro)}</p>
+  ${productListHtml}
 </body>
 </html>`;
 }

@@ -90,17 +90,23 @@ export default function AboutPage() {
                         </p>
                     </section>
 
+                    {/* Founder section — expanded from single-line credential */}
                     <section className="bg-white p-8 border border-silk shadow-sm rounded-sm hover:border-ruby-red/30 transition-colors text-center">
-    <h3 className="font-serif text-xl text-dark-red mb-6">Our Leadership</h3>
-
-    <div className="grid grid-cols-1 md:grid-cols-1 gap-8 text-sm text-gray-600 justify-items-center">
-        <div className="text-center">
-            <h4 className="font-bold text-dark-red mb-1">BHANUJA POLANI</h4>
-            <p className="font-medium text-ruby-red mb-2">Founder</p>
-            <p className="font-light">Bio medical engineer, M.Tech Biotechnology</p>
-        </div>
-    </div>
-</section>
+                        <h3 className="font-serif text-xl text-dark-red mb-6">Our Leadership</h3>
+                        <div className="text-sm text-gray-600 max-w-xl mx-auto">
+                            <h4 className="font-bold text-dark-red mb-1">BHANUJA POLANI</h4>
+                            <p className="font-medium text-ruby-red mb-4">Founder &amp; Formulator</p>
+                            <p className="font-light leading-relaxed mb-3">
+                                Bhanuja is a biomedical engineer with an M.Tech in Biotechnology — which is exactly why Bodilicious works differently from most beauty brands. Her background isn't in marketing; it's in understanding how biological systems respond to compounds at a molecular level.
+                            </p>
+                            <p className="font-light leading-relaxed mb-3">
+                                Bodilicious was born out of a personal frustration: the Indian skincare market was flooded with products that promised results but were formulated around tradition and marketing claims rather than clinical evidence. Bhanuja set out to build a brand that treated skincare the same way medicine is approached — with specific actives, at verified concentrations, matched to specific concerns.
+                            </p>
+                            <p className="font-light leading-relaxed">
+                                Every Bodilicious formula reflects that principle. Not a generic moisturiser — a peptide moisturiser for collagen support. Not a shampoo — a DHT-blocking, scalp-stimulating formula for hair fall. The science is the brand.
+                            </p>
+                        </div>
+                    </section>
                 </div>
             </div>
 

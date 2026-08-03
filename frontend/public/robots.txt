@@ -13,4 +13,29 @@ Disallow: /track/
 Disallow: /tracking
 Disallow: /internal/
 
+# AI crawlers — explicitly allowed so Bodilicious appears in AI-generated answers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
 Sitemap: https://bodilicious.in/sitemap.xml
