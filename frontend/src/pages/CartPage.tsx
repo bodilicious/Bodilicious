@@ -5,6 +5,7 @@ import { useCurrency } from '../hooks/useCurrency';
 import Footer from '../components/Footer';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSEO } from '../hooks/useSEO';
+import { getCountryNameFromIso } from '../utils/countries';
 
 export default function CartPage() {
   useSEO({
@@ -21,6 +22,16 @@ export default function CartPage() {
   storeSettingsRef.current = storeSettings;
   const { formatPrice, userCurrency } = useCurrency();
   const navigate = useNavigate();
+
+  // ── Country used for the cart's shipping preview ───────────────────────────
+  // The customer enters their real address on the next step; until then we use the
+  // IP-detected country. It must be the full NAME, because the backend validates
+  // against `supportedCountries` — the old code sent the bare ISO code 'US', which
+  // the quote endpoint rejected ("We do not currently ship to US"). That error was
+  // then surfaced as a bogus coupon error and the cart silently fell back to showing
+  // domestic ₹99 shipping to international shoppers.
+  const previewCountry = getCountryNameFromIso(storeSettings.detectedCountryCode);
+  const isPreviewIndia = ['india', 'in', 'bharat', 'ind'].includes(previewCountry.toLowerCase());
 
   // 1. Memoize validCartItems to avoid creating a new array reference on every render
   const validCartItems = useMemo(
@@ -51,10 +62,6 @@ export default function CartPage() {
     if (validCartItems.length === 0) return;
     let isMounted = true;
     
-    // Use userCurrency to proxy their country for the cart preview.
-    // They will enter their real country on the next step (ShippingPage).
-    const guessCountry = userCurrency === 'USD' ? 'US' : 'IN';
-    
     // Prepare lightweight items list to send to the API (avoid sending full product objects)
     const itemsForQuote = validCartItems.map((item: any) => ({
       productId: item.product?._id || item.product,
@@ -62,7 +69,7 @@ export default function CartPage() {
       quantity: item.quantity,
     }));
 
-    fetchShippingQuote(itemsForQuote, { country: guessCountry }, appliedCoupon || undefined)
+    fetchShippingQuote(itemsForQuote, { country: previewCountry }, appliedCoupon || undefined)
       .then(data => {
         if (isMounted) {
           const s = storeSettingsRef.current;
@@ -70,7 +77,7 @@ export default function CartPage() {
             shippingCost: data.shippingCost,
             discountAmount: data.discountAmount,
             total: data.totalAmount,
-            threshold: guessCountry === 'IN' ? s.shippingThreshold : s.internationalShippingThreshold,
+            threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold,
             isWelcomeOfferApplied: data.isWelcomeOfferApplied,
             isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
           });
@@ -88,10 +95,10 @@ export default function CartPage() {
             setAppliedCoupon(null);
             setCouponError(err.message || "Invalid coupon");
             // Re-fetch without the invalid coupon
-            fetchShippingQuote(itemsForQuote, { country: guessCountry }).then(d => {
+            fetchShippingQuote(itemsForQuote, { country: previewCountry }).then(d => {
               if (isMounted) {
                 const s = storeSettingsRef.current;
-                setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, threshold: guessCountry === 'IN' ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
+                setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
               }
             }).catch(e => console.error("Fallback quote failed:", e));
          }
@@ -100,8 +107,10 @@ export default function CartPage() {
     return () => { isMounted = false; };
   // storeSettings intentionally excluded — use storeSettingsRef inside to avoid
   // a double quote fetch when settings load from the server after initial render.
+  // previewCountry IS a dependency (it drives the request) and is a plain string,
+  // so it only re-triggers when the detected country actually changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [validCartItems, userCurrency, fetchShippingQuote, appliedCoupon]);
+  }, [validCartItems, previewCountry, fetchShippingQuote, appliedCoupon]);
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
@@ -113,14 +122,12 @@ export default function CartPage() {
         pid: item.product?.pid,
         quantity: item.quantity,
       }));
-      const guessCountry = userCurrency === 'USD' ? 'US' : 'IN';
-      
-      const data = await fetchShippingQuote(itemsForQuote, { country: guessCountry }, couponInput.trim());
+      const data = await fetchShippingQuote(itemsForQuote, { country: previewCountry }, couponInput.trim());
       setQuoteData({
         shippingCost: data.shippingCost,
         discountAmount: data.discountAmount,
         total: data.totalAmount,
-        threshold: guessCountry === 'IN' ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold,
+        threshold: isPreviewIndia ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold,
         isWelcomeOfferApplied: data.isWelcomeOfferApplied,
         isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
       });

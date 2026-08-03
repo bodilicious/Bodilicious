@@ -98,6 +98,9 @@ interface AppContextType {
     autoCurrencySwitchingEnabled: boolean;
     detectedCountryCode: string;
     usdExchangeRate: number;
+    // INR → currency rates for the currencies checkout supports. Needed so display
+    // prices are shown in the same currency the customer is actually charged in.
+    checkoutExchangeRates: Record<string, number>;
     internationalShippingEnabled: boolean;
     internationalShippingCost: number;
     internationalShippingThreshold: number;
@@ -229,6 +232,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     autoCurrencySwitchingEnabled: true,
     detectedCountryCode: 'IN',
     usdExchangeRate: 83.5,
+    checkoutExchangeRates: {},
     internationalShippingEnabled: false,
     internationalShippingCost: 2000,
     internationalShippingThreshold: 10000,

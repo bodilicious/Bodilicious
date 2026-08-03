@@ -1,6 +1,7 @@
 import StoreSettings from "./models.js";
 import HomepageContent from "./homepageModel.js";
 import { COUNTRIES } from "../utils/countries.js";
+import { CHECKOUT_CURRENCIES } from "../utils/currencies.js";
 import { logAction } from "../admin/controller.js";
 import { clearSettingsCache } from "./cache.js";
 
@@ -30,6 +31,22 @@ export const getSettings = async (req, res) => {
         }
     } else {
         console.warn("[WARNING] Exchange Rates have never been updated.");
+    }
+
+    // ── Checkout-currency rates for the storefront ────────────────────────────
+    // The storefront could only convert USD, so a shopper detected as EUR/GBP/CAD/
+    // AUD/DKK saw ₹ prices on every product while the (correct) quote came back in
+    // their own currency — line items in ₹, "Place Order (€21.50)" on the button.
+    // The full exchangeRates map is ~150 currencies / ~3 KB and stays omitted; this
+    // is just the handful Razorpay can actually charge in (~7 entries, ~110 bytes).
+    const rates = settings.exchangeRates;
+    const readRate = (code) => (rates?.get ? rates.get(code) : rates?.[code]);
+    const checkoutExchangeRates = {};
+    for (const code of CHECKOUT_CURRENCIES) {
+      if (code === "INR") continue;
+      const rate = readRate(code) ||
+        (code === "USD" && settings.usdExchangeRate ? 1 / settings.usdExchangeRate : null);
+      if (rate && rate > 0) checkoutExchangeRates[code] = rate;
     }
 
     // Allow browsers/CDN to cache public settings for 60 s.
@@ -66,9 +83,11 @@ export const getSettings = async (req, res) => {
         autoCurrencySwitchingEnabled: settings.autoCurrencySwitchingEnabled ?? true,
         detectedCountryCode,
         usdExchangeRate: settings.usdExchangeRate || 83.5,
-        // NOTE: exchangeRates (150+ currencies, ~3 KB) intentionally omitted from public
-        // endpoint. The storefront only uses usdExchangeRate for display.
-        // Admin / checkout pages that need full rates should call the admin settings route.
+        // INR → currency rates, limited to the currencies checkout supports.
+        // Same direction as StoreSettings.exchangeRates: amountInINR * rate = amount.
+        checkoutExchangeRates,
+        // NOTE: the FULL exchangeRates map (150+ currencies, ~3 KB) is still omitted from
+        // this public endpoint. Admin pages that need every rate use the admin settings route.
       },
     });
   } catch (err) {

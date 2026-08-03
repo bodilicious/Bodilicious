@@ -29,7 +29,9 @@ router.post("/webhook", razorpayWebhook);
 // adminOnly guard added — any authenticated user could otherwise trigger processPaidOrder.
 router.post("/admin/reconcile", protect, adminOnly, async (req, res) => {
     try {
-        const result = await runPaymentReconciliation();
+        // force: bypass the idle-skip window — an admin hitting this is chasing a
+        // specific missing order and must never get a silent no-op.
+        const result = await runPaymentReconciliation({ force: true });
         return res.status(200).json({ success: true, data: result });
     } catch (err) {
         console.error("[Admin Reconcile] Error:", err.message);

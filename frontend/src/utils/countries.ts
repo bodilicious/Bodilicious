@@ -205,3 +205,23 @@ export const getCountryFlag = (countryName: string) => {
   if (!code || code === 'UN') return '🏳️';
   return code.toUpperCase().replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
 };
+
+// Reverse of COUNTRY_ISO_MAP, built once at module load.
+const ISO_COUNTRY_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(COUNTRY_ISO_MAP).map(([name, code]) => [code, name])
+);
+
+/**
+ * ISO alpha-2 code → the country NAME used throughout checkout.
+ *
+ * The backend validates shipping country against `supportedCountries`, which holds
+ * full names ("United States of America"), so anything sending a bare ISO code
+ * ("US") is rejected with "We do not currently ship to US". Always convert before
+ * sending a country to the quote endpoint.
+ *
+ * Falls back to "India" for unknown/missing codes, matching the Order schema default.
+ */
+export const getCountryNameFromIso = (isoCode?: string | null): string => {
+  if (!isoCode) return 'India';
+  return ISO_COUNTRY_MAP[isoCode.trim().toUpperCase()] ?? 'India';
+};

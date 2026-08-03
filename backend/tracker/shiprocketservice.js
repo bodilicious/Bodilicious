@@ -3,6 +3,32 @@ import Order from "./models.js";
 let cachedToken = null;
 let tokenExpiry = null;
 
+/**
+ * Shiprocket only services Indian pickup/delivery pincodes. Every payload builder
+ * below assumes an Indian address (6-digit pincode, 10-digit phone, "India" country)
+ * and silently rewrites anything else to Delhi/110001 placeholders — which would
+ * book a real courier against a fake address. Callers must gate on this.
+ */
+export const isIndiaOrder = (order) => {
+  const country = order?.shippingDetails?.country;
+  if (!country) return true; // schema default is "India"
+  return ["india", "in", "bharat", "ind"].includes(country.toLowerCase().trim());
+};
+
+/**
+ * Flags an order for ops follow-up without corrupting orderStatus.
+ * Previously this wrote orderStatus: "payment_captured_fulfillment_pending",
+ * which is NOT in the orderStatus enum — findByIdAndUpdate skips validators so it
+ * persisted, then any later order.save() threw a ValidationError, and the admin
+ * "Push to Shiprocket" button (gated on pending/processing) disappeared exactly
+ * when it was needed. needsManualReview is indexed and already alerted on in server.js.
+ */
+const flagForManualReview = async (orderId, reason) => {
+  await Order.findByIdAndUpdate(orderId, {
+    $set: { needsManualReview: true, reviewReason: reason },
+  }).catch((e) => console.error("Failed to flag order for manual review:", e.message));
+};
+
 export const getShiprocketToken = async () => {
   if (
     cachedToken &&
@@ -95,6 +121,14 @@ export const pushOrderToShiprocket = async (order) => {
     if (!process.env.SHIPROCKET_EMAIL || !process.env.SHIPROCKET_PASSWORD) return;
     if (order.shiprocketOrderId || order.shipmentId) return; // Already created
 
+    // Hard guard — callers should already gate on this, but a stray international
+    // order reaching here would be shipped to a placeholder Delhi address.
+    if (!isIndiaOrder(order)) {
+      console.warn(`[Shiprocket] Refusing to push international order ${order._id} (${order.shippingDetails?.country}). Requires manual fulfilment.`);
+      await flagForManualReview(order._id, `International order (${order.shippingDetails?.country}) — Shiprocket cannot fulfil; arrange carrier manually.`);
+      return;
+    }
+
     const token = await getShiprocketToken();
     const shippingDetails = order.shippingDetails;
 
@@ -171,15 +205,18 @@ export const pushOrderToShiprocket = async (order) => {
         await Order.findByIdAndUpdate(order._id, updateData);
       }
     } else {
-      console.error("Shiprocket Order Creation Failed:", await createRes.text());
+      const errText = await createRes.text();
+      console.error("Shiprocket Order Creation Failed:", errText);
       if (order.paymentStatus === "paid") {
-        await Order.findByIdAndUpdate(order._id, { orderStatus: "payment_captured_fulfillment_pending" });
+        // Leave orderStatus alone (it stays "pending", so the admin "Push to
+        // Shiprocket" action remains available) and flag it instead.
+        await flagForManualReview(order._id, `Payment captured but Shiprocket order creation failed: ${errText.slice(0, 300)}`);
       }
     }
   } catch (err) {
     console.error("Shiprocket push error:", err.message);
     if (order && order.paymentStatus === "paid") {
-      await Order.findByIdAndUpdate(order._id, { orderStatus: "payment_captured_fulfillment_pending" }).catch(e => console.error(e));
+      await flagForManualReview(order._id, `Payment captured but Shiprocket push threw: ${err.message}`);
     }
   }
 };
@@ -192,6 +229,15 @@ export const createShiprocketReturn = async (order, reason) => {
   try {
     if (!process.env.SHIPROCKET_EMAIL || !process.env.SHIPROCKET_PASSWORD) return;
     if (order.returnShipmentId) return; // Already created
+
+    // The payload below hardcodes pickup_country: "India" and rewrites any
+    // non-6-digit postal code to 110001, so an international return would book a
+    // reverse pickup from a Delhi address the customer has never been to.
+    if (!isIndiaOrder(order)) {
+      console.warn(`[Shiprocket] Skipping reverse pickup for international order ${order._id} (${order.shippingDetails?.country}). Requires manual RMA.`);
+      await flagForManualReview(order._id, `International return requested (${order.shippingDetails?.country}) — arrange reverse logistics manually.`);
+      return;
+    }
 
     const token = await getShiprocketToken();
     const shippingDetails = order.shippingDetails;

@@ -85,7 +85,10 @@ mongoose
           for (const o of stuckOrders) {
             await NotificationService.emit({
               title: `⚠️ Manual Review Required — Order ${o._id.toString().slice(-6).toUpperCase()}`,
-              body: `Order ${o._id} (${o.currency} ${o.totalAmount}) was paid (payment: ${o.razorpayPaymentId || "unknown"}) but was never fully processed. Reason: ${o.reviewReason || "unknown"}. Created: ${new Date(o.createdAt).toISOString()}`,
+              // `|| "INR"` matters here: this is a .lean() query, and lean results
+              // skip Mongoose schema defaults, so orders written before `currency`
+              // existed come back undefined and would print "undefined 1499".
+              body: `Order ${o._id} (${o.currency || "INR"} ${o.totalAmount}) was paid (payment: ${o.razorpayPaymentId || "unknown"}) but was never fully processed. Reason: ${o.reviewReason || "unknown"}. Created: ${new Date(o.createdAt).toISOString()}`,
               type: "critical",
               sourceModule: "orders",
               sourceModel: "Order",

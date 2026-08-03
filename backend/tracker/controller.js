@@ -3,7 +3,7 @@ import { calculateDiscount } from "../utils/pricing.js";
 import Order from "./models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
-import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, createShiprocketReturn } from "./shiprocketservice.js";
+import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, createShiprocketReturn, isIndiaOrder } from "./shiprocketservice.js";
 import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendOrderShippedEmail, sendAdminNewOrderAlert } from "../email/emailService.js";
 import { logAction } from "../admin/controller.js";
 import { trackServerEvent } from "../utils/posthog.js";
@@ -1119,14 +1119,19 @@ export const requestReturn = async (req, res) => {
     orderEvents.emit("order_status_updated", order);
 
     // 🚀 Automate Shiprocket Return Creation (Non-Blocking)
+    // Internally a no-op for international orders — Shiprocket reverse pickup only
+    // covers Indian addresses, so it flags the order for manual RMA instead.
     const freshOrder = await Order.findById(order._id).populate("items.product");
     createShiprocketReturn(freshOrder, reason.trim()).catch(err => {
       console.error("Delayed Shiprocket return error:", err.message);
     });
 
+    const isDomesticReturn = isIndiaOrder(order);
     await NotificationService.emit({
-        title: "Return Requested",
-        body: `Order ${order._id.toString().slice(-6).toUpperCase()} requested a return: ${reason.trim()}`,
+        title: isDomesticReturn ? "Return Requested" : "International Return — Manual RMA Required",
+        body: isDomesticReturn
+          ? `Order ${order._id.toString().slice(-6).toUpperCase()} requested a return: ${reason.trim()}`
+          : `Order ${order._id.toString().slice(-6).toUpperCase()} (ships to ${order.shippingDetails?.country}) requested a return: ${reason.trim()}. No automated reverse pickup — arrange the return manually.`,
         type: "warning",
         sourceModule: "orders",
         sourceModel: "Order",

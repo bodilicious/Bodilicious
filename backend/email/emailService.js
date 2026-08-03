@@ -22,6 +22,29 @@ const FROM_DEFAULT  = process.env.EMAIL_FROM        || "Bodilicious <noreply@bod
 const FROM_SUPPORT  = process.env.EMAIL_FROM_SUPPORT || "Bodilicious Support <support@bodilicious.in>";
 const FROM_ALERTS   = process.env.EMAIL_FROM_ALERTS  || "Bodilicious Alerts <alerts@bodilicious.in>";
 
+/**
+ * Formats a monetary amount in the order's own currency.
+ *
+ * Order amounts (totalAmount, priceAtPurchase, refundAmount…) are denominated in
+ * the CHECKOUT currency, not INR. These templates used to hardcode "₹" with
+ * en-IN grouping, so a customer charged $49.99 received a receipt reading
+ * "₹49.99". Always pass the order's currency.
+ */
+const formatMoney = (amount, currency = "INR") => {
+  const code = (currency || "INR").toString().trim().toUpperCase();
+  const value = Number(amount) || 0;
+  try {
+    return new Intl.NumberFormat(code === "INR" ? "en-IN" : "en-US", {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "narrowSymbol",
+    }).format(value);
+  } catch {
+    // Unknown/invalid ISO code — never throw inside an email template
+    return `${code} ${value.toLocaleString("en-US")}`;
+  }
+};
+
 // Helper to get primary admin email
 const getPrimaryAdminEmail = async () => {
   try {
@@ -104,7 +127,7 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
               <span style="color:#777777; font-size:13px;">Qty: ${item?.quantity || 0}</span>
             </td>
             <td style="padding:12px 10px; border-bottom:1px solid #eeeeee; text-align:right; vertical-align:top;">
-              ₹${((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0)).toLocaleString("en-IN")}
+              ${formatMoney((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0), order?.currency)}
             </td>
           </tr>
         `
@@ -174,7 +197,7 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
           <tr>
             <td style="padding:12px 10px; text-align:right; font-weight:bold;">Total Paid</td>
             <td style="padding:12px 10px; text-align:right; color:#8B0000; font-weight:bold; font-size:18px;">
-              ₹${totalAmount.toLocaleString("en-IN")}
+              ${formatMoney(totalAmount, order?.currency)}
             </td>
           </tr>
         </tfoot>
@@ -334,7 +357,7 @@ export const sendAdminNewOrderAlert = async (order) => {
           <tr>
             <td style="padding:10px 0; border-bottom:1px solid #eeeeee;">
               <strong>${item?.product?.name || item?.name || "Product"}</strong><br>
-              <span style="color:#777777; font-size:12px;">Qty: ${item?.quantity || 0} | ₹${((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0)).toLocaleString("en-IN")}</span>
+              <span style="color:#777777; font-size:12px;">Qty: ${item?.quantity || 0} | ${formatMoney((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0), order?.currency)}</span>
             </td>
           </tr>
         `
@@ -352,7 +375,7 @@ export const sendAdminNewOrderAlert = async (order) => {
 
       <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
         <p style="margin:0 0 8px;"><strong>Order ID:</strong> #${displayOrderId}</p>
-        <p style="margin:0 0 8px;"><strong>Amount:</strong> ₹${totalAmount.toLocaleString("en-IN")}</p>
+        <p style="margin:0 0 8px;"><strong>Amount:</strong> ${formatMoney(totalAmount, order?.currency)}</p>
         <p style="margin:0 0 8px;"><strong>Payment Method:</strong> ${paymentMethod}</p>
         <p style="margin:0;"><strong>Items:</strong> ${(order?.items || []).length}</p>
       </div>
@@ -372,7 +395,7 @@ export const sendAdminNewOrderAlert = async (order) => {
     return await sendEmail({
       from: FROM_ALERTS,
       to: adminEmail,
-      subject: `New Order Alert! [#${displayOrderId}] - ₹${totalAmount.toLocaleString("en-IN")}`,
+      subject: `New Order Alert! [#${displayOrderId}] - ${formatMoney(totalAmount, order?.currency)}`,
       html: buildEmailLayout(content, { customerName: "Admin" }),
       label: "Admin new order alert",
     });
@@ -384,7 +407,8 @@ export const sendAdminNewOrderAlert = async (order) => {
 /* ─────────────────────────────────────────────
    ADMIN ALERT: PAYMENT SUCCESS NO ORDER
 ───────────────────────────────────────────── */
-export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, amount) => {
+// currency comes from the Razorpay payment entity — there is no DB order to read it from.
+export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, amount, currency = "INR") => {
   try {
     const adminEmail = await getPrimaryAdminEmail();
     if (!adminEmail) return;
@@ -401,7 +425,7 @@ export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, am
       <div style="background:#fff5f5; padding:16px 18px; border:1px solid #fecaca; border-radius:8px; margin:22px 0;">
         <p style="margin:0 0 8px;"><strong>Razorpay Order ID:</strong> ${orderId}</p>
         <p style="margin:0 0 8px;"><strong>Razorpay Payment ID:</strong> ${paymentId}</p>
-        <p style="margin:0;"><strong>Amount Paid:</strong> ₹${amount.toLocaleString("en-IN")}</p>
+        <p style="margin:0;"><strong>Amount Paid:</strong> ${formatMoney(amount, currency)}</p>
       </div>
 
       <p style="margin:18px 0 0;">
@@ -412,7 +436,7 @@ export const sendAdminPaymentSuccessNoOrderAlert = async (paymentId, orderId, am
     return await sendEmail({
       from: FROM_ALERTS,
       to: adminEmail,
-      subject: `CRITICAL: Orphaned Payment Captured - ₹${amount.toLocaleString("en-IN")}`,
+      subject: `CRITICAL: Orphaned Payment Captured - ${formatMoney(amount, currency)}`,
       html: buildEmailLayout(content, { customerName: "Admin" }),
       label: "Admin orphaned payment alert",
     });

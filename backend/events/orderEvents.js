@@ -1,5 +1,6 @@
 import EventEmitter from "events";
-import { pushOrderToShiprocket } from "../tracker/shiprocketservice.js";
+import { pushOrderToShiprocket, isIndiaOrder } from "../tracker/shiprocketservice.js";
+import NotificationService from "../procurement/notificationService.js";
 import { sendOrderConfirmationAfterInvoice, sendAdminNewOrderAlert } from "../email/emailService.js";
 import UserProfile from "../profile/models.js";
 import Order from "../tracker/models.js";
@@ -28,16 +29,15 @@ orderEvents.on("order_placed", async (order) => {
         await updateSegments(order);
 
         // 1. PostHog Tracking
-        const isIndiaOrder = !order.shippingDetails?.country || 
-            ['india', 'in', 'bharat', 'ind'].includes((order.shippingDetails.country || '').toLowerCase().trim());
-        
+        const isDomestic = isIndiaOrder(order);
+
         const distinctId = order.user ? order.user.toString() : order.shippingDetails?.email || "guest";
         trackServerEvent(distinctId, 'Order Completed', {
             order_id: order._id.toString(),
             total_amount: order.totalAmount,
             currency: order.currency || "INR",
             payment_method: order.paymentMethod,
-            region: isIndiaOrder ? 'domestic' : 'international',
+            region: isDomestic ? 'domestic' : 'international',
             items: order.items.map(item => ({
                 product_id: item.product && item.product._id ? item.product._id.toString() : item.product.toString(),
                 quantity: item.quantity,
@@ -45,11 +45,33 @@ orderEvents.on("order_placed", async (order) => {
             }))
         });
 
-        // 2. Shiprocket Pushing (Only for India)
-        if (isIndiaOrder) {
+        // 2. Fulfilment
+        if (isDomestic) {
+            // India → Shiprocket handles it automatically.
             pushOrderToShiprocket(order).catch(err => {
                 console.error("[Order Events] Shiprocket push failed:", err.message);
             });
+        } else {
+            // International → no carrier integration exists. Without this the order
+            // would sit at "pending" with no shipment, no AWB and no signal to ops.
+            // Flag it and raise a notification so it enters the manual queue.
+            const country = order.shippingDetails?.country || "Unknown";
+            await Order.updateOne(
+                { _id: order._id },
+                { $set: {
+                    needsManualReview: true,
+                    reviewReason: `International order (${country}) — no automated carrier. Arrange shipment manually.`
+                }}
+            ).catch(err => console.error("[Order Events] Failed to flag international order:", err.message));
+
+            await NotificationService.emit({
+                title: "International Order — Manual Fulfilment Required",
+                body: `Order ${order._id.toString().slice(-6).toUpperCase()} ships to ${country} (${order.currency || "INR"} ${order.totalAmount}). Shiprocket does not cover this destination — book a carrier manually.`,
+                type: "warning",
+                sourceModule: "orders",
+                sourceModel: "Order",
+                sourceId: order._id.toString()
+            }).catch(err => console.error("[Order Events] International notification failed:", err.message));
         }
 
         // 3. Email Generation

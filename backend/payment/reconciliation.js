@@ -44,16 +44,25 @@ let lastQuietAt = null; // timestamp of last run that found 0 orders
 
 /**
  * Core reconciliation logic — exported for manual triggering from admin routes.
+ *
+ * @param {object}  [options]
+ * @param {boolean} [options.force] Bypass the idle-skip window. Manual admin
+ *   triggers MUST pass this: the quiet window is up to 4 hours long, so without it
+ *   the "customer paid but has no order" recovery button was a silent no-op for
+ *   most of the day — exactly the situation it exists to fix.
  */
-export async function runPaymentReconciliation() {
+export async function runPaymentReconciliation({ force = false } = {}) {
     // ── Idle-skip: if the last run found nothing and we're still within the
     // quiet window, skip the entire function to avoid pointless DB round-trips.
-    // Manual admin triggers bypass this by calling the function directly outside
-    // the cron — lastQuietAt is only set by zero-result cron runs.
-    if (lastQuietAt !== null && (Date.now() - lastQuietAt) < QUIET_SKIP_MS) {
+    // Only scheduled cron ticks are eligible to skip.
+    if (!force && lastQuietAt !== null && (Date.now() - lastQuietAt) < QUIET_SKIP_MS) {
         console.log(`[Reconcile] Quiet skip — no stale orders found in last run. Next full check in ${Math.round((QUIET_SKIP_MS - (Date.now() - lastQuietAt)) / 60000)} min.`);
         return { skipped: true, reason: 'quiet' };
     }
+
+    // A forced run means someone is actively chasing a missing order. Clear the
+    // quiet marker so subsequent cron ticks resume checking every 30 minutes.
+    if (force) lastQuietAt = null;
 
     const staleThreshold = new Date(Date.now() - 5 * 60 * 1000);
     let lock;
@@ -111,8 +120,13 @@ export async function runPaymentReconciliation() {
             .lean();
 
         if (stalePendingOrders.length === 0) {
-            // Record quiet timestamp so the next ticks can skip the DB call.
-            lastQuietAt = Date.now();
+            // Record quiet timestamp so the next ticks can skip the DB call —
+            // but NEVER off the back of a forced run. An admin forces this while
+            // actively chasing a missing order, and an order younger than
+            // MIN_AGE_MINUTES is invisible to this query. Re-arming the 4-hour
+            // window here would hide that order from the cron for another 4 hours,
+            // right when we most need to keep looking.
+            if (!force) lastQuietAt = Date.now();
             return { checked: 0, recovered: 0, errors: 0, durationMs: Date.now() - startedAt };
         }
 
@@ -220,7 +234,7 @@ export function initPaymentReconciliationCron() {
         );
     });
 
-    console.log("[Reconcile] Payment reconciliation cron scheduled (every 5 mins).");
+    console.log("[Reconcile] Payment reconciliation cron scheduled (every 30 mins).");
 
     // Run once shortly after startup to catch anything from a previous server crash
     setTimeout(() => {

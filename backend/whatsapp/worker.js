@@ -18,6 +18,7 @@ import Order from "../tracker/models.js";
 import { Ticket } from "../support/models.js";
 import Product from "../products/models.js";
 import { getSettings } from "../settings/cache.js";
+import { toRazorpayMinorUnits } from "../utils/currencies.js";
 
 dotenv.config();
 
@@ -220,9 +221,13 @@ const processJob = async (job) => {
           const userEmail = user?.email || order.shippingDetails?.email;
           if (userEmail) customerObj.email = userEmail;
 
+          // Bill in the order's own currency. Hardcoding INR here charged a foreign
+          // customer the numeric total in rupees (a $49.99 order → a ₹49.99 link),
+          // and *100 mis-scales any currency that isn't 2-decimal.
+          const linkCurrency = (order.currency || data.currency || "INR").toUpperCase();
           const paymentLinkReq = {
-            amount: Math.round(data.amount * 100),
-            currency: "INR",
+            amount: toRazorpayMinorUnits(data.amount, linkCurrency),
+            currency: linkCurrency,
             accept_partial: false,
             description: `Payment for Bodilicious Order ${order._id}`,
             customer: customerObj,

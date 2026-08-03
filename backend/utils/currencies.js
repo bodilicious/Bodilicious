@@ -39,6 +39,20 @@ export function toRazorpayMinorUnits(amount, currency) {
 }
 
 /**
+ * Inverse of toRazorpayMinorUnits — converts a Razorpay minor-unit integer back
+ * to a decimal amount. Webhook payloads (payment.amount, refund.amount) are always
+ * in minor units, and dividing by a hardcoded 100 silently mis-scales any currency
+ * that isn't 2-decimal.
+ * 1250 JPY → 1250, 1250 USD → 12.50, 1250 KWD → 1.250
+ */
+export function fromRazorpayMinorUnits(amount, currency) {
+  const value = Number(amount) || 0;
+  if (ZERO_DECIMAL_CURRENCIES.has(currency)) return value;
+  if (THREE_DECIMAL_CURRENCIES.has(currency)) return value / 1000;
+  return value / 100;
+}
+
+/**
  * Returns the number of decimal places for a given currency.
  * Used to round converted prices correctly.
  */

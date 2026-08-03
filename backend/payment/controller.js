@@ -13,7 +13,7 @@ import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
 import { calculateDiscount } from "../utils/pricing.js";
-import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits } from "../utils/currencies.js";
+import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits, fromRazorpayMinorUnits } from "../utils/currencies.js";
 import orderEvents from "../events/orderEvents.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
 import { validateCouponAtCheckout } from "../coupons/controller.js";
@@ -231,7 +231,9 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
 
         await NotificationService.emit({
             title: "New Order Received",
-            body: `Order ${order._id.toString().slice(-6).toUpperCase()} placed for ₹${order.totalAmount}.`,
+            // Use the order's own currency — totalAmount is denominated in the
+            // checkout currency, so a hardcoded ₹ misreported every foreign order.
+            body: `Order ${order._id.toString().slice(-6).toUpperCase()} placed for ${order.currency || "INR"} ${order.totalAmount}.`,
             type: "info",
             sourceModule: "orders",
             sourceModel: "Order",
@@ -276,7 +278,7 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
                                 paymentStatus: "refunded",
                                 refundStatus: "processed",
                                 refundId: refund.id,
-                                refundAmount: refund.amount / 100,
+                                refundAmount: fromRazorpayMinorUnits(refund.amount, (paymentFetch.currency || "INR").toUpperCase()),
                                 paymentClaimedAt: null 
                             },
                             $push: {
@@ -284,7 +286,11 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
                                     fromStatus: priorPaymentStatus === "paid" ? "processing" : "pending",
                                     toStatus: "cancelled",
                                     status: "cancelled",
-                                    changedBy: "system",
+                                    // changedBy is an ObjectId ref — the string "system" fails to cast
+                                    // and rejected this whole update, leaving the customer refunded on
+                                    // Razorpay while the order still looked live in our DB.
+                                    // `source` is the field that records system-origin changes.
+                                    changedBy: null,
                                     source: "system",
                                     // `changedAt` matches the schema field — `timestamp` was silently ignored
                                     changedAt: new Date()
@@ -639,9 +645,31 @@ export const initRazorpayOrder = async (req, res) => {
         // Full Pricing Re-validation (Fix for #1)
         const isIndia = !shippingDetails?.country?.trim() || ["india", "in", "bharat", "ind"].includes(shippingDetails.country.toLowerCase().trim());
         // Use the in-memory settings cache — avoids an extra DB round-trip per init request
-        const settings = (await getSettings()) || { shippingThreshold: 999, shippingCost: 99, internationalShippingCost: 2000, internationalShippingThreshold: 10000 };
-        
-        let shippingCost = isIndia 
+        const settings = (await getSettings()) || {
+            shippingThreshold: 999, shippingCost: 99,
+            internationalShippingEnabled: false, internationalShippingCost: 2000, internationalShippingThreshold: 10000,
+            supportedCountries: COUNTRIES
+        };
+
+        // ── Re-check international eligibility ────────────────────────────────
+        // The signed quote pins the COUNTRY but not the store settings, and it stays
+        // valid for 30 minutes. Without this, orders could still be initiated for up
+        // to half an hour after international shipping was switched off, or after a
+        // country was removed from supportedCountries.
+        if (!isIndia) {
+            if (!settings.internationalShippingEnabled) {
+                return res.status(400).json({ success: false, message: "International shipping is not enabled." });
+            }
+            if (!settings.internationalCheckoutEnabled) {
+                return res.status(400).json({ success: false, message: "International checkout is currently disabled. Please check back later." });
+            }
+            const supported = (settings.supportedCountries || []).map(c => c.toLowerCase());
+            if (!supported.includes(shippingDetails.country.toLowerCase().trim())) {
+                return res.status(400).json({ success: false, message: `We do not currently ship to ${shippingDetails.country}.` });
+            }
+        }
+
+        let shippingCost = isIndia
             ? (subtotal >= settings.shippingThreshold ? 0 : settings.shippingCost)
             : (subtotal >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost);
 
@@ -671,10 +699,19 @@ export const initRazorpayOrder = async (req, res) => {
         }
 
         const pricing = calculateDiscount(subtotal, shippingCost, { existingOrdersCount }, coupon);
-        const applyConversion = (val) => roundForCurrency(val * (payload.exchangeRate || 1), payload.currency || "INR");
+        const targetCurrencyForCheck = payload.currency || "INR";
+        const applyConversion = (val) => roundForCurrency(val * (payload.exchangeRate || 1), targetCurrencyForCheck);
         const convertedFinalAmount = applyConversion(pricing.finalAmount);
 
-        if (Math.abs(convertedFinalAmount - payload.finalAmount) > Math.max(1, convertedFinalAmount * 0.001)) {
+        // ── Price-drift tolerance ─────────────────────────────────────────────
+        // Absorbs rounding noise only. The old floor was a flat `1`, which is ~₹1
+        // domestically but $1/€1 internationally — an ~87x wider window to swallow a
+        // genuine price change at our expense. Scale the floor into the checkout
+        // currency so it means the same thing everywhere.
+        const absoluteFloor = roundForCurrency(1 * (payload.exchangeRate || 1), targetCurrencyForCheck);
+        const tolerance = Math.max(absoluteFloor, convertedFinalAmount * 0.001);
+
+        if (Math.abs(convertedFinalAmount - payload.finalAmount) > tolerance) {
             return res.status(400).json({ success: false, message: "Cart contents or pricing changed. Please refresh quote." });
         }
 
@@ -1071,7 +1108,8 @@ export const razorpayWebhook = async (req, res) => {
                         
                         await logAction(req, "payment_auto_refunded", "order", existing._id.toString(), {
                             paymentId: payment.id,
-                            amount: payment.amount / 100,
+                            amount: fromRazorpayMinorUnits(payment.amount, (payment.currency || "INR").toUpperCase()),
+                            currency: (payment.currency || "INR").toUpperCase(),
                             reason: "Order was cancelled"
                         }, { source: "razorpay-webhook", severity: "WARNING" });
                         
@@ -1110,7 +1148,8 @@ export const razorpayWebhook = async (req, res) => {
                 // 🚀 Audit Payment Success No Order (should be very rare now!)
                 await logAction(req, "payment_success_no_order", "order", payment.order_id, {
                     paymentId: payment.id,
-                    amount: payment.amount / 100
+                    amount: fromRazorpayMinorUnits(payment.amount, (payment.currency || "INR").toUpperCase()),
+                    currency: (payment.currency || "INR").toUpperCase()
                 }, { source: "razorpay-webhook", severity: "CRITICAL" }).catch(err => console.error("Payment Success No Order Audit:", err));
                 
                 let refundSuccess = false;
@@ -1134,13 +1173,16 @@ export const razorpayWebhook = async (req, res) => {
                     console.error(`[Webhook] Failed to auto-refund orphaned payment ${payment.id}:`, err);
                 }
 
-                // If sendAdminPaymentSuccessNoOrderAlert doesn't take 4 arguments, it'll just ignore the 4th,
-                // but the ops alert will still trigger from NotificationService.
-                sendAdminPaymentSuccessNoOrderAlert(payment.id, payment.order_id, payment.amount / 100);
+                // Amount/currency come straight off the Razorpay entity — there is no
+                // DB order to read them from, and payment.amount is in minor units.
+                const orphanCurrency = (payment.currency || "INR").toUpperCase();
+                const orphanAmount = fromRazorpayMinorUnits(payment.amount, orphanCurrency);
+
+                sendAdminPaymentSuccessNoOrderAlert(payment.id, payment.order_id, orphanAmount, orphanCurrency);
 
                 await NotificationService.emit({
                     title: `Orphaned Payment Received ${refundSuccess ? '(Auto-Refunded)' : '(Action Required)'}`,
-                    body: `Payment of ₹${payment.amount / 100} was captured via Razorpay, but the corresponding order was not found in our database. ${refundSuccess ? 'It has been automatically refunded.' : 'Auto-refund FAILED. Please refund manually in Razorpay.'}`,
+                    body: `Payment of ${orphanCurrency} ${orphanAmount} was captured via Razorpay, but the corresponding order was not found in our database. ${refundSuccess ? 'It has been automatically refunded.' : 'Auto-refund FAILED. Please refund manually in Razorpay.'}`,
                     type: "critical",
                     sourceModule: "payment",
                     sourceId: payment.id
@@ -1181,9 +1223,12 @@ export const razorpayWebhook = async (req, res) => {
                 reason: payment.error_description
             }, { source: "razorpay-webhook", severity: "WARNING" }).catch(err => console.error("Payment Failed Audit Failed:", err));
 
+            const failedCurrency = (payment.currency || "INR").toUpperCase();
+            const failedAmount = fromRazorpayMinorUnits(payment.amount, failedCurrency);
+
             await NotificationService.emit({
                 title: "Payment Failed",
-                body: `A payment attempt of ₹${payment.amount / 100} failed. Reason: ${payment.error_description}`,
+                body: `A payment attempt of ${failedCurrency} ${failedAmount} failed. Reason: ${payment.error_description}`,
                 type: "warning",
                 sourceModule: "payment",
                 sourceId: payment.id
@@ -1193,7 +1238,8 @@ export const razorpayWebhook = async (req, res) => {
             if (settings.waAllEnabled && settings.waPaymentFailureEnabled) {
               await enqueueWhatsApp("payment_failure", {
                 razorpayOrderId: payment.order_id,
-                amount: payment.amount / 100
+                amount: failedAmount,
+                currency: failedCurrency
               }, { delay: 3000 }).catch(err => console.error("Failed to enqueue WhatsApp payment_failure:", err));
             }
         } else if (event === "refund.processed") {
@@ -1297,7 +1343,8 @@ export const razorpayWebhook = async (req, res) => {
                 
                 await logAction(req, "refund_confirmed", "order", order._id.toString(), {
                     refundId: refund.id,
-                    amount: refund.amount / 100,
+                    amount: fromRazorpayMinorUnits(refund.amount, (refund.currency || order.currency || "INR").toUpperCase()),
+                    currency: (refund.currency || order.currency || "INR").toUpperCase(),
                     autoCancelled: true
                 }, { source: "razorpay-webhook" }).catch(err => console.error("Refund Confirmed Audit Failed:", err));
             }

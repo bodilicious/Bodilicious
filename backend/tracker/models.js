@@ -113,6 +113,30 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
+    /* =========================================
+       Currency
+       All monetary fields above (totalAmount, originalAmount, shippingCost,
+       discountAmount, refundAmount) are denominated in THIS currency — not INR.
+       `exchangeRate` is the INR → currency rate that was locked in at quote time,
+       so INR-equivalent reporting is always recoverable: amount / exchangeRate.
+
+       Legacy orders written before these fields existed have no stored value;
+       Mongoose applies the defaults below on hydration, and every read path
+       already guards with `order.currency || "INR"`. Those orders were all INR,
+       so no backfill is required.
+    ========================================= */
+    currency: {
+      type: String,
+      default: "INR",
+      uppercase: true,
+      trim: true,
+    },
+
+    exchangeRate: {
+      type: Number,
+      default: 1,
+    },
+
     shippingCost: {
       type: Number,
       default: 0,
