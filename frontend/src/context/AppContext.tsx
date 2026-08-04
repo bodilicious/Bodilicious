@@ -807,9 +807,16 @@ const triggerPasswordReset = async (email: string) => {
     const path = location.pathname.substring(1) || 'home';
     setCurrentPage(path as Page);
 
-    // 🎯 Google Analytics/Ads Tracking - Page View
+    // 🎯 Google Analytics/Ads Tracking - Page View for SPAs
     if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'page_view', {
+      // Re-fire config for GA4 to register the SPA route change
+      (window as any).gtag('config', 'G-LZ14TZ4GDG', {
+        page_path: location.pathname,
+        page_title: document.title || path
+      });
+
+      // Re-fire config for Google Ads to register the SPA route change (Remarketing/Page View)
+      (window as any).gtag('config', 'AW-306323373', {
         page_path: location.pathname,
         page_title: document.title || path
       });
