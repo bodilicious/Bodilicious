@@ -64,6 +64,8 @@ export const getAllProducts = async (req, res) => {
           { name: { $regex: s, $options: "i" } },
           { description: { $regex: s, $options: "i" } },
           { brand: { $regex: s, $options: "i" } },
+          { "seo_keywords.primary": { $regex: s, $options: "i" } },
+          { "seo_keywords.secondary": { $regex: s, $options: "i" } },
         ]
       });
     }

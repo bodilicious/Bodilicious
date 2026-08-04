@@ -32,7 +32,6 @@ const seoKeywordSchema = new mongoose.Schema(
   {
     primary: { type: [String], default: [] },
     secondary: { type: [String], default: [] },
-    tertiary: { type: [String], default: [] },
   },
   { _id: false }
 );
@@ -70,7 +69,7 @@ const blogSchema = new mongoose.Schema(
     // SEO fields — description is more important than keywords for modern search engines.
     seo_title:       { type: String, trim: true, maxlength: 300, default: "" },
     seo_description: { type: String, trim: true, maxlength: 500, default: "" },
-    seo_keywords:    { type: seoKeywordSchema, default: () => ({ primary: [], secondary: [], tertiary: [] }) },
+    seo_keywords:    { type: seoKeywordSchema, default: () => ({ primary: [], secondary: [] }) },
 
     status: {
       type: String,

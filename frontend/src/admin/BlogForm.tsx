@@ -109,7 +109,7 @@ const toSlug = (str: string) =>
 const EMPTY_FORM: BlogData = {
   title: '', slug: '', content: '', excerpt: '',
   coverImage: '', categories: [], tags: [],
-  seo_title: '', seo_description: '', seo_keywords: { primary: [], secondary: [], tertiary: [] },
+  seo_title: '', seo_description: '', seo_keywords: { primary: [], secondary: [] },
   status: 'draft',
 };
 
@@ -200,8 +200,8 @@ const BlogForm: React.FC = () => {
           seo_title: b.seo_title,
           seo_description: b.seo_description,
           seo_keywords: typeof b.seo_keywords === 'string'
-            ? { primary: b.seo_keywords.split(',').map((s: string) => s.trim()).filter(Boolean), secondary: [], tertiary: [] }
-            : { primary: [], secondary: [], tertiary: [], ...b.seo_keywords },
+            ? { primary: b.seo_keywords.split(',').map((s: string) => s.trim()).filter(Boolean), secondary: [] }
+            : { primary: [], secondary: [], ...b.seo_keywords },
           status: b.status,
         };
         setForm(loaded);
@@ -582,11 +582,6 @@ const BlogForm: React.FC = () => {
                     label="Secondary Keywords" 
                     value={(form.seo_keywords as any).secondary} 
                     onChange={v => setForm(f => ({ ...f, seo_keywords: { ...(f.seo_keywords as any), secondary: v } }))} 
-                  />
-                  <ArrayField 
-                    label="Tertiary Keywords" 
-                    value={(form.seo_keywords as any).tertiary} 
-                    onChange={v => setForm(f => ({ ...f, seo_keywords: { ...(f.seo_keywords as any), tertiary: v } }))} 
                   />
                 </div>
               </div>

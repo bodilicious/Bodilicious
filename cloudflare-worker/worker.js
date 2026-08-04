@@ -1,4 +1,11 @@
-import { isBot, renderProductHtml, renderShopHtml } from './seoUtils.js';
+import {
+  isBot,
+  renderProductHtml,
+  renderShopHtml,
+  SITEMAP_CATEGORIES,
+  SITEMAP_CONCERNS,
+  SITEMAP_TYPES,
+} from './seoUtils.js';
 
 // Cache for bot rendered HTML
 const cache = new Map();
@@ -251,15 +258,40 @@ async function handleSitemap(env) {
     } while (page <= totalPages && page <= MAX_PAGES);
 
     const urls = [];
-    
-    // Add static routes
-    const staticRoutes = ['/', '/shop', '/about', '/brand-story', '/contact', '/faq'];
+
+    // Add static routes.
+    // NOTE: this list previously contained '/faq', which is not a route — the app
+    // serves '/faqs' (see App.tsx). It also omitted every legal//info page, so
+    // those were never submitted to Google.
+    const staticRoutes = [
+      '/', '/shop', '/about', '/brand-story', '/contact', '/faqs',
+      '/blogs', '/offers', '/how-to-order', '/ritual-finder',
+      '/terms', '/privacy', '/shipping-refund',
+    ];
+    const LOW_PRIORITY = new Set(['/terms', '/privacy', '/shipping-refund']);
     staticRoutes.forEach(route => {
+      const priority = route === '/' ? '1.0' : LOW_PRIORITY.has(route) ? '0.3' : '0.8';
       urls.push(`
   <url>
     <loc>${frontendUrl}${route}</loc>
     <changefreq>weekly</changefreq>
-    <priority>${route === '/' ? '1.0' : '0.8'}</priority>
+    <priority>${priority}</priority>
+  </url>`);
+    });
+
+    // Add /shop facet landing pages — handleShop() already renders bot HTML for
+    // each of these, but without sitemap entries crawlers had no way to find them.
+    const facets = [
+      ...SITEMAP_CATEGORIES.map(v => ['category', v]),
+      ...SITEMAP_TYPES.map(v => ['type', v]),
+      ...SITEMAP_CONCERNS.map(v => ['concern', v]),
+    ];
+    facets.forEach(([key, value]) => {
+      urls.push(`
+  <url>
+    <loc>${frontendUrl}/shop?${key}=${encodeURIComponent(value)}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>`);
     });
 
@@ -277,6 +309,40 @@ async function handleSitemap(env) {
   </url>`);
       }
     });
+
+    // Add published blog posts. These were absent from the worker sitemap
+    // entirely — the only generator that knew about them wrote to the static
+    // public/sitemap.xml, which this route shadows and therefore never serves.
+    // A blog-API failure must not fail the whole sitemap, so this is best-effort.
+    try {
+      let blogPage = 1;
+      let blogTotalPages = 1;
+      do {
+        const blogRes = await fetchWithTimeout(
+          `${apiUrl}/api/v1/blogs?limit=${PAGE_SIZE}&page=${blogPage}`
+        );
+        if (!blogRes.ok) break;
+        const blogData = await blogRes.json();
+        const posts = blogData.data || blogData.blogs || [];
+        if (posts.length === 0) break;
+        posts.forEach(post => {
+          if (!post.slug) return;
+          const lastmod = (post.updatedAt || post.publishedAt || '').substring(0, 10)
+            || new Date().toISOString().substring(0, 10);
+          urls.push(`
+  <url>
+    <loc>${frontendUrl}/blogs/${encodeURIComponent(post.slug)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>`);
+        });
+        blogTotalPages = blogData.totalPages || 1;
+        blogPage++;
+      } while (blogPage <= blogTotalPages && blogPage <= MAX_PAGES);
+    } catch (blogError) {
+      console.error('[SEO Worker] Blog sitemap fetch failed:', blogError.name);
+    }
 
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

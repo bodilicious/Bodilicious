@@ -111,6 +111,48 @@ export const getEstimatedDeliveryDate = async (deliveryPincode, weight, cod) => 
   }
 };
 
+export const getInternationalShippingRate = async (deliveryCountry, deliveryPincode, weight) => {
+  try {
+    const token = await getShiprocketToken();
+    const pickupPincode = "600081"; // Tondiarpet, Chennai origin
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500); // 2.5s timeout
+
+    const response = await fetch(`https://apiv2.shiprocket.in/v1/external/courier/international/serviceability?pickup_postcode=${pickupPincode}&delivery_country=${deliveryCountry}&delivery_postcode=${deliveryPincode || ""}&weight=${weight}&cod=0`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+        throw new Error(`Shiprocket International API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data && data.data && data.data.available_courier_companies && data.data.available_courier_companies.length > 0) {
+      // Filter out blocked couriers
+      const validCouriers = data.data.available_courier_companies.filter(c => c.blocked === 0);
+
+      if (validCouriers.length === 0) return null;
+
+      // Sort by cheapest rate
+      const sortedCouriers = validCouriers.sort((a, b) => a.rate.total - b.rate.total);
+      return sortedCouriers[0].rate.total;
+    }
+    return null;
+  } catch (err) {
+    console.error("International rate fetch error:", err.message);
+    return null; // Fail gracefully, allows fallback
+  }
+};
+
 /**
  * Pushes a verified order (Prepaid or COD) to Shiprocket.
  * Handles both order creation and AWB assignment.

@@ -2,6 +2,20 @@
 /**
  * generate-sitemap.js
  *
+ * ⚠️  THIS FILE NO LONGER PRODUCES THE LIVE SITEMAP.
+ *
+ * cloudflare-worker/worker.js intercepts /sitemap.xml and — unlike the bot
+ * renderer — that route deliberately bypasses the SEO_BOT_RENDER_ENABLED
+ * kill-switch, so the worker ALWAYS answers on bodilicious.in. public/sitemap.xml
+ * is only reachable by hitting the Render origin directly, which crawlers do not.
+ *
+ * The worker now generates the full set (static routes + /shop facets + products
+ * + blog posts) dynamically. If you need to add or remove a URL, edit
+ * `handleSitemap` in cloudflare-worker/worker.js — changing this file or
+ * public/sitemap.xml will have no effect on what Google sees.
+ *
+ * Kept as an origin-level fallback only.
+ *
  * Fetches all published blog posts from the Bodilicious API and injects
  * their URLs into public/sitemap.xml.
  *

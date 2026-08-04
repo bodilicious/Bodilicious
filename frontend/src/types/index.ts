@@ -21,7 +21,6 @@ export interface UsageData {
 export interface SeoKeywords {
   primary?: string[];
   secondary?: string[];
-  tertiary?: string[];
 }
 
 export interface Product {

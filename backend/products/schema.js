@@ -58,7 +58,6 @@ export const createProductSchema = z
     seo_keywords: z.object({
       primary: z.array(z.string()).optional(),
       secondary: z.array(z.string()).optional(),
-      tertiary: z.array(z.string()).optional(),
     }).optional(),
   })
   .strict();

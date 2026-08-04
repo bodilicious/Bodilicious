@@ -939,6 +939,24 @@ const triggerPasswordReset = async (email: string) => {
         value: Number(product.price || 0) * Number(quantity),
         currency: userCurrency || 'INR'
       });
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for CoQ10 Serum Add to Cart
+      if (product.pid === 'BD-SER-COQ10') {
+        (window as any).gtag('event', 'conversion', {
+          send_to: 'AW-306323373/e2Y2CJWVgtwcEK2_iJIB',
+          value: Number(product.price || 0) * Number(quantity),
+          currency: userCurrency || 'INR'
+        });
+      }
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for Vitamin C Serum Add to Cart
+      if (product.pid === 'BD-SER-VITC') {
+        (window as any).gtag('event', 'conversion', {
+          send_to: 'AW-306323373/5--dCJiVgtwcEK2_iJIB',
+          value: Number(product.price || 0) * Number(quantity),
+          currency: userCurrency || 'INR'
+        });
+      }
     }
 
     if (!skipRedirect) {
@@ -1032,6 +1050,26 @@ const triggerPasswordReset = async (email: string) => {
           quantity: i.quantity
         }))
       });
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for CoQ10 Serum Purchase
+      if (order.items.some((i: any) => (i.product?.pid || i.product) === 'BD-SER-COQ10')) {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-306323373/dfX0CJeY6dscEK2_iJIB',
+          'value': 1.0,
+          'currency': 'INR',
+          'transaction_id': order._id || order.orderId
+        });
+      }
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for Vitamin C Serum Purchase
+      if (order.items.some((i: any) => (i.product?.pid || i.product) === 'BD-SER-VITC')) {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-306323373/s6W3CJqY6dscEK2_iJIB',
+          'value': 1.0,
+          'currency': 'INR',
+          'transaction_id': order._id || order.orderId
+        });
+      }
     }
 
     // Only remove purchased items from local cart to match backend $pull logic
@@ -1174,6 +1212,26 @@ const triggerPasswordReset = async (email: string) => {
           quantity: i.quantity
         }))
       });
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for CoQ10 Serum Purchase
+      if (order.items.some((i: any) => (i.product?.pid || i.product) === 'BD-SER-COQ10')) {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-306323373/dfX0CJeY6dscEK2_iJIB',
+          'value': 1.0,
+          'currency': 'INR',
+          'transaction_id': order._id || order.orderId
+        });
+      }
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for Vitamin C Serum Purchase
+      if (order.items.some((i: any) => (i.product?.pid || i.product) === 'BD-SER-VITC')) {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-306323373/s6W3CJqY6dscEK2_iJIB',
+          'value': 1.0,
+          'currency': 'INR',
+          'transaction_id': order._id || order.orderId
+        });
+      }
     }
 
     // Only remove purchased items from local cart to match backend $pull logic

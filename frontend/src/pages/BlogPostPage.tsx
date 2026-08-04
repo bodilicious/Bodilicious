@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useSEO } from '../hooks/useSEO';
 import { useApp } from '../context/useApp';
-import { ArrowLeft, Calendar, User, Loader2, AlertCircle, Heart } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, AlertCircle, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface BlogPost {
@@ -65,8 +65,7 @@ const BlogPostPage: React.FC = () => {
       }
       return [
         ...(post.seo_keywords.primary || []),
-        ...(post.seo_keywords.secondary || []),
-        ...(post.seo_keywords.tertiary || [])
+        ...(post.seo_keywords.secondary || [])
       ].filter(Boolean);
     })();
 
@@ -189,7 +188,7 @@ const BlogPostPage: React.FC = () => {
         if (cancelled) return;
         setPost(data.data);
         setLikesCount(data.data.likes?.length || 0);
-        setHasLiked(user ? data.data.likes?.includes(user._id) : false);
+        setHasLiked(user ? data.data.likes?.includes(user.uid) : false);
 
         const [relatedRes, commentsRes] = await Promise.allSettled([
           fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${slug}/related`),

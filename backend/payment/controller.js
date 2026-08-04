@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import Order from "../tracker/models.js";
 import UserProfile from "../profile/models.js";
 import Product from "../products/models.js";
-import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket } from "../tracker/shiprocketservice.js";
+import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, getInternationalShippingRate } from "../tracker/shiprocketservice.js";
 import { sendOrderConfirmationEmail, sendOrderConfirmationAfterInvoice, sendAdminNewOrderAlert, sendAdminPaymentSuccessNoOrderAlert } from "../email/emailService.js";
 import Razorpay from "razorpay";
 import { COUNTRIES } from "../utils/countries.js";
@@ -411,6 +411,7 @@ export const getOrderQuote = async (req, res) => {
         const { mapById: productMapById, mapByPid: productMapByPid } = await fetchProductMaps(mergedItems);
 
         let totalAmount = 0;
+        let totalWeightGrams = 0;
         for (const item of mergedItems) {
             const product = resolveProduct(item, productMapById, productMapByPid);
             if (!product) {
@@ -420,13 +421,22 @@ export const getOrderQuote = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
             }
             totalAmount += product.price * item.quantity;
+            const itemWeightG = product.product_weight_g || (product.product_weight_ml ? product.product_weight_ml * 1.05 : 200);
+            totalWeightGrams += itemWeightG * item.quantity;
         }
 
         let shippingCost = 0;
         if (isIndia) {
             shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
         } else {
-            shippingCost = totalAmount >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost;
+            const totalWeightKg = Math.max(0.5, totalWeightGrams / 1000);
+            const dynamicRate = await getInternationalShippingRate(
+                shippingDetails.country,
+                shippingDetails.postalCode || shippingDetails.zip || "",
+                totalWeightKg
+            );
+            // Fallback to static cost if API fails
+            shippingCost = dynamicRate !== null ? dynamicRate : settings.internationalShippingCost;
         }
 
         let existingOrdersCount = 1; // Default to 1 for guests (no welcome offer)

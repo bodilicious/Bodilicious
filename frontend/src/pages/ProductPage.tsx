@@ -49,6 +49,7 @@ import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { getIngredientData } from '../data/ingredientMeta';
 import { useSEO } from '../hooks/useSEO';
+import { buildProductTitle, buildProductKeywords, buildProductOgAlt } from '../utils/seo';
 import { usePostHog } from 'posthog-js/react';
 import { useCurrency } from '../hooks/useCurrency';
 
@@ -145,6 +146,7 @@ export default function ProductPage() {
           return img.startsWith('http') ? img : `https://bodilicious.in${img.startsWith('/') ? '' : '/'}${img}`;
         })(),
         description: product.description || '',
+        sku: product.pid,
         brand: { '@type': 'Brand', name: 'Bodilicious' },
         offers: {
           '@type': 'Offer',
@@ -154,6 +156,7 @@ export default function ProductPage() {
             product.stock > 0
               ? 'https://schema.org/InStock'
               : 'https://schema.org/OutOfStock',
+          itemCondition: 'https://schema.org/NewCondition',
           url: `https://bodilicious.in/product/${product.pid}`,
           seller: { '@type': 'Organization', name: 'Bodilicious' },
         },
@@ -171,57 +174,11 @@ export default function ProductPage() {
       }
     : null;
 
-  const productKeywords = (() => {
-    if (!product) return undefined;
-
-    const autoKeywords = [
-      product.name,
-      product.category,
-      product.sub_category,
-      product.product_type,
-      ...(product.concerns_targeted || []),
-      'Bodilicious',
-      'dermatologically tested'
-    ].filter(Boolean) as string[];
-
-    const customKeywords = (() => {
-      if (!product.seo_keywords) return [];
-      if (typeof product.seo_keywords === 'string') {
-        return product.seo_keywords.split(',').map(k => k.trim()).filter(Boolean);
-      }
-      return [
-        ...(product.seo_keywords.primary || []),
-        ...(product.seo_keywords.secondary || []),
-        ...(product.seo_keywords.tertiary || [])
-      ].filter(Boolean);
-    })();
-
-    const seen = new Set<string>();
-    const merged = [...autoKeywords, ...customKeywords].filter(k => {
-      const key = k.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    return merged.join(', ');
-  })();
-
-  const primaryKw = product?.seo_keywords && typeof product.seo_keywords !== 'string' && product.seo_keywords.primary?.[0] 
-    ? product.seo_keywords.primary[0].trim() 
-    : '';
-  
-  const secondaryKw = product?.seo_keywords && typeof product.seo_keywords !== 'string' && product.seo_keywords.secondary?.[0]
-    ? product.seo_keywords.secondary[0].trim()
-    : '';
-
-  const pageTitle = product 
-    ? (primaryKw ? `${product.name} - ${primaryKw} | Bodilicious` : `${product.name} — Bodilicious`)
-    : 'Product — Bodilicious';
-
-  const ogAlt = product 
-    ? (secondaryKw ? `${product.name} - ${secondaryKw}` : `${product.name} by Bodilicious`)
-    : undefined;
+  // Title/keyword/alt construction lives in utils/seo.ts because the Cloudflare
+  // bot renderer must emit exactly the same values — see that file's header.
+  const productKeywords = buildProductKeywords(product);
+  const pageTitle = buildProductTitle(product);
+  const ogAlt = buildProductOgAlt(product);
 
   const breadcrumbSchema = product
     ? {

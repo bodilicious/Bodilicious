@@ -1,5 +1,14 @@
-// Includes major search engines + AI crawlers (GPTBot, ClaudeBot, Google-Extended, Perplexity)
-export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|twitterbot|linkedinbot|applebot|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|claudebot|claude-web|perplexitybot|amazonbot|applebot-extended/i;
+// Single source of truth for product title/keywords/alt, shared with the React
+// app so crawlers and users are served identical metadata. wrangler bundles this
+// .ts file via esbuild, which strips the types.
+import {
+  buildProductTitle,
+  buildProductKeywords,
+  buildProductOgAlt,
+} from '../frontend/src/utils/seo.ts';
+
+// Includes major search engines, social media unfurlers, AI crawlers, and generic HTTP clients (used by AI assistants in sandboxes)
+export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|amazonbot|meta-externalagent|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
 
 export function isBot(request) {
   const userAgent = request.headers.get("user-agent") || "";
@@ -28,6 +37,7 @@ export function buildProductSchema(product, frontendUrl) {
     name: product.name,
     image: product.images?.[0] || '',
     description: product.description || '',
+    sku: product.pid,
     brand: { '@type': 'Brand', name: 'Bodilicious' },
     offers: {
       '@type': 'Offer',
@@ -37,6 +47,7 @@ export function buildProductSchema(product, frontendUrl) {
         product.stock > 0
           ? 'https://schema.org/InStock'
           : 'https://schema.org/OutOfStock',
+      itemCondition: 'https://schema.org/NewCondition',
       url: `${frontendUrl}/product/${product.pid}`,
       seller: { '@type': 'Organization', name: 'Bodilicious' },
     },
@@ -83,13 +94,12 @@ export function buildBreadcrumbSchema(product, frontendUrl) {
 
 // Generate the final HTML for a product page
 export function renderProductHtml(product, frontendUrl) {
-  // SYNC: Must match useSEO logic in frontend/src/pages/ProductPage.tsx L214-216
-  const primaryKw = product.seo_keywords?.primary?.[0] ? product.seo_keywords.primary[0].trim() : '';
-  const secondaryKw = product.seo_keywords?.secondary?.[0] ? product.seo_keywords.secondary[0].trim() : '';
-  
-  const pageTitle = primaryKw ? `${product.name} - ${primaryKw} | Bodilicious` : `${product.name} — Bodilicious`;
+  // Title/keywords/alt come from the SAME module the browser uses, so bot HTML
+  // and user HTML can never drift apart. See frontend/src/utils/seo.ts.
+  const pageTitle = buildProductTitle(product);
+  const mergedKeywords = buildProductKeywords(product) || '';
+  const ogAlt = buildProductOgAlt(product) || '';
   const productDesc = truncateDescription(product.description || 'Premium skincare and haircare from Bodilicious.');
-  const ogAlt = secondaryKw ? `${product.name} - ${secondaryKw}` : `${product.name} by Bodilicious`;
 
   const schemas = [
     buildProductSchema(product, frontendUrl),
@@ -102,6 +112,7 @@ export function renderProductHtml(product, frontendUrl) {
   <meta charset="UTF-8">
   <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(productDesc)}">
+  <meta name="keywords" content="${escapeHtml(mergedKeywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/product/${product.pid}">
   
@@ -147,6 +158,27 @@ const CATEGORY_INTRO = {
   makeup: 'Bodilicious makeup is formulated with skin care principles in mind — so you are not undoing your serum routine with a foundation that clogs pores. Our range is non-comedogenic, long-wear, and suited to warm, humid Indian conditions where most imported formulas transfer or oxidise by midday.',
   default: 'Bodilicious is an Indian science-backed beauty brand offering dermatologically tested skincare, haircare, lip care, and makeup. Every formula is built around proven actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, BHAs, and keratin — at concentrations that work for Indian skin types. Free shipping on orders over ₹1500.',
 };
+
+/**
+ * Facet landing pages worth listing in the sitemap.
+ *
+ * handleShop() renders bot HTML for any single-facet /shop URL, but Google can
+ * only index what it can discover — and these were missing from the sitemap
+ * entirely, so 20 rendered landing pages were invisible to crawlers.
+ *
+ * Categories and concerns must have a CATEGORY_INTRO entry above (otherwise the
+ * page renders the generic `default` blurb and is thin duplicate content).
+ * Types intentionally use the default blurb — they are still distinct product
+ * listings, which is enough to index.
+ */
+export const SITEMAP_CATEGORIES = ['skin', 'hair', 'body', 'lip', 'makeup'];
+export const SITEMAP_CONCERNS = [
+  'acne', 'brightening', 'anti-aging', 'hyperpigmentation', 'hair growth', 'dandruff',
+];
+export const SITEMAP_TYPES = [
+  'serum', 'sunscreen', 'face wash', 'moisturizer', 'shampoo',
+  'conditioner', 'soap', 'lip balm', 'eye cream',
+];
 
 function titleCase(s) {
   return s.replace(/[_\-/]+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());

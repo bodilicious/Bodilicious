@@ -70,7 +70,7 @@ const defaultFormData = {
   skin_type_not_suitable: [] as string[],
   hair_type_suitable: [] as string[],
   ingredients: { key_actives: [] as string[], botanical_extracts: [] as string[], others: [] as string[] },
-  seo_keywords: { primary: [] as string[], secondary: [] as string[], tertiary: [] as string[] },
+  seo_keywords: { primary: [] as string[], secondary: [] as string[] },
   usage: { time: '', frequency: '', routine_step: '' },
   price: 0, price_inr: 0, stock: 0, lowStockThreshold: 5,
   product_weight_ml: 0, product_weight_g: 0,
@@ -404,11 +404,6 @@ const ProductForm: React.FC = () => {
                 label="Secondary Keywords" 
                 value={(formData as any).seo_keywords.secondary} 
                 onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, secondary: v } }))} 
-              />
-              <ArrayField 
-                label="Tertiary Keywords" 
-                value={(formData as any).seo_keywords.tertiary} 
-                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, tertiary: v } }))} 
               />
             </div>
           </div>
