@@ -820,7 +820,7 @@ const triggerPasswordReset = async (email: string) => {
 
       // 🎯 Google Ads Specific Conversion for Page View
       (window as any).gtag('event', 'conversion', {
-        'send_to': 'AW-306323373/lspYCN-55tscEK2_iJIB',
+        'send_to': 'AW-306323373/aOQeCMmPgdwcEK2_iJIB',
         'value': 1.0,
         'currency': 'INR'
       });
