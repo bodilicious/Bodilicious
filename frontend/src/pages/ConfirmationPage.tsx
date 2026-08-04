@@ -320,7 +320,12 @@ export default function ConfirmationPage() {
                                                 <span>Total</span>
                                                 <div className="text-right flex flex-col">
                                                     <span className="font-bold">{_fmt(rawTotalAmount)}</span>
-                                                    <span className="text-[10px] text-gray-400 font-sans tracking-widest uppercase mt-0.5">Includes {order.currency || 'INR'} {_fmt(rawTaxAmount)} Taxes</span>
+                                                    {/* Only shown when tax was actually charged. Previously
+                                                        unconditional, so every order read "Includes INR 0 Taxes"
+                                                        — and it must stay hidden for zero-rated exports. */}
+                                                    {rawTaxAmount > 0 && (
+                                                        <span className="text-[10px] text-gray-400 font-sans tracking-widest uppercase mt-0.5">Includes {order.currency || 'INR'} {_fmt(rawTaxAmount)} Taxes</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </>

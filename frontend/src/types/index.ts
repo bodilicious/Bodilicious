@@ -32,6 +32,17 @@ export interface Product {
   images: string[];
   description: string;
 
+  /** Editorial SEO overrides — blank means "generate it" (see utils/seo.ts) */
+  seo_title?: string;
+  seo_description?: string;
+  seo_h1?: string;
+  seo_h2?: string[];
+  seo_image_alt?: string;
+  /** Rendered as visible content + FAQPage structured data. Both fields required. */
+  faqs?: { question: string; answer: string }[];
+  /** Injected by the API on the detail endpoint — internal linking, not stored. */
+  relatedBlogs?: { title: string; slug: string; excerpt?: string; coverImage?: string }[];
+
   category: 'skin' | 'hair' | 'body' | 'makeup' | 'lip' | 'other';
   sub_category?: string;
   product_type?: string;

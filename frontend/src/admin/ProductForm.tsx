@@ -3,6 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import Select from '../components/Select';
+import {
+  buildProductTitle,
+  buildProductDescription,
+  buildProductH1,
+  buildProductH2s,
+  buildProductOgAlt,
+} from '../utils/seo';
 
 function ArrayField({ label, value, onChange }: {
   label: string;
@@ -71,6 +78,9 @@ const defaultFormData = {
   hair_type_suitable: [] as string[],
   ingredients: { key_actives: [] as string[], botanical_extracts: [] as string[], others: [] as string[] },
   seo_keywords: { primary: [] as string[], secondary: [] as string[] },
+  seo_title: '', seo_description: '', seo_h1: '', seo_image_alt: '',
+  seo_h2: [] as string[],
+  faqs: [] as { question: string; answer: string }[],
   usage: { time: '', frequency: '', routine_step: '' },
   price: 0, price_inr: 0, stock: 0, lowStockThreshold: 5,
   product_weight_ml: 0, product_weight_g: 0,
@@ -103,9 +113,18 @@ const ProductForm: React.FC = () => {
             ...prev, 
             ...data.data, 
             ingredients: { ...prev.ingredients, ...data.data.ingredients },
-            seo_keywords: typeof data.data.seo_keywords === 'string' 
+            seo_keywords: typeof data.data.seo_keywords === 'string'
               ? { ...prev.seo_keywords, primary: data.data.seo_keywords.split(',').map((s: string) => s.trim()).filter(Boolean) }
               : { ...prev.seo_keywords, ...data.data.seo_keywords },
+            // Products created before these fields existed come back without them
+            // (.lean() skips schema defaults), and ArrayField/CountedField would
+            // then receive undefined. Coerce to the empty forms here.
+            seo_h2: Array.isArray(data.data.seo_h2) ? data.data.seo_h2 : [],
+            faqs: Array.isArray(data.data.faqs) ? data.data.faqs : [],
+            seo_title: data.data.seo_title ?? '',
+            seo_description: data.data.seo_description ?? '',
+            seo_h1: data.data.seo_h1 ?? '',
+            seo_image_alt: data.data.seo_image_alt ?? '',
             usage: { ...prev.usage, ...data.data.usage }
           }));
         } else {
@@ -210,6 +229,26 @@ const ProductForm: React.FC = () => {
     setIsSaving(true);
     
     const payload = { ...formData } as any;
+    
+    // Parse number fields so decimals and empty inputs work during typing
+    const numberFields = ['price', 'price_inr', 'stock', 'lowStockThreshold', 'product_weight_ml', 'product_weight_g'];
+    for (const f of numberFields) {
+      if (payload[f] !== undefined && payload[f] !== '') {
+        payload[f] = Number(payload[f]);
+      } else if (payload[f] === '') {
+        payload[f] = 0;
+      }
+    }
+
+    // Drop half-filled FAQ rows before sending. The Mongoose subdocument marks
+    // both fields required and the update runs with runValidators, so an empty
+    // row added and left blank would fail the entire save with a confusing
+    // ValidationError rather than just being ignored.
+    if (Array.isArray(payload.faqs)) {
+      payload.faqs = payload.faqs
+        .map((f: any) => ({ question: (f.question || '').trim(), answer: (f.answer || '').trim() }))
+        .filter((f: any) => f.question && f.answer);
+    }
     if (!payload.supplier) {
       delete payload.supplier;
     }
@@ -261,6 +300,49 @@ const ProductForm: React.FC = () => {
     );
   }
 
+  // What will actually be emitted, using the same builders the storefront and
+  // the Cloudflare bot renderer use — so this preview cannot drift from reality.
+  const seoPreview = {
+    title: buildProductTitle(formData as any),
+    description: buildProductDescription(formData as any),
+    h1: buildProductH1(formData as any),
+    imageAlt: buildProductOgAlt(formData as any) || '',
+    h2Count: buildProductH2s(formData as any).length,
+  };
+
+  /** Text field with a live character counter that turns amber past the limit. */
+  const CountedField = ({ label, field, limit, hint, placeholder, multiline = false }: any) => {
+    const value = ((formData as any)[field] ?? '') as string;
+    const over = value.length > limit;
+    const shared = {
+      className: `w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 transition-all ${
+        over ? 'ring-2 ring-amber-400' : 'ring-dark-red/20'
+      }`,
+      value,
+      placeholder,
+      onChange: (e: any) => setFormData(prev => ({ ...prev, [field]: e.target.value })),
+    };
+    return (
+      <div className="mb-4">
+        <div className="flex items-baseline justify-between mb-2">
+          <label className="block text-sm font-bold text-gray-700">{label}</label>
+          <span className={`text-xs tabular-nums ${over ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
+            {value.length}/{limit}
+          </span>
+        </div>
+        {multiline
+          ? <textarea {...shared} className={`${shared.className} min-h-[80px]`} />
+          : <input type="text" {...shared} />}
+        {hint && <p className="text-xs text-gray-500 mt-1.5">{hint}</p>}
+        {over && (
+          <p className="text-xs text-amber-600 mt-1">
+            Over {limit} characters — Google will truncate this.
+          </p>
+        )}
+      </div>
+    );
+  };
+
   const InputField = ({ label, field, type = "text", required = false, readOnly = false, min }: any) => (
     <div className="mb-4">
       <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -272,7 +354,7 @@ const ProductForm: React.FC = () => {
         className={`w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20 transition-all ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
         value={(formData as any)[field]}
         readOnly={readOnly}
-        onChange={e => setFormData(prev => ({ ...prev, [field]: type === 'number' ? Number(e.target.value) : e.target.value }))}
+        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
         onBlur={field === 'name' ? handleNameBlur : undefined}
       />
     </div>
@@ -395,16 +477,183 @@ const ProductForm: React.FC = () => {
             <label className="block text-sm font-bold text-gray-700 mb-2">Custom SEO Keywords</label>
             <p className="text-xs text-gray-500 mb-4">Auto-deduplicated with default keywords.</p>
             <div className="pl-4 border-l-2 border-dark-red/20 space-y-4">
-              <ArrayField 
-                label="Primary Keywords" 
-                value={(formData as any).seo_keywords.primary} 
-                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, primary: v } }))} 
+              <ArrayField
+                label="Primary Keywords"
+                value={(formData as any).seo_keywords.primary}
+                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, primary: v } }))}
               />
-              <ArrayField 
-                label="Secondary Keywords" 
-                value={(formData as any).seo_keywords.secondary} 
-                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, secondary: v } }))} 
+              <ArrayField
+                label="Secondary Keywords"
+                value={(formData as any).seo_keywords.secondary}
+                onChange={v => setFormData(prev => ({ ...prev, seo_keywords: { ...(prev as any).seo_keywords, secondary: v } }))}
               />
+            </div>
+          </div>
+
+          {/* ── Page SEO ─────────────────────────────────────────────────────
+              Every field here is optional. Left blank, the shared builders in
+              utils/seo.ts generate a value — and the preview below always shows
+              what will actually ship, generated or overridden. */}
+          <div className="mb-4 mt-8 pt-6 border-t border-gray-200">
+            <label className="block text-sm font-bold text-gray-700 mb-1">Page SEO</label>
+            <p className="text-xs text-gray-500 mb-4">
+              All optional. Leave blank to auto-generate from the product name, keywords and description.
+            </p>
+
+            <div className="pl-4 border-l-2 border-dark-red/20 space-y-4">
+              <CountedField
+                label="Meta Title"
+                field="seo_title"
+                limit={60}
+                placeholder={seoPreview.title}
+                hint="Shown as the clickable headline in Google. Google cuts it off past ~60 characters."
+              />
+
+              <CountedField
+                label="Meta Description"
+                field="seo_description"
+                limit={155}
+                multiline
+                placeholder={seoPreview.description}
+                hint="The grey summary under the headline. Not a ranking factor, but it decides whether people click."
+              />
+
+              <CountedField
+                label="H1 — main page heading"
+                field="seo_h1"
+                limit={70}
+                placeholder={seoPreview.h1}
+                hint="The single biggest on-page heading. Defaults to the product name — override when the catalogue name isn't what people search for."
+              />
+
+              <div>
+                <ArrayField
+                  label="H2 — section subheadings"
+                  value={(formData as any).seo_h2}
+                  onChange={v => setFormData(prev => ({ ...prev, seo_h2: v }))}
+                />
+                <p className="text-xs text-gray-500 -mt-2 mb-4">
+                  These rename the page's existing sections <em>in order</em> — 1st replaces the
+                  Benefits heading, 2nd the Ingredients heading, 3rd the How to Use heading.
+                  Leave empty to auto-generate. Working a keyword into a subheading beats
+                  repeating it in the title.
+                </p>
+              </div>
+
+              <CountedField
+                label="Main Image Alt Text"
+                field="seo_image_alt"
+                limit={125}
+                placeholder={seoPreview.imageAlt}
+                hint="Describes the image for screen readers and Google Images."
+              />
+            </div>
+
+            {/* ── FAQs ────────────────────────────────────────────────────
+                Rendered as visible page content and as FAQPage structured data.
+                Note: Google restricted FAQ *rich results* in 2023 to
+                government and health sites, so these will rarely show as
+                dropdowns in search. The value is the on-page content itself —
+                it adds real words to a thin page and can win featured
+                snippets for question queries. */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <label className="block text-sm font-bold text-gray-700 mb-1">
+                Frequently Asked Questions
+              </label>
+              <p className="text-xs text-gray-500 mb-4">
+                Shown on the product page and emitted as FAQPage structured data.
+                An entry is only used if <strong>both</strong> the question and answer are filled —
+                a half-filled entry invalidates the whole block, so incomplete rows are dropped.
+              </p>
+
+              <div className="space-y-3">
+                {((formData as any).faqs as any[]).map((faq, i) => {
+                  const incomplete = !faq.question?.trim() || !faq.answer?.trim();
+                  return (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-xl bg-gray-50 ${incomplete ? 'ring-1 ring-amber-300' : ''}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 space-y-2">
+                          <input
+                            type="text"
+                            className="w-full p-2.5 bg-white border-none rounded-lg outline-none focus:ring-2 ring-dark-red/20 text-sm"
+                            placeholder="Question — e.g. Can I use this with retinol?"
+                            value={faq.question || ''}
+                            onChange={e => setFormData(prev => {
+                              const next = [...(prev as any).faqs];
+                              next[i] = { ...next[i], question: e.target.value };
+                              return { ...prev, faqs: next };
+                            })}
+                          />
+                          <textarea
+                            className="w-full p-2.5 bg-white border-none rounded-lg outline-none focus:ring-2 ring-dark-red/20 text-sm min-h-[64px]"
+                            placeholder="Answer — write a real, specific answer. This is indexable content."
+                            value={faq.answer || ''}
+                            onChange={e => setFormData(prev => {
+                              const next = [...(prev as any).faqs];
+                              next[i] = { ...next[i], answer: e.target.value };
+                              return { ...prev, faqs: next };
+                            })}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            faqs: ((prev as any).faqs as any[]).filter((_, j) => j !== i),
+                          }))}
+                          className="text-gray-400 hover:text-red-500 hover:bg-gray-200 rounded-full w-7 h-7 flex items-center justify-center transition-colors shrink-0"
+                          aria-label="Remove FAQ"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {incomplete && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          Needs both a question and an answer, or it will be skipped.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({
+                  ...prev,
+                  faqs: [...((prev as any).faqs as any[]), { question: '', answer: '' }],
+                }))}
+                className="mt-3 px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                + Add question
+              </button>
+            </div>
+
+            {/* Live search-result preview */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-3">
+                Google preview
+              </p>
+              <div className="font-sans">
+                <div className="text-[#202124] text-xs mb-0.5">
+                  bodilicious.in › product › {(formData as any).pid || 'pid'}
+                </div>
+                <div className="text-[#1a0dab] text-lg leading-snug truncate">
+                  {seoPreview.title}
+                </div>
+                <div className="text-[#4d5156] text-sm leading-snug">
+                  {seoPreview.description}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-gray-500">
+                <span>title {seoPreview.title.length}/60</span>
+                <span>description {seoPreview.description.length}/155</span>
+                <span>H1: {seoPreview.h1}</span>
+                <span>H2 ×{seoPreview.h2Count}</span>
+              </div>
             </div>
           </div>
           <InputField label="Texture" field="texture" />

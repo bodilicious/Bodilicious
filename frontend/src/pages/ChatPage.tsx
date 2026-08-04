@@ -5,6 +5,7 @@ import { MessageCircle, Send, Sparkles, Droplets, ShieldCheck, User, Trash2 } fr
 import { motion, AnimatePresence } from "framer-motion";
 import ProductCard from "../components/ProductCard";
 import { useApp } from "../context/AppContext";
+import { useSEO } from "../hooks/useSEO";
 
 type Message = {
     id: string;
@@ -58,6 +59,15 @@ const renderMarkdown = (text: string) => {
 export default function ChatPage() {
     const { products: allProducts, user, isAuthenticated } = useApp();
     const location = useLocation();
+
+    // Session-specific conversational UI with no stable indexable content —
+    // noindex keeps it out of search while still setting its own title instead
+    // of inheriting the previous route's tags.
+    useSEO({
+        title: "Skincare Assistant — Bodilicious",
+        description: "Chat with the Bodilicious skincare assistant for personalised product guidance.",
+        noIndex: true,
+    });
 
     // Initial welcome message logic
     const getInitialMessage = () => {

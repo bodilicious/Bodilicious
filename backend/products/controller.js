@@ -3,6 +3,8 @@ import UserProfile from "../profile/models.js";
 import Order from "../tracker/models.js";
 import escapeStringRegexp from "escape-string-regexp";
 import { logAuditEvent } from "../audit/logger.js";
+import { buildTopicPatterns } from "../utils/topicMatch.js";
+import { pingIndexNow } from "../utils/indexNow.js";
 
 /**
  * CREATE PRODUCT
@@ -15,6 +17,8 @@ export const createProduct = async (req, res) => {
       ...req.body,
       isActive: true, // force default, don’t trust client
     });
+
+    pingIndexNow([`https://bodilicious.in/product/${product.pid}`]);
 
     res.status(201).json({
       success: true,
@@ -296,7 +300,7 @@ export const getProductByPid = async (req, res) => {
     // reviews, description, or ingredients (e.g. homepage best-seller section).
     const projection = isSlim
       ? 'pid name price images rating ratingCount stock category brand isActive'
-      : 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords';
+      : 'pid name brand images description category sub_category product_type item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords seo_title seo_description seo_h1 seo_h2 seo_image_alt faqs';
 
     let productQuery = Product.findOne({
       pid: req.params.pid,
@@ -316,6 +320,39 @@ export const getProductByPid = async (req, res) => {
         success: false,
         message: "Product not found",
       });
+    }
+
+    // ── Related blog posts ────────────────────────────────────────────────────
+    // Internal links between a product and the articles about its concern pass
+    // authority in both directions and give crawlers a reason to walk deeper
+    // into the site. Matching is on blog tags vs the product's own taxonomy.
+    // Best-effort: a failure here must never break the product page.
+    if (!isSlim) {
+      try {
+        const { default: Blog } = await import("../blog/models.js");
+        const patterns = buildTopicPatterns([
+          ...(product.concerns_targeted || []),
+          product.product_type,
+          product.name,
+        ]);
+
+        if (patterns.length) {
+          // Match on title as well as tags: tags are freeform and currently hold
+          // editorial placeholder text ("pigmentation (concern-based)"), so an
+          // exact tag match would find nothing. Word-boundary containment across
+          // both fields survives messy tags and keeps working once they're tidied.
+          product.relatedBlogs = await Blog.find({
+            status: "published",
+            $or: [{ title: { $in: patterns } }, { tags: { $in: patterns } }],
+          })
+            .select("title slug excerpt coverImage publishedAt")
+            .sort({ publishedAt: -1 })
+            .limit(3)
+            .lean();
+        }
+      } catch (relErr) {
+        console.error("[Products] Related blogs lookup failed:", relErr.message);
+      }
     }
 
     // 🚀 NEW: Update UserProfile productViewCounts if user is logged in (skip for slim requests)
@@ -421,6 +458,8 @@ export const updateProductByPid = async (req, res) => {
         message: "Product not found",
       });
     }
+
+    pingIndexNow([`https://bodilicious.in/product/${product.pid}`]);
 
     res.json({
       success: true,

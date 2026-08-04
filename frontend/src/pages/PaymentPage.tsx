@@ -72,7 +72,7 @@ export default function PaymentPage() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string, currency: string, isFallback: boolean, subtotal?: number } | null>(null);
+    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string, currency: string, isFallback: boolean, subtotal?: number, taxAmount?: number, taxRatePercent?: number } | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(true);
     const [quoteError, setQuoteError] = useState<string | null>(null);
 
@@ -256,7 +256,9 @@ export default function PaymentPage() {
                         deliveryEstimate: data.deliveryEstimate,
                         currency: data.currency || 'INR',
                         isFallback: !!data.isFallback,
-                        subtotal: data.subtotal
+                        subtotal: data.subtotal,
+                        taxAmount: data.taxAmount,
+                        taxRatePercent: data.taxRatePercent
                     });
                     if (isBackgroundRefresh) {
                         toast.success("Prices refreshed", { id: 'quote-refresh' });
@@ -1101,6 +1103,18 @@ export default function PaymentPage() {
                                     <span>Total</span>
                                     <span>{formatCurrency(total, quoteData?.currency || 'INR')}</span>
                                 </div>
+
+                                {/* GST is contained within Total, not added to it — so this is a
+                                    disclosure line, never a second charge. Hidden entirely when the
+                                    store rate is 0 or the order is an export (zero-rated).
+                                    quoteData amounts are ALREADY in the checkout currency, so this
+                                    must use formatCurrency, never formatPrice. */}
+                                {(quoteData?.taxAmount ?? 0) > 0 && (
+                                    <div className="mt-1 text-right font-sans text-[11px] text-gray-500">
+                                        Includes GST{quoteData?.taxRatePercent ? ` (${quoteData.taxRatePercent}%)` : ''}{' '}
+                                        {formatCurrency(quoteData!.taxAmount!, quoteData?.currency || 'INR')}
+                                    </div>
+                                )}
 
                                 {quoteData?.isFallback && (
                                     <div className="mt-3 text-xs font-sans text-gray-500 bg-gray-50 p-3 rounded-sm border border-gray-100 leading-relaxed text-center">

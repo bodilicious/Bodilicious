@@ -49,7 +49,15 @@ import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { getIngredientData } from '../data/ingredientMeta';
 import { useSEO } from '../hooks/useSEO';
-import { buildProductTitle, buildProductKeywords, buildProductOgAlt } from '../utils/seo';
+import {
+  buildProductTitle,
+  buildProductKeywords,
+  buildProductOgAlt,
+  buildProductDescription,
+  buildProductH1,
+  buildFaqSchema,
+  usableFaqs,
+} from '../utils/seo';
 import { usePostHog } from 'posthog-js/react';
 import { useCurrency } from '../hooks/useCurrency';
 
@@ -131,9 +139,9 @@ export default function ProductPage() {
   const [error, setError] = useState<string | null>(null);
 
   // ── SEO: update meta tags + inject Product JSON-LD when loaded ──
-  const productDesc = product?.description
-    ? product.description.slice(0, 155)
-    : 'Premium skincare and haircare from Bodilicious. Dermatologically tested, science-backed formulas.';
+  // Shared with the Cloudflare bot renderer so both emit the same description,
+  // and so an editorial seo_description set in the admin panel is honoured here.
+  const productDesc = buildProductDescription(product);
 
   const productSchema = product
     ? {
@@ -207,9 +215,12 @@ export default function ProductPage() {
       }
     : null;
 
+  const faqSchema = buildFaqSchema(product?.faqs);
+  const productFaqs = usableFaqs(product?.faqs);
+
   const productJsonLd =
     productSchema && breadcrumbSchema
-      ? [productSchema, breadcrumbSchema]
+      ? [productSchema, breadcrumbSchema, ...(faqSchema ? [faqSchema] : [])]
       : productSchema ?? undefined;
 
   useSEO({
@@ -688,7 +699,7 @@ export default function ProductPage() {
               >
                 <img
                   src={product.images[activeImage]}
-                  alt={product.name}
+                  alt={ogAlt || product.name}
                   loading="eager"
                   decoding="async"
                   className={`w-full h-full object-cover transition-opacity duration-300 ${
@@ -791,8 +802,9 @@ export default function ProductPage() {
                   : 'Body Care'}
             </p>
 
+            {/* Honours the seo_h1 override so this matches the bot-rendered <h1> */}
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif text-dark-red mb-4 leading-[1.05]">
-              {product.name}
+              {buildProductH1(product)}
             </h1>
 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-6">
@@ -1008,6 +1020,46 @@ export default function ProductPage() {
             </div>
           </m.div>
         </m.div>
+
+        {/* FAQs — visible content backing the FAQPage structured data above.
+            Rendered as plain headings rather than an accordion so the answers
+            are in the DOM for crawlers without needing interaction. */}
+        {productFaqs.length > 0 && (
+          <section className="mt-24 sm:mt-28 lg:mt-32 max-w-3xl mx-auto">
+            <h2 className="font-serif text-3xl md:text-4xl text-dark-red mb-10 text-center">
+              Frequently Asked Questions
+            </h2>
+            <dl className="space-y-8">
+              {productFaqs.map((faq, i) => (
+                <div key={i} className="border-b border-silk/60 pb-6">
+                  <dt className="font-sans font-semibold text-dark-red mb-2">{faq.question}</dt>
+                  <dd className="font-sans text-sm text-dark-red/80 leading-relaxed">{faq.answer}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+
+        {/* Related articles — the product half of product↔blog interlinking */}
+        {(product.relatedBlogs?.length ?? 0) > 0 && (
+          <section className="mt-20 max-w-3xl mx-auto">
+            <h2 className="font-serif text-2xl md:text-3xl text-dark-red mb-8 text-center">
+              Read More
+            </h2>
+            <ul className="space-y-3">
+              {product.relatedBlogs!.map(blog => (
+                <li key={blog.slug}>
+                  <a
+                    href={`/blogs/${blog.slug}`}
+                    className="font-sans text-sm text-dark-red underline underline-offset-4 hover:text-ruby-red transition-colors"
+                  >
+                    {blog.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Key Benefits Grid */}
         {benefitsMap.length > 0 && (

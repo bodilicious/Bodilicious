@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useSEO } from '../hooks/useSEO';
+import { buildBlogTitle, buildBlogDescription, buildBlogKeywords, buildBlogOgAlt } from '../utils/seo';
 import { useApp } from '../context/useApp';
 import { ArrowLeft, Calendar, Loader2, AlertCircle, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -22,6 +23,8 @@ interface BlogPost {
   readingTime?: number;
   publishedAt: string;
   likes?: string[];
+  /** Injected by the API on the detail endpoint — internal linking, not stored. */
+  relatedProducts?: { pid: string; name: string; price: number; images?: string[] }[];
 }
 
 interface Comment {
@@ -48,53 +51,12 @@ const BlogPostPage: React.FC = () => {
   const [hasLiked, setHasLiked] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
 
-  const blogKeywords = (() => {
-    if (!post) return undefined;
-
-    const autoKeywords = [
-      post.title,
-      ...(post.categories?.map(c => c.name) || []),
-      ...(post.tags || []),
-      'Bodilicious blog',
-    ].filter(Boolean) as string[];
-
-    const customKeywords = (() => {
-      if (!post.seo_keywords) return [];
-      if (typeof post.seo_keywords === 'string') {
-        return post.seo_keywords.split(',').map((k: string) => k.trim()).filter(Boolean);
-      }
-      return [
-        ...(post.seo_keywords.primary || []),
-        ...(post.seo_keywords.secondary || [])
-      ].filter(Boolean);
-    })();
-
-    const seen = new Set<string>();
-    const merged = [...autoKeywords, ...customKeywords].filter(k => {
-      const key = k.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    return merged.join(', ');
-  })();
-
-  const primaryKw = post?.seo_keywords && typeof post.seo_keywords !== 'string' && post.seo_keywords.primary?.[0] 
-    ? post.seo_keywords.primary[0].trim() 
-    : '';
-  
-  const secondaryKw = post?.seo_keywords && typeof post.seo_keywords !== 'string' && post.seo_keywords.secondary?.[0]
-    ? post.seo_keywords.secondary[0].trim()
-    : '';
-
-  const pageTitle = post 
-    ? (primaryKw ? `${post.seo_title || post.title} - ${primaryKw} | Bodilicious` : `${post.seo_title || post.title} | Bodilicious`)
-    : 'Blog | Bodilicious';
-
-  const ogAlt = post 
-    ? (secondaryKw ? `${post.title} - ${secondaryKw}` : `${post.title}`)
-    : undefined;
+  // Shared with the Cloudflare bot renderer — see frontend/src/utils/seo.ts.
+  // Also fixes the doubled brand: post.title is stored already ending in
+  // "| Bodilicious", and the old template appended it a second time.
+  const blogKeywords = buildBlogKeywords(post);
+  const pageTitle = buildBlogTitle(post);
+  const ogAlt = buildBlogOgAlt(post);
 
   // ── Article + BreadcrumbList JSON-LD ──────────────────────────────────────
   // Only built once post data is loaded. Schema is withheld entirely if
@@ -163,7 +125,9 @@ const BlogPostPage: React.FC = () => {
 
   useSEO({
     title: pageTitle,
-    description: post?.seo_description || post?.excerpt || 'Read on the Bodilicious blog.',
+    // Falls through seo_description → excerpt → article body. Excerpt is empty
+    // on every currently published post, so the body fallback is what ships.
+    description: buildBlogDescription(post),
     keywords: blogKeywords,
     canonical: post ? `/blogs/${post.slug}` : '/blogs',
     ogImage: post?.coverImage || undefined,
@@ -374,6 +338,38 @@ const BlogPostPage: React.FC = () => {
                      prose-img:rounded-2xl prose-img:shadow-sm"
           dangerouslySetInnerHTML={{ __html: safeContent }}
         />
+
+        {/* Products mentioned — the blog half of product↔blog interlinking.
+            Matched server-side on blog tags vs product concerns/type/category. */}
+        {(post.relatedProducts?.length ?? 0) > 0 && (
+          <section className="max-w-[70ch] mx-auto mt-16 pt-8 border-t border-silk/60">
+            <h2 className="font-serif text-2xl text-b-burgundy mb-6">
+              Products mentioned in this guide
+            </h2>
+            <ul className="space-y-4">
+              {post.relatedProducts!.map(product => (
+                <li key={product.pid}>
+                  <Link
+                    to={`/product/${product.pid}`}
+                    className="flex items-center gap-4 group"
+                  >
+                    {product.images?.[0] && (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        loading="lazy"
+                        className="w-16 h-16 object-cover rounded-xl border border-silk/60"
+                      />
+                    )}
+                    <span className="font-sans text-sm text-b-text-primary group-hover:text-b-burgundy transition-colors underline underline-offset-4">
+                      {product.name}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Tags */}
         {post.tags.length > 0 && (

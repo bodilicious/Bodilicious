@@ -1,11 +1,25 @@
 // Single source of truth for product title/keywords/alt, shared with the React
 // app so crawlers and users are served identical metadata. wrangler bundles this
+
+
 // .ts file via esbuild, which strips the types.
 import {
   buildProductTitle,
   buildProductKeywords,
   buildProductOgAlt,
+  buildProductDescription,
+  buildProductH1,
+  buildProductH2s,
+  buildBlogTitle,
+  buildBlogDescription,
+  buildBlogKeywords,
+  buildBlogOgAlt,
+  buildBlogHeadline,
+  STATIC_PAGE_SEO,
 } from '../frontend/src/utils/seo.ts';
+
+// Re-exported so worker.js can route on it without reaching into the frontend.
+export { STATIC_PAGE_SEO };
 
 // Includes major search engines, social media unfurlers, AI crawlers, and generic HTTP clients (used by AI assistants in sandboxes)
 export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|amazonbot|meta-externalagent|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
@@ -99,11 +113,83 @@ export function renderProductHtml(product, frontendUrl) {
   const pageTitle = buildProductTitle(product);
   const mergedKeywords = buildProductKeywords(product) || '';
   const ogAlt = buildProductOgAlt(product) || '';
-  const productDesc = truncateDescription(product.description || 'Premium skincare and haircare from Bodilicious.');
+  const productDesc = buildProductDescription(product);
+  const h1 = buildProductH1(product);
+  const h2s = buildProductH2s(product);
+
+  // ── Body content ──────────────────────────────────────────────────────────
+  // This body used to be three lines (h1 + description + price) — about 20 words.
+  // Google receives this HTML complete and does NOT execute the React app, so
+  // those 20 words were the entire indexed page, while users saw ingredients,
+  // benefits, usage and reviews. That gap is both wasted ranking signal and a
+  // dynamic-rendering equivalence problem: the bot version must match the user
+  // version. Everything below already exists in the product payload.
+  const list = (items) =>
+    items && items.length
+      ? `<ul>${items.map(i => `<li>${escapeHtml(String(i))}</li>`).join('')}</ul>`
+      : '';
+
+  const ing = product.ingredients || {};
+  const allIngredients = [
+    ...(ing.key_actives || []),
+    ...(ing.botanical_extracts || []),
+    ...(ing.others || []),
+  ];
+
+  const usageLine = product.usage && typeof product.usage === 'object'
+    ? [product.usage.time, product.usage.frequency, product.usage.routine_step]
+        .filter(Boolean).join(' · ')
+    : '';
+
+  // Only entries with BOTH a question and an answer are usable — Google drops
+  // the whole FAQPage block if any mainEntity is incomplete.
+  const faqs = (product.faqs || []).filter(f => f && f.question && f.answer);
+  const faqSchema = faqs.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(f => ({
+      '@type': 'Question',
+      name: String(f.question),
+      acceptedAnswer: { '@type': 'Answer', text: String(f.answer) },
+    })),
+  } : null;
+
+  const relatedBlogs = (product.relatedBlogs || []).filter(b => b && b.slug && b.title);
+
+  const reviewBlock = (product.reviews || []).slice(0, 5)
+    .filter(r => r && r.comment)
+    .map(r => `<blockquote><p>${escapeHtml(String(r.comment))}</p>
+      <cite>${escapeHtml(String(r.user || 'Customer'))} — ${escapeHtml(String(r.rating ?? ''))}/5</cite></blockquote>`)
+    .join('');
+
+  // h2s[0..2] map to benefits / ingredients / how-to-use in buildProductH2s.
+  const sections = [
+    product.benefits?.length
+      ? `<h2>${escapeHtml(h2s[0] || 'Benefits')}</h2>${list(product.benefits)}` : '',
+    allIngredients.length
+      ? `<h2>${escapeHtml(h2s[1] || 'Key Ingredients')}</h2>${list(allIngredients)}` : '',
+    (product.how_to_use?.length || usageLine)
+      ? `<h2>${escapeHtml(h2s[2] || 'How to Use')}</h2>${list(product.how_to_use)}${
+          usageLine ? `<p>${escapeHtml(usageLine)}</p>` : ''}` : '',
+    product.concerns_targeted?.length
+      // titleCase so stored slugs like "uneven_tone" don't reach the page as-is.
+      ? `<h2>Targets</h2>${list(product.concerns_targeted.map(titleCase))}` : '',
+    product.warnings?.length
+      ? `<h2>Warnings</h2>${list(product.warnings)}` : '',
+    reviewBlock ? `<h2>Customer Reviews</h2>${reviewBlock}` : '',
+    faqs.length
+      ? `<h2>Frequently Asked Questions</h2>${faqs.map(f =>
+          `<h3>${escapeHtml(f.question)}</h3><p>${escapeHtml(f.answer)}</p>`).join('')}` : '',
+    relatedBlogs.length
+      ? `<h2>Read More</h2><ul>${relatedBlogs.map(b =>
+          `<li><a href="${frontendUrl}/blogs/${encodeURIComponent(b.slug)}">${escapeHtml(b.title)}</a></li>`
+        ).join('')}</ul>` : '',
+  ].filter(Boolean).join('\n  ');
 
   const schemas = [
     buildProductSchema(product, frontendUrl),
-    buildBreadcrumbSchema(product, frontendUrl)
+    buildBreadcrumbSchema(product, frontendUrl),
+    ...(faqSchema ? [faqSchema] : []),
   ];
 
   return `<!doctype html>
@@ -133,11 +219,203 @@ export function renderProductHtml(product, frontendUrl) {
   </script>
 </head>
 <body>
-  <h1>${escapeHtml(product.name)}</h1>
+  <h1>${escapeHtml(h1)}</h1>
   <p>${escapeHtml(product.description || '')}</p>
   <p>Price: ₹${escapeHtml(String(product.price))}</p>
+  ${sections}
 </body>
 </html>`;
+}
+
+// ─── Blog Post Bot Renderer ─────────────────────────────────────────────────
+
+/**
+ * Minimal HTML sanitiser for blog bodies.
+ *
+ * Blog content is admin-authored Tiptap HTML. The React page runs it through
+ * DOMPurify, but DOMPurify needs a DOM and this runs in a Worker — so we do the
+ * conservative thing: drop dangerous elements entirely, keep a small structural
+ * allowlist, and strip every attribute (which kills href/src/onerror vectors in
+ * one move). Headings survive, which is the part that carries SEO weight.
+ */
+const BLOG_ALLOWED_TAGS = new Set([
+  'p', 'br', 'h2', 'h3', 'h4', 'ul', 'ol', 'li',
+  'strong', 'em', 'b', 'i', 'blockquote',
+]);
+
+export function sanitizeBlogHtml(html) {
+  return String(html || '')
+    // Remove these elements *with* their contents, not just the tags.
+    .replace(/<(script|style|iframe|object|embed|form|svg)[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(script|style|iframe|object|embed|form|svg)[^>]*\/?>/gi, '')
+    // Keep allowlisted tags but with no attributes; drop everything else.
+    .replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tag) => {
+      const name = tag.toLowerCase();
+      if (!BLOG_ALLOWED_TAGS.has(name)) return '';
+      return match.startsWith('</') ? `</${name}>` : `<${name}>`;
+    });
+}
+
+export function renderBlogHtml(post, frontendUrl) {
+  const pageTitle = buildBlogTitle(post);
+  const description = buildBlogDescription(post);
+  const keywords = buildBlogKeywords(post) || '';
+  const ogAlt = buildBlogOgAlt(post) || '';
+  const url = `${frontendUrl}/blogs/${encodeURIComponent(post.slug || '')}`;
+  const image = post.coverImage || '';
+  const published = post.publishedAt || post.createdAt || null;
+  const modified = post.updatedAt || published;
+  const relatedProducts = (post.relatedProducts || []).filter(p => p && p.pid && p.name);
+
+  const schemas = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: buildBlogHeadline(post).slice(0, 110), // Google caps headline at 110
+      description,
+      image: image || undefined,
+      mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+      // author is an unpopulated ref on current posts, so attribute to the
+      // organisation rather than emitting an invalid/empty Person.
+      author: { '@type': 'Organization', name: 'Bodilicious', url: frontendUrl },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Bodilicious',
+        url: frontendUrl,
+      },
+      ...(published ? { datePublished: published } : {}),
+      ...(modified ? { dateModified: modified } : {}),
+      ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${frontendUrl}/` },
+        { '@type': 'ListItem', position: 2, name: 'Blog', item: `${frontendUrl}/blogs` },
+        { '@type': 'ListItem', position: 3, name: buildBlogHeadline(post), item: url },
+      ],
+    },
+  ];
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="keywords" content="${escapeHtml(keywords)}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${url}">
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${url}" />
+  <meta property="og:title" content="${escapeHtml(pageTitle)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+  <meta property="og:image:alt" content="${escapeHtml(ogAlt)}" />
+  ${published ? `<meta property="article:published_time" content="${escapeHtml(published)}" />` : ''}
+  ${modified ? `<meta property="article:modified_time" content="${escapeHtml(modified)}" />` : ''}
+  ${(post.tags || []).map(t => `<meta property="article:tag" content="${escapeHtml(String(t))}" />`).join('\n  ')}
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+
+  <script type="application/ld+json">
+    ${safeJsonLd(schemas)}
+  </script>
+</head>
+<body>
+  <article>
+    <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
+    ${published ? `<p><time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time></p>` : ''}
+    ${sanitizeBlogHtml(post.content)}
+  </article>
+  ${relatedProducts.length ? `<section>
+    <h2>Products mentioned in this guide</h2>
+    <ul>${relatedProducts.map(p =>
+      `<li><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a> — ₹${escapeHtml(String(p.price))}</li>`
+    ).join('')}</ul>
+  </section>` : ''}
+</body>
+</html>`;
+}
+
+// ─── Static Page Bot Renderer ───────────────────────────────────────────────
+
+/**
+ * Rewrite the SPA shell's head with the correct metadata for a static page.
+ *
+ * Deliberately NOT a replacement page. Replacing the body would serve crawlers
+ * a two-line stub where users get a full About/Contact page — thinner than the
+ * real thing, and the same dynamic-rendering equivalence problem the product
+ * renderer exists to fix. It would also be counterproductive: a complete HTML
+ * response stops Google rendering the JS, so it would index the stub instead of
+ * the real content.
+ *
+ * Streaming the origin response through HTMLRewriter keeps the SPA intact —
+ * JS-capable crawlers still render the full page — while clients that never run
+ * JS (every social unfurler) finally get the right title, description and card.
+ */
+export function rewriteStaticMeta(response, pathname, frontendUrl) {
+  const meta = STATIC_PAGE_SEO[pathname];
+  if (!meta) return response;
+
+  const url = `${frontendUrl}${pathname}`;
+  const setAttr = (name, value) => ({
+    element(el) { el.setAttribute(name, value); },
+  });
+
+  return new HTMLRewriter()
+    .on('title', {
+      element(el) { el.setInnerContent(meta.title); },
+    })
+    .on('meta[name="description"]', setAttr('content', meta.description))
+    .on('link[rel="canonical"]', setAttr('href', url))
+    .on('meta[property="og:title"]', setAttr('content', meta.title))
+    .on('meta[property="og:description"]', setAttr('content', meta.description))
+    .on('meta[property="og:url"]', setAttr('content', url))
+    .on('meta[name="twitter:title"]', setAttr('content', meta.title))
+    .on('meta[name="twitter:description"]', setAttr('content', meta.description))
+    .transform(response);
+}
+
+/**
+ * Blog index: correct metadata plus an ItemList naming every published post.
+ *
+ * Same approach as rewriteStaticMeta — augment the real page rather than
+ * replace it. The ItemList is appended to <head> so non-JS clients still learn
+ * what articles exist, while JS-capable crawlers render the actual listing.
+ */
+export function rewriteBlogIndex(response, posts, frontendUrl) {
+  const itemList = posts.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: STATIC_PAGE_SEO['/blogs'].title,
+    numberOfItems: posts.length,
+    itemListElement: posts.slice(0, 50).map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${frontendUrl}/blogs/${encodeURIComponent(p.slug)}`,
+      name: buildBlogHeadline(p),
+    })),
+  } : null;
+
+  const withMeta = rewriteStaticMeta(response, '/blogs', frontendUrl);
+  if (!itemList) return withMeta;
+
+  return new HTMLRewriter()
+    .on('head', {
+      element(el) {
+        el.append(
+          `<script type="application/ld+json">${safeJsonLd(itemList)}</script>`,
+          { html: true }
+        );
+      },
+    })
+    .transform(withMeta);
 }
 
 // ─── Shop / Category Page Bot Renderer ──────────────────────────────────────
@@ -218,16 +496,35 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
     ],
   };
 
-  // ItemList JSON-LD (first 20 products)
+  // ItemList JSON-LD (first 20 products).
+  // numberOfItems tells Google the list is a complete collection rather than a
+  // truncated sample, and embedding the Product with its offer makes each entry
+  // eligible for price/availability annotations instead of a bare link.
   const itemList = products.length > 0 ? {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: pageTitle,
+    numberOfItems: products.length,
     itemListElement: products.slice(0, 20).map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      name: p.name,
       url: `${frontendUrl}/product/${p.pid}`,
+      item: {
+        '@type': 'Product',
+        name: p.name,
+        url: `${frontendUrl}/product/${p.pid}`,
+        ...(p.images?.[0] ? { image: p.images[0] } : {}),
+        ...(p.price != null ? {
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'INR',
+            price: String(p.price),
+            availability: p.stock > 0
+              ? 'https://schema.org/InStock'
+              : 'https://schema.org/OutOfStock',
+          },
+        } : {}),
+      },
     })),
   } : null;
 

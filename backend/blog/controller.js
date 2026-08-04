@@ -2,6 +2,8 @@ import Blog, { BlogCategory, BlogComment } from "./models.js";
 import { v2 as cloudinary } from "cloudinary";
 import escapeStringRegexp from "escape-string-regexp";
 import mongoose from "mongoose";
+import { buildTopicPatterns } from "../utils/topicMatch.js";
+import { pingIndexNow } from "../utils/indexNow.js";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -82,6 +84,10 @@ export const createBlog = async (req, res) => {
     await blog.save();
     await blog.populate("author", "name email");
     await blog.populate("categories", "name slug");
+
+    if (blog.status === "published") {
+      pingIndexNow([`https://bodilicious.in/blogs/${blog.slug}`]);
+    }
 
     res.status(201).json({ success: true, data: blog });
   } catch (err) {
@@ -220,6 +226,10 @@ export const updateBlog = async (req, res) => {
     )
       .populate("author", "name email")
       .populate("categories", "name slug");
+
+    if (updated.status === "published") {
+      pingIndexNow([`https://bodilicious.in/blogs/${updated.slug}`]);
+    }
 
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -400,7 +410,41 @@ export const getPublicBlogBySlug = async (req, res) => {
       .populate("categories", "name slug");
 
     if (!blog) return res.status(404).json({ success: false, message: "Post not found" });
-    res.json({ success: true, data: blog });
+
+    // ── Related products ──────────────────────────────────────────────────────
+    // The other half of the product↔blog link. A retinol article and a retinol
+    // night cream that don't link to each other waste the authority each has.
+    // Best-effort: a failure here must never break the article page.
+    const data = blog.toObject({ virtuals: true });
+    try {
+      const { default: Product } = await import("../products/models.js");
+      // Title is included as a source because tags currently hold editorial
+      // placeholder text rather than real tags — see utils/topicMatch.js.
+      const patterns = buildTopicPatterns([
+        blog.title,
+        ...(blog.tags || []),
+        ...((blog.categories || []).map(c => c?.name).filter(Boolean)),
+      ]);
+
+      if (patterns.length) {
+        data.relatedProducts = await Product.find({
+          isActive: true,
+          $or: [
+            { name: { $in: patterns } },
+            { concerns_targeted: { $in: patterns } },
+            { product_type: { $in: patterns } },
+          ],
+        })
+          .select("pid name price images rating ratingCount")
+          .sort({ ratingCount: -1, rating: -1 })
+          .limit(3)
+          .lean();
+      }
+    } catch (relErr) {
+      console.error("[Blog] Related products lookup failed:", relErr.message);
+    }
+
+    res.json({ success: true, data });
   } catch (err) {
     console.error("Blog getPublicBlogBySlug Error:", err);
     res.status(500).json({ success: false, message: "Failed to fetch post" });

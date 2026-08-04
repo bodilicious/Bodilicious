@@ -205,7 +205,7 @@ export const pushOrderToShiprocket = async (order) => {
 
     const finalPhone = domestic
       ? (digitsOnlyPhone.length >= 10 ? digitsOnlyPhone.slice(-10) : "9999999999")
-      : phoneStr;                                    // keep the country code formatting
+      : phoneStr.replace(/[^\d+]/g, "");             // keep country code but drop spaces/hyphens
     const finalPincode = domestic
       ? (rawPincode.replace(/\D/g, "").length === 6 ? rawPincode.replace(/\D/g, "") : "110001")
       : rawPincode;                                  // keep alphanumerics (UK/CA postcodes)

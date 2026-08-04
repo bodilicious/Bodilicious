@@ -496,10 +496,15 @@ export default function OrderDetailsPage() {
                                             <span>Shipping</span>
                                             <span className="text-gray-900">{rawShippingCost === 0 ? 'Free' : formatCurrency(rawShippingCost)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center py-2 text-sm text-gray-600">
-                                            <span>Tax (Inclusive)</span>
-                                            <span className="text-gray-900">{formatCurrency(rawTaxAmount)}</span>
-                                        </div>
+                                        {/* Hidden when no tax applies. This row was unconditional, so
+                                            every order showed "Tax (Inclusive) ₹0" — and it must stay
+                                            hidden on zero-rated international orders. */}
+                                        {rawTaxAmount > 0 && (
+                                            <div className="flex justify-between items-center py-2 text-sm text-gray-600">
+                                                <span>Tax (Inclusive)</span>
+                                                <span className="text-gray-900">{formatCurrency(rawTaxAmount)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-center py-4 mt-2 border-t border-gray-100 text-base font-serif text-dark-red">
                                             <span>Total</span>
                                             <div className="text-right">

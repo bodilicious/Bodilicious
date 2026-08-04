@@ -59,6 +59,24 @@ export const createProductSchema = z
       primary: z.array(z.string()).optional(),
       secondary: z.array(z.string()).optional(),
     }).optional(),
+
+    // Editorial SEO overrides. Lengths mirror the Mongoose maxlengths so a value
+    // that would be silently truncated by Mongoose is rejected here instead.
+    // NOTE: this schema is .strict() — omitting a field here makes the whole
+    // request 400 rather than dropping just that field.
+    seo_title: z.string().max(200).optional(),
+    seo_description: z.string().max(500).optional(),
+    seo_h1: z.string().max(200).optional(),
+    seo_h2: z.array(z.string()).optional(),
+    seo_image_alt: z.string().max(300).optional(),
+
+    // Both fields required per entry — a question with no answer makes the
+    // whole FAQPage block invalid, so reject it at the edge rather than
+    // emitting broken structured data.
+    faqs: z.array(z.object({
+      question: z.string().min(1).max(300),
+      answer: z.string().min(1).max(1000),
+    })).optional(),
   })
   .strict();
 

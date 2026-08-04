@@ -183,6 +183,8 @@ export default function ShippingPage() {
         isFallback?: boolean;
         subtotal?: number;
         isFetched?: boolean;
+        taxAmount?: number;
+        taxRatePercent?: number;
     }>({
         shippingCost: storeSettings.shippingCost,
         total: cartTotal + storeSettings.shippingCost,
@@ -218,6 +220,8 @@ export default function ShippingPage() {
                         currency: data.currency || 'INR',
                         isFallback: !!data.isFallback,
                         subtotal: data.subtotal,
+                        taxAmount: data.taxAmount,
+                        taxRatePercent: data.taxRatePercent,
                         isFetched: true
                     });
 
@@ -1260,6 +1264,15 @@ export default function ShippingPage() {
                                         {quoteData.isFallback && <span className="text-sm ml-1 opacity-60">*</span>}
                                     </span>
                                 </div>
+
+                                {/* Disclosure only — GST is already inside Total. Quote amounts
+                                    are pre-converted, hence formatCurrency rather than formatPrice. */}
+                                {quoteData.isFetched && (quoteData.taxAmount ?? 0) > 0 && (
+                                    <div className="mt-1 text-right font-sans text-[11px] text-grey-beige">
+                                        Includes GST{quoteData.taxRatePercent ? ` (${quoteData.taxRatePercent}%)` : ''}{' '}
+                                        {formatCurrency(quoteData.taxAmount!, quoteData.currency)}
+                                    </div>
+                                )}
 
                                 <div className="pt-6">
                                     {!appliedCoupon ? (

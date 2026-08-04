@@ -2,10 +2,19 @@ import { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { applyActionCode, confirmPasswordReset, getAuth } from "firebase/auth";
+import { useSEO } from "../hooks/useSEO";
 
 type StatusType = "loading" | "success" | "error";
 
 export default function EmailActionPage() {
+  // This page handles Firebase email actions (password reset, email
+  // verification) via one-time codes in the URL. It must never be indexed —
+  // without this it inherited whatever meta tags the previous route left behind.
+  useSEO({
+    title: "Account Action — Bodilicious",
+    description: "Complete your Bodilicious account action.",
+    noIndex: true,
+  });
   const location = useLocation();
   const navigate = useNavigate();
 

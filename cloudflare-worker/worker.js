@@ -2,6 +2,10 @@ import {
   isBot,
   renderProductHtml,
   renderShopHtml,
+  renderBlogHtml,
+  rewriteBlogIndex,
+  rewriteStaticMeta,
+  STATIC_PAGE_SEO,
   SITEMAP_CATEGORIES,
   SITEMAP_CONCERNS,
   SITEMAP_TYPES,
@@ -70,6 +74,45 @@ export default {
       if (pid) {
         return handleProduct(pid, request, env, ctx);
       }
+    }
+
+    // 3b. Handle Blog posts. Without this, every /blogs/<slug> request from a
+    // crawler fell through to the SPA shell and returned the homepage title and
+    // description. Google eventually renders the JS, but social unfurlers
+    // (facebookexternalhit, whatsapp, twitterbot, linkedinbot — all matched by
+    // BOT_UA_PATTERNS) never do, so every shared article link previewed as the
+    // generic homepage card.
+    if (pathname.startsWith('/blogs/')) {
+      const rawSlug = pathname.split('/')[2];
+      const slug = rawSlug ? decodeURIComponent(rawSlug).trim() : null;
+      if (slug) {
+        return handleBlog(slug, request, env, ctx);
+      }
+    }
+
+    // 3c. Blog index — correct metadata plus an ItemList of every post.
+    if (pathname === '/blogs' && !url.search) {
+      return handleBlogIndex(request, env, fetchFromOrigin);
+    }
+
+    // 3d. Remaining static content pages. These fell through to the SPA shell,
+    // so every one of them returned the homepage title and description to any
+    // client that doesn't execute JavaScript — meaning every social share of
+    // /about, /contact or a policy page previewed as the homepage.
+    //
+    // These stream the ORIGIN response through HTMLRewriter rather than
+    // returning a synthesised page: the real copy lives in React components,
+    // and replacing the body would both serve crawlers less than users see and
+    // stop Google rendering the JS that contains the actual content.
+    if (STATIC_PAGE_SEO[pathname]) {
+      const originResponse = await fetchFromOrigin();
+      const contentType = originResponse.headers.get('content-type') || '';
+      if (!contentType.includes('text/html')) return originResponse;
+      return rewriteStaticMeta(
+        originResponse,
+        pathname,
+        env.FRONTEND_URL || 'https://bodilicious.in'
+      );
     }
 
     // 4. Handle Shop / category filter pages — these were previously served as
@@ -212,6 +255,97 @@ async function handleProduct(pid, request, env, ctx) {
     }
     // On any error, fall through to origin (graceful degradation)
     return fetch(request);
+  }
+}
+
+/**
+ * Bot renderer for /blogs/<slug>. Mirrors handleProduct: per-isolate cache,
+ * 404 for unknown slugs, and graceful fall-through to origin on any API error
+ * so a backend hiccup degrades to the SPA rather than serving a broken page.
+ */
+async function handleBlog(slug, request, env, ctx) {
+  try {
+    const now = Date.now();
+    const cacheKey = `blog:${slug}`;
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return new Response(cached.html, {
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+          'Cache-Control': 'public, max-age=300, s-maxage=300',
+          'X-Cache': 'HIT',
+        }
+      });
+    }
+
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+
+    const res = await fetchWithTimeout(`${apiUrl}/api/v1/blogs/${encodeURIComponent(slug)}`);
+
+    const notFound = () => new Response(
+      '<!doctype html><html lang="en"><head><title>Article Not Found — Bodilicious</title><meta name="robots" content="noindex, nofollow"></head><body>Not Found</body></html>',
+      { status: 404, headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
+    );
+
+    if (res.status === 404) return notFound();
+    if (!res.ok) return fetch(request);
+
+    const data = await res.json();
+    const post = data.data || data.blog;
+    if (!data.success || !post) return notFound();
+
+    // Never let an unpublished draft into the index, even if the API returns it.
+    if (post.status && post.status !== 'published') return notFound();
+
+    const html = renderBlogHtml(post, frontendUrl);
+    cache.set(cacheKey, { html, expiresAt: now + TTL_MS });
+
+    return new Response(html, {
+      headers: {
+        'Content-Type': 'text/html;charset=UTF-8',
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
+      }
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error(`[SEO Worker] Timeout fetching blog ${slug} — Render backend may be cold-starting`);
+    } else {
+      console.error(`[SEO Worker] Error fetching blog ${slug}:`, error.message);
+    }
+    return fetch(request);
+  }
+}
+
+/**
+ * Blog index: rewrite the origin page's metadata and append an ItemList.
+ * The post list itself is not cached here because the response is a stream
+ * transform of the origin, not a synthesised string.
+ */
+async function handleBlogIndex(request, env, fetchFromOrigin) {
+  const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+  try {
+    const originResponse = await fetchFromOrigin();
+    const contentType = originResponse.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) return originResponse;
+
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    let posts = [];
+    try {
+      const res = await fetchWithTimeout(`${apiUrl}/api/v1/blogs?limit=100`);
+      if (res.ok) {
+        const data = await res.json();
+        posts = (data.data || data.blogs || []).filter(p => p && p.slug);
+      }
+    } catch (apiErr) {
+      // Metadata rewrite is still worth doing without the ItemList.
+      console.error('[SEO Worker] Blog index list fetch failed:', apiErr.name);
+    }
+
+    return rewriteBlogIndex(originResponse, posts, frontendUrl);
+  } catch (error) {
+    console.error('[SEO Worker] Blog index rewrite failed:', error.message);
+    return fetchFromOrigin();
   }
 }
 

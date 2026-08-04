@@ -12,7 +12,7 @@ import { trackServerEvent } from "../utils/posthog.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
-import { calculateDiscount } from "../utils/pricing.js";
+import { calculateDiscount, calculateInclusiveTax } from "../utils/pricing.js";
 import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits, fromRazorpayMinorUnits } from "../utils/currencies.js";
 import orderEvents from "../events/orderEvents.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
@@ -507,6 +507,17 @@ export const getOrderQuote = async (req, res) => {
         const convertedFinalAmount   = applyConversion(pricing.finalAmount);
         const convertedOriginalAmount = applyConversion(pricing.originalAmount);
 
+        // ── GST (inclusive) ───────────────────────────────────────────────────
+        // Domestic only: exports are zero-rated under GST, so international
+        // orders carry rate 0 and the buyer settles any destination duties —
+        // which is exactly what the order confirmation email already tells them.
+        // This is a disclosure line carved out of finalAmount, never added to it,
+        // so no customer's total changes when taxRatePercent is switched on.
+        const taxRate = isIndia ? (settings.taxRatePercent || 0) : 0;
+        const convertedTaxAmount = applyConversion(
+            calculateInclusiveTax(pricing.finalAmount, taxRate)
+        );
+
         const expiry = Date.now() + 30 * 60 * 1000; // 30 minutes
 
         const quotePayload = {
@@ -516,6 +527,10 @@ export const getOrderQuote = async (req, res) => {
             discountAmount: convertedDiscountAmount,
             finalAmount: convertedFinalAmount,
             originalAmount: convertedOriginalAmount,
+            // Inside the signed payload so it can't be tampered with, and so
+            // initRazorpayOrder can persist the same figure it quoted.
+            taxAmount: convertedTaxAmount,
+            taxRatePercent: taxRate,
             isWelcomeOfferApplied: pricing.isWelcomeOfferApplied,
             isFreeShippingCouponApplied: pricing.isFreeShippingCouponApplied,
             couponCode: coupon ? coupon.code : null,
@@ -542,6 +557,9 @@ export const getOrderQuote = async (req, res) => {
                 shippingCost: convertedShippingCost,
                 discountAmount: convertedDiscountAmount,
                 totalAmount: convertedFinalAmount,
+                // Included in, not added to, totalAmount — see calculateInclusiveTax.
+                taxAmount: convertedTaxAmount,
+                taxRatePercent: taxRate,
                 deliveryEstimate,
                 couponCode: coupon ? coupon.code : null,
                 isFreeShippingCouponApplied: pricing.isFreeShippingCouponApplied,
@@ -789,6 +807,12 @@ export const initRazorpayOrder = async (req, res) => {
                 appliedCoupon: coupon ? coupon._id : undefined,
                 couponDiscount: payload.couponCode ? payload.discountAmount : 0,
                 originalAmount: payload.originalAmount,
+                // Taken from the signed quote so the invoice states exactly the
+                // GST that was disclosed at checkout, even if the store's rate
+                // is changed between quote and payment. `taxAmount` is already a
+                // path on the Order schema, so it persists (Mongoose would drop
+                // it silently otherwise).
+                taxAmount: payload.taxAmount || 0,
                 paymentMethod: "razorpay",
                 paymentStatus: "pending",
                 orderStatus: "pending",

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { calculateDiscount } from "../utils/pricing.js";
+import { calculateDiscount, calculateInclusiveTax } from "../utils/pricing.js";
 import Order from "./models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
@@ -255,6 +255,14 @@ export const createOrder = async (req, res) => {
     const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
     const { finalAmount, discountAmount, originalAmount, isWelcomeOfferApplied } = pricing;
 
+    // GST disclosure, mirroring getOrderQuote: domestic only (exports are
+    // zero-rated), carved out of finalAmount rather than added to it. COD orders
+    // are always priced in INR, so no currency conversion is needed here.
+    const codTaxAmount = calculateInclusiveTax(
+        finalAmount,
+        isIndia ? ((await getSettings())?.taxRatePercent || 0) : 0
+    );
+
     if (isWelcomeOfferApplied) {
         const profileClaim = await UserProfile.findOneAndUpdate(
             { _id: userId, welcomeOfferUsed: { $ne: true } },
@@ -319,6 +327,7 @@ export const createOrder = async (req, res) => {
           discountAmount,
           isWelcomeOfferApplied,
           originalAmount,
+          taxAmount: codTaxAmount,
           paymentMethod: finalPaymentMethod,
           paymentStatus: "pending",
           orderStatus: "pending",

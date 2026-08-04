@@ -108,6 +108,37 @@ const productSchema = new mongoose.Schema(
     is_active_based: { type: Boolean, default: false },
     seo_keywords: { type: seoKeywordSchema, default: () => ({ primary: [], secondary: [] }) },
 
+    // ── Editorial SEO overrides ───────────────────────────────────────────────
+    // All optional. When blank, the shared builders in frontend/src/utils/seo.ts
+    // fall back to generated values, so an unfilled product behaves exactly as
+    // it does today. Naming matches the Blog model (seo_title/seo_description).
+    seo_title:       { type: String, trim: true, maxlength: 200, default: "" },
+    seo_description: { type: String, trim: true, maxlength: 500, default: "" },
+    // Visible <h1>. Defaults to the product name; useful when the catalogue name
+    // is a SKU-ish string but the page should lead with a searchable phrase.
+    seo_h1:          { type: String, trim: true, maxlength: 200, default: "" },
+    // Visible <h2> subheadings, rendered as real page content for crawlers.
+    seo_h2:          { type: [String], default: [] },
+    // Alt text for the primary/OG image.
+    seo_image_alt:   { type: String, trim: true, maxlength: 300, default: "" },
+
+    // Customer questions rendered as visible page content and FAQPage JSON-LD.
+    // Both fields are required per entry — schema.org FAQPage is invalid with a
+    // question and no answer, and Google ignores the whole block if any entry
+    // is incomplete.
+    faqs: {
+      type: [
+        new mongoose.Schema(
+          {
+            question: { type: String, trim: true, maxlength: 300, required: true },
+            answer: { type: String, trim: true, maxlength: 1000, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
     rating: { type: Number, default: 0, min: 0, max: 5 },
     ratingCount: { type: Number, default: 0, min: 0 },
     reviews: { type: [reviewSchema], default: [] },
