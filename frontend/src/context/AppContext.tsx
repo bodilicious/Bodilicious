@@ -817,6 +817,13 @@ const triggerPasswordReset = async (email: string) => {
 
       // Fire a generic page_view event which will be routed to ALL initialized tags (GA4 and Google Ads)
       (window as any).gtag('event', 'page_view');
+
+      // 🎯 Google Ads Specific Conversion for Page View
+      (window as any).gtag('event', 'conversion', {
+        'send_to': 'AW-306323373/lspYCN-55tscEK2_iJIB',
+        'value': 1.0,
+        'currency': 'INR'
+      });
     }
   }, [location.pathname]);
 
