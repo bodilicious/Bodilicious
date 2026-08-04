@@ -73,6 +73,22 @@ const orderSchema = new mongoose.Schema(
       campaign: { type: String, default: null },
     },
 
+    /* =========================================
+       Origin of the order.
+       Distinct from `marketing.source` (a UTM value). This records HOW the order
+       came into existence, which the admin views use to tell a genuinely abandoned
+       customer checkout apart from a draft an admin created by hand.
+       Without this path Mongoose silently discards `source: "admin_draft"` on
+       create, and `{ source: { $ne: "admin_draft" } }` then matches every order —
+       so admin drafts were being counted as abandoned checkouts.
+    ========================================= */
+    source: {
+      type: String,
+      enum: ["storefront", "admin_draft"],
+      default: "storefront",
+      index: true,
+    },
+
     paymentMethod: {
       type: String,
       enum: ["cod", "razorpay"],

@@ -97,7 +97,17 @@ app.post("/api/v1/payment/webhook",
 
 // 4 MB covers larger payloads (e.g. product imports). Upload routes use multer
 // (multipart/form-data) and are unaffected by this limit.
-app.use(express.json({ limit: "4mb" }));
+// The WhatsApp webhook needs the exact bytes Meta signed to verify
+// X-Hub-Signature-256. Capture the raw buffer for that path only — holding a
+// reference for every API request would waste memory for no benefit.
+// (Razorpay's webhook is registered above with express.raw and sets its own rawBody.)
+app.use(express.json({
+  limit: "4mb",
+  verify: (req, res, buf) => {
+    const url = req.originalUrl || req.url || "";
+    if (url.startsWith("/api/v1/whatsapp/webhook")) req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ limit: "4mb", extended: true }));
 // Custom integration for express-mongo-sanitize to avoid read-only getter crash on req.query
 app.use((req, res, next) => {

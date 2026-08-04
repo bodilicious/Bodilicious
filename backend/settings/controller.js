@@ -53,7 +53,11 @@ export const getSettings = async (req, res) => {
     // Every page load calls this; a short cache halves traffic from SPA navigation.
     // Bump to 5 minutes (300 s) — settings change infrequently and this is called on
     // every SPA page load. stale-while-revalidate lets the CDN serve stale in <1 s.
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+    } else {
+      res.setHeader('Cache-Control', 'no-store');
+    }
 
     res.json({
       success: true,

@@ -115,9 +115,6 @@ services:
       - type: redirect
         source: /pages/*
         destination: /
-      - type: redirect
-        source: /blogs/*
-        destination: /
       - type: rewrite
         source: /*
         destination: /index.html
@@ -195,6 +192,15 @@ services:
         name: Cache-Control
         value: "public, max-age=3600, must-revalidate"
 
+    # ── Build-time env vars (baked into the Vite bundle at build time) ───────────
+    # These MUST be set in the Render dashboard — the local .env file is NOT used
+    # during Render's build step. Without them the frontend points to localhost.
+    envVars:
+      - key: VITE_API_URL
+        sync: false   # set to your backend URL e.g. https://bodilicious-backend.onrender.com
+      - key: VITE_RAZORPAY_KEY_ID
+        sync: false   # set to your LIVE Razorpay key: rzp_live_...
+
   # ─── Backend (Node Web Service) ─────────────────────────────────────────────
   - type: web
     name: bodilicious-backend
@@ -215,3 +221,13 @@ services:
         value: "Bodilicious Support <support@bodilicious.in>"
       - key: EMAIL_FROM_ALERTS
         value: "Bodilicious Alerts <alerts@bodilicious.in>"
+      # Signs our own HMAC blobs (checkout quotes, support-upload ownership tags).
+      # Kept separate from RAZORPAY_KEY_SECRET so the gateway key can be rotated
+      # without invalidating live quotes. Any long random string works.
+      # If unset, the app falls back to RAZORPAY_KEY_SECRET and warns at startup.
+      - key: APP_SIGNING_SECRET
+        sync: false   # set this secret in the Render dashboard
+      # Meta app secret used to verify X-Hub-Signature-256 on the WhatsApp
+      # webhook. The webhook rejects all traffic until this is set.
+      - key: WHATSAPP_APP_SECRET
+        sync: false   # set this secret in the Render dashboard

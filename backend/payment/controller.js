@@ -18,6 +18,7 @@ import orderEvents from "../events/orderEvents.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
 import { validateCouponAtCheckout } from "../coupons/controller.js";
 import { Coupon, CouponUse } from "../coupons/models.js";
+import { sign as signInternal, verify as verifyInternal, safeEqual } from "../utils/signing.js";
 
 /* =========================================================
    PERMANENT ERROR — throw this inside processPaidOrder for errors
@@ -516,10 +517,9 @@ export const getOrderQuote = async (req, res) => {
             exchangeRate: conversionRate
         };
 
-        const signature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(JSON.stringify(quotePayload))
-            .digest("hex");
+        // Signed with APP_SIGNING_SECRET (see utils/signing.js) — this is our own
+        // blob, not a Razorpay artifact, so it must not ride on the gateway key.
+        const signature = signInternal(JSON.stringify(quotePayload));
 
         const quoteId = Buffer.from(JSON.stringify({ payload: quotePayload, signature })).toString('base64');
         const deliveryEstimate = isIndia ? "3-5 business days" : "7-21 business days";
@@ -573,12 +573,8 @@ export const initRazorpayOrder = async (req, res) => {
             return res.status(500).json({ success: false, message: "Payment configuration error" });
         }
 
-        const expectedSignature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-            .update(JSON.stringify(payload))
-            .digest("hex");
-
-        if (expectedSignature !== signature) {
+        // Constant-time verify against APP_SIGNING_SECRET (see utils/signing.js)
+        if (!verifyInternal(JSON.stringify(payload), signature)) {
             return res.status(400).json({ success: false, message: "Quote signature mismatch. Please refresh." });
         }
 
@@ -916,7 +912,7 @@ export const verifyPayment = async (req, res) => {
             .update(body.toString())
             .digest("hex");
 
-        if (expectedSignature !== razorpay_signature) {
+        if (!safeEqual(expectedSignature, razorpay_signature)) {
             await logAction(req, "payment_verification_failed", "order", razorpay_order_id, {
                 paymentId: razorpay_payment_id
             }, { severity: "CRITICAL" }).catch(err => console.error("Payment Verification Failed Audit:", err));
@@ -1064,7 +1060,7 @@ export const razorpayWebhook = async (req, res) => {
             .update(req.rawBody)
             .digest("hex");
 
-        if (expectedSignature !== signature) {
+        if (!safeEqual(expectedSignature, signature)) {
             return res.status(400).json({ success: false, message: "Invalid webhook signature" });
         }
 
@@ -1335,7 +1331,13 @@ export const razorpayWebhook = async (req, res) => {
                             paymentStatus: order.paymentStatus,
                             refundStatus: order.refundStatus,
                             refundId: refund.id || order.refundId || null,
-                            refundAmount: order.refundAmount ?? null,
+                            // Derive refund amount from the webhook entity itself — order.refundAmount
+                            // is only set on the auto-refund cancellation path, so it was always null
+                            // when a merchant manually refunds from the Razorpay dashboard.
+                            refundAmount: fromRazorpayMinorUnits(
+                                refund.amount,
+                                (refund.currency || order.currency || "INR").toUpperCase()
+                            ),
                             isStockRestored: order.isStockRestored
                         }
                     });

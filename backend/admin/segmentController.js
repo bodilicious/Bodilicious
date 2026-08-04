@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import escapeStringRegexp from "escape-string-regexp";
 import UserProfile from "../profile/models.js";
 import Product from "../products/models.js";
 import Order from "../tracker/models.js";
@@ -165,9 +166,12 @@ export const getSegmentCustomers = async (req, res) => {
     const query = {};
     if (segment) query.segment = segment;
     if (search) {
+      // Escape before interpolating: an unescaped pattern like "(a+)+$" would
+      // pin the event loop (ReDoS). Matches how every other search path here works.
+      const safeSearch = escapeStringRegexp(String(search));
       query.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
+        { name: { $regex: safeSearch, $options: "i" } },
+        { email: { $regex: safeSearch, $options: "i" } },
       ];
     }
 

@@ -55,12 +55,12 @@ const runTests = async () => {
         const req2 = JSON.parse(JSON.stringify(req1)); // clone
         req2.user = req1.user; // keep object id
 
-        const crypto = await import("crypto");
+        // Must use the same helper the controller verifies with — quotes are signed
+        // with APP_SIGNING_SECRET now, not the Razorpay key.
+        const { sign: signInternal } = await import("../utils/signing.js");
         const generateMockQuote = (items, isWelcomeOfferApplied) => {
-            const secret = process.env.RAZORPAY_KEY_SECRET;
             const payload = { items, isWelcomeOfferApplied, country: "India", ts: Date.now(), subtotal: 1000, finalAmount: 1000, originalAmount: 1000, currency: "INR", userId: testUser._id.toString() };
-            const hmac = crypto.createHmac("sha256", secret).update(JSON.stringify(payload)).digest("hex");
-            return Buffer.from(JSON.stringify({ payload, signature: hmac })).toString("base64");
+            return Buffer.from(JSON.stringify({ payload, signature: signInternal(JSON.stringify(payload)) })).toString("base64");
         };
         
         req1.body.quoteId = generateMockQuote([{ productId: testProduct._id.toString(), quantity: 1 }], true);

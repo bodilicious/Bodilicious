@@ -16,6 +16,7 @@ import NotificationService from "../procurement/notificationService.js";
 import orderEvents from "../events/orderEvents.js";
 import { toRazorpayMinorUnits } from "../utils/currencies.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
+import { safeEqual } from "../utils/signing.js";
 
 
 /* =========================================================
@@ -611,14 +612,16 @@ export const getSingleOrder = async (req, res) => {
 export const shiprocketWebhook = async (req, res) => {
   try {
     // ── Token verification ──────────────────────────────────────────────────
-    // Set SHIPROCKET_WEBHOOK_TOKEN in .env, then append it to the URL you
-    // enter in the Shiprocket dashboard:
+    // Set SHIPROCKET_WEBHOOK_TOKEN in .env, then supply it from the Shiprocket
+    // dashboard either as the X-Webhook-Token header or as a query param:
     //   POST /api/v1/orders/webhook/shipping?token=<SHIPROCKET_WEBHOOK_TOKEN>
-    // Shiprocket also supports sending it as X-Webhook-Token header.
+    // Both are accepted — previously only the header was read, so a dashboard
+    // configured per the documented ?token= form silently 401'd and shipment
+    // statuses stopped updating.
     const expectedToken = process.env.SHIPROCKET_WEBHOOK_TOKEN;
-    const providedToken = req.headers["x-webhook-token"];
+    const providedToken = req.headers["x-webhook-token"] || req.query.token;
 
-    if (!expectedToken || providedToken !== expectedToken) {
+    if (!expectedToken || !safeEqual(String(providedToken || ""), expectedToken)) {
       console.warn("[Shiprocket Webhook] Blocked unauthorized request — IP:", req.ip);
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }

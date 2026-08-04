@@ -157,12 +157,13 @@ export const pushOrderToShiprocket = async (order) => {
     // International: those same coercions are actively harmful — "02108" is a valid
     // Boston ZIP, and coercing it to "110001" ships the parcel to Delhi. Send the
     // real address and let Shiprocket validate it.
-    const rawPhone = (shippingDetails.phone || "").replace(/\D/g, "");
+    const phoneStr = (shippingDetails.phone || "").trim();
+    const digitsOnlyPhone = phoneStr.replace(/\D/g, "");
     const rawPincode = (shippingDetails.pincode || "").trim();
 
     const finalPhone = domestic
-      ? (rawPhone.length >= 10 ? rawPhone.slice(-10) : "9999999999")
-      : rawPhone;                                    // keep the country code
+      ? (digitsOnlyPhone.length >= 10 ? digitsOnlyPhone.slice(-10) : "9999999999")
+      : phoneStr;                                    // keep the country code formatting
     const finalPincode = domestic
       ? (rawPincode.replace(/\D/g, "").length === 6 ? rawPincode.replace(/\D/g, "") : "110001")
       : rawPincode;                                  // keep alphanumerics (UK/CA postcodes)
@@ -196,6 +197,23 @@ export const pushOrderToShiprocket = async (order) => {
       billing_email: shippingDetails.email || "customer@bodilicious.in",
       billing_phone: finalPhone,
       shipping_is_billing: true,
+      // ── Explicit shipping block ───────────────────────────────────────────
+      // `shipping_is_billing: true` is honoured for domestic orders but NOT for
+      // international ones — Shiprocket left the shipping fields empty and flagged
+      // the order unshippable:
+      //   errors: { shipping_phone: "Customer phone is empty",
+      //             shipping_pincode: "Delivery pincode is empty" }
+      // Sending the block explicitly costs nothing on the domestic path (identical
+      // values) and is what makes an international order actually dispatchable.
+      shipping_customer_name: firstName,
+      shipping_last_name: lastName,
+      shipping_address: shippingDetails.address || "No Address Provided",
+      shipping_city: shippingDetails.city || (domestic ? "Delhi" : ""),
+      shipping_pincode: finalPincode,
+      shipping_state: shippingDetails.state || (domestic ? "Delhi" : ""),
+      shipping_country: shippingDetails.country || "India",
+      shipping_email: shippingDetails.email || "customer@bodilicious.in",
+      shipping_phone: finalPhone,
       order_items: shiprocketItems,
       // Declare what the order actually is. Previously this forced "Prepaid" on every
       // international order, which would have told Shiprocket the parcel was already

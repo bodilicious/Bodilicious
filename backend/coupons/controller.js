@@ -197,7 +197,7 @@ export const validateCouponAtCheckout = async (code, cartTotal, userId, activeCo
 
     // Min order value
     if (cartTotal < coupon.minOrderValue) {
-      return { valid: false, error: `Minimum order value of ₹${coupon.minOrderValue} required` };
+      return { valid: false, error: `Minimum order value of ${coupon.minOrderValue} required to use this coupon` };
     }
 
     // Total cap

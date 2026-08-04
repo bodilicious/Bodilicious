@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSEO } from '../hooks/useSEO';
 import { getCountryNameFromIso } from '../utils/countries';
+import { formatCurrency } from '../utils/currencies';
 
 export default function CartPage() {
   useSEO({
@@ -40,18 +41,31 @@ export default function CartPage() {
   );
 
   // 2. Call all hooks BEFORE any conditional returns (Rules of Hooks)
-  const [quoteData, setQuoteData] = useState<{ 
-    shippingCost: number; 
-    discountAmount: number; 
-    total: number; 
+  // ── Currency note ──────────────────────────────────────────────────────────
+  // Everything the quote endpoint returns is ALREADY converted into `currency`.
+  // Only `threshold` (read from storeSettings) and the locally-summed `cartTotal`
+  // are in INR. That distinction decides which formatter to use:
+  //   formatPrice(x)              converts x FROM INR  -> use for INR values
+  //   formatCurrency(x, currency) formats x as-is      -> use for quote values
+  // Passing a quote value to formatPrice converts it twice, which rendered a
+  // $40.24 cart as $0.46. `isFetched` marks when the quote has landed.
+  const [quoteData, setQuoteData] = useState<{
+    shippingCost: number;
+    discountAmount: number;
+    total: number;
     threshold: number;
+    subtotal?: number;
+    currency: string;
+    isFetched: boolean;
     isWelcomeOfferApplied?: boolean;
     isFreeShippingCouponApplied?: boolean;
   }>({
     shippingCost: storeSettings.shippingCost,
     discountAmount: 0,
     total: cartTotal + storeSettings.shippingCost,
-    threshold: storeSettings.shippingThreshold
+    threshold: storeSettings.shippingThreshold,
+    currency: 'INR',
+    isFetched: false
   });
 
   const [couponInput, setCouponInput] = useState('');
@@ -77,6 +91,9 @@ export default function CartPage() {
             shippingCost: data.shippingCost,
             discountAmount: data.discountAmount,
             total: data.totalAmount,
+            subtotal: data.subtotal,
+            currency: data.currency || 'INR',
+            isFetched: true,
             threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold,
             isWelcomeOfferApplied: data.isWelcomeOfferApplied,
             isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
@@ -98,7 +115,7 @@ export default function CartPage() {
             fetchShippingQuote(itemsForQuote, { country: previewCountry }).then(d => {
               if (isMounted) {
                 const s = storeSettingsRef.current;
-                setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
+                setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, subtotal: d.subtotal, currency: d.currency || 'INR', isFetched: true, threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
               }
             }).catch(e => console.error("Fallback quote failed:", e));
          }
@@ -127,6 +144,9 @@ export default function CartPage() {
         shippingCost: data.shippingCost,
         discountAmount: data.discountAmount,
         total: data.totalAmount,
+        subtotal: data.subtotal,
+        currency: data.currency || 'INR',
+        isFetched: true,
         threshold: isPreviewIndia ? storeSettings.shippingThreshold : storeSettings.internationalShippingThreshold,
         isWelcomeOfferApplied: data.isWelcomeOfferApplied,
         isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
@@ -259,12 +279,20 @@ export default function CartPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-sm font-sans">
                   <span className="text-grey-beige">Subtotal</span>
-                  <span className="text-dark-red">{formatPrice(cartTotal)}</span>
+                  <span className="text-dark-red">
+                    {quoteData.isFetched && quoteData.subtotal !== undefined
+                      ? formatCurrency(quoteData.subtotal, quoteData.currency)
+                      : formatPrice(cartTotal)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm font-sans">
                   <span className="text-grey-beige">Shipping</span>
                   <span className={shipping === 0 ? 'text-ruby-red font-medium' : 'text-dark-red'}>
-                    {shipping === 0 ? 'Free' : formatPrice(shipping)}
+                    {shipping === 0
+                      ? 'Free'
+                      : quoteData.isFetched
+                        ? formatCurrency(shipping, quoteData.currency)
+                        : formatPrice(shipping)}
                   </span>
                 </div>
                 {shipping > 0 && !quoteData.isFreeShippingCouponApplied && (
@@ -277,14 +305,18 @@ export default function CartPage() {
                 {(discountAmount > 0 || quoteData.isFreeShippingCouponApplied) && (
                   <div className="flex justify-between text-sm font-sans text-emerald-600">
                     <span>{quoteData.isWelcomeOfferApplied ? 'Welcome Offer (10%)' : quoteData.isFreeShippingCouponApplied && discountAmount === 0 ? 'Free Shipping Coupon' : 'Coupon Applied'}</span>
-                    <span>{discountAmount > 0 ? `-${formatPrice(discountAmount)}` : 'Applied'}</span>
+                    <span>{discountAmount > 0
+                      ? `-${quoteData.isFetched ? formatCurrency(discountAmount, quoteData.currency) : formatPrice(discountAmount)}`
+                      : 'Applied'}</span>
                   </div>
                 )}
 
                 <div className="border-t border-silk pt-3 flex justify-between font-sans font-semibold text-dark-red">
                   <span>Total</span>
                   <span>
-                    {formatPrice(total)}
+                    {quoteData.isFetched
+                      ? formatCurrency(total, quoteData.currency)
+                      : formatPrice(total)}
                     {userCurrency === 'USD' && <span className="text-xs ml-1 opacity-60">*</span>}
                   </span>
                 </div>

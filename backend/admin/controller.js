@@ -23,6 +23,40 @@ const redis = _redis ?? {
 };
 
 /**
+ * How long an unpaid online checkout sits before we call it abandoned.
+ * Matches the 30-minute quote expiry and the draft-cleanup cron, so the admin views
+ * and the cron agree on what "abandoned" means.
+ */
+const ABANDONED_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * The single definition of an abandoned checkout.
+ *
+ * Built fresh on each call rather than held as a module constant: `createdAt` is
+ * relative to now, and a constant would freeze the cutoff at server-boot time and
+ * silently widen every day the process stayed up.
+ *
+ * Used two ways, and they must stay in agreement — the abandoned list shows exactly
+ * what the other views exclude. When these were four copy-pasted literals, any edit
+ * to one made orders disappear from both places at once.
+ *   - `Order.find(abandonedCheckoutFilter())` — the dedicated abandoned view
+ *   - `{ $nor: [abandonedCheckoutFilter()] }` — everywhere abandoned should be hidden
+ *
+ * `needsManualReview` is deliberately excluded. When a payment is captured but order
+ * creation fails, the claim is reverted to pending/failed and the order is flagged —
+ * which otherwise looks exactly like an abandoned checkout. Those are the opposite of
+ * abandoned: the customer's money is gone and ops must see them.
+ */
+const abandonedCheckoutFilter = () => ({
+  paymentMethod: { $ne: "cod" },          // COD is never "unpaid" in this sense
+  source: { $ne: "admin_draft" },         // admin-created drafts aren't customer checkouts
+  orderStatus: "pending",
+  paymentStatus: { $in: ["pending", "failed"] },
+  needsManualReview: { $ne: true },       // money captured, order stuck — keep visible
+  createdAt: { $lt: new Date(Date.now() - ABANDONED_WINDOW_MS) },
+});
+
+/**
  * Helper to log administrative actions
  */
 export const logAction = async (req, action, entity, entityId, details, options = {}) => {
@@ -101,8 +135,11 @@ export const getDashboardSummary = async (req, res) => {
         { $match: { paymentStatus: "paid", orderStatus: { $ne: "cancelled" } } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } }
       ]),
-      // Total Orders
-      Order.countDocuments({ orderStatus: { $ne: "cancelled" } }),
+      // Total Orders (excludes cancelled and abandoned checkouts)
+      Order.countDocuments({
+        orderStatus: { $ne: "cancelled" },
+        $nor: [abandonedCheckoutFilter()]
+      }),
       // Total Users
       UserProfile.countDocuments(),
       // Pending Shipments (status = processing)
@@ -555,7 +592,12 @@ export const getAllOrdersAdmin = async (req, res) => {
     const { search, orderStatus, paymentStatus, startDate, endDate } = req.query;
 
     // Exclude abandoned orders by default — they have their own dedicated section in the admin panel.
-    const query = { orderStatus: { $ne: "abandoned" } };
+    // Abandoned = frontend non-COD, orderStatus: pending, paymentStatus: pending/failed, older than 30 mins
+    const query = {
+      orderStatus: { $ne: "abandoned" },   // set by the cleanup cron
+      $nor: [abandonedCheckoutFilter()]    // covers the gap before the cron runs
+    };
+
     if (search) {
       const safeSearch = escapeStringRegexp(search);
       query.$or = [
@@ -1087,7 +1129,11 @@ export const exportLogsCSV = async (req, res) => {
 export const exportOrdersCSV = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    const exportQuery = { orderStatus: { $ne: "abandoned" } };
+    // Exclude abandoned orders just like the main view
+    const exportQuery = {
+      orderStatus: { $ne: "abandoned" },
+      $nor: [abandonedCheckoutFilter()]   // keep the CSV consistent with the on-screen list
+    };
 
     if (startDate || endDate) {
       exportQuery.createdAt = {};
@@ -1659,13 +1705,7 @@ export const adminSyncShiprocket = async (req, res) => {
 export const getAbandonedCheckouts = async (req, res) => {
   try {
     const { limit, skip } = req.pagination;
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
-
-    const query = {
-      paymentStatus: { $in: ["pending", "failed"] },
-      orderStatus: "pending",
-      createdAt: { $lt: thirtyMinsAgo }
-    };
+    const query = abandonedCheckoutFilter();
 
     const [orders, total] = await Promise.all([
       Order.find(query)
@@ -1787,7 +1827,9 @@ export const createDraftOrder = async (req, res) => {
       orderStatus: paymentStatus === "paid" ? "processing" : "pending",
       shippingDetails,
       source: "admin_draft",
-      notes
+      // The schema field is `adminNote`; a bare `notes` key is silently discarded,
+      // so the admin's note never reached the database.
+      adminNote: notes || "",
     }], { session });
 
     await UserProfile.findByIdAndUpdate(userId, { $push: { orders: newOrder._id } }, { session });

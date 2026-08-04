@@ -10,6 +10,7 @@ import {
 } from "../email/emailService.js";
 import { v2 as cloudinary } from "cloudinary";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
+import { sign as signInternal, safeEqual } from "../utils/signing.js";
 import { getSettings } from "../settings/cache.js";
 import _redis from "../utils/redis.js";
 import NotificationService from "../procurement/notificationService.js";
@@ -17,6 +18,18 @@ import NotificationService from "../procurement/notificationService.js";
 // Use the shared singleton; fall back to a no-op if Redis is unavailable.
 // incr returns a Promise since the call site uses await.
 const redis = _redis ?? { incr: () => Promise.resolve(0) };
+
+/**
+ * Support attachments are uploaded before the ticket/message exists (the UI lets
+ * you attach, then remove, then send), so there is no ticket to check ownership
+ * against on delete. Instead we stamp a non-reversible owner tag into the
+ * Cloudinary public_id at upload time and verify it on delete.
+ *
+ * An HMAC is used rather than the raw ObjectId so the uploader's user id is not
+ * exposed in an attachment URL that other parties may see.
+ */
+const ownerTagFor = (userId) => signInternal(`support-upload:${userId}`).slice(0, 16);
+const OWNER_TAG_RE = /(?:^|\/)BD-SUP-o([0-9a-f]{16})-/;
 
 // POST /api/v1/support/tickets
 export const createTicket = async (req, res) => {
@@ -395,7 +408,9 @@ export const uploadSupportAttachment = async (req, res) => {
 
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const safeOriginalName = req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const filename = `BD-SUP-${uniqueSuffix}-${safeOriginalName}`;
+    // The `o<tag>` segment binds this upload to the uploader so deleteSupportAttachment
+    // can prove ownership without a ticket lookup.
+    const filename = `BD-SUP-o${ownerTagFor(req.user._id)}-${uniqueSuffix}-${safeOriginalName}`;
 
     // Wrap upload_stream in a Promise
     const uploadResult = await new Promise((resolve, reject) => {
@@ -439,6 +454,17 @@ export const deleteSupportAttachment = async (req, res) => {
     // Security check: Only allow deleting files in the bodilicious_support folder
     if (!publicId.startsWith("bodilicious_support/")) {
       return res.status(400).json({ success: false, message: "Access denied: Invalid folder" });
+    }
+
+    // Ownership check. Without this, any authenticated user could permanently
+    // delete another customer's support attachment just by knowing its publicId.
+    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+    if (!isAdmin) {
+      const match = OWNER_TAG_RE.exec(publicId);
+      // Untagged files predate owner stamping; only admins may remove those.
+      if (!match || !safeEqual(match[1], ownerTagFor(req.user._id))) {
+        return res.status(403).json({ success: false, message: "Access denied" });
+      }
     }
 
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
