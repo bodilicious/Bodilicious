@@ -408,7 +408,23 @@ export default function ProductPage() {
         price: product.price
       });
     }
-  }, [product?.pid, product?.name, product?.category, product?.price, posthog]); // pid is the primary dep; viewTracked ref + sessionStorage deduplicate
+
+    // 🎯 Google Analytics/Ads Client-Side Tracking (Dynamic Remarketing)
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'view_item', {
+        currency: userCurrency || 'INR',
+        value: Number(product.price || 0),
+        items: [
+          {
+            item_id: product.pid,
+            item_name: product.name,
+            price: Number(product.price || 0),
+            item_category: product.category
+          }
+        ]
+      });
+    }
+  }, [product?.pid, product?.name, product?.category, product?.price, posthog, userCurrency]); // pid is the primary dep; viewTracked ref + sessionStorage deduplicate
 
   const prevImage = useCallback(() => {
     setActiveImage((i) => (i === 0 ? (product?.images.length || 1) - 1 : i - 1));
