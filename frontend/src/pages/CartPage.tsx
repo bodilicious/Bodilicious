@@ -365,6 +365,20 @@ export default function CartPage() {
 
               <button
                 onClick={() => {
+                  // 🎯 Google Analytics/Ads Tracking - Begin Checkout
+                  if (typeof window !== 'undefined' && (window as any).gtag) {
+                    (window as any).gtag('event', 'begin_checkout', {
+                      currency: quoteData.currency || userCurrency || 'INR',
+                      value: quoteData.total,
+                      items: validCartItems.map((i: any) => ({
+                        item_id: i.product?.pid,
+                        item_name: i.product?.name,
+                        price: i.product?.price,
+                        quantity: i.quantity
+                      }))
+                    });
+                  }
+
                   if (isAuthenticated) {
                     navigateTo('shipping');
                   } else {

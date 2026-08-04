@@ -806,6 +806,14 @@ const triggerPasswordReset = async (email: string) => {
   useEffect(() => {
     const path = location.pathname.substring(1) || 'home';
     setCurrentPage(path as Page);
+
+    // 🎯 Google Analytics/Ads Tracking - Page View
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'page_view', {
+        page_path: location.pathname,
+        page_title: document.title || path
+      });
+    }
   }, [location.pathname]);
 
   const navigateTo = (page: Page, pid?: string, orderId?: string) => {
@@ -898,6 +906,22 @@ const triggerPasswordReset = async (email: string) => {
       });
     }
 
+    // 🎯 Google Analytics/Ads Tracking
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'add_to_cart', {
+        currency: userCurrency || 'INR',
+        value: Number(product.price || 0) * Number(quantity),
+        items: [
+          {
+            item_id: product.pid,
+            item_name: product.name,
+            price: Number(product.price || 0),
+            quantity: Number(quantity)
+          }
+        ]
+      });
+    }
+
     if (!skipRedirect) {
       navigateTo('cart');
     }
@@ -975,6 +999,21 @@ const triggerPasswordReset = async (email: string) => {
 
     const json = await response.json();
     const { order } = json.data;
+
+    // 🎯 Google Analytics/Ads Tracking - Purchase
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'purchase', {
+        transaction_id: order._id || order.orderId,
+        currency: order.currency || userCurrency || 'INR',
+        value: order.totalAmount,
+        items: order.items.map((i: any) => ({
+          item_id: i.product?.pid || i.product,
+          item_name: i.product?.name || 'Product',
+          price: i.price,
+          quantity: i.quantity
+        }))
+      });
+    }
 
     // Only remove purchased items from local cart to match backend $pull logic
     const purchasedProductIds = new Set(order.items.map((i: any) => i.product._id || i.product));
@@ -1102,6 +1141,21 @@ const triggerPasswordReset = async (email: string) => {
     }
 
     const { data: order } = await res.json();
+
+    // 🎯 Google Analytics/Ads Tracking - Purchase
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'purchase', {
+        transaction_id: order._id || order.orderId,
+        currency: order.currency || userCurrency || 'INR',
+        value: order.totalAmount,
+        items: order.items.map((i: any) => ({
+          item_id: i.product?.pid || i.product,
+          item_name: i.product?.name || 'Product',
+          price: i.price,
+          quantity: i.quantity
+        }))
+      });
+    }
 
     // Only remove purchased items from local cart to match backend $pull logic
     const purchasedProductIds = new Set(order.items.map((i: any) => i.product._id || i.product));
