@@ -324,20 +324,21 @@ const ProductManagement: React.FC = () => {
                   </button>
                 </td>
                 <td className="px-4 py-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-silk-light/50 overflow-hidden border border-silk-light flex-shrink-0">
+                  <button
+                    onClick={() => navigate(`/admin/products/${product.pid}`)}
+                    title="Edit Product"
+                    className="flex items-center gap-4 text-left group/name"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-silk-light/50 overflow-hidden border border-silk-light flex-shrink-0 group-hover/name:border-dark-red/40 transition-colors">
                       <img src={product.images?.[0]?.startsWith('assets/') ? `/${product.images[0]}` : product.images?.[0]} alt={product.name} loading="lazy" decoding="async" className="w-full h-full object-cover mix-blend-multiply" />
                     </div>
                     <div>
-                      <button
-                        onClick={() => setStockProduct({ id: product._id, name: product.name })}
-                        className="font-bold text-dark-red text-sm line-clamp-1 hover:text-ruby-red hover:underline text-left"
-                      >
+                      <p className="font-bold text-dark-red text-sm line-clamp-1 group-hover/name:text-ruby-red group-hover/name:underline">
                         {product.name}
-                      </button>
+                      </p>
                       <p className="text-xs text-grey-beige font-medium">#{product.pid}</p>
                     </div>
-                  </div>
+                  </button>
                 </td>
                 <td className="px-4 py-4">
                   <span className="px-3 py-1 bg-silk-light text-dark-red rounded-full text-[10px] font-bold uppercase tracking-wider">
@@ -396,10 +397,10 @@ const ProductManagement: React.FC = () => {
                     >
                       <BarChart2 size={15} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => navigate(`/admin/products/${product.pid}`)}
                       title="Edit Product"
-                      className="admin-action-btn text-grey-beige"
+                      className="admin-action-btn bg-dark-red/10 text-dark-red hover:bg-dark-red hover:text-white"
                     >
                       <Edit2 size={15} />
                     </button>

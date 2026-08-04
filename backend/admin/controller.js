@@ -1575,13 +1575,28 @@ export const adminPushShiprocket = async (req, res) => {
       });
     }
 
+    // manual: true — an admin explicitly pushing this one order is the human
+    // confirmation the international auto-push gate exists to require, so this
+    // call must not be silently no-op'd by that same gate.
     // srPush updates order in DB internally (saves shipmentId, shiprocketOrderId, awb)
-    await srPush(order);
+    await srPush(order, { manual: true });
 
     // Re-fetch to return the updated doc
     const updated = await Order.findById(order._id)
       .populate("user", "name email")
       .populate("items.product", "name pid price images");
+
+    // srPush swallows its own errors (Shiprocket API failure, missing credentials,
+    // etc.) and just flags the order for manual review instead of throwing — so
+    // "no shiprocketOrderId after the call" is the only reliable signal that it
+    // didn't actually work. Without this check the endpoint always returned 200
+    // even when nothing was pushed, and the admin UI showed a false "Pushed ✓".
+    if (!updated.shiprocketOrderId) {
+      return res.status(502).json({
+        success: false,
+        message: updated.reviewReason || "Shiprocket did not return an order ID. Check server logs for details.",
+      });
+    }
 
     await logAction(req, "ADMIN_PUSH_SHIPROCKET", "order", order._id.toString(), {
       shiprocketOrderId: updated.shiprocketOrderId,

@@ -1,5 +1,213 @@
 import Order from "./models.js";
 
+const COUNTRY_ISO_MAP = {
+    "Afghanistan": "AF",
+    "Albania": "AL",
+    "Algeria": "DZ",
+    "Andorra": "AD",
+    "Angola": "AO",
+    "Antigua and Barbuda": "AG",
+    "Argentina": "AR",
+    "Armenia": "AM",
+    "Australia": "AU",
+    "Austria": "AT",
+    "Azerbaijan": "AZ",
+    "Bahamas": "BS",
+    "Bahrain": "BH",
+    "Bangladesh": "BD",
+    "Barbados": "BB",
+    "Belarus": "BY",
+    "Belgium": "BE",
+    "Belize": "BZ",
+    "Benin": "BJ",
+    "Bhutan": "BT",
+    "Bolivia": "BO",
+    "Bosnia and Herzegovina": "BA",
+    "Botswana": "BW",
+    "Brazil": "BR",
+    "Brunei": "BN",
+    "Bulgaria": "BG",
+    "Burkina Faso": "BF",
+    "Burundi": "BI",
+    "Côte d'Ivoire": "CI",
+    "Cabo Verde": "CV",
+    "Cambodia": "KH",
+    "Cameroon": "CM",
+    "Canada": "CA",
+    "Central African Republic": "CF",
+    "Chad": "TD",
+    "Chile": "CL",
+    "China": "CN",
+    "Colombia": "CO",
+    "Comoros": "KM",
+    "Congo (Congo-Brazzaville)": "CG",
+    "Costa Rica": "CR",
+    "Croatia": "HR",
+    "Cuba": "CU",
+    "Cyprus": "CY",
+    "Czechia (Czech Republic)": "CZ",
+    "Democratic Republic of the Congo": "CD",
+    "Denmark": "DK",
+    "Djibouti": "DJ",
+    "Dominica": "DM",
+    "Dominican Republic": "DO",
+    "Ecuador": "EC",
+    "Egypt": "EG",
+    "El Salvador": "SV",
+    "Equatorial Guinea": "GQ",
+    "Eritrea": "ER",
+    "Estonia": "EE",
+    "Eswatini": "SZ",
+    "Ethiopia": "ET",
+    "Fiji": "FJ",
+    "Finland": "FI",
+    "France": "FR",
+    "Gabon": "GA",
+    "Gambia": "GM",
+    "Georgia": "GE",
+    "Germany": "DE",
+    "Ghana": "GH",
+    "Greece": "GR",
+    "Grenada": "GD",
+    "Guatemala": "GT",
+    "Guinea": "GN",
+    "Guinea-Bissau": "GW",
+    "Guyana": "GY",
+    "Haiti": "HT",
+    "Holy See": "VA",
+    "Honduras": "HN",
+    "Hungary": "HU",
+    "Iceland": "IS",
+    "India": "IN",
+    "Indonesia": "ID",
+    "Iran": "IR",
+    "Iraq": "IQ",
+    "Ireland": "IE",
+    "Israel": "IL",
+    "Italy": "IT",
+    "Jamaica": "JM",
+    "Japan": "JP",
+    "Jordan": "JO",
+    "Kazakhstan": "KZ",
+    "Kenya": "KE",
+    "Kiribati": "KI",
+    "Kuwait": "KW",
+    "Kyrgyzstan": "KG",
+    "Laos": "LA",
+    "Latvia": "LV",
+    "Lebanon": "LB",
+    "Lesotho": "LS",
+    "Liberia": "LR",
+    "Libya": "LY",
+    "Liechtenstein": "LI",
+    "Lithuania": "LT",
+    "Luxembourg": "LU",
+    "Madagascar": "MG",
+    "Malawi": "MW",
+    "Malaysia": "MY",
+    "Maldives": "MV",
+    "Mali": "ML",
+    "Malta": "MT",
+    "Marshall Islands": "MH",
+    "Mauritania": "MR",
+    "Mauritius": "MU",
+    "Mexico": "MX",
+    "Micronesia": "FM",
+    "Moldova": "MD",
+    "Monaco": "MC",
+    "Mongolia": "MN",
+    "Montenegro": "ME",
+    "Morocco": "MA",
+    "Mozambique": "MZ",
+    "Myanmar (formerly Burma)": "MM",
+    "Namibia": "NA",
+    "Nauru": "NR",
+    "Nepal": "NP",
+    "Netherlands": "NL",
+    "New Zealand": "NZ",
+    "Nicaragua": "NI",
+    "Niger": "NE",
+    "Nigeria": "NG",
+    "North Korea": "KP",
+    "North Macedonia": "MK",
+    "Norway": "NO",
+    "Oman": "OM",
+    "Pakistan": "PK",
+    "Palau": "PW",
+    "Palestine State": "PS",
+    "Panama": "PA",
+    "Papua New Guinea": "PG",
+    "Paraguay": "PY",
+    "Peru": "PE",
+    "Philippines": "PH",
+    "Poland": "PL",
+    "Portugal": "PT",
+    "Qatar": "QA",
+    "Romania": "RO",
+    "Russia": "RU",
+    "Rwanda": "RW",
+    "Saint Kitts and Nevis": "KN",
+    "Saint Lucia": "LC",
+    "Saint Vincent and the Grenadines": "VC",
+    "Samoa": "WS",
+    "San Marino": "SM",
+    "Sao Tome and Principe": "ST",
+    "Saudi Arabia": "SA",
+    "Senegal": "SN",
+    "Serbia": "RS",
+    "Seychelles": "SC",
+    "Sierra Leone": "SL",
+    "Singapore": "SG",
+    "Slovakia": "SK",
+    "Slovenia": "SI",
+    "Solomon Islands": "SB",
+    "Somalia": "SO",
+    "South Africa": "ZA",
+    "South Korea": "KR",
+    "South Sudan": "SS",
+    "Spain": "ES",
+    "Sri Lanka": "LK",
+    "Sudan": "SD",
+    "Suriname": "SR",
+    "Sweden": "SE",
+    "Switzerland": "CH",
+    "Syria": "SY",
+    "Tajikistan": "TJ",
+    "Tanzania": "TZ",
+    "Thailand": "TH",
+    "Timor-Leste": "TL",
+    "Togo": "TG",
+    "Tonga": "TO",
+    "Trinidad and Tobago": "TT",
+    "Tunisia": "TN",
+    "Turkey": "TR",
+    "Turkmenistan": "TM",
+    "Tuvalu": "TV",
+    "Uganda": "UG",
+    "Ukraine": "UA",
+    "United Arab Emirates": "AE",
+    "United Kingdom": "GB",
+    "United States of America": "US",
+    "Uruguay": "UY",
+    "Uzbekistan": "UZ",
+    "Vanuatu": "VU",
+    "Venezuela": "VE",
+    "Vietnam": "VN",
+    "Yemen": "YE",
+    "Zambia": "ZM",
+    "Zimbabwe": "ZW"
+};
+
+const COUNTRY_ISO_MAP_LOWER = Object.fromEntries(
+  Object.entries(COUNTRY_ISO_MAP).map(([name, code]) => [name.toLowerCase(), code])
+);
+
+const getIsoAlpha2Code = (countryName) => {
+    if (!countryName) return null;
+    const normalized = countryName.trim().toLowerCase();
+    return COUNTRY_ISO_MAP_LOWER[normalized] || null;
+};
+
 let cachedToken = null;
 let tokenExpiry = null;
 
@@ -116,10 +324,12 @@ export const getInternationalShippingRate = async (deliveryCountry, deliveryPinc
     const token = await getShiprocketToken();
     const pickupPincode = "600081"; // Tondiarpet, Chennai origin
 
+    const isoCountry = getIsoAlpha2Code(deliveryCountry) || deliveryCountry;
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500); // 2.5s timeout
 
-    const response = await fetch(`https://apiv2.shiprocket.in/v1/external/courier/international/serviceability?pickup_postcode=${pickupPincode}&delivery_country=${deliveryCountry}&delivery_postcode=${deliveryPincode || ""}&weight=${weight}&cod=0`, {
+    const response = await fetch(`https://apiv2.shiprocket.in/v1/external/courier/international/serviceability?pickup_postcode=${pickupPincode}&delivery_country=${isoCountry}&delivery_postcode=${deliveryPincode || ""}&weight=${weight}&cod=0`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -157,8 +367,15 @@ export const getInternationalShippingRate = async (deliveryCountry, deliveryPinc
  * Pushes a verified order (Prepaid or COD) to Shiprocket.
  * Handles both order creation and AWB assignment.
  * Updates the order in DB with shipmentId, shiprocketOrderId, and awb.
+ *
+ * @param {object} order
+ * @param {{ manual?: boolean }} [opts] - manual: true bypasses the international
+ *   auto-push gate. That gate exists to stop a payment webhook from silently
+ *   booking a courier against an unverified international payload; an admin
+ *   explicitly clicking "Push to Shiprocket" for one specific order IS the human
+ *   confirmation the gate is meant to require, so it must not also block that path.
  */
-export const pushOrderToShiprocket = async (order) => {
+export const pushOrderToShiprocket = async (order, opts = {}) => {
   try {
     if (!process.env.SHIPROCKET_EMAIL || !process.env.SHIPROCKET_PASSWORD) return;
     if (order.shiprocketOrderId || order.shipmentId) return; // Already created
@@ -166,13 +383,15 @@ export const pushOrderToShiprocket = async (order) => {
     const domestic = isIndiaOrder(order);
 
     // ── International gate ────────────────────────────────────────────────────
-    // Fails CLOSED. The domestic payload below sanitises addresses for Indian
-    // couriers (6-digit pincode, 10-digit phone) and would turn a Boston order
-    // into a Delhi one, so international must never fall through to it by accident.
-    // Flip SHIPROCKET_INTERNATIONAL_ENABLED=true only once a live test order has
-    // been confirmed landing in the dashboard's International tab.
-    if (!domestic && process.env.SHIPROCKET_INTERNATIONAL_ENABLED !== "true") {
-      console.warn(`[Shiprocket] International auto-push disabled — order ${order._id} (${order.shippingDetails?.country}) flagged for manual fulfilment. Set SHIPROCKET_INTERNATIONAL_ENABLED=true to enable.`);
+    // Fails CLOSED for the automatic post-payment path. The domestic payload below
+    // sanitises addresses for Indian couriers (6-digit pincode, 10-digit phone) and
+    // would turn a Boston order into a Delhi one, so international must never fall
+    // through to it by accident from an unattended webhook.
+    // Flip SHIPROCKET_INTERNATIONAL_ENABLED=true to enable it for the automatic
+    // path too, once a live test order has been confirmed landing in the
+    // dashboard's International tab.
+    if (!domestic && !opts.manual && process.env.SHIPROCKET_INTERNATIONAL_ENABLED !== "true") {
+      console.warn(`[Shiprocket] International auto-push disabled — order ${order._id} (${order.shippingDetails?.country}) flagged for manual fulfilment. Set SHIPROCKET_INTERNATIONAL_ENABLED=true to enable, or push it manually from the admin panel.`);
       await flagForManualReview(order._id, `International order (${order.shippingDetails?.country}) — automated international push is disabled; arrange carrier manually.`);
       return;
     }

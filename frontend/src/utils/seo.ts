@@ -79,24 +79,33 @@ function normaliseKeywordGroups(raw: SeoProductLike['seo_keywords']): string[] {
   ].map(k => String(k).trim()).filter(Boolean);
 }
 
-function nthOf(
-  raw: SeoProductLike['seo_keywords'],
-  group: keyof SeoKeywordGroups,
-  index: number,
-): string {
-  if (!raw || typeof raw === 'string') return '';
-  const value = raw[group]?.[index];
-  return value ? String(value).trim() : '';
+function groupOf(raw: SeoProductLike['seo_keywords'], group: keyof SeoKeywordGroups): string[] {
+  if (!raw || typeof raw === 'string') return [];
+  return (raw[group] || []).map(k => String(k).trim()).filter(Boolean);
 }
 
-/** First primary keyword — the one worth spending title characters on. */
-export function primaryKeyword(product?: SeoProductLike | null): string {
-  return product ? nthOf(product.seo_keywords, 'primary', 0) : '';
+/**
+ * First primary keyword usable in the title — the one worth spending title
+ * characters on. Scans the whole list rather than just index 0: an admin who
+ * enters several keywords expects all of them to be candidates, not just the
+ * first, and a later one may fit where an earlier one doesn't or is already
+ * redundant with the product name.
+ */
+export function primaryKeyword(product?: SeoProductLike | null, notContainedIn = ''): string {
+  const haystack = notContainedIn.toLowerCase();
+  const candidates = groupOf(product?.seo_keywords, 'primary');
+  return candidates.find(k => !haystack || !haystack.includes(k.toLowerCase())) || '';
 }
 
-/** First secondary keyword — used for image alt text. */
-export function secondaryKeyword(product?: SeoProductLike | null): string {
-  return product ? nthOf(product.seo_keywords, 'secondary', 0) : '';
+/**
+ * First secondary keyword usable for image alt text — same multi-candidate
+ * scan as primaryKeyword, so every entry in the list can actually be used,
+ * not just the first.
+ */
+export function secondaryKeyword(product?: SeoProductLike | null, notContainedIn = ''): string {
+  const haystack = notContainedIn.toLowerCase();
+  const candidates = groupOf(product?.seo_keywords, 'secondary');
+  return candidates.find(k => !haystack || !haystack.includes(k.toLowerCase())) || '';
 }
 
 /**
@@ -113,6 +122,10 @@ export function secondaryKeyword(product?: SeoProductLike | null): string {
  *
  * If appending would still overflow, the name alone wins — a complete title
  * beats a truncated one with a half-visible keyword.
+ *
+ * Tries every primary keyword in order, not just the first — a keyword list
+ * is a prioritised set of candidates, and one further down the list may fit
+ * (or add something new) where an earlier one doesn't.
  */
 export function buildProductTitle(product?: SeoProductLike | null): string {
   // An editorially-set title always wins — a human chose it deliberately.
@@ -126,8 +139,10 @@ export function buildProductTitle(product?: SeoProductLike | null): string {
   const hasBrand = nameLower.includes(BRAND.toLowerCase());
   const base = hasBrand ? name : `${name} — ${BRAND}`;
 
-  const keyword = primaryKeyword(product);
-  if (keyword && !nameLower.includes(keyword.toLowerCase())) {
+  const candidates = groupOf(product?.seo_keywords, 'primary')
+    .filter(k => !nameLower.includes(k.toLowerCase()));
+
+  for (const keyword of candidates) {
     const withKeyword = hasBrand
       ? `${name} - ${keyword}`
       : `${name} - ${keyword} | ${BRAND}`;
@@ -177,7 +192,7 @@ export function buildProductOgAlt(product?: SeoProductLike | null): string | und
 
   const name = (product?.name || '').trim();
   if (!name) return undefined;
-  const secondary = secondaryKeyword(product);
+  const secondary = secondaryKeyword(product, name);
   return secondary ? `${name} - ${secondary}` : `${name} by ${BRAND}`;
 }
 

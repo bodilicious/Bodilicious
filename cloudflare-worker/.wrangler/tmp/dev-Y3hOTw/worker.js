@@ -24,18 +24,15 @@ function normaliseKeywordGroups(raw) {
   ].map((k) => String(k).trim()).filter(Boolean);
 }
 __name(normaliseKeywordGroups, "normaliseKeywordGroups");
-function nthOf(raw, group, index) {
-  if (!raw || typeof raw === "string") return "";
-  const value = raw[group]?.[index];
-  return value ? String(value).trim() : "";
+function groupOf(raw, group) {
+  if (!raw || typeof raw === "string") return [];
+  return (raw[group] || []).map((k) => String(k).trim()).filter(Boolean);
 }
-__name(nthOf, "nthOf");
-function primaryKeyword(product) {
-  return product ? nthOf(product.seo_keywords, "primary", 0) : "";
-}
-__name(primaryKeyword, "primaryKeyword");
-function secondaryKeyword(product) {
-  return product ? nthOf(product.seo_keywords, "secondary", 0) : "";
+__name(groupOf, "groupOf");
+function secondaryKeyword(product, notContainedIn = "") {
+  const haystack = notContainedIn.toLowerCase();
+  const candidates = groupOf(product?.seo_keywords, "secondary");
+  return candidates.find((k) => !haystack || !haystack.includes(k.toLowerCase())) || "";
 }
 __name(secondaryKeyword, "secondaryKeyword");
 function buildProductTitle(product) {
@@ -46,8 +43,8 @@ function buildProductTitle(product) {
   const nameLower = name.toLowerCase();
   const hasBrand = nameLower.includes(BRAND.toLowerCase());
   const base = hasBrand ? name : `${name} \u2014 ${BRAND}`;
-  const keyword = primaryKeyword(product);
-  if (keyword && !nameLower.includes(keyword.toLowerCase())) {
+  const candidates = groupOf(product?.seo_keywords, "primary").filter((k) => !nameLower.includes(k.toLowerCase()));
+  for (const keyword of candidates) {
     const withKeyword = hasBrand ? `${name} - ${keyword}` : `${name} - ${keyword} | ${BRAND}`;
     if (withKeyword.length <= MAX_TITLE_LENGTH) return withKeyword;
   }
@@ -79,7 +76,7 @@ function buildProductOgAlt(product) {
   if (override) return override;
   const name = (product?.name || "").trim();
   if (!name) return void 0;
-  const secondary = secondaryKeyword(product);
+  const secondary = secondaryKeyword(product, name);
   return secondary ? `${name} - ${secondary}` : `${name} by ${BRAND}`;
 }
 __name(buildProductOgAlt, "buildProductOgAlt");

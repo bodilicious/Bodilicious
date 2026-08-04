@@ -430,9 +430,13 @@ export const getOrderQuote = async (req, res) => {
             shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
         } else {
             const totalWeightKg = Math.max(0.5, totalWeightGrams / 1000);
+            // shippingDetails has no postalCode/zip field — the schema (and every
+            // caller) names it "pincode". Reading postalCode/zip always resolved to
+            // "" here, so the live Shiprocket rate call ran with a blank postcode
+            // on every quote and silently fell back to the static rate.
             const dynamicRate = await getInternationalShippingRate(
                 shippingDetails.country,
-                shippingDetails.postalCode || shippingDetails.zip || "",
+                shippingDetails.pincode || "",
                 totalWeightKg
             );
             // Fallback to static cost if API fails
@@ -643,6 +647,7 @@ export const initRazorpayOrder = async (req, res) => {
 
         // Recalculate subtotal to ensure items haven't changed
         let subtotal = 0;
+        let totalWeightGrams = 0;
         const orderItems = [];
 
         // Batch fetch all products in one round-trip — avoids N sequential DB calls
@@ -658,7 +663,9 @@ export const initRazorpayOrder = async (req, res) => {
                 return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
             }
             subtotal += product.price * item.quantity;
-            
+            const itemWeightG = product.product_weight_g || (product.product_weight_ml ? product.product_weight_ml * 1.05 : 200);
+            totalWeightGrams += itemWeightG * item.quantity;
+
             orderItems.push({
                 product: product._id,
                 quantity: item.quantity,
@@ -693,9 +700,25 @@ export const initRazorpayOrder = async (req, res) => {
             }
         }
 
-        let shippingCost = isIndia
-            ? (subtotal >= settings.shippingThreshold ? 0 : settings.shippingCost)
-            : (subtotal >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost);
+        // Mirror getOrderQuote's shipping-cost calc exactly. This used to always use
+        // the flat settings.internationalShippingCost while the quote used the live
+        // Shiprocket rate — the two could legitimately disagree, so international
+        // checkouts intermittently failed the drift-tolerance check below with
+        // "Cart contents or pricing changed" even when the cart hadn't changed.
+        let shippingCost;
+        if (isIndia) {
+            shippingCost = subtotal >= settings.shippingThreshold ? 0 : settings.shippingCost;
+        } else if (subtotal >= settings.internationalShippingThreshold) {
+            shippingCost = 0;
+        } else {
+            const totalWeightKg = Math.max(0.5, totalWeightGrams / 1000);
+            const dynamicRate = await getInternationalShippingRate(
+                shippingDetails.country,
+                shippingDetails.pincode || "",
+                totalWeightKg
+            );
+            shippingCost = dynamicRate !== null ? dynamicRate : settings.internationalShippingCost;
+        }
 
         let existingOrdersCount = 1;
         if (userId) {

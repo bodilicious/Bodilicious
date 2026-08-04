@@ -475,7 +475,12 @@ const ProductForm: React.FC = () => {
           </div>
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-2">Custom SEO Keywords</label>
-            <p className="text-xs text-gray-500 mb-4">Auto-deduplicated with default keywords.</p>
+            <p className="text-xs text-gray-500 mb-4">
+              We try each keyword in order and use the first one that fits and isn't already in the
+              product name — a Primary keyword can appear in the title, a Secondary keyword in the
+              image alt text. List your best keyword first in each. Every keyword you add also goes
+              into the page's meta keywords tag, which search engines no longer use for ranking.
+            </p>
             <div className="pl-4 border-l-2 border-dark-red/20 space-y-4">
               <ArrayField
                 label="Primary Keywords"
