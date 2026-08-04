@@ -809,19 +809,14 @@ const triggerPasswordReset = async (email: string) => {
 
     // 🎯 Google Analytics/Ads Tracking - Page View for SPAs
     if (typeof window !== 'undefined' && (window as any).gtag) {
-      // Fire page_view event for GA4
-      (window as any).gtag('event', 'page_view', {
-        send_to: 'G-LZ14TZ4GDG',
+      // Update the global gtag state with the new path and title
+      (window as any).gtag('set', {
         page_path: location.pathname,
         page_title: document.title || path
       });
 
-      // Fire page_view event for Google Ads (fixes "Misconfigured / Outside of <head>" Tag Assistant error)
-      (window as any).gtag('event', 'page_view', {
-        send_to: 'AW-306323373',
-        page_path: location.pathname,
-        page_title: document.title || path
-      });
+      // Fire a generic page_view event which will be routed to ALL initialized tags (GA4 and Google Ads)
+      (window as any).gtag('event', 'page_view');
     }
   }, [location.pathname]);
 
