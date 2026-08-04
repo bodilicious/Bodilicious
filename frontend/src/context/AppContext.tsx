@@ -908,6 +908,7 @@ const triggerPasswordReset = async (email: string) => {
 
     // 🎯 Google Analytics/Ads Tracking
     if (typeof window !== 'undefined' && (window as any).gtag) {
+      // GA4 Event
       (window as any).gtag('event', 'add_to_cart', {
         currency: userCurrency || 'INR',
         value: Number(product.price || 0) * Number(quantity),
@@ -919,6 +920,13 @@ const triggerPasswordReset = async (email: string) => {
             quantity: Number(quantity)
           }
         ]
+      });
+
+      // Google Ads Specific Conversion
+      (window as any).gtag('event', 'conversion', {
+        send_to: 'AW-306323373/Y1B7CPHyt5gYEK2_iJIB',
+        value: Number(product.price || 0) * Number(quantity),
+        currency: userCurrency || 'INR'
       });
     }
 
