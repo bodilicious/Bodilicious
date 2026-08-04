@@ -423,6 +423,24 @@ export default function ProductPage() {
           }
         ]
       });
+
+      // 🎯 Dedicated Google Ads Campaign Conversion for CoQ10 Serum
+      if (product.pid === 'BD-SER-COQ10') {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-306323373/HCQECNrH_dscEK2_iJIB',
+          'value': 1.0,
+          'currency': 'INR'
+        });
+      }
+      
+      // 🎯 Dedicated Google Ads Campaign Conversion for Vitamin C Serum
+      if (product.pid === 'BD-SER-VITC') {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-306323373/-dxmCMrAgdwcEK2_iJIB',
+          'value': 1.0,
+          'currency': 'INR'
+        });
+      }
     }
   }, [product?.pid, product?.name, product?.category, product?.price, posthog, userCurrency]); // pid is the primary dep; viewTracked ref + sessionStorage deduplicate
 
