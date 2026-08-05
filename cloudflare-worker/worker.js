@@ -54,6 +54,13 @@ export default {
       return handleSitemap(env);
     }
 
+    // Google Merchant Center product feed — must bypass the kill-switch for the
+    // same reason as the sitemap: Merchant Center's fetcher isn't in BOT_UA_PATTERNS
+    // and this is always valid public content regardless of bot-render state.
+    if (pathname === '/product-feed.xml') {
+      return handleProductFeed(env);
+    }
+
     // 1. Check if SEO rendering is enabled (kill-switch)
     if (env.SEO_BOT_RENDER_ENABLED !== 'true') {
       return fetchFromOrigin(); 
@@ -493,6 +500,117 @@ ${urls.join('')}
   } catch (error) {
     console.error('Error fetching products for sitemap:', error);
     return new Response('Error generating sitemap', {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    });
+  }
+}
+
+// ─── Google Merchant Center product feed ───────────────────────────────────
+// Free listings (the "Popular products" carousel in normal Search, not paid
+// Shopping ads) are populated from a feed submitted in Merchant Center, not
+// from the on-page Product schema alone. This is that feed, in the RSS 2.0 +
+// g: namespace format Merchant Center expects. Once live, submit
+// https://bodilicious.in/product-feed.xml under Products > Feeds in Merchant
+// Center Next (scheduled fetch, e.g. daily).
+const GOOGLE_PRODUCT_CATEGORY = {
+  skin: 'Health & Beauty > Personal Care > Cosmetics > Skin Care',
+  hair: 'Health & Beauty > Personal Care > Hair Care',
+  body: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Body Care',
+  makeup: 'Health & Beauty > Personal Care > Cosmetics > Makeup',
+  lip: 'Health & Beauty > Personal Care > Cosmetics > Makeup > Lip Makeup',
+  other: 'Health & Beauty > Personal Care',
+};
+
+function escapeXml(unsafe) {
+  return String(unsafe ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+async function handleProductFeed(env) {
+  try {
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+
+    // Same pagination approach as handleSitemap: the API hard-caps limit at 100
+    // per page, so a single request would silently truncate the catalog.
+    let allProducts = [];
+    let page = 1;
+    const PAGE_SIZE = 100;
+    let totalPages = 1;
+    const MAX_PAGES = 50;
+
+    do {
+      let res;
+      try {
+        res = await fetchWithTimeout(`${apiUrl}/api/v1/products?limit=${PAGE_SIZE}&page=${page}`);
+      } catch (pageError) {
+        console.error(`[SEO Worker] Product feed page ${page} fetch failed:`, pageError.name);
+        break;
+      }
+      if (!res.ok) break;
+      const data = await res.json();
+      const products = data.data || [];
+      if (products.length === 0) break;
+      allProducts = allProducts.concat(products);
+      totalPages = data.totalPages || 1;
+      page++;
+    } while (page <= totalPages && page <= MAX_PAGES);
+
+    // NOTE: the products list endpoint's projection (controller.js getAllProducts)
+    // doesn't return the `availability` enum field, only `stock` — so derive
+    // in-stock/out-of-stock from stock count rather than the (always-undefined) field.
+    const items = allProducts
+      .filter(p => p.price != null && Array.isArray(p.images) && p.images.length > 0)
+      .map(p => {
+        const availability = Number(p.stock) > 0 ? 'in stock' : 'out of stock';
+        const toAbsolute = (img) => (img.startsWith('http') ? img : `${frontendUrl}${img}`);
+        const [primaryImage, ...restImages] = p.images;
+        const extraImageTags = restImages
+          .slice(0, 10)
+          .map((img) => `\n    <g:additional_image_link>${escapeXml(toAbsolute(img))}</g:additional_image_link>`)
+          .join('');
+
+        return `
+  <item>
+    <g:id>${escapeXml(p.pid)}</g:id>
+    <title>${escapeXml(p.name)}</title>
+    <description>${escapeXml(p.description || p.name)}</description>
+    <link>${frontendUrl}/product/${escapeXml(p.pid)}</link>
+    <g:image_link>${escapeXml(toAbsolute(primaryImage))}</g:image_link>${extraImageTags}
+    <g:availability>${availability}</g:availability>
+    <g:price>${Number(p.price).toFixed(2)} INR</g:price>
+    <g:brand>${escapeXml(p.brand || 'Bodilicious')}</g:brand>
+    <g:condition>new</g:condition>
+    <g:identifier_exists>no</g:identifier_exists>
+    <g:google_product_category>${escapeXml(GOOGLE_PRODUCT_CATEGORY[p.category] || GOOGLE_PRODUCT_CATEGORY.other)}</g:google_product_category>
+  </item>`;
+      })
+      .join('');
+
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
+<channel>
+  <title>Bodilicious Product Feed</title>
+  <link>${frontendUrl}</link>
+  <description>Bodilicious skincare, hair, and body care products</description>${items}
+</channel>
+</rss>`;
+
+    return new Response(feed, {
+      headers: {
+        'Content-Type': 'application/xml',
+        'Cache-Control': 'public, max-age=3600',
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generating product feed:', error);
+    return new Response('Error generating product feed', {
       status: 500,
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     });

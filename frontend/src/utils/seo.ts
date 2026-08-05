@@ -412,7 +412,7 @@ export function buildBlogHeadline(post?: SeoBlogLike | null): string {
 export function buildBlogOgAlt(post?: SeoBlogLike | null): string | undefined {
   const title = (post?.title || '').trim();
   if (!title) return undefined;
-  const secondary = post ? nthOf(post.seo_keywords, 'secondary', 0) : '';
+  const secondary = post ? groupOf(post.seo_keywords, 'secondary')[0] : '';
   return secondary ? `${title} - ${secondary}` : title;
 }
 
