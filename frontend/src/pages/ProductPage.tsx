@@ -36,6 +36,8 @@ import {
   Waves,
   CheckCircle2,
   Clock,
+  HelpCircle,
+  MessageCircleQuestion,
   type LucideIcon
 } from 'lucide-react';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
@@ -253,6 +255,10 @@ export default function ProductPage() {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [isRelatedLoading, setIsRelatedLoading] = useState(false);
 
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const addToCartRef = useRef<HTMLDivElement>(null);
+
   const fetchProduct = useCallback(async (isInitial = true) => {
     try {
       if (isInitial) setLoading(true);
@@ -325,10 +331,29 @@ export default function ProductPage() {
     setActiveImage(0);
     setQty(1);
     setActiveAccordion('details');
+    setOpenFaqIndex(0);
     setShowIngredientSidebar(false);
     setZoomStyle({ display: 'none', backgroundPosition: '0% 0%' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product?.pid]);
+
+  // ── Sticky mobile "Add to Bag" bar ──
+  // Shows once the main add-to-cart control scrolls out of view, so the CTA
+  // stays reachable on this long, content-rich page without a second look.
+  useEffect(() => {
+    const el = addToCartRef.current;
+    if (!el || !product || product.stock <= 0) {
+      setShowStickyBar(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickyBar(!entry.isIntersecting),
+      { rootMargin: '-96px 0px 0px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [product?.pid, product?.stock]);
 
   const inWishlist = product ? isInWishlist(product.pid) : false;
 
@@ -862,7 +887,7 @@ export default function ProductPage() {
             )}
 
             {product.stock > 0 ? (
-              <div className="flex flex-col sm:flex-row sm:flex-wrap xl:flex-nowrap gap-3 sm:gap-4 mb-4 w-full">
+              <div ref={addToCartRef} className="flex flex-col sm:flex-row sm:flex-wrap xl:flex-nowrap gap-3 sm:gap-4 mb-4 w-full">
                 <div className="flex border border-silk/80 h-14 w-full sm:w-36 items-center justify-between px-4 bg-white/60 shadow-sm rounded-sm">
                   <button
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
@@ -1023,22 +1048,77 @@ export default function ProductPage() {
         </m.div>
 
         {/* FAQs — visible content backing the FAQPage structured data above.
-            Rendered as plain headings rather than an accordion so the answers
-            are in the DOM for crawlers without needing interaction. */}
+            Each answer stays permanently mounted in the DOM (collapsed purely
+            via a CSS grid-rows transition) so crawlers and no-JS clients still
+            see the full text, while sighted users get an interactive accordion. */}
         {productFaqs.length > 0 && (
-          <section className="mt-24 sm:mt-28 lg:mt-32 max-w-3xl mx-auto">
-            <h2 className="font-serif text-3xl md:text-4xl text-dark-red mb-10 text-center">
-              Frequently Asked Questions
-            </h2>
-            <dl className="space-y-8">
-              {productFaqs.map((faq, i) => (
-                <div key={i} className="border-b border-silk/60 pb-6">
-                  <dt className="font-sans font-semibold text-dark-red mb-2">{faq.question}</dt>
-                  <dd className="font-sans text-sm text-dark-red/80 leading-relaxed">{faq.answer}</dd>
-                </div>
-              ))}
+          <m.section
+            className="mt-24 sm:mt-28 lg:mt-32 max-w-3xl mx-auto"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={stagger}
+          >
+            <m.div variants={fadeUp} className="text-center mb-12 sm:mb-14">
+              <p className="text-[10px] font-sans tracking-[0.3em] uppercase text-ruby-red mb-3">
+                Got Questions?
+              </p>
+              <h2 className="font-serif text-3xl md:text-4xl text-dark-red">Frequently Asked Questions</h2>
+            </m.div>
+
+            <dl className="flex flex-col gap-3">
+              {productFaqs.map((faq, i) => {
+                const isOpen = openFaqIndex === i;
+                return (
+                  <m.div
+                    key={i}
+                    variants={fadeUp}
+                    className={`bg-white/50 border rounded-xl transition-colors ${
+                      isOpen ? 'border-ruby-red/30 shadow-sm' : 'border-silk/50'
+                    }`}
+                  >
+                    <dt>
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqIndex(isOpen ? null : i)}
+                        aria-expanded={isOpen}
+                        className="w-full flex items-center gap-3 text-left px-5 sm:px-6 py-5 font-sans font-semibold text-sm sm:text-base text-dark-red"
+                      >
+                        <HelpCircle size={18} className="shrink-0 text-ruby-red/70" strokeWidth={1.5} />
+                        <span className="flex-1">{faq.question}</span>
+                        <ChevronDown
+                          size={16}
+                          className={`shrink-0 text-grey-beige transition-transform duration-300 ${
+                            isOpen ? 'rotate-180 text-ruby-red' : ''
+                          }`}
+                        />
+                      </button>
+                    </dt>
+                    <div
+                      className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                      style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+                    >
+                      <div className="overflow-hidden">
+                        <dd className="px-5 sm:px-6 pb-5 pl-[46px] sm:pl-[54px] -mt-1 font-sans text-sm text-dark-red/80 leading-relaxed">
+                          {faq.answer}
+                        </dd>
+                      </div>
+                    </div>
+                  </m.div>
+                );
+              })}
             </dl>
-          </section>
+
+            <m.div variants={fadeUp} className="text-center mt-10">
+              <a
+                href="/contact"
+                className="inline-flex items-center gap-2 text-xs uppercase font-sans tracking-widest text-dark-red border-b border-dark-red pb-1 hover:text-ruby-red hover:border-ruby-red transition-colors"
+              >
+                <MessageCircleQuestion size={15} />
+                Still have questions? Contact us
+              </a>
+            </m.div>
+          </m.section>
         )}
 
         {/* Related articles — the product half of product↔blog interlinking */}
@@ -1450,6 +1530,40 @@ export default function ProductPage() {
           </m.div>
         )}
       </main>
+
+      {/* Sticky mobile Add to Bag bar — surfaces the CTA again once the user
+          has scrolled past it, since this page runs long with FAQ/benefit content. */}
+      <AnimatePresence>
+        {showStickyBar && (
+          <m.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-[#FDFBF7]/95 backdrop-blur-md border-t border-silk/60 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+          >
+            <div className="flex items-center gap-3 max-w-xl mx-auto">
+              <img
+                src={product.images[0]}
+                alt=""
+                aria-hidden="true"
+                className="w-11 h-11 rounded-md object-cover bg-white shrink-0 border border-silk/40"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-sans text-xs font-semibold text-dark-red truncate">{product.name}</p>
+                <p className="font-sans text-sm text-dark-red">{formatPrice(product.price)}</p>
+              </div>
+              <button
+                onClick={handleAddToCart}
+                className="shrink-0 bg-ruby-red text-white px-5 h-11 font-sans text-[11px] tracking-[0.18em] uppercase hover:bg-dark-red transition-colors flex items-center justify-center gap-2 rounded-sm shadow-md"
+              >
+                <ShoppingBag size={15} />
+                Add
+              </button>
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <Footer />
     </div>
