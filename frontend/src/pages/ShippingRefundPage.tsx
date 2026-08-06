@@ -8,7 +8,7 @@ export default function ShippingRefundPage() {
     useSEO({
         title: 'Shipping & Returns Policy — Bodilicious',
         description:
-            'Free shipping on orders over ₹1500. Learn about Bodilicious delivery timelines, international shipping, 7-day returns, and our hassle-free refund process.',
+            'Free shipping over ₹1500. Bodilicious delivery timelines, international shipping, and 7-day returns.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/shipping-refund',
     });

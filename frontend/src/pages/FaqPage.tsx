@@ -110,7 +110,7 @@ export default function FaqPage() {
 
   useSEO({
     title: 'FAQs — Bodilicious',
-    description: 'Find answers to the most common questions about Bodilicious products, shipping, payments, and more.',
+    description: 'Answers to common questions about Bodilicious products, shipping, and payments.',
     keywords: 'bodilicious faq, skincare questions, haircare help, shipping, returns, natural beauty',
     canonical: '/faqs',
     jsonLd: faqJsonLd,

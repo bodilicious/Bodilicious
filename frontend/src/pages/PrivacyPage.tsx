@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     useSEO({
         title: 'Privacy Policy — Bodilicious',
         description:
-            'Read the Bodilicious Privacy Policy to understand how we collect, use, and protect your personal data when you shop with us.',
+            'The Bodilicious Privacy Policy — how we collect, use, and protect your personal data when you shop.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/privacy',
     });

@@ -8,7 +8,7 @@ export default function TermsPage() {
     useSEO({
         title: 'Terms & Conditions — Bodilicious',
         description:
-            'Review the Terms and Conditions governing your use of the Bodilicious website, products, intellectual property, and dispute resolution process.',
+            'The Terms and Conditions governing use of the Bodilicious website, products, and intellectual property.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/terms',
     });

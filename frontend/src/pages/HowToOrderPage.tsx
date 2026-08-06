@@ -98,7 +98,7 @@ export default function HowToOrderPage() {
   useSEO({
     title: 'How to Order — Bodilicious',
     description:
-      'An interactive, step-by-step walkthrough to placing an order on Bodilicious. Discover, select, check out, and track your package.',
+      'A step-by-step walkthrough to placing an order on Bodilicious — discover, select, checkout, and track.',
     canonical: '/how-to-order',
     keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     jsonLd: {

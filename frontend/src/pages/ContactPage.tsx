@@ -11,7 +11,7 @@ export default function ContactPage() {
     useSEO({
         title: 'Contact Us — Bodilicious',
         description:
-            'Get in touch with the Bodilicious team. Write us a review, ask about products or shipping, or give feedback. We are here to help you on your skincare journey.',
+            'Get in touch with the Bodilicious team — questions about products, shipping, or feedback, we are here to help.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/contact',
         jsonLd: {

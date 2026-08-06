@@ -401,7 +401,7 @@ export default function RitualFinderPage() {
     useSEO({
         title: 'Skincare Ritual Finder — Bodilicious',
         description:
-            'Answer a few questions and get a personalized Bodilicious skincare or haircare routine tailored to your skin type, concerns, and goals.',
+            'Answer a few questions and get a personalized Bodilicious skincare or haircare routine for your needs.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/ritual-finder',
     });
