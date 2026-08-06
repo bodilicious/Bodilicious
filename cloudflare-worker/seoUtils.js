@@ -530,7 +530,7 @@ function titleCase(s) {
  */
 export function renderHomeHtml(products, frontendUrl) {
   const title = 'Bodilicious — Premium Skincare & Haircare';
-  const description = 'Shop dermatologically tested skincare and haircare made with science-backed actives like Niacinamide, Retinol & Hyaluronic Acid. Free shipping on orders over ₹1500. Find your perfect routine today.';
+  const description = 'Dermatologically tested skincare & haircare with science-backed actives — Niacinamide, Retinol & Hyaluronic Acid. Free shipping over ₹1500. Shop now.';
   const image = `${frontendUrl}/og-image.png`;
 
   const orgSchema = {

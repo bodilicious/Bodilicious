@@ -212,7 +212,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
   useSEO({
     title: 'Bodilicious — Premium Skincare & Haircare',
     description:
-      'Shop dermatologically tested skincare and haircare made with science-backed actives like Niacinamide, Retinol & Hyaluronic Acid. Free shipping on orders over ₹1500. Find your perfect routine today.',
+      'Dermatologically tested skincare & haircare with science-backed actives — Niacinamide, Retinol & Hyaluronic Acid. Free shipping over ₹1500. Shop now.',
     keywords: 'skincare products, dermatologically tested haircare, niacinamide serum for glowing skin, retinol anti-aging cream, organic shampoo for hair fall, hyaluronic acid moisturizer natural, premium skincare india, buy skincare products online india',
     canonical: '/',
   });
