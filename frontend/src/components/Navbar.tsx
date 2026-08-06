@@ -315,6 +315,7 @@ export default function Navbar() {
           <div className="flex-1 flex items-center justify-end gap-3 sm:gap-4">
             <button
               onClick={() => setSearchOpen(!searchOpen)}
+              aria-label={searchOpen ? 'Close search' : 'Open search'}
               className={`flex transition-colors ${
                 searchOpen ? 'text-ruby-red' : isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'
               }`}
@@ -325,7 +326,7 @@ export default function Navbar() {
 
 
 
-            <Link to="/wishlist" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-ruby-red'}`}>
+            <Link to="/wishlist" aria-label="Wishlist" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-ruby-red'}`}>
               <Heart size={18} />
               {wishlist.length > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-ruby-red text-white text-[10px] rounded-full flex items-center justify-center font-sans">
@@ -356,12 +357,13 @@ export default function Navbar() {
                 to={authStatus === 'authenticated' ? '/account' : '/signin'}
                 className={`transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}
                 title={authStatus === 'authenticated' ? 'My Account' : 'Sign In'}
+                aria-label={authStatus === 'authenticated' ? 'My Account' : 'Sign In'}
               >
                 <User size={18} />
               </Link>
             )}
 
-            <Link to="/cart" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}>
+            <Link to="/cart" aria-label="Cart" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}>
               <ShoppingBag size={18} />
               {cartCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-dark-red text-silk text-[10px] rounded-full flex items-center justify-center font-sans">
@@ -370,7 +372,7 @@ export default function Navbar() {
               )}
             </Link>
 
-            <button className={`md:hidden transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/70 hover:text-dark-red'}`} onClick={() => setMenuOpen(!menuOpen)}>
+            <button aria-label={menuOpen ? 'Close menu' : 'Open menu'} className={`md:hidden transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/70 hover:text-dark-red'}`} onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
@@ -391,6 +393,7 @@ export default function Navbar() {
             <Search className="absolute left-3 text-grey-beige" size={18} />
             <input
               type="text"
+              aria-label="Search products, ingredients, treatments"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products, ingredients, treatments..."
@@ -399,6 +402,7 @@ export default function Navbar() {
             />
             <button
               type="button"
+              aria-label="Close search"
               onClick={() => {
                 setSearchOpen(false);
                 setSearchQuery('');

@@ -22,7 +22,7 @@ import {
 export { STATIC_PAGE_SEO };
 
 // Includes major search engines, social media unfurlers, AI crawlers, and generic HTTP clients (used by AI assistants in sandboxes)
-export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|amazonbot|meta-externalagent|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
+export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|perplexity-user|amazonbot|meta-externalagent|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
 
 export function isBot(request) {
   const userAgent = request.headers.get("user-agent") || "";
@@ -44,12 +44,23 @@ export function safeJsonLd(obj) {
   return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
 
+// Product/blog images are stored as either a full CDN URL or a path relative
+// to the frontend origin (e.g. "/products/foo.webp"). og:image, twitter:image
+// and schema.org `image` all require an absolute URL — the React pages already
+// absolutize this (ProductPage.tsx, BlogPostPage.tsx) but the bot renderer was
+// emitting the raw relative path, so bots and social unfurlers never resolve
+// the preview image.
+export function toAbsoluteUrl(url, frontendUrl) {
+  if (!url) return '';
+  return url.startsWith('http') ? url : `${frontendUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 export function buildProductSchema(product, frontendUrl) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    image: product.images?.[0] || '',
+    image: toAbsoluteUrl(product.images?.[0], frontendUrl),
     description: product.description || '',
     sku: product.pid,
     brand: { '@type': 'Brand', name: 'Bodilicious' },
@@ -116,6 +127,7 @@ export function renderProductHtml(product, frontendUrl) {
   const productDesc = buildProductDescription(product);
   const h1 = buildProductH1(product);
   const h2s = buildProductH2s(product);
+  const absImage = toAbsoluteUrl(product.images?.[0], frontendUrl);
 
   // ── Body content ──────────────────────────────────────────────────────────
   // This body used to be three lines (h1 + description + price) — about 20 words.
@@ -206,13 +218,13 @@ export function renderProductHtml(product, frontendUrl) {
   <meta property="og:url" content="${frontendUrl}/product/${product.pid}" />
   <meta property="og:title" content="${escapeHtml(pageTitle)}" />
   <meta property="og:description" content="${escapeHtml(productDesc)}" />
-  <meta property="og:image" content="${escapeHtml(product.images?.[0] ?? '')}" />
+  <meta property="og:image" content="${escapeHtml(absImage)}" />
   <meta property="og:image:alt" content="${escapeHtml(ogAlt)}" />
-  
+
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
   <meta name="twitter:description" content="${escapeHtml(productDesc)}" />
-  <meta name="twitter:image" content="${escapeHtml(product.images?.[0] ?? '')}" />
+  <meta name="twitter:image" content="${escapeHtml(absImage)}" />
 
   <script type="application/ld+json">
     ${safeJsonLd(schemas)}
@@ -262,7 +274,7 @@ export function renderBlogHtml(post, frontendUrl) {
   const keywords = buildBlogKeywords(post) || '';
   const ogAlt = buildBlogOgAlt(post) || '';
   const url = `${frontendUrl}/blogs/${encodeURIComponent(post.slug || '')}`;
-  const image = post.coverImage || '';
+  const image = toAbsoluteUrl(post.coverImage, frontendUrl);
   const published = post.publishedAt || post.createdAt || null;
   const modified = post.updatedAt || published;
   const relatedProducts = (post.relatedProducts || []).filter(p => p && p.pid && p.name);
@@ -513,7 +525,7 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
         '@type': 'Product',
         name: p.name,
         url: `${frontendUrl}/product/${p.pid}`,
-        ...(p.images?.[0] ? { image: p.images[0] } : {}),
+        ...(p.images?.[0] ? { image: toAbsoluteUrl(p.images[0], frontendUrl) } : {}),
         ...(p.price != null ? {
           offers: {
             '@type': 'Offer',

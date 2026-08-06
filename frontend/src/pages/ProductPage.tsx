@@ -227,7 +227,7 @@ export default function ProductPage() {
     title: pageTitle,
     description: productDesc,
     keywords: productKeywords,
-    canonical: product ? `/product/${product.pid}` : '/shop',
+    canonical: `/product/${product?.pid || productId}`,
     ogImage: product?.images[0],
     ogImageAlt: ogAlt,
     jsonLd: productJsonLd,
@@ -482,9 +482,9 @@ export default function ProductPage() {
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-dark-red mb-4" />
-        <p className="text-xs uppercase tracking-widest font-sans text-dark-red">
+        <h1 className="text-xs uppercase tracking-widest font-sans text-dark-red">
           Loading Bodilicious...
-        </p>
+        </h1>
       </div>
     );
   }
@@ -701,6 +701,7 @@ export default function ProductPage() {
                   src={product.images[activeImage]}
                   alt={ogAlt || product.name}
                   loading="eager"
+                  fetchPriority="high"
                   decoding="async"
                   className={`w-full h-full object-cover transition-opacity duration-300 ${
                     !showIngredientSidebar && activeImage === 0 && isZoomed ? 'opacity-0' : 'opacity-100'

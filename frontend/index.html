@@ -26,10 +26,15 @@
 
     <!-- Preconnect to reduce TCP/TLS overhead for first-party API requests -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded as a real <link> (not CSS @import) so the browser's preload scanner
+         discovers and fetches it in parallel instead of waiting on index.css to parse -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" />
     <!-- Preconnect to Render backend — cuts TCP/TLS latency on first API call -->
     <link rel="dns-prefetch" href="https://bodilicious-cxow.onrender.com" />
     <link rel="preconnect" href="https://bodilicious-cxow.onrender.com" crossorigin />
+    <!-- Preconnect for GTM — loaded async in <head> above, first script users wait on -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
 
     <!-- Preload the first hero carousel image (LCP element) -->
     <link rel="preload" as="image" href="/assets/hero_carousel_1.webp" fetchpriority="high" />

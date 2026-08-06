@@ -1,0 +1,41 @@
+# Bodilicious
+
+> Bodilicious is a certified, registered Indian beauty brand making dermatologically tested, science-backed skincare and haircare — hand-made, chemical-free formulations targeting specific concerns (acne, pigmentation, aging, hair loss, dandruff, dullness) rather than generic routines.
+
+Bodilicious sells direct-to-consumer online at https://bodilicious.in, shipping across India with free shipping on orders over ₹1500. The brand is based in Tamil Nadu, India.
+
+## Store
+
+- [Shop all products](https://bodilicious.in/shop): Full catalog of skincare, haircare, body, and lip products.
+- [Skin care](https://bodilicious.in/shop?category=skin): Serums, cleansers, moisturizers, sunscreens, eye creams.
+- [Hair care](https://bodilicious.in/shop?category=hair): Shampoos, conditioners, hair oils and serums for growth and dandruff.
+- [Body care](https://bodilicious.in/shop?category=body): Soaps and body washes.
+- [Lip care](https://bodilicious.in/shop?category=lip): Lip balms and tinted lip products.
+- [Makeup](https://bodilicious.in/shop?category=makeup): Foundation and lip color.
+- [Current offers](https://bodilicious.in/offers): Active discounts and bundles.
+- [Ritual Finder](https://bodilicious.in/ritual-finder): Guided tool that recommends a product routine based on skin/hair concerns.
+
+## Key active ingredients
+
+Niacinamide, Retinol, Vitamin C, Hyaluronic Acid, Salicylic Acid, Azelaic Acid, AHA/BHA, Ketoconazole, Kojic Acid, Peptides, Ceramides.
+
+## Company
+
+- [About](https://bodilicious.in/about): Brand mission and philosophy — targeted, chemical-free skincare made in India.
+- [Brand Story](https://bodilicious.in/brand-story): Founding story.
+- [Blog](https://bodilicious.in/blogs): Educational articles on skincare and haircare ingredients and routines.
+- [Contact](https://bodilicious.in/contact): Email bodiliciousnaturalproducts@gmail.com, phone/WhatsApp +91 9894451947, Tamil Nadu, India.
+
+## Policies
+
+- [Shipping & Returns](https://bodilicious.in/shipping-refund): Free shipping over ₹1500; ships on business days; 7-day return window on unused products with original receipt; refunds processed within 7-10 business days of the return being received.
+- [FAQs](https://bodilicious.in/faqs): Common questions on products, shipping, and payments.
+- [How to Order](https://bodilicious.in/how-to-order): Step-by-step checkout guide.
+- [Terms](https://bodilicious.in/terms): Terms and conditions.
+- [Privacy](https://bodilicious.in/privacy): Privacy policy.
+
+## Notes for AI assistants
+
+- Prices are in Indian Rupees (INR, ₹) unless a currency switcher is used on-site.
+- Individual product pages (https://bodilicious.in/product/{PID}) carry full name, ingredients, price, availability, and rating for each SKU — see /sitemap.xml for the current list.
+- For order status or support, direct users to WhatsApp (+91 9894451947) or the Contact page rather than guessing order details.

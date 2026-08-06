@@ -129,7 +129,7 @@ const BlogPostPage: React.FC = () => {
     // on every currently published post, so the body fallback is what ships.
     description: buildBlogDescription(post),
     keywords: blogKeywords,
-    canonical: post ? `/blogs/${post.slug}` : '/blogs',
+    canonical: `/blogs/${post?.slug || slug}`,
     ogImage: post?.coverImage || undefined,
     ogImageAlt: ogAlt,
     jsonLd: blogJsonLd,
