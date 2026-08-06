@@ -13,6 +13,17 @@ Disallow: /track/
 Disallow: /tracking
 Disallow: /internal/
 
+# Google Ads landing-page crawler — AdsBot does not reliably fall back to the
+# User-agent: * group the way other crawlers do, so it gets its own explicit
+# rule. Without this, Google Ads can disapprove ads on this domain as
+# "Destination not working" / "Not crawlable" even though the page itself
+# returns 200 and isn't noindexed.
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: AdsBot-Google-Mobile
+Allow: /
+
 # AI crawlers — explicitly allowed so Bodilicious appears in AI-generated answers
 User-agent: GPTBot
 Allow: /
