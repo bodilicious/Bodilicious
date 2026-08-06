@@ -27,6 +27,20 @@
     <!-- Preconnect to reduce TCP/TLS overhead for first-party API requests -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Preload the two font files every page needs for its first paint (body text
+         + headings, both weight 400/normal/latin) so the browser fetches the actual
+         font binary in parallel with the stylesheet below, instead of discovering it
+         only after that CSS has downloaded and parsed. Other weights/styles/unicode
+         subsets are still served normally via the stylesheet — this just warms the
+         two that matter for above-the-fold text. Pinned to Google Fonts' current
+         file hashes (v20 Inter / v40 Playfair Display); if the stylesheet URL below
+         ever changes version, re-fetch it and update these two hrefs to match, or
+         the preload silently stops matching anything and this optimization lapses
+         (harmless — the page just loses the head start, nothing breaks). -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href="https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2" />
     <!-- Loaded as a real <link> (not CSS @import) so the browser's preload scanner
          discovers and fetches it in parallel instead of waiting on index.css to parse -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" />
@@ -42,7 +56,7 @@
     <!-- Primary SEO -->
 
     <title>Bodilicious — Premium Skincare &amp; Haircare</title>
-    <meta name="description" content="Dermatologically tested skincare &amp; haircare with science-backed actives — Niacinamide, Retinol &amp; Hyaluronic Acid. Free shipping over ₹1500. Shop now." />
+    <meta name="description" content="Dermatologically tested skincare &amp; haircare with science-backed actives. Free shipping over ₹1500. Shop now." />
     <meta name="keywords" content="skincare, haircare, beauty, organic skincare, dermatologically tested, Bodilicious, serum, shampoo, niacinamide, retinol, hyaluronic acid" />
     <meta name="author" content="Bodilicious" />
     <meta name="robots" content="index, follow" />
