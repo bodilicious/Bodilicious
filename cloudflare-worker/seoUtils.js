@@ -194,6 +194,21 @@ export function buildProductSchema(product, frontendUrl) {
       itemCondition: 'https://schema.org/NewCondition',
       url: `${frontendUrl}/product/${product.pid}`,
       seller: { '@type': 'Organization', name: 'Bodilicious' },
+      // Matches the real policy on /shipping-refund: 7-day window on unused
+      // items with the original receipt, customer pays return shipping
+      // unless the item is defective or incorrect. Not adding shippingDetails
+      // alongside this — the real shipping cost is "calculated based on
+      // method, weight, dimensions, and address" (i.e. genuinely variable
+      // below the ₹1500 free-shipping threshold), so there's no single
+      // honest flat rate to declare here.
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        applicableCountry: 'IN',
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        merchantReturnDays: 7,
+        returnMethod: 'https://schema.org/ReturnByMail',
+        returnFees: 'https://schema.org/ReturnShippingFees',
+      },
     },
     ...(product.rating && product.ratingCount && product.ratingCount > 0
       ? {
@@ -689,7 +704,14 @@ export function renderHomeHtml(products, frontendUrl) {
     url: frontendUrl,
     logo: { '@type': 'ImageObject', url: `${frontendUrl}/logo.webp` },
     description: 'Premium skincare and haircare brand offering dermatologically tested, science-backed beauty products.',
-    address: { '@type': 'PostalAddress', addressCountry: 'IN' },
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '3/1, Varadaraja Perumal Koil St, Sanjeevarayanpet, Tondiarpet',
+      addressLocality: 'Chennai',
+      addressRegion: 'Tamil Nadu',
+      postalCode: '600081',
+      addressCountry: 'IN',
+    },
   };
 
   const websiteSchema = {
