@@ -496,16 +496,16 @@ export function renderBlogHtml(post, frontendUrl) {
 /**
  * Rewrite the SPA shell's head with the correct metadata for a static page.
  *
- * Deliberately NOT a replacement page. Replacing the body would serve crawlers
- * a two-line stub where users get a full About/Contact page — thinner than the
- * real thing, and the same dynamic-rendering equivalence problem the product
- * renderer exists to fix. It would also be counterproductive: a complete HTML
- * response stops Google rendering the JS, so it would index the stub instead of
- * the real content.
- *
- * Streaming the origin response through HTMLRewriter keeps the SPA intact —
- * JS-capable crawlers still render the full page — while clients that never run
- * JS (every social unfurler) finally get the right title, description and card.
+ * Deliberately NOT a full replacement page — it streams the origin response
+ * through HTMLRewriter rather than synthesising one, so the SPA stays intact
+ * and JS-capable crawlers still render the real page. Clients that never run
+ * JS (every social unfurler, and any audit tool that doesn't execute JS)
+ * previously got just the bare `<div id="root"></div>` shell: no title match,
+ * no h1, no content — showing up as "thin content" and near-0% text-to-HTML
+ * ratio on every one of these pages regardless of how much real copy the
+ * React component actually renders. The h1 and a couple of real paragraphs
+ * (STATIC_PAGE_SEO[pathname].body, copied verbatim from the component) are
+ * injected into #root to fix that, without going as far as a full stub page.
  */
 export function rewriteStaticMeta(response, pathname, frontendUrl) {
   const meta = STATIC_PAGE_SEO[pathname];
@@ -531,11 +531,16 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
     // isBot() before it runs), so it's safe to drop static content into
     // #root — real browsers never get this response, and Googlebot's later
     // JS-rendering pass fully replaces #root with the real React output
-    // anyway. Without this, every non-JS crawler on these routes — the
-    // audit that flagged "missing h1 on every page" almost certainly
-    // included all of these — saw a raw shell with no heading at all.
+    // anyway. Prepend in reverse order (each prepend inserts before whatever
+    // is currently first) so the final order reads h1, then paragraphs top
+    // to bottom.
     .on('div#root', {
-      element(el) { el.prepend(`<h1>${escapeHtml(meta.h1)}</h1>`, { html: true }); },
+      element(el) {
+        for (let i = meta.body.length - 1; i >= 0; i--) {
+          el.prepend(`<p>${escapeHtml(meta.body[i])}</p>`, { html: true });
+        }
+        el.prepend(`<h1>${escapeHtml(meta.h1)}</h1>`, { html: true });
+      },
     })
     .transform(response);
 }
@@ -545,7 +550,10 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
  *
  * Same approach as rewriteStaticMeta — augment the real page rather than
  * replace it. The ItemList is appended to <head> so non-JS clients still learn
- * what articles exist, while JS-capable crawlers render the actual listing.
+ * what articles exist; a matching visible <ul> of the same links goes into
+ * #root (via rewriteStaticMeta's body injection) so it isn't just JSON-LD —
+ * this page's real post titles were otherwise invisible to any crawler that
+ * doesn't execute JS, same thin-content gap as the other static pages.
  */
 export function rewriteBlogIndex(response, posts, frontendUrl) {
   const itemList = posts.length ? {
@@ -562,16 +570,25 @@ export function rewriteBlogIndex(response, posts, frontendUrl) {
   } : null;
 
   const withMeta = rewriteStaticMeta(response, '/blogs', frontendUrl);
-  if (!itemList) return withMeta;
+  if (!posts.length) return withMeta;
+
+  const postLinks = posts.slice(0, 50)
+    .map(p => `<li><a href="${frontendUrl}/blogs/${encodeURIComponent(p.slug)}">${escapeHtml(buildBlogHeadline(p))}</a></li>`)
+    .join('');
 
   return new HTMLRewriter()
     .on('head', {
       element(el) {
-        el.append(
-          `<script type="application/ld+json">${safeJsonLd(itemList)}</script>`,
-          { html: true }
-        );
+        if (itemList) {
+          el.append(
+            `<script type="application/ld+json">${safeJsonLd(itemList)}</script>`,
+            { html: true }
+          );
+        }
       },
+    })
+    .on('div#root', {
+      element(el) { el.append(`<ul>${postLinks}</ul>`, { html: true }); },
     })
     .transform(withMeta);
 }
@@ -637,7 +654,7 @@ function titleCase(s) {
  */
 export function renderHomeHtml(products, frontendUrl) {
   const title = 'Bodilicious — Premium Skincare & Haircare';
-  const description = 'Dermatologically tested skincare & haircare with science-backed actives — Niacinamide, Retinol & Hyaluronic Acid. Free shipping over ₹1500. Shop now.';
+  const description = 'Dermatologically tested skincare & haircare with science-backed actives. Free shipping over ₹1500. Shop now.';
   const image = `${frontendUrl}/og-image.png`;
 
   const orgSchema = {
