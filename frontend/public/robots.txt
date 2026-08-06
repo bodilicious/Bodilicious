@@ -53,4 +53,7 @@ Allow: /
 User-agent: Bytespider
 Allow: /
 
+# LLM-readable site summary (products, policies, contact) — https://llmstxt.org
+# llms.txt: https://bodilicious.in/llms.txt
+
 Sitemap: https://bodilicious.in/sitemap.xml

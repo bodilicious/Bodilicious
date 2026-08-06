@@ -174,28 +174,31 @@ export function renderProductHtml(product, frontendUrl) {
       <cite>${escapeHtml(String(r.user || 'Customer'))} — ${escapeHtml(String(r.rating ?? ''))}/5</cite></blockquote>`)
     .join('');
 
-  // h2s[0..2] map to benefits / ingredients / how-to-use in buildProductH2s.
+  // Each block is a <section> so bots parsing structure (not just text) can
+  // tell benefits/ingredients/reviews/FAQs apart instead of one flat run of
+  // <h2>s — this is what AI-answer engines and screen readers use to segment
+  // the page. h2s[0..2] map to benefits / ingredients / how-to-use in buildProductH2s.
   const sections = [
     product.benefits?.length
-      ? `<h2>${escapeHtml(h2s[0] || 'Benefits')}</h2>${list(product.benefits)}` : '',
+      ? `<section aria-labelledby="benefits-h"><h2 id="benefits-h">${escapeHtml(h2s[0] || 'Benefits')}</h2>${list(product.benefits)}</section>` : '',
     allIngredients.length
-      ? `<h2>${escapeHtml(h2s[1] || 'Key Ingredients')}</h2>${list(allIngredients)}` : '',
+      ? `<section aria-labelledby="ingredients-h"><h2 id="ingredients-h">${escapeHtml(h2s[1] || 'Key Ingredients')}</h2>${list(allIngredients)}</section>` : '',
     (product.how_to_use?.length || usageLine)
-      ? `<h2>${escapeHtml(h2s[2] || 'How to Use')}</h2>${list(product.how_to_use)}${
-          usageLine ? `<p>${escapeHtml(usageLine)}</p>` : ''}` : '',
+      ? `<section aria-labelledby="how-to-use-h"><h2 id="how-to-use-h">${escapeHtml(h2s[2] || 'How to Use')}</h2>${list(product.how_to_use)}${
+          usageLine ? `<p>${escapeHtml(usageLine)}</p>` : ''}</section>` : '',
     product.concerns_targeted?.length
       // titleCase so stored slugs like "uneven_tone" don't reach the page as-is.
-      ? `<h2>Targets</h2>${list(product.concerns_targeted.map(titleCase))}` : '',
+      ? `<section aria-labelledby="targets-h"><h2 id="targets-h">Targets</h2>${list(product.concerns_targeted.map(titleCase))}</section>` : '',
     product.warnings?.length
-      ? `<h2>Warnings</h2>${list(product.warnings)}` : '',
-    reviewBlock ? `<h2>Customer Reviews</h2>${reviewBlock}` : '',
+      ? `<section aria-labelledby="warnings-h"><h2 id="warnings-h">Warnings</h2>${list(product.warnings)}</section>` : '',
+    reviewBlock ? `<section aria-labelledby="reviews-h"><h2 id="reviews-h">Customer Reviews</h2>${reviewBlock}</section>` : '',
     faqs.length
-      ? `<h2>Frequently Asked Questions</h2>${faqs.map(f =>
-          `<h3>${escapeHtml(f.question)}</h3><p>${escapeHtml(f.answer)}</p>`).join('')}` : '',
+      ? `<section aria-labelledby="faq-h"><h2 id="faq-h">Frequently Asked Questions</h2>${faqs.map(f =>
+          `<h3>${escapeHtml(f.question)}</h3><p>${escapeHtml(f.answer)}</p>`).join('')}</section>` : '',
     relatedBlogs.length
-      ? `<h2>Read More</h2><ul>${relatedBlogs.map(b =>
+      ? `<section aria-labelledby="read-more-h"><h2 id="read-more-h">Read More</h2><ul>${relatedBlogs.map(b =>
           `<li><a href="${frontendUrl}/blogs/${encodeURIComponent(b.slug)}">${escapeHtml(b.title)}</a></li>`
-        ).join('')}</ul>` : '',
+        ).join('')}</ul></section>` : '',
   ].filter(Boolean).join('\n  ');
 
   const schemas = [
@@ -213,7 +216,8 @@ export function renderProductHtml(product, frontendUrl) {
   <meta name="keywords" content="${escapeHtml(mergedKeywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/product/${product.pid}">
-  
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
+
   <meta property="og:type" content="product" />
   <meta property="og:url" content="${frontendUrl}/product/${product.pid}" />
   <meta property="og:title" content="${escapeHtml(pageTitle)}" />
@@ -231,10 +235,16 @@ export function renderProductHtml(product, frontendUrl) {
   </script>
 </head>
 <body>
-  <h1>${escapeHtml(h1)}</h1>
-  <p>${escapeHtml(product.description || '')}</p>
-  <p>Price: ₹${escapeHtml(String(product.price))}</p>
-  ${sections}
+  <main>
+    <article>
+      <header>
+        <h1>${escapeHtml(h1)}</h1>
+        <p>${escapeHtml(product.description || '')}</p>
+        <p>Price: ₹${escapeHtml(String(product.price))}</p>
+      </header>
+      ${sections}
+    </article>
+  </main>
 </body>
 </html>`;
 }
@@ -319,6 +329,7 @@ export function renderBlogHtml(post, frontendUrl) {
   <meta name="keywords" content="${escapeHtml(keywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${url}">
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${url}" />
@@ -340,17 +351,21 @@ export function renderBlogHtml(post, frontendUrl) {
   </script>
 </head>
 <body>
-  <article>
-    <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
-    ${published ? `<p><time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time></p>` : ''}
-    ${sanitizeBlogHtml(post.content)}
-  </article>
-  ${relatedProducts.length ? `<section>
-    <h2>Products mentioned in this guide</h2>
-    <ul>${relatedProducts.map(p =>
-      `<li><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a> — ₹${escapeHtml(String(p.price))}</li>`
-    ).join('')}</ul>
-  </section>` : ''}
+  <main>
+    <article>
+      <header>
+        <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
+        ${published ? `<p><time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time></p>` : ''}
+      </header>
+      ${sanitizeBlogHtml(post.content)}
+    </article>
+    ${relatedProducts.length ? `<section aria-labelledby="related-products-h">
+      <h2 id="related-products-h">Products mentioned in this guide</h2>
+      <ul>${relatedProducts.map(p =>
+        `<li><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a> — ₹${escapeHtml(String(p.price))}</li>`
+      ).join('')}</ul>
+    </section>` : ''}
+  </main>
 </body>
 </html>`;
 }
@@ -555,6 +570,7 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
   <meta name="description" content="${escapeHtml(description)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${canonicalUrl}">
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
   <meta property="og:type" content="website">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(pageTitle)}">
@@ -563,9 +579,16 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
 </head>
 <body>
   <nav aria-label="breadcrumb"><a href="${frontendUrl}/">Home</a> › <a href="${frontendUrl}/shop">Shop</a>${label ? ` › ${escapeHtml(label)}` : ''}</nav>
-  <h1>${escapeHtml(pageTitle.replace(' — Bodilicious', ''))}</h1>
-  <p>${escapeHtml(intro)}</p>
-  ${productListHtml}
+  <main>
+    <header>
+      <h1>${escapeHtml(pageTitle.replace(' — Bodilicious', ''))}</h1>
+      <p>${escapeHtml(intro)}</p>
+    </header>
+    <section aria-labelledby="product-list-h">
+      <h2 id="product-list-h" class="sr-only">Products</h2>
+      ${productListHtml}
+    </section>
+  </main>
 </body>
 </html>`;
 }

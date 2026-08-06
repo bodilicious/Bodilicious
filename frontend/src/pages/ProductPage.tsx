@@ -647,7 +647,7 @@ export default function ProductPage() {
 
   return (
     <div className="bg-[#FDFBF7] min-h-screen text-dark-red">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20">
         <button
           onClick={() => navigateTo('shop')}
           className="group flex items-center gap-1.5 text-[10px] sm:text-xs font-sans tracking-[0.18em] uppercase text-grey-beige hover:text-dark-red transition-colors mb-8 sm:mb-10"
@@ -1449,7 +1449,7 @@ export default function ProductPage() {
             </div>
           </m.div>
         )}
-      </div>
+      </main>
 
       <Footer />
     </div>
