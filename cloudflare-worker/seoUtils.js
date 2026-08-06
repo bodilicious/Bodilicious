@@ -55,6 +55,28 @@ export function toAbsoluteUrl(url, frontendUrl) {
   return url.startsWith('http') ? url : `${frontendUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
+/**
+ * Shared trust/E-E-A-T footer for bot-rendered pages. The React app's real
+ * Footer.tsx has these same links, but the bot renderer builds its own HTML
+ * from scratch and never included them — so any crawler that doesn't execute
+ * JS (which is most AI bots) saw a page with no path to About/Contact/policy
+ * pages at all, and no visible trust signals beyond the JSON-LD.
+ *
+ * Only states claims already made elsewhere on the site (About page copy) —
+ * do not add anything here that isn't independently true and verifiable.
+ */
+export function renderTrustFooter(frontendUrl) {
+  return `<footer>
+    <p>Dermatologically tested, science-backed skincare and haircare — Bodilicious is a certified, registered Indian beauty brand.</p>
+    <nav aria-label="Company">
+      <a href="${frontendUrl}/about">About Bodilicious</a>
+      <a href="${frontendUrl}/contact">Contact Us</a>
+      <a href="${frontendUrl}/privacy">Privacy Policy</a>
+      <a href="${frontendUrl}/terms">Terms &amp; Conditions</a>
+    </nav>
+  </footer>`;
+}
+
 export function buildProductSchema(product, frontendUrl) {
   return {
     '@context': 'https://schema.org',
@@ -245,6 +267,7 @@ export function renderProductHtml(product, frontendUrl) {
       ${sections}
     </article>
   </main>
+  ${renderTrustFooter(frontendUrl)}
 </body>
 </html>`;
 }
@@ -355,7 +378,7 @@ export function renderBlogHtml(post, frontendUrl) {
     <article>
       <header>
         <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
-        ${published ? `<p><time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time></p>` : ''}
+        <p class="byline">By ${escapeHtml(post.author?.name || 'Bodilicious Team')}${published ? ` · <time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time>` : ''}</p>
       </header>
       ${sanitizeBlogHtml(post.content)}
     </article>
@@ -366,6 +389,7 @@ export function renderBlogHtml(post, frontendUrl) {
       ).join('')}</ul>
     </section>` : ''}
   </main>
+  ${renderTrustFooter(frontendUrl)}
 </body>
 </html>`;
 }
@@ -589,6 +613,7 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
       ${productListHtml}
     </section>
   </main>
+  ${renderTrustFooter(frontendUrl)}
 </body>
 </html>`;
 }
