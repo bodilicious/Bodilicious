@@ -216,6 +216,19 @@ export function buildProductOgAlt(product?: SeoProductLike | null): string | und
    step — this map is what non-JS clients receive.
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * One content block in a static page's bot-visible body. 'heading' renders as
+ * <h2>, 'paragraph' as <p>, 'list' as <ul>. All copied verbatim from the same
+ * subsections the React component already renders (its own h3 + p / ul) — the
+ * point is real structure (headings, lists — the things an AI-comprehension
+ * check looks for) built from real content, not a synthesised outline.
+ */
+export interface StaticPageBodyBlock {
+  type: 'heading' | 'paragraph' | 'list';
+  text?: string;
+  items?: string[];
+}
+
 export interface StaticPageSeo {
   title: string;
   description: string;
@@ -230,8 +243,12 @@ export interface StaticPageSeo {
   // Real body copy, pulled verbatim from the page (not written for this
   // purpose) so non-JS crawlers see actual content instead of a near-empty
   // shell with just a title and h1. Same bot-only injection as h1 above.
-  body: string[];
+  body: StaticPageBodyBlock[];
 }
+
+const p = (text: string): StaticPageBodyBlock => ({ type: 'paragraph', text });
+const h = (text: string): StaticPageBodyBlock => ({ type: 'heading', text });
+const ul = (items: string[]): StaticPageBodyBlock => ({ type: 'list', items });
 
 export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
   '/about': {
@@ -239,9 +256,13 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Bodilicious is a certified Indian beauty brand offering science-backed skincare and haircare. Learn our story.',
     h1: 'About Bodilicious',
     body: [
-      'Bodilicious is a certified licenced brand, officially recognized in India as a registered beauty and skincare company. Our focus is on targeted skincare aimed at combating hair loss, premature greying, skin dullness, aging, pigmentation, and more.',
-      'Our product line encompasses everything from skin to hair care. Our products are hand-made, free from chemicals, and dermatologically tested — formulated to address specific issues at the source rather than simply hiding them.',
-      'Bhanuja Polani, Founder & Formulator, is a biomedical engineer with an M.Tech in Biotechnology. Her background is in understanding how biological systems respond to compounds at a molecular level, not in marketing.',
+      p('Bodilicious is a certified licenced brand, officially recognized in India as a registered beauty and skincare company. Our focus is on targeted skincare aimed at combating hair loss, premature greying, skin dullness, aging, pigmentation, and more.'),
+      h('About Us'),
+      p('Our product line encompasses everything from skin to hair care. Our products are hand-made, free from chemicals, and dermatologically tested. We believe in treating skin problems at the source rather than simply hiding them.'),
+      h('Committed to Quality'),
+      p('Bodilicious natural products are target-oriented skincare products. We suggest the right products to our customers in the ocean of skin care products, so you are using the right products for your skin or hair concern. Quality should never be a compromise.'),
+      h('Our Leadership'),
+      p('Bhanuja Polani, Founder & Formulator, is a biomedical engineer with an M.Tech in Biotechnology. Her background is in understanding how biological systems respond to compounds at a molecular level, not in marketing.'),
     ],
   },
   '/brand-story': {
@@ -249,9 +270,12 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with tradition for targeted skincare.',
     h1: 'Brand Story',
     body: [
-      'Bodilicious was born from a personal journey of discovery and determination. Like many people, Dr. Bhanuja Polani struggled to find skincare products that truly suited her skin. This experience inspired her to create something different — a skincare brand that understands the real needs of people and delivers effective yet gentle solutions.',
-      'With a strong academic background in Biomedical Engineering and M.Tech in Biotechnology, Dr. Bhanuja Polani combined scientific knowledge with her passion for skincare to develop formulations that work in harmony with the skin.',
-      "Bodilicious was created with the belief that every individual deserves skincare that truly understands their concerns. The brand's products are thoughtfully designed to address a wide range of skin and hair concerns including age spots, freckles, tanning, acne, dark circles, hair fall, and dandruff.",
+      p('Bodilicious was born from a personal journey of discovery and determination. Like many people, Dr. Bhanuja Polani struggled to find skincare products that truly suited her skin. This experience inspired her to create something different — a skincare brand that understands the real needs of people and delivers effective yet gentle solutions.'),
+      p('With a strong academic background in Biomedical Engineering and M.Tech in Biotechnology, Dr. Bhanuja Polani combined scientific knowledge with her passion for skincare to develop formulations that work in harmony with the skin.'),
+      h('Our Philosophy'),
+      p('One of the unique aspects of Bodilicious is its structured skincare philosophy. Rather than offering temporary fixes, the brand focuses on gradual and sustainable skin improvement, with routines built around 3-month, 6-month, and 9-month programs and personalized follow-ups along the way.'),
+      h('Our Leadership'),
+      p("The brand's products are thoughtfully designed to address a wide range of skin and hair concerns including age spots, freckles, tanning, acne, dark circles, hair fall, and dandruff, under the continued leadership of founder Dr. Bhanuja Polani."),
     ],
   },
   '/contact': {
@@ -259,8 +283,8 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Get in touch with the Bodilicious team — questions about products, shipping, or feedback, we are here to help.',
     h1: 'Contact Us',
     body: [
-      'Get in touch and let us know how we can help. Whether you have a question about our products, shipping, or anything else, our team is ready to answer all your questions.',
-      'Address: 3/1, Varadaraja Perumal Koil St, Sanjeevarayanpet, Tondiarpet, Chennai, Tamil Nadu 600081. Email: bodiliciousnaturalproducts@gmail.com. Phone/WhatsApp: +91 9894451947.',
+      p('Get in touch and let us know how we can help. Whether you have a question about our products, shipping, or anything else, our team is ready to answer all your questions.'),
+      p('Address: 3/1, Varadaraja Perumal Koil St, Sanjeevarayanpet, Tondiarpet, Chennai, Tamil Nadu 600081. Email: bodiliciousnaturalproducts@gmail.com. Phone/WhatsApp: +91 9894451947.'),
     ],
   },
   '/faqs': {
@@ -268,7 +292,7 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Answers to common questions about Bodilicious products, shipping, and payments.',
     h1: 'Frequently Asked Questions',
     body: [
-      'Quick answers about our products, shipping, and everything in between.',
+      p('Quick answers about Bodilicious products, shipping, and everything in between.'),
     ],
   },
   '/blogs': {
@@ -276,7 +300,7 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Skincare tips, ingredient guides, and beauty rituals from the Bodilicious team.',
     h1: 'Blogs',
     body: [
-      'Skincare science, beauty rituals, and ingredient deep-dives from the Bodilicious team.',
+      p('Skincare science, beauty rituals, and ingredient deep-dives from the Bodilicious team.'),
     ],
   },
   '/offers': {
@@ -284,7 +308,7 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'New to Bodilicious? Enjoy 10% off your first order. Dermatologically tested, free shipping over ₹1500.',
     h1: 'The Welcome Ritual',
     body: [
-      'Experience the Bodilicious difference with 10% off your first intentional skincare purchase.',
+      p('Experience the Bodilicious difference with 10% off your first intentional skincare purchase.'),
     ],
   },
   '/how-to-order': {
@@ -292,7 +316,7 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'A step-by-step walkthrough to placing an order on Bodilicious — discover, select, checkout, and track.',
     h1: 'How to Place Your Order',
     body: [
-      'Experience premium convenience. Discover how to purchase your favorite skincare rituals and track their journey to your home.',
+      p('Experience premium convenience. Discover how to purchase your favorite Bodilicious skincare rituals and track their journey to your home.'),
     ],
   },
   '/ritual-finder': {
@@ -300,7 +324,7 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Answer a few questions and get a personalized Bodilicious skincare or haircare routine for your needs.',
     h1: 'Find Your Perfect Bodilicious Ritual',
     body: [
-      "For your skin, body, or hair — we'll curate a personalized routine that truly works for you.",
+      p("For your skin, body, or hair — Bodilicious will curate a personalized routine that truly works for you."),
     ],
   },
   '/terms': {
@@ -308,8 +332,17 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'The Terms and Conditions governing use of the Bodilicious website, products, and intellectual property.',
     h1: 'Terms of Conditions',
     body: [
-      'Welcome to Bodilicious. By accessing or using our website, you agree to be bound by the Terms and Conditions set forth below. If you do not agree, please do not use this website.',
-      'The Bodilicious.in website is provided solely for your personal use. You may not use this website for any commercial purpose without our express written consent. All content available on the website, including text, graphics, logos, images, and software, is the property of Bodilicious or its content suppliers and is protected by intellectual property laws.',
+      p('Welcome to Bodilicious. By accessing or using our website, you agree to be bound by the Terms and Conditions set forth below. If you do not agree, please do not use this website.'),
+      h('Use of the Site & Features'),
+      p('The Bodilicious.in website is provided solely for your personal use. You may not use this website for any commercial purpose without our express written consent. We grant you a limited, revocable, and non-exclusive license to access and make personal use of the website.'),
+      h('Intellectual Property'),
+      p('All content available on the website, including text, graphics, logos, images, and software, is the property of Bodilicious or its content suppliers and is protected by intellectual property laws.'),
+      h('Liability & Disputes'),
+      ul([
+        'Product Descriptions: We strive to ensure accuracy, but errors may occur. If we discover an error in price, we will inform you as soon as possible.',
+        'Indemnification: You agree to indemnify and hold harmless Bodilicious from any claims arising from your use of this website.',
+        'Disputes: Any dispute relating to your visit shall be submitted to confidential arbitration in India, except for small claims court.',
+      ]),
     ],
   },
   '/privacy': {
@@ -317,8 +350,23 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'The Bodilicious Privacy Policy — how we collect, use, and protect your personal data when you shop.',
     h1: 'Privacy Policy',
     body: [
-      'Welcome to Bodilicious. We are committed to protecting your privacy and ensuring you have a seamless, secure experience on our luxury skincare platform. By using our website, you agree to the practices described below.',
-      'We collect personal data such as email, name, phone number, and address, along with usage and interaction data like product views and cart activity. We do not sell, trade, or transfer your personally identifiable information to outside parties unless we provide advance notice.',
+      p('Welcome to Bodilicious. We are committed to protecting your privacy and ensuring you have a seamless, secure experience on our platform. By using our website, you agree to the practices described below.'),
+      h('Data We Collect'),
+      ul([
+        'Personal Data: email, first/last name, phone number, and address details.',
+        'Usage & Interaction Data: product views, items added to your cart, and wishlist activity, alongside standard analytics.',
+        'Cookies: small pieces of data stored on your device to track activity on our website.',
+      ]),
+      h('How We Use It'),
+      ul([
+        'To provide and maintain our website',
+        'To notify you about changes',
+        'To provide customer support',
+        'To personalize recommendations and analyze shopping behaviors to improve our website',
+        'To monitor usage and detect technical issues',
+      ]),
+      h('Transfer & Disclosure'),
+      p('Your information may be transferred to computers located outside of your jurisdiction; we take all necessary steps to ensure data is treated securely. We do not sell, trade, or transfer your personally identifiable information to outside parties unless we provide advance notice.'),
     ],
   },
   '/shipping-refund': {
@@ -326,8 +374,21 @@ export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
     description: 'Free shipping over ₹1500. Bodilicious delivery timelines, international shipping, and 7-day returns.',
     h1: 'Shipping & Refund Policy',
     body: [
-      'We are committed to delivering your luxurious Bodilicious rituals with unparalleled speed, accuracy, and care. Orders are shipped on business days only; a tracking number is provided once your order has shipped.',
-      'Our goal is for you to be completely satisfied. We offer a 7-day return policy for products purchased directly from our website, provided they are in original, unused condition and accompanied by the original receipt. Refunds are processed to the original method of payment within 7-10 business days of receiving the returned item.',
+      p('We are committed to delivering your Bodilicious rituals with speed, accuracy, and care.'),
+      h('Shipping Policy'),
+      ul([
+        'Methods & Costs: shipping costs are calculated based on the shipping method selected, weight, dimensions, and delivery address.',
+        'Domestic Shipping: orders are shipped on business days only; a tracking number is provided once your order has shipped.',
+        'International Shipping: rates and fees vary by destination; customs fees or taxes are the responsibility of the customer.',
+        'Delivery Times: influenced by product availability, geographic location, and the chosen shipping carrier.',
+      ]),
+      h('Refund Policy'),
+      ul([
+        'Returns: a 7-day return policy for products in original, unused condition with the original receipt.',
+        'Exchanges & Replacements: return the original item for a refund and place a new order to exchange for a different size or colour.',
+        'Refund Process: refunds are processed to the original payment method within 7-10 business days of receiving the returned item.',
+        'Return Shipping: the customer is responsible for return shipping costs unless the item is defective or incorrect.',
+      ]),
     ],
   },
 };

@@ -543,15 +543,22 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
     // isBot() before it runs), so it's safe to drop static content into
     // #root — real browsers never get this response, and Googlebot's later
     // JS-rendering pass fully replaces #root with the real React output
-    // anyway. Prepend in reverse order (each prepend inserts before whatever
-    // is currently first) so the final order reads h1, then paragraphs top
-    // to bottom.
+    // anyway. <main>/<article> landmarks and real <h2>/<ul> structure (not
+    // just a flat run of <p> tags) are what a "semantic HTML" / "content
+    // structure" check is actually looking for — product/blog/home/shop
+    // bot-renders already had this via <main><article><section>; these 11
+    // static routes previously had none of it, just loose children of #root.
     .on('div#root', {
       element(el) {
-        for (let i = meta.body.length - 1; i >= 0; i--) {
-          el.prepend(`<p>${escapeHtml(meta.body[i])}</p>`, { html: true });
-        }
-        el.prepend(`<h1>${escapeHtml(meta.h1)}</h1>`, { html: true });
+        const blockHtml = meta.body.map(block => {
+          if (block.type === 'heading') return `<h2>${escapeHtml(block.text)}</h2>`;
+          if (block.type === 'list') return `<ul>${block.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>`;
+          return `<p>${escapeHtml(block.text)}</p>`;
+        }).join('');
+        el.prepend(
+          `<main><article><h1>${escapeHtml(meta.h1)}</h1>${blockHtml}</article></main>`,
+          { html: true }
+        );
         // These 11 routes were the only bot-rendered pages missing the
         // trust footer (product/blog/home/shop already have it) — meaning
         // a crawler landing on /terms or /privacy had no path at all to
