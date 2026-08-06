@@ -513,6 +513,134 @@ function titleCase(s) {
   return s.replace(/[_\-/]+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// ─── Homepage Bot Renderer ──────────────────────────────────────────────────
+// The homepage is entirely client-rendered — hero carousel, best sellers,
+// categories are all fetched and painted by React after mount. A bot that
+// doesn't execute JS (most AI crawlers) got literally <div id="root"></div>
+// and nothing else, regardless of whether it's on the isBot() allowlist,
+// because worker.js never intercepted "/" at all. This is the single
+// highest-traffic entry point, so it gets the same treatment as product/
+// blog/shop pages: real brand copy, category links, and a product ItemList.
+
+/**
+ * Render a bot-readable HTML page for "/". Mirrors index.html's static
+ * Organization/WebSite JSON-LD (kept in sync manually — index.html is the
+ * source of truth for those two schemas) and adds a Product ItemList built
+ * from live catalog data, which index.html cannot provide statically.
+ */
+export function renderHomeHtml(products, frontendUrl) {
+  const title = 'Bodilicious — Premium Skincare & Haircare';
+  const description = 'Shop dermatologically tested skincare and haircare made with science-backed actives like Niacinamide, Retinol & Hyaluronic Acid. Free shipping on orders over ₹1500. Find your perfect routine today.';
+  const image = `${frontendUrl}/og-image.png`;
+
+  const orgSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Bodilicious',
+    url: frontendUrl,
+    logo: { '@type': 'ImageObject', url: `${frontendUrl}/logo.webp` },
+    description: 'Premium skincare and haircare brand offering dermatologically tested, science-backed beauty products.',
+    address: { '@type': 'PostalAddress', addressCountry: 'IN' },
+  };
+
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Bodilicious',
+    url: frontendUrl,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: { '@type': 'EntryPoint', urlTemplate: `${frontendUrl}/shop?search={search_term_string}` },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
+  const itemList = products.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Bodilicious Best Sellers',
+    numberOfItems: products.length,
+    itemListElement: products.map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${frontendUrl}/product/${p.pid}`,
+      item: {
+        '@type': 'Product',
+        name: p.name,
+        url: `${frontendUrl}/product/${p.pid}`,
+        ...(p.images?.[0] ? { image: toAbsoluteUrl(p.images[0], frontendUrl) } : {}),
+        ...(p.price != null ? {
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'INR',
+            price: String(p.price),
+            availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          },
+        } : {}),
+      },
+    })),
+  } : null;
+
+  const schemas = [orgSchema, websiteSchema, ...(itemList ? [itemList] : [])];
+
+  const categoryLinks = [
+    ['skin', 'Skin Care'],
+    ['hair', 'Hair Care'],
+    ['body', 'Body Care'],
+    ['lip', 'Lip Care'],
+    ['makeup', 'Makeup'],
+  ].map(([slug, label]) => `<li><a href="${frontendUrl}/shop?category=${slug}">${escapeHtml(label)}</a></li>`).join('');
+
+  const productListHtml = products.map(p =>
+    `<article><h3><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a></h3><p>₹${escapeHtml(String(p.price))}</p></article>`
+  ).join('');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${frontendUrl}/">
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${frontendUrl}/" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+
+  <script type="application/ld+json">
+    ${safeJsonLd(schemas)}
+  </script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Bodilicious — Premium Skincare &amp; Haircare</h1>
+      <p>Bodilicious is a certified, registered Indian beauty brand making dermatologically tested, science-backed skincare and haircare — hand-made, chemical-free formulations targeting specific concerns like acne, pigmentation, aging, hair loss, and dandruff. Free shipping across India on orders over ₹1500.</p>
+    </header>
+    <nav aria-labelledby="categories-h">
+      <h2 id="categories-h">Shop by Category</h2>
+      <ul>${categoryLinks}</ul>
+    </nav>
+    <section aria-labelledby="products-h">
+      <h2 id="products-h">Best Selling Products</h2>
+      ${productListHtml}
+      <p><a href="${frontendUrl}/shop">View all products</a></p>
+    </section>
+  </main>
+  ${renderTrustFooter(frontendUrl)}
+</body>
+</html>`;
+}
+
 /**
  * Render a bot-readable HTML page for /shop?category=X, /shop?type=X, /shop?concern=X.
  * Sets a correct self-canonical so Google indexes the facet page, not the homepage.

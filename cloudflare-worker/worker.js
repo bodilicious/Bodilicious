@@ -2,6 +2,7 @@ import {
   isBot,
   renderProductHtml,
   renderShopHtml,
+  renderHomeHtml,
   renderBlogHtml,
   rewriteBlogIndex,
   rewriteStaticMeta,
@@ -102,6 +103,13 @@ export default {
       return handleBlogIndex(request, env, fetchFromOrigin);
     }
 
+    // 3d(i). Homepage — was never intercepted at all, so any bot (even ones
+    // on the isBot() allowlist) got the bare <div id="root"></div> SPA shell.
+    // The single highest-traffic entry point on the site.
+    if (pathname === '/' && !url.search) {
+      return handleHome(request, env, ctx);
+    }
+
     // 3d. Remaining static content pages. These fell through to the SPA shell,
     // so every one of them returned the homepage title and description to any
     // client that doesn't execute JavaScript — meaning every social share of
@@ -145,6 +153,59 @@ export default {
     return fetchFromOrigin();
   }
 };
+
+/**
+ * Bot renderer for "/". No facets to key the cache on, so a single fixed key.
+ * Products are ranked by rating*ratingCount as a proxy for "best sellers" —
+ * the API doesn't expose a dedicated bestseller flag, so this is the closest
+ * honest signal available without inventing one.
+ */
+async function handleHome(request, env, ctx) {
+  try {
+    const now = Date.now();
+    const cacheKey = 'home';
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return new Response(cached.html, {
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+          'Cache-Control': 'public, max-age=300, s-maxage=300',
+          'X-Cache': 'HIT',
+        }
+      });
+    }
+
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
+    const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+
+    let products = [];
+    try {
+      const res = await fetchWithTimeout(`${apiUrl}/api/v1/products?slim=true&limit=24`);
+      if (res.ok) {
+        const data = await res.json();
+        products = (data.data || data.products || [])
+          .filter(p => p.isActive !== false)
+          .sort((a, b) => (Number(b.rating || 0) * Number(b.ratingCount || 0)) - (Number(a.rating || 0) * Number(a.ratingCount || 0)))
+          .slice(0, 12);
+      }
+    } catch (_) {
+      // API down — still render the page with brand copy and nav; better than nothing
+    }
+
+    const html = renderHomeHtml(products, frontendUrl);
+    cache.set(cacheKey, { html, expiresAt: now + TTL_MS });
+
+    return new Response(html, {
+      headers: {
+        'Content-Type': 'text/html;charset=UTF-8',
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
+      }
+    });
+  } catch (error) {
+    console.error('[SEO Worker] Error rendering homepage:', error.message);
+    return fetch(request);
+  }
+}
 
 async function handleShop({ category, type, concern }, request, env, ctx) {
   try {
