@@ -1325,13 +1325,13 @@ export default function ShippingPage() {
                                     ) : (
                                         <div className="bg-neutral-50 p-4 rounded-sm border border-silk space-y-2">
                                             <div className="flex justify-between text-xs font-sans text-gray-600">
-                                                <span>Add {formatPrice(storeSettings.shippingThreshold - cartTotal)} for Free Shipping</span>
-                                                <span className="font-medium text-dark-red">{formatPrice(cartTotal)} / {formatPrice(storeSettings.shippingThreshold)}</span>
+                                                <span>Add {formatPrice(quoteData.threshold - cartTotal)} for Free Shipping</span>
+                                                <span className="font-medium text-dark-red">{formatPrice(cartTotal)} / {formatPrice(quoteData.threshold)}</span>
                                             </div>
                                             <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                                <div 
+                                                <div
                                                     className="bg-dark-red h-full rounded-full transition-all duration-500 ease-out"
-                                                    style={{ width: `${Math.min(100, (cartTotal / storeSettings.shippingThreshold) * 100)}%` }}
+                                                    style={{ width: `${Math.min(100, (cartTotal / quoteData.threshold) * 100)}%` }}
                                                 />
                                             </div>
                                         </div>

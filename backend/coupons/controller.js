@@ -228,3 +228,61 @@ export const validateCouponAtCheckout = async (code, cartTotal, userId, activeCo
     return { valid: false, error: "Error validating coupon" };
   }
 };
+
+/**
+ * Atomically claims one usage slot for a coupon and records the CouponUse row.
+ *
+ * validateCouponAtCheckout's perUserLimit check is a plain countDocuments read —
+ * fine as an early, friendly rejection, but not a guard against two concurrent
+ * checkouts both passing it before either records a use (the same race totalCap
+ * used to have, before it was enforced with a conditional findOneAndUpdate here).
+ * This claims totalCap AND perUserLimit in the same conditional update, using
+ * usesByUser (keyed by user id) as a per-user counter alongside usageCount, so
+ * a "one per customer" coupon genuinely can't be redeemed twice by racing it.
+ *
+ * Must be called inside the caller's session/transaction. Returns
+ * { claimed: false, reason } if a limit was hit; caller decides whether that's
+ * fatal (reject the order — COD, pre-payment) or something to log and honor
+ * (Razorpay capture — money already moved, can't retroactively re-charge).
+ */
+export const claimCouponUsage = async ({ couponId, userId, orderId, orderTotal, discountApplied, session }) => {
+  const coupon = await Coupon.findById(couponId).session(session);
+  if (!coupon) return { claimed: false, reason: "Coupon not found" };
+
+  const userKey = `usesByUser.${userId.toString()}`;
+  const filter = { _id: couponId };
+  const update = { $inc: { usageCount: 1 } };
+  const andConditions = [];
+
+  if (coupon.totalCap !== null) {
+    andConditions.push({ usageCount: { $lt: coupon.totalCap } });
+  }
+  if (coupon.perUserLimit !== null) {
+    // $lt alone does NOT match a genuinely absent field (verified — a first-time
+    // user with no usesByUser entry failed this filter, blocking every claim).
+    // Explicitly allow "never used" as well as "used fewer than the limit".
+    andConditions.push({
+      $or: [
+        { [userKey]: { $exists: false } },
+        { [userKey]: { $lt: coupon.perUserLimit } },
+      ],
+    });
+    update.$inc[userKey] = 1;
+  }
+  if (andConditions.length > 0) {
+    filter.$and = andConditions;
+  }
+
+  const claimed = await Coupon.findOneAndUpdate(filter, update, { session, new: true });
+  if (!claimed) return { claimed: false, reason: "Coupon usage limit reached" };
+
+  await CouponUse.create([{
+    coupon: couponId,
+    order: orderId,
+    user: userId,
+    discountApplied,
+    orderTotal
+  }], { session });
+
+  return { claimed: true };
+};

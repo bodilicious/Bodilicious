@@ -24,6 +24,26 @@ export const calculateInclusiveTax = (grossAmount, taxRatePercent) => {
     return Math.round((gross - gross / (1 + rate / 100)) * 100) / 100;
 };
 
+/**
+ * Single source of truth for shipping cost, shared by getOrderQuote and
+ * initRazorpayOrder. Before this, each endpoint had its own copy — the quote
+ * copy was missing the international free-shipping threshold that the init
+ * copy had, so a large international cart got quoted a paid shipping charge
+ * that init would then price at 0, tripping the Razorpay price-drift guard
+ * ("Cart contents or pricing changed") and blocking checkout outright.
+ */
+export const calculateShippingCost = async ({ isIndia, totalAmount, settings, country, pincode, totalWeightGrams, getInternationalShippingRate }) => {
+    if (isIndia) {
+        return totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
+    }
+    if (totalAmount >= settings.internationalShippingThreshold) {
+        return 0;
+    }
+    const totalWeightKg = Math.max(0.5, (totalWeightGrams || 0) / 1000);
+    const dynamicRate = await getInternationalShippingRate(country, pincode || "", totalWeightKg);
+    return dynamicRate !== null ? dynamicRate : settings.internationalShippingCost;
+};
+
 export const calculateDiscount = (subtotal, shippingCost, userStats, coupon = null) => {
     let discountAmount = 0;
     let isWelcomeOfferApplied = false;

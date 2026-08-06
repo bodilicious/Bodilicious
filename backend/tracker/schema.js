@@ -95,6 +95,12 @@ export const createOrderSchema = z.object({
     
     // quoteId for Razorpay integration
     quoteId: z.string().optional(),
+
+    // Coupon code applied at checkout. Must be declared here — Zod's default
+    // parse() strips unknown keys, so omitting this would silently drop the
+    // field before createOrder ever saw it (same trap as Mongoose's strict
+    // schema silently dropping unknown fields).
+    couponCode: z.string().optional(),
   });
 
 

@@ -12,12 +12,12 @@ import { trackServerEvent } from "../utils/posthog.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
 import NotificationService from "../procurement/notificationService.js";
-import { calculateDiscount, calculateInclusiveTax } from "../utils/pricing.js";
+import { calculateDiscount, calculateInclusiveTax, calculateShippingCost } from "../utils/pricing.js";
 import { CHECKOUT_CURRENCIES, roundForCurrency, toRazorpayMinorUnits, fromRazorpayMinorUnits } from "../utils/currencies.js";
 import orderEvents from "../events/orderEvents.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
-import { validateCouponAtCheckout } from "../coupons/controller.js";
-import { Coupon, CouponUse } from "../coupons/models.js";
+import { validateCouponAtCheckout, claimCouponUsage } from "../coupons/controller.js";
+import { CouponUse } from "../coupons/models.js";
 import { sign as signInternal, verify as verifyInternal, safeEqual } from "../utils/signing.js";
 
 /* =========================================================
@@ -185,32 +185,21 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
         if (order.appliedCoupon) {
             const existingUse = await CouponUse.findOne({ order: order._id }).session(session);
             if (!existingUse) {
-                const couponToUpdate = await Coupon.findById(order.appliedCoupon).session(session);
-                if (couponToUpdate) {
-                    const hasLimit = couponToUpdate.totalCap !== null;
-                    const query = { _id: order.appliedCoupon };
-                    if (hasLimit) {
-                        query.usageCount = { $lt: couponToUpdate.totalCap };
-                    }
-                    
-                    const incrementedCoupon = await Coupon.findOneAndUpdate(
-                        query,
-                        { $inc: { usageCount: 1 } },
-                        { session, new: true }
-                    );
+                const { claimed, reason } = await claimCouponUsage({
+                    couponId: order.appliedCoupon,
+                    userId: order.user,
+                    orderId: order._id,
+                    orderTotal: order.totalAmount,
+                    discountApplied: order.couponDiscount || order.discountAmount,
+                    session
+                });
 
-                    if (!incrementedCoupon && hasLimit) {
-                        console.warn(`[processPaidOrder] Coupon ${couponToUpdate.code} limit reached after order creation. Honoring discount for order ${order._id} but not recording CouponUse.`);
-                        updateFields.adminNote = ((order.adminNote || "") + `\n[System] Coupon ${couponToUpdate.code} limit reached but honored for paid order.`).trim();
-                    } else {
-                        await CouponUse.create([{
-                            coupon: order.appliedCoupon,
-                            order: order._id,
-                            user: order.user,
-                            discountApplied: order.couponDiscount || order.discountAmount,
-                            orderTotal: order.totalAmount
-                        }], { session });
-                    }
+                if (!claimed) {
+                    // Payment is already captured — we can't retroactively re-charge the
+                    // customer for hitting a limit after the fact, so honor the discount
+                    // and leave a trail for finance/ops instead of failing the order.
+                    console.warn(`[processPaidOrder] Coupon limit reached after order creation (${reason}). Honoring discount for order ${order._id} but not recording CouponUse.`);
+                    updateFields.adminNote = ((order.adminNote || "") + `\n[System] Coupon limit reached but honored for paid order (${reason}).`).trim();
                 }
             }
         }
@@ -425,23 +414,19 @@ export const getOrderQuote = async (req, res) => {
             totalWeightGrams += itemWeightG * item.quantity;
         }
 
-        let shippingCost = 0;
-        if (isIndia) {
-            shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
-        } else {
-            const totalWeightKg = Math.max(0.5, totalWeightGrams / 1000);
+        const shippingCost = await calculateShippingCost({
+            isIndia,
+            totalAmount,
+            settings,
+            country: shippingDetails.country,
             // shippingDetails has no postalCode/zip field — the schema (and every
             // caller) names it "pincode". Reading postalCode/zip always resolved to
             // "" here, so the live Shiprocket rate call ran with a blank postcode
             // on every quote and silently fell back to the static rate.
-            const dynamicRate = await getInternationalShippingRate(
-                shippingDetails.country,
-                shippingDetails.pincode || "",
-                totalWeightKg
-            );
-            // Fallback to static cost if API fails
-            shippingCost = dynamicRate !== null ? dynamicRate : settings.internationalShippingCost;
-        }
+            pincode: shippingDetails.pincode,
+            totalWeightGrams,
+            getInternationalShippingRate
+        });
 
         let existingOrdersCount = 1; // Default to 1 for guests (no welcome offer)
         if (userId) {
@@ -700,25 +685,17 @@ export const initRazorpayOrder = async (req, res) => {
             }
         }
 
-        // Mirror getOrderQuote's shipping-cost calc exactly. This used to always use
-        // the flat settings.internationalShippingCost while the quote used the live
-        // Shiprocket rate — the two could legitimately disagree, so international
-        // checkouts intermittently failed the drift-tolerance check below with
-        // "Cart contents or pricing changed" even when the cart hadn't changed.
-        let shippingCost;
-        if (isIndia) {
-            shippingCost = subtotal >= settings.shippingThreshold ? 0 : settings.shippingCost;
-        } else if (subtotal >= settings.internationalShippingThreshold) {
-            shippingCost = 0;
-        } else {
-            const totalWeightKg = Math.max(0.5, totalWeightGrams / 1000);
-            const dynamicRate = await getInternationalShippingRate(
-                shippingDetails.country,
-                shippingDetails.pincode || "",
-                totalWeightKg
-            );
-            shippingCost = dynamicRate !== null ? dynamicRate : settings.internationalShippingCost;
-        }
+        // Shares calculateShippingCost with getOrderQuote so the two can never drift
+        // apart again — see that function's doc comment for the incident this fixes.
+        const shippingCost = await calculateShippingCost({
+            isIndia,
+            totalAmount: subtotal,
+            settings,
+            country: shippingDetails.country,
+            pincode: shippingDetails.pincode,
+            totalWeightGrams,
+            getInternationalShippingRate
+        });
 
         let existingOrdersCount = 1;
         if (userId) {

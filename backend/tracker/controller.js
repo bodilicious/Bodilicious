@@ -17,6 +17,7 @@ import orderEvents from "../events/orderEvents.js";
 import { toRazorpayMinorUnits } from "../utils/currencies.js";
 import { fetchProductMaps, resolveProduct } from "../utils/productLookup.js";
 import { safeEqual } from "../utils/signing.js";
+import { validateCouponAtCheckout, claimCouponUsage } from "../coupons/controller.js";
 
 
 /* =========================================================
@@ -151,7 +152,7 @@ export const createOrder = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { items, shippingDetails, billingDetails, paymentMethod, marketing } = req.body;
+    const { items, shippingDetails, billingDetails, paymentMethod, marketing, couponCode } = req.body;
     const userId = req.user._id;
 
     // Razorpay orders must use /api/payment/razorpay/init + /api/payment/verify flow
@@ -252,8 +253,24 @@ export const createOrder = async (req, res) => {
         }).session(session);
     }
 
-    const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount });
-    const { finalAmount, discountAmount, originalAmount, isWelcomeOfferApplied } = pricing;
+    // ── Coupon (COD previously had no coupon support at all — a coupon applied
+    // on the cart/shipping page would show a discounted total, then silently
+    // vanish when the customer chose Cash on Delivery, charging full price
+    // with no error. Validate + apply it the same way the Razorpay path does.) ──
+    let coupon = null;
+    if (couponCode) {
+        const couponValidationResult = await validateCouponAtCheckout(couponCode, totalAmount, userId, []);
+        if (!couponValidationResult.valid) {
+            throw new Error(couponValidationResult.error || "Invalid coupon code");
+        }
+        coupon = couponValidationResult.coupon;
+    }
+
+    const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount }, coupon);
+    // pricing.shippingCost (not the outer `shippingCost`) is authoritative from
+    // here on — a free_shipping coupon zeroes it out, and finalAmount is
+    // computed against that effective value.
+    const { finalAmount, discountAmount, originalAmount, isWelcomeOfferApplied, shippingCost: finalShippingCost } = pricing;
 
     // GST disclosure, mirroring getOrderQuote: domestic only (exports are
     // zero-rated), carved out of finalAmount rather than added to it. COD orders
@@ -323,9 +340,12 @@ export const createOrder = async (req, res) => {
           user: userId,
           items: orderItems,
           totalAmount: finalAmount,
-          shippingCost,
+          shippingCost: finalShippingCost,
           discountAmount,
           isWelcomeOfferApplied,
+          couponCode: coupon ? coupon.code : null,
+          appliedCoupon: coupon ? coupon._id : undefined,
+          couponDiscount: coupon ? discountAmount : 0,
           originalAmount,
           taxAmount: codTaxAmount,
           paymentMethod: finalPaymentMethod,
@@ -338,6 +358,25 @@ export const createOrder = async (req, res) => {
         }],
       { session }
     );
+
+    // Claim the coupon now, not at the pre-check above — nothing irreversible
+    // has happened yet (no payment taken), so if a concurrent checkout won the
+    // race for the last slot, aborting the transaction and asking the customer
+    // to retry is correct here, unlike the Razorpay path where money has
+    // already moved and the discount must be honored regardless.
+    if (coupon) {
+        const { claimed, reason } = await claimCouponUsage({
+            couponId: coupon._id,
+            userId,
+            orderId: order._id,
+            orderTotal: finalAmount,
+            discountApplied: discountAmount,
+            session
+        });
+        if (!claimed) {
+            throw new Error(`Coupon is no longer available (${reason}). Please refresh your cart and try again.`);
+        }
+    }
 
     const productIdsToRemove = orderItems.map(i => i.product);
     await UserProfile.findByIdAndUpdate(userId, { 

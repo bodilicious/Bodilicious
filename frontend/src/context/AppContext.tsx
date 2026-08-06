@@ -138,7 +138,7 @@ interface AppContextType {
   removeFromCart: (pid: string) => void;
   updateQuantity: (pid: string, qty: number) => void;
 
-  checkout: (shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null) => Promise<{ order: Order }>;
+  checkout: (shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, couponCode?: string) => Promise<{ order: Order }>;
   initRazorpayOrder: (items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, quoteId?: string, couponCode?: string) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
   verifyPayment: (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string, items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails) => Promise<Order>;
   fetchShippingQuote: (items: any[], shippingDetails: any, couponCode?: string) => Promise<any>;
@@ -987,7 +987,8 @@ const triggerPasswordReset = async (email: string) => {
   ============================== */
   const checkout = async (
     shippingDetails: ShippingDetails,
-    billingDetails?: ShippingDetails | null
+    billingDetails?: ShippingDetails | null,
+    couponCode?: string
   ): Promise<{ order: Order }> => {
     if (authStatus !== 'authenticated') throw new Error('Please sign in to checkout');
     if (cartItems.length === 0) throw new Error('Your cart is empty');
@@ -1019,7 +1020,7 @@ const triggerPasswordReset = async (email: string) => {
       response = await fetch(`${API_BASE}/orders`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ items, shippingDetails, billingDetails, paymentMethod: 'cod', marketing }),
+        body: JSON.stringify({ items, shippingDetails, billingDetails, paymentMethod: 'cod', marketing, couponCode }),
         signal: controller.signal
       });
     } catch (err: any) {

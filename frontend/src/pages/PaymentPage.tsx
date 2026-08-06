@@ -446,7 +446,7 @@ export default function PaymentPage() {
                 }
                 setOverlay('cod_processing');
                 try {
-                    const { order } = await checkout(shippingDetails, finalBillingDetails as any);
+                    const { order } = await checkout(shippingDetails, finalBillingDetails as any, appliedCoupon || undefined);
                     navigate('/confirmation', { state: { orderId: order._id, status: 'success' }, replace: true });
                 } finally {
                     // Always reset guard so user can retry if navigation or confirmation throws

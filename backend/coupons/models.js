@@ -41,6 +41,14 @@ const couponSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Per-user usage counts, keyed by UserProfile _id (string). Lets a single
+    // atomic findOneAndUpdate enforce perUserLimit the same way usageCount
+    // enforces totalCap — see claimCouponUsage in coupons/controller.js.
+    usesByUser: {
+      type: Map,
+      of: Number,
+      default: () => new Map(),
+    },
     allowsStacking: {
       type: Boolean,
       default: false,
