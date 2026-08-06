@@ -527,6 +527,16 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
     .on('meta[property="og:url"]', setAttr('content', url))
     .on('meta[name="twitter:title"]', setAttr('content', meta.title))
     .on('meta[name="twitter:description"]', setAttr('content', meta.description))
+    // This stream-through only ever reaches bots (worker.js gates it behind
+    // isBot() before it runs), so it's safe to drop static content into
+    // #root — real browsers never get this response, and Googlebot's later
+    // JS-rendering pass fully replaces #root with the real React output
+    // anyway. Without this, every non-JS crawler on these routes — the
+    // audit that flagged "missing h1 on every page" almost certainly
+    // included all of these — saw a raw shell with no heading at all.
+    .on('div#root', {
+      element(el) { el.prepend(`<h1>${escapeHtml(meta.h1)}</h1>`, { html: true }); },
+    })
     .transform(response);
 }
 

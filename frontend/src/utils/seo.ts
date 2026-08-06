@@ -214,52 +214,71 @@ export function buildProductOgAlt(product?: SeoProductLike | null): string | und
 export interface StaticPageSeo {
   title: string;
   description: string;
+  // The page's real <h1> text, copied verbatim from the component (see each
+  // file's hero section). rewriteStaticMeta() in the Cloudflare worker injects
+  // this into the raw HTML for non-JS crawlers, which otherwise only ever see
+  // the bare `<div id="root"></div>` shell — no h1, no content, nothing. Keep
+  // this in sync with the component; it's bot-only output so a mismatch won't
+  // show to real users, but it will make crawlers see a different h1 than
+  // Googlebot's JS-rendered pass does.
+  h1: string;
 }
 
 export const STATIC_PAGE_SEO: Record<string, StaticPageSeo> = {
   '/about': {
     title: 'About Bodilicious — Our Story & Mission',
     description: 'Bodilicious is a certified, registered Indian beauty brand offering science-backed skincare and haircare. Learn about our mission, founders, and philosophy.',
+    h1: 'About Bodilicious',
   },
   '/brand-story': {
     title: 'Our Brand Story — Bodilicious',
     description: 'Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional wisdom to create safe, targeted skincare and haircare for every concern.',
+    h1: 'Brand Story',
   },
   '/contact': {
     title: 'Contact Us — Bodilicious',
     description: 'Get in touch with the Bodilicious team. Write us a review, ask about products or shipping, or give feedback. We are here to help you on your skincare journey.',
+    h1: 'Contact Us',
   },
   '/faqs': {
     title: 'FAQs — Bodilicious',
     description: 'Find answers to the most common questions about Bodilicious products, shipping, payments, and more.',
+    h1: 'Frequently Asked Questions',
   },
   '/blogs': {
     title: 'Blog | Bodilicious',
     description: 'Skincare tips, ingredient guides, and beauty rituals from the Bodilicious team.',
+    h1: 'Blogs',
   },
   '/offers': {
     title: 'Welcome Offer — 10% Off Your First Order | Bodilicious',
     description: 'New to Bodilicious? Enjoy 10% off your first skincare or haircare order. Premium beauty products, dermatologically tested, delivered free over ₹1500.',
+    h1: 'The Welcome Ritual',
   },
   '/how-to-order': {
     title: 'How to Order — Bodilicious',
     description: 'An interactive, step-by-step walkthrough to placing an order on Bodilicious. Discover, select, check out, and track your package.',
+    h1: 'How to Place Your Order',
   },
   '/ritual-finder': {
     title: 'Skincare Ritual Finder — Bodilicious',
     description: 'Answer a few questions and get a personalized Bodilicious skincare or haircare routine tailored to your skin type, concerns, and goals.',
+    h1: 'Find Your Perfect Bodilicious Ritual',
   },
   '/terms': {
     title: 'Terms & Conditions — Bodilicious',
     description: 'Review the Terms and Conditions governing your use of the Bodilicious website, products, intellectual property, and dispute resolution process.',
+    h1: 'Terms of Conditions',
   },
   '/privacy': {
     title: 'Privacy Policy — Bodilicious',
     description: 'Read the Bodilicious Privacy Policy to understand how we collect, use, and protect your personal data when you shop with us.',
+    h1: 'Privacy Policy',
   },
   '/shipping-refund': {
     title: 'Shipping & Returns Policy — Bodilicious',
     description: 'Free shipping on orders over ₹1500. Learn about Bodilicious delivery timelines, international shipping, 7-day returns, and our hassle-free refund process.',
+    h1: 'Shipping & Refund Policy',
   },
 };
 
