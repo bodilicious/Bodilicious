@@ -96,20 +96,29 @@ export function getLegacyShopifyAction(pathname) {
     if (pattern.test(pathname)) return { type: 'gone' };
   }
 
-  if (/^\/products\/[^/]+\/?$/.test(pathname)) {
+  // BUG FIX: a bare [^/]+ handle match also caught this site's own static
+  // assets served from these same path prefixes (e.g. frontend/public's
+  // /products/coq-0.webp product photos), 301-redirecting every product
+  // image on the site to /shop. Real Shopify handles are slugs with no
+  // dot in them, so require the segment to look like one — this excludes
+  // any filename with an extension while still matching legacy handles.
+  const isLegacySlug = (segment) => /^[a-zA-Z0-9_-]+$/.test(segment);
+
+  const productMatch = pathname.match(/^\/products\/([^/]+)\/?$/);
+  if (productMatch && isLegacySlug(productMatch[1])) {
     // No preserved handle→pid mapping from the old catalog, so send to the
     // closest honest destination rather than guessing a specific product.
     return { type: 'redirect', to: '/shop' };
   }
 
   const collectionMatch = pathname.match(/^\/collections\/([^/]+)\/?$/);
-  if (collectionMatch) {
+  if (collectionMatch && isLegacySlug(collectionMatch[1])) {
     const to = LEGACY_COLLECTION_MAP[collectionMatch[1].toLowerCase()] || '/shop';
     return { type: 'redirect', to };
   }
 
   const pageMatch = pathname.match(/^\/pages\/([^/]+)\/?$/);
-  if (pageMatch) {
+  if (pageMatch && isLegacySlug(pageMatch[1])) {
     const to = LEGACY_PAGE_MAP[pageMatch[1].toLowerCase()] || '/about';
     return { type: 'redirect', to };
   }
