@@ -360,6 +360,18 @@ export function renderProductHtml(product, frontendUrl) {
         <h1>${escapeHtml(h1)}</h1>
         <p>${escapeHtml(product.description || '')}</p>
         <p>Price: ₹${escapeHtml(String(product.price))}</p>
+        ${product.rating && product.ratingCount
+          ? `<p>Rated ${escapeHtml(String(product.rating.toFixed ? product.rating.toFixed(1) : product.rating))} out of 5 (${escapeHtml(String(product.ratingCount))} reviews)</p>`
+          : ''}
+        <!-- Same trust badges as the real product page's trust bar (ProductPage.tsx) —
+             previously only present as aggregateRating in JSON-LD, with no visible
+             trust signal in the body text a crawler could actually read. -->
+        <ul aria-label="Trust signals">
+          <li>7-Day Returns — Hassle-free</li>
+          <li>Secure SSL — 100% Secure</li>
+          <li>Delivery SLA — Fast Shipping</li>
+          <li>Verified Science — Dermatologically Tested</li>
+        </ul>
       </header>
       ${sections}
     </article>
@@ -540,6 +552,12 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
           el.prepend(`<p>${escapeHtml(meta.body[i])}</p>`, { html: true });
         }
         el.prepend(`<h1>${escapeHtml(meta.h1)}</h1>`, { html: true });
+        // These 11 routes were the only bot-rendered pages missing the
+        // trust footer (product/blog/home/shop already have it) — meaning
+        // a crawler landing on /terms or /privacy had no path at all to
+        // About/Contact/Privacy/Terms, which is exactly what an E-E-A-T
+        // check flags as a missing trust signal.
+        el.append(renderTrustFooter(frontendUrl), { html: true });
       },
     })
     .transform(response);
