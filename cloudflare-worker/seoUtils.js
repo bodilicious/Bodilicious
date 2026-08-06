@@ -29,6 +29,94 @@ export function isBot(request) {
   return BOT_UA_PATTERNS.test(userAgent);
 }
 
+// ─── Legacy Shopify URL cleanup ─────────────────────────────────────────────
+// This domain ran a Shopify store before the current site. Shopify's URL
+// structure (/products/:handle, /collections/:handle, /pages/:handle, plus
+// its JSON/XML/asset endpoints) is still indexed by Bing/Google and gets
+// cited by AI assistants doing live web search — because nothing on this
+// domain ever told those crawlers the URLs moved or disappeared. They fell
+// through to the SPA shell and got a plain 200 with generic homepage
+// metadata, which is not a "moved" or "gone" signal, so the stale snippets
+// never got refreshed. A real 301 (moved) or 410 (gone) here is what
+// actually clears that out of search indexes and AI answers over time.
+const LEGACY_COLLECTION_MAP = {
+  all: '/shop',
+  'shop-all': '/shop',
+  'skin-care': '/shop?category=skin',
+  skincare: '/shop?category=skin',
+  'hair-care': '/shop?category=hair',
+  haircare: '/shop?category=hair',
+  'body-care': '/shop?category=body',
+  lipcare: '/shop?category=lip',
+  'lip-care': '/shop?category=lip',
+  makeup: '/shop?category=makeup',
+  foundation: '/shop?category=makeup',
+};
+
+const LEGACY_PAGE_MAP = {
+  'brand-story': '/brand-story',
+  about: '/about',
+  'about-us': '/about',
+  contact: '/contact',
+  'contact-us': '/contact',
+  faq: '/faqs',
+  faqs: '/faqs',
+  'shipping-policy': '/shipping-refund',
+  'refund-policy': '/shipping-refund',
+  'return-policy': '/shipping-refund',
+  'terms-of-service': '/terms',
+  'terms-conditions': '/terms',
+  'privacy-policy': '/privacy',
+};
+
+// Shopify API/asset/checkout endpoints with no meaningful equivalent on the
+// current site — these should disappear from the index (410), not redirect.
+const LEGACY_GONE_PATTERNS = [
+  /^\/products\/[^/]+\.json$/,
+  /^\/products\.json$/,
+  /^\/collections\.json$/,
+  /^\/collections\/[^/]+\.json$/,
+  /^\/sitemap_products_\d+\.xml$/,
+  /^\/sitemap_collections_\d+\.xml$/,
+  /^\/sitemap_pages_\d+\.xml$/,
+  /^\/cdn\/shop\//,
+  /^\/cart\.js$/,
+  /^\/cart\/[^/]+\.js$/,
+  /^\/checkouts\//,
+  /^\/apps\//,
+  /^\/wpm@/,
+];
+
+/**
+ * Classifies a request path as belonging to the old Shopify store.
+ * Returns { type: 'redirect', to } | { type: 'gone' } | null.
+ */
+export function getLegacyShopifyAction(pathname) {
+  for (const pattern of LEGACY_GONE_PATTERNS) {
+    if (pattern.test(pathname)) return { type: 'gone' };
+  }
+
+  if (/^\/products\/[^/]+\/?$/.test(pathname)) {
+    // No preserved handle→pid mapping from the old catalog, so send to the
+    // closest honest destination rather than guessing a specific product.
+    return { type: 'redirect', to: '/shop' };
+  }
+
+  const collectionMatch = pathname.match(/^\/collections\/([^/]+)\/?$/);
+  if (collectionMatch) {
+    const to = LEGACY_COLLECTION_MAP[collectionMatch[1].toLowerCase()] || '/shop';
+    return { type: 'redirect', to };
+  }
+
+  const pageMatch = pathname.match(/^\/pages\/([^/]+)\/?$/);
+  if (pageMatch) {
+    const to = LEGACY_PAGE_MAP[pageMatch[1].toLowerCase()] || '/about';
+    return { type: 'redirect', to };
+  }
+
+  return null;
+}
+
 export function truncateDescription(text, maxLen = 155) {
   if (!text || text.length <= maxLen) return text ?? '';
   const truncated = text.slice(0, maxLen);

@@ -10,6 +10,7 @@ import {
   SITEMAP_CATEGORIES,
   SITEMAP_CONCERNS,
   SITEMAP_TYPES,
+  getLegacyShopifyAction,
 } from './seoUtils.js';
 
 // Cache for bot rendered HTML
@@ -53,6 +54,23 @@ export default {
     // BUG FIX 1: Sitemap must bypass the kill-switch — it is always valid public content.
     if (pathname === '/sitemap.xml') {
       return handleSitemap(env);
+    }
+
+    // Legacy Shopify URLs (this domain ran a Shopify store before this site).
+    // Runs for every request — not gated by the bot kill-switch/isBot check
+    // below — so a human who clicks a stale /products/ or /collections/
+    // search result lands on the right page too, not just crawlers. See
+    // getLegacyShopifyAction() in seoUtils.js for why this exists.
+    const legacyAction = getLegacyShopifyAction(pathname);
+    if (legacyAction) {
+      const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+      if (legacyAction.type === 'redirect') {
+        return Response.redirect(`${frontendUrl}${legacyAction.to}`, 301);
+      }
+      return new Response(
+        '<!doctype html><html lang="en"><head><title>Gone</title><meta name="robots" content="noindex, nofollow"></head><body>This resource no longer exists.</body></html>',
+        { status: 410, headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
+      );
     }
 
     // Google Merchant Center product feed — must bypass the kill-switch for the
