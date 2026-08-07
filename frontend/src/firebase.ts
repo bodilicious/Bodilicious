@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+    initializeAuth,
+    indexedDBLocalPersistence,
+    browserLocalPersistence,
+    GoogleAuthProvider,
+} from "firebase/auth";
 
 // Warning: To run properly, replace these mock env defaults safely injected via Vite
 const firebaseConfig = {
@@ -12,5 +17,19 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+// initializeAuth() instead of getAuth(): getAuth() installs the default
+// popupRedirectResolver, which loads Firebase's cross-origin auth iframe
+// (…firebaseapp.com/__/auth/iframe.js, ~93 KB) on EVERY page load — it was the
+// longest chain in the critical path even for signed-out visitors who never
+// touch sign-in. Omitting the resolver here defers that download until a
+// sign-in is actually attempted, where it's passed explicitly (see
+// signInWithGoogle in AppContext).
+//
+// The persistence list mirrors the browser default getAuth() used
+// (IndexedDB, falling back to localStorage), so existing sessions keep
+// working and nobody gets signed out by this change.
+export const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
 export const googleProvider = new GoogleAuthProvider();

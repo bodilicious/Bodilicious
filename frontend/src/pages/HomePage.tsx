@@ -15,7 +15,7 @@ import EditableBlock from '../components/EditableBlock';
 import EditableList from '../components/EditableList';
 import ImageUploadField from '../components/ImageUploadField';
 import ProductPickerModal from '../admin/ProductPickerModal';
-import { cloudinaryUrl } from '../utils/cloudinary';
+import { CATEGORY_GRID_SIZES } from '../utils/responsiveImage';
 
 // Fallback banner assets — served from /public so they are NOT bundled into JS
 const haircareImg = '/assets/banners/haircare0.webp';
@@ -699,6 +699,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                         handleListChange('categories', newCats);
                       }}
                       containerClassName="absolute inset-0"
+                      sizes={CATEGORY_GRID_SIZES}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-red/80 via-dark-red/20 to-transparent pointer-events-none" />

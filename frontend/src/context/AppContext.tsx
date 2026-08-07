@@ -562,7 +562,12 @@ const refreshAuthState = async () => {
   ============================== */
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    // The resolver must be passed explicitly: firebase.ts deliberately builds
+    // `auth` without a default popupRedirectResolver so the auth iframe isn't
+    // downloaded on every page load. This is the one place that needs it, and
+    // importing it here means the iframe loads only once sign-in is clicked.
+    const { browserPopupRedirectResolver } = await import('firebase/auth');
+    await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     await refreshAuthState();
   };
 

@@ -319,6 +319,13 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
             />
           ) : visited.has(idx) ? (
             <picture className="absolute inset-0 w-full h-full">
+              {/* Portrait mobile crop — both a smaller download and better art
+                  direction than letting the wide desktop image be cropped by
+                  object-cover. Only emitted when the slide actually defines
+                  one, since DB-authored slides may not. */}
+              {s.mobileImage && (
+                <source media="(max-width: 767px)" srcSet={s.mobileImage} />
+              )}
               <img
                 src={s.imageUrl}
                 alt={s.imageAlt || s.title || ''}

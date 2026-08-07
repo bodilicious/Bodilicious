@@ -14,8 +14,8 @@ export default memo(function Logo({ size = 'md', inverted = false }: LogoProps) 
       <img
         src="/logo.webp"
         alt="Bodilicious Logo"
-        width={1536}
-        height={1024}
+        width={800}
+        height={533}
         decoding="async"
         loading="eager"
         fetchPriority="high"

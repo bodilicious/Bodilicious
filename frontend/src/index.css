@@ -6,6 +6,16 @@
   * {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Firefox scrollbar styling. Declared on `html` rather than `*` because both
+     properties inherit, so this styles every scrollable element exactly as
+     before — but without giving all ~thousands of elements their own declared
+     value. When these sat on `*`, every element carrying Tailwind's
+     `transition-all` (footer links, carousel dots, product cards, CTA buttons)
+     picked up scrollbar-color as an animatable-but-not-compositable property,
+     which is what Lighthouse reported as 33 "non-composited animations". */
+  html {
     scrollbar-width: thin;
     scrollbar-color: rgba(61, 10, 5, 0.2) transparent;
   }

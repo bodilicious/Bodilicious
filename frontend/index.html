@@ -46,16 +46,26 @@
     <!-- Preconnect to Render backend — cuts TCP/TLS latency on first API call -->
     <link rel="dns-prefetch" href="https://bodilicious-cxow.onrender.com" />
     <link rel="preconnect" href="https://bodilicious-cxow.onrender.com" crossorigin />
-    <!-- Preconnect for critical third-party origins to cut DNS/TCP/TLS latency -->
-    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <!-- Preconnect for critical third-party origins to cut DNS/TCP/TLS latency.
+         Kept to 4 preconnects total (Lighthouse warns past that, since each one
+         costs a connection). apis.google.com is here because Firebase Auth
+         blocks the critical path on it; googletagmanager and cloudinary are
+         dns-prefetch instead — gtag loads async, and Cloudinary is only hit
+         when a page actually renders an admin-uploaded image. -->
+    <link rel="preconnect" href="https://apis.google.com" crossorigin />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://analytics.ahrefs.com" />
-    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
 
-    <!-- Preload the first hero carousel image (LCP element on desktop) -->
-    <link rel="preload" as="image" href="/assets/hero_carousel_1.webp" fetchpriority="high" />
-    <!-- Preload the navbar logo (LCP element on mobile — the hero carousel
-         sits lower in the mobile layout, so the logo paints first there) -->
-    <link rel="preload" as="image" href="/logo.webp" fetchpriority="high" />
+    <!-- Preload the LCP image for each breakpoint. These MUST stay in sync with
+         what HeroCarousel/Logo actually render: the carousel serves the portrait
+         hero_mobile_* crop under 768px, so preloading the desktop file there
+         would download an image the page never uses. -->
+    <link rel="preload" as="image" href="/assets/hero_carousel_1.webp" fetchpriority="high" media="(min-width: 768px)" />
+    <link rel="preload" as="image" href="/assets/hero_mobile_1.webp" fetchpriority="high" media="(max-width: 767px)" />
+    <!-- The navbar logo is the LCP element on mobile — the hero sits lower in
+         the mobile layout, so the logo paints first there. -->
+    <link rel="preload" as="image" href="/logo.webp" fetchpriority="high" media="(max-width: 767px)" />
 
     <!-- Primary SEO -->
 

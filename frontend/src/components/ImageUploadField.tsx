@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { useApp } from '../context/AppContext';
 import { Upload, X, Link as LinkIcon, Image as ImageIcon, Library } from 'lucide-react';
+import { buildSrcSet } from '../utils/responsiveImage';
 
 const MediaLibrary = lazy(() => import('./MediaLibrary'));
 
@@ -15,6 +16,8 @@ interface ImageUploadFieldProps {
   className?: string;
   containerClassName?: string;
   aspectRatio?: string;
+  /** `sizes` attribute, paired with the responsive srcset built from imageUrl. */
+  sizes?: string;
 }
 
 export default function ImageUploadField({
@@ -25,7 +28,8 @@ export default function ImageUploadField({
   onAltChange,
   className = '',
   containerClassName = '',
-  aspectRatio = 'auto'
+  aspectRatio = 'auto',
+  sizes
 }: ImageUploadFieldProps) {
   const { getAuthHeaders } = useApp();
   const [isUploading, setIsUploading] = useState(false);
@@ -80,10 +84,21 @@ export default function ImageUploadField({
     ? `/${imageUrl}`
     : imageUrl;
 
+  const srcSet = buildSrcSet(displayUrl);
+
   if (!isEditing) {
     if (!imageUrl) return null;
     return (
-      <img src={displayUrl} alt={imageAlt} className={className} style={{ aspectRatio }} loading="lazy" decoding="async" />
+      <img
+        src={displayUrl}
+        srcSet={srcSet}
+        sizes={srcSet ? sizes : undefined}
+        alt={imageAlt}
+        className={className}
+        style={{ aspectRatio }}
+        loading="lazy"
+        decoding="async"
+      />
     );
   }
 
