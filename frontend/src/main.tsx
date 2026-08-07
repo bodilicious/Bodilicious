@@ -13,7 +13,8 @@ if (import.meta.env.VITE_POSTHOG_KEY) {
     posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
       api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com',
       autocapture: true, // Auto captures clicks and pageviews
-      capture_pageview: true // Captures page views on load
+      capture_pageview: true, // Captures page views on load
+      disable_surveys: true // Feature unused in this app — skips loading the surveys.js bundle
     });
   };
   if ('requestIdleCallback' in window) {

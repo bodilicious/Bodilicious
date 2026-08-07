@@ -57,12 +57,37 @@ const CSP_DIRECTIVES = [
 ].join('; ');
 
 /**
- * Clones `response` and layers security headers onto it without touching
- * status/body. Applied once, right before the worker's fetch handler returns,
- * so every code path (bot-rendered HTML, proxied origin responses, XML
- * feeds, 404s) gets the same treatment.
+ * Long-lived Cache-Control for static build output and public assets, keyed
+ * off the URL path alone (works for both bot-rendered and proxied-origin
+ * responses). Two tiers:
+ *  - Vite's own /assets/*.js and *.css are content-hashed by the build (the
+ *    filename changes whenever the content does), so they're safe to cache
+ *    "forever" — a stale copy can never be served because a content change
+ *    always ships under a new URL.
+ *  - Everything else static (webp/png/svg/ico/font files, e.g. the homepage
+ *    category banners and /logo.webp) is served from /public under a FIXED
+ *    filename, so a long-but-bounded cache is used instead: if someone swaps
+ *    that file's contents without renaming it, this is how long browsers can
+ *    keep showing the old one.
+ * Anything else (HTML, API responses, XML feeds) is left untouched.
  */
-function withSecurityHeaders(response) {
+function getStaticCacheControl(pathname) {
+  if (/^\/assets\/.+-[A-Za-z0-9_]{6,}\.(js|css)$/.test(pathname)) {
+    return 'public, max-age=31536000, immutable';
+  }
+  if (/\.(webp|png|jpe?g|avif|gif|svg|ico|woff2?)$/i.test(pathname)) {
+    return 'public, max-age=2592000'; // 30 days
+  }
+  return null;
+}
+
+/**
+ * Clones `response` and layers security + cache headers onto it without
+ * touching status/body. Applied once, right before the worker's fetch
+ * handler returns, so every code path (bot-rendered HTML, proxied origin
+ * responses, XML feeds, 404s) gets the same treatment.
+ */
+function withSecurityHeaders(response, pathname) {
   const headers = new Headers(response.headers);
   headers.set('Content-Security-Policy-Report-Only', CSP_DIRECTIVES);
   // same-origin-allow-popups (not the stricter same-origin) because Firebase's
@@ -75,6 +100,10 @@ function withSecurityHeaders(response) {
   headers.set('X-Frame-Options', 'DENY');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (response.status === 200 || response.status === 206) {
+    const cacheControl = getStaticCacheControl(pathname);
+    if (cacheControl) headers.set('Cache-Control', cacheControl);
+  }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -103,7 +132,7 @@ async function fetchWithTimeout(url, timeoutMs = 25000) {
 export default {
   async fetch(request, env, ctx) {
     const response = await route(request, env, ctx);
-    return withSecurityHeaders(response);
+    return withSecurityHeaders(response, new URL(request.url).pathname);
   }
 };
 
