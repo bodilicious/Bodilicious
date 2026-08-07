@@ -316,7 +316,7 @@ export default function Navbar() {
             <button
               onClick={() => setSearchOpen(!searchOpen)}
               aria-label={searchOpen ? 'Close search' : 'Open search'}
-              className={`flex transition-colors ${
+              className={`flex p-1.5 -m-1.5 transition-colors ${
                 searchOpen ? 'text-ruby-red' : isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'
               }`}
             >
@@ -326,13 +326,15 @@ export default function Navbar() {
 
 
 
-            <Link to="/wishlist" aria-label="Wishlist" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-ruby-red'}`}>
-              <Heart size={18} />
-              {wishlist.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-ruby-red text-white text-[10px] rounded-full flex items-center justify-center font-sans">
-                  {wishlist.length}
-                </span>
-              )}
+            <Link to="/wishlist" aria-label="Wishlist" className={`flex p-1.5 -m-1.5 transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-ruby-red'}`}>
+              <span className="relative flex">
+                <Heart size={18} />
+                {wishlist.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-ruby-red text-white text-[10px] rounded-full flex items-center justify-center font-sans">
+                    {wishlist.length}
+                  </span>
+                )}
+              </span>
             </Link>
 
             {authStatus === 'authenticated' && (user?.role === 'admin' || user?.role === 'primary_admin') && (
@@ -355,7 +357,7 @@ export default function Navbar() {
             ) : (
               <Link
                 to={authStatus === 'authenticated' ? '/account' : '/signin'}
-                className={`transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}
+                className={`p-1.5 -m-1.5 transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}
                 title={authStatus === 'authenticated' ? 'My Account' : 'Sign In'}
                 aria-label={authStatus === 'authenticated' ? 'My Account' : 'Sign In'}
               >
@@ -363,16 +365,18 @@ export default function Navbar() {
               </Link>
             )}
 
-            <Link to="/cart" aria-label="Cart" className={`relative transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}>
-              <ShoppingBag size={18} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-dark-red text-silk text-[10px] rounded-full flex items-center justify-center font-sans">
-                  {cartCount}
-                </span>
-              )}
+            <Link to="/cart" aria-label="Cart" className={`flex p-1.5 -m-1.5 transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/60 hover:text-dark-red'}`}>
+              <span className="relative flex">
+                <ShoppingBag size={18} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-dark-red text-silk text-[10px] rounded-full flex items-center justify-center font-sans">
+                    {cartCount}
+                  </span>
+                )}
+              </span>
             </Link>
 
-            <button aria-label={menuOpen ? 'Close menu' : 'Open menu'} className={`md:hidden transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/70 hover:text-dark-red'}`} onClick={() => setMenuOpen(!menuOpen)}>
+            <button aria-label={menuOpen ? 'Close menu' : 'Open menu'} className={`md:hidden p-1.5 -m-1.5 transition-colors ${isTransparent ? 'text-white/95 hover:text-white [filter:drop-shadow(0_1px_6px_rgba(0,0,0,0.7))]' : 'text-dark-red/70 hover:text-dark-red'}`} onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
@@ -407,7 +411,7 @@ export default function Navbar() {
                 setSearchOpen(false);
                 setSearchQuery('');
               }}
-              className="absolute right-3 text-gray-400 hover:text-dark-red transition-colors"
+              className="absolute right-1.5 p-1.5 text-gray-400 hover:text-dark-red transition-colors"
             >
               <X size={18} />
             </button>

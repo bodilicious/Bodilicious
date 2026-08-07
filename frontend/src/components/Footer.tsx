@@ -31,7 +31,7 @@ export default function Footer() {
                   <Link
                     to={item.path}
                     onClick={() => window.scrollTo(0, 0)}
-                    className="text-sm font-sans flex items-center w-fit text-grey-beige hover:text-ruby-red hover:translate-x-1 transition-all duration-300 tracking-wide"
+                    className="text-sm font-sans flex items-center w-fit text-grey-beige-dark hover:text-ruby-red hover:translate-x-1 transition-all duration-300 tracking-wide"
                   >
                     {item.label}
                   </Link>
@@ -58,7 +58,7 @@ export default function Footer() {
                   <Link
                     to={item.path}
                     onClick={() => window.scrollTo(0, 0)}
-                    className="text-sm font-sans flex items-center w-fit text-grey-beige hover:text-ruby-red hover:translate-x-1 transition-all duration-300 tracking-wide"
+                    className="text-sm font-sans flex items-center w-fit text-grey-beige-dark hover:text-ruby-red hover:translate-x-1 transition-all duration-300 tracking-wide"
                   >
                     {item.label}
                   </Link>
@@ -83,7 +83,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="text-grey-beige hover:text-ruby-red hover:-translate-y-1 hover:scale-110 transition-all duration-300 inline-block"
+                  className="text-grey-beige-dark hover:text-ruby-red hover:-translate-y-1 hover:scale-110 transition-all duration-300 inline-block p-1 -m-1"
                 >
                   <Icon size={20} />
                 </a>
@@ -117,9 +117,9 @@ export default function Footer() {
               100% Secure Payments
             </p>
             <div className="flex items-center gap-4 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-              <img src="/assets/payment-badges/visa.svg" alt="Visa" className="h-4 w-auto" />
-              <img src="/assets/payment-badges/mastercard.svg" alt="Mastercard" className="h-6 w-auto" />
-              <img src="/assets/payment-badges/razorpay.svg" alt="Razorpay" className="h-4 w-auto" />
+              <img src="/assets/payment-badges/visa.svg" alt="Visa" width={48} height={16} loading="lazy" className="h-4 w-auto" />
+              <img src="/assets/payment-badges/mastercard.svg" alt="Mastercard" width={48} height={24} loading="lazy" className="h-6 w-auto" />
+              <img src="/assets/payment-badges/razorpay.svg" alt="Razorpay" width={80} height={16} loading="lazy" className="h-4 w-auto" />
             </div>
           </div>
 
@@ -128,7 +128,7 @@ export default function Footer() {
               <ShieldCheck size={14} strokeWidth={2.5} />
               <span className="text-[10px] font-sans font-bold tracking-wider uppercase">Secure SSL Checkout</span>
             </div>
-            <p className="text-xs font-sans text-grey-beige tracking-wide">
+            <p className="text-xs font-sans text-grey-beige-dark tracking-wide">
               © {new Date().getFullYear()} Bodilicious – International
             </p>
           </div>

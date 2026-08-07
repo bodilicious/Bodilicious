@@ -173,7 +173,7 @@ const BlogListPage: React.FC = () => {
             ))}
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center gap-3 py-24 text-red-500">
+          <div className="flex flex-col items-center gap-3 py-24 text-red-700">
             <AlertCircle size={32} />
             <span className="text-sm">{error}</span>
           </div>

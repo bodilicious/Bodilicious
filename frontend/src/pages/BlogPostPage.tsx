@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
+import { toTrustedHTML } from '../utils/trustedTypes';
 import { useSEO } from '../hooks/useSEO';
 import { buildBlogTitle, buildBlogDescription, buildBlogKeywords, buildBlogOgAlt } from '../utils/seo';
 import { useApp } from '../context/useApp';
@@ -261,7 +262,7 @@ const BlogPostPage: React.FC = () => {
   }
 
   // Sanitise HTML content before rendering (DOMPurify prevents stored XSS)
-  const safeContent = DOMPurify.sanitize(post.content, {
+  const safeContent = toTrustedHTML(DOMPurify.sanitize(post.content, {
     ALLOWED_TAGS: [
       'p','br','strong','em','u','s','h1','h2','h3','h4','h5','h6',
       'ul','ol','li','blockquote','pre','code',
@@ -269,7 +270,7 @@ const BlogPostPage: React.FC = () => {
     ],
     ALLOWED_ATTR: ['href','target','rel','src','alt','class','title'],
     FORCE_BODY: true,
-  });
+  }));
 
   return (
     <main className="min-h-screen bg-b-bg pt-32 pb-24">

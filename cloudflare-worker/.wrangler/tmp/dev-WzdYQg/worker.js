@@ -4,7 +4,7 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 // ../frontend/src/utils/seo.ts
 var BRAND = "Bodilicious";
 var MAX_TITLE_LENGTH = 60;
-var MAX_DESCRIPTION_LENGTH = 155;
+var MAX_DESCRIPTION_LENGTH = 120;
 function truncateAtWord(text, maxLen) {
   const clean = String(text || "").trim();
   if (clean.length <= maxLen) return clean;
@@ -80,50 +80,149 @@ function buildProductOgAlt(product) {
   return secondary ? `${name} - ${secondary}` : `${name} by ${BRAND}`;
 }
 __name(buildProductOgAlt, "buildProductOgAlt");
+var p = /* @__PURE__ */ __name((text) => ({ type: "paragraph", text }), "p");
+var h = /* @__PURE__ */ __name((text) => ({ type: "heading", text }), "h");
+var ul = /* @__PURE__ */ __name((items) => ({ type: "list", items }), "ul");
 var STATIC_PAGE_SEO = {
   "/about": {
     title: "About Bodilicious \u2014 Our Story & Mission",
-    description: "Bodilicious is a certified, registered Indian beauty brand offering science-backed skincare and haircare. Learn about our mission, founders, and philosophy."
+    description: "Bodilicious is a certified Indian beauty brand offering science-backed skincare and haircare. Learn our story.",
+    h1: "About Bodilicious",
+    body: [
+      p("Bodilicious is a certified licenced brand, officially recognized in India as a registered beauty and skincare company. Our focus is on targeted skincare aimed at combating hair loss, premature greying, skin dullness, aging, pigmentation, and more."),
+      h("About Us"),
+      p("Our product line encompasses everything from skin to hair care. Our products are hand-made, free from chemicals, and dermatologically tested. We believe in treating skin problems at the source rather than simply hiding them."),
+      h("Committed to Quality"),
+      p("Bodilicious natural products are target-oriented skincare products. We suggest the right products to our customers in the ocean of skin care products, so you are using the right products for your skin or hair concern. Quality should never be a compromise."),
+      h("Our Leadership"),
+      p("Bhanuja Polani, Founder & Formulator, is a biomedical engineer with an M.Tech in Biotechnology. Her background is in understanding how biological systems respond to compounds at a molecular level, not in marketing.")
+    ]
   },
   "/brand-story": {
     title: "Our Brand Story \u2014 Bodilicious",
-    description: "Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with traditional wisdom to create safe, targeted skincare and haircare for every concern."
+    description: "Founded by Dr. Bhanuja Polani, Bodilicious blends biomedical science with tradition for targeted skincare.",
+    h1: "Brand Story",
+    body: [
+      p("Bodilicious was born from a personal journey of discovery and determination. Like many people, Dr. Bhanuja Polani struggled to find skincare products that truly suited her skin. This experience inspired her to create something different \u2014 a skincare brand that understands the real needs of people and delivers effective yet gentle solutions."),
+      p("With a strong academic background in Biomedical Engineering and M.Tech in Biotechnology, Dr. Bhanuja Polani combined scientific knowledge with her passion for skincare to develop formulations that work in harmony with the skin."),
+      h("Our Philosophy"),
+      p("One of the unique aspects of Bodilicious is its structured skincare philosophy. Rather than offering temporary fixes, the brand focuses on gradual and sustainable skin improvement, with routines built around 3-month, 6-month, and 9-month programs and personalized follow-ups along the way."),
+      h("Our Leadership"),
+      p("The brand's products are thoughtfully designed to address a wide range of skin and hair concerns including age spots, freckles, tanning, acne, dark circles, hair fall, and dandruff, under the continued leadership of founder Dr. Bhanuja Polani.")
+    ]
   },
   "/contact": {
     title: "Contact Us \u2014 Bodilicious",
-    description: "Get in touch with the Bodilicious team. Write us a review, ask about products or shipping, or give feedback. We are here to help you on your skincare journey."
+    description: "Get in touch with the Bodilicious team \u2014 questions about products, shipping, or feedback, we are here to help.",
+    h1: "Contact Us",
+    body: [
+      p("Get in touch and let us know how we can help. Whether you have a question about our products, shipping, or anything else, our team is ready to answer all your questions."),
+      p("Address: 3/1, Varadaraja Perumal Koil St, Sanjeevarayanpet, Tondiarpet, Chennai, Tamil Nadu 600081. Email: bodiliciousnaturalproducts@gmail.com. Phone/WhatsApp: +91 9894451947.")
+    ]
   },
   "/faqs": {
     title: "FAQs \u2014 Bodilicious",
-    description: "Find answers to the most common questions about Bodilicious products, shipping, payments, and more."
+    description: "Answers to common questions about Bodilicious products, shipping, and payments.",
+    h1: "Frequently Asked Questions",
+    body: [
+      p("Quick answers about Bodilicious products, shipping, and everything in between.")
+    ]
   },
   "/blogs": {
     title: "Blog | Bodilicious",
-    description: "Skincare tips, ingredient guides, and beauty rituals from the Bodilicious team."
+    description: "Skincare tips, ingredient guides, and beauty rituals from the Bodilicious team.",
+    h1: "Blogs",
+    body: [
+      p("Skincare science, beauty rituals, and ingredient deep-dives from the Bodilicious team.")
+    ]
   },
   "/offers": {
     title: "Welcome Offer \u2014 10% Off Your First Order | Bodilicious",
-    description: "New to Bodilicious? Enjoy 10% off your first skincare or haircare order. Premium beauty products, dermatologically tested, delivered free over \u20B91500."
+    description: "New to Bodilicious? Enjoy 10% off your first order. Dermatologically tested, free shipping over \u20B91500.",
+    h1: "The Welcome Ritual",
+    body: [
+      p("Experience the Bodilicious difference with 10% off your first intentional skincare purchase.")
+    ]
   },
   "/how-to-order": {
     title: "How to Order \u2014 Bodilicious",
-    description: "An interactive, step-by-step walkthrough to placing an order on Bodilicious. Discover, select, check out, and track your package."
+    description: "A step-by-step walkthrough to placing an order on Bodilicious \u2014 discover, select, checkout, and track.",
+    h1: "How to Place Your Order",
+    body: [
+      p("Experience premium convenience. Discover how to purchase your favorite Bodilicious skincare rituals and track their journey to your home.")
+    ]
   },
   "/ritual-finder": {
     title: "Skincare Ritual Finder \u2014 Bodilicious",
-    description: "Answer a few questions and get a personalized Bodilicious skincare or haircare routine tailored to your skin type, concerns, and goals."
+    description: "Answer a few questions and get a personalized Bodilicious skincare or haircare routine for your needs.",
+    h1: "Find Your Perfect Bodilicious Ritual",
+    body: [
+      p("For your skin, body, or hair \u2014 Bodilicious will curate a personalized routine that truly works for you.")
+    ]
   },
   "/terms": {
     title: "Terms & Conditions \u2014 Bodilicious",
-    description: "Review the Terms and Conditions governing your use of the Bodilicious website, products, intellectual property, and dispute resolution process."
+    description: "The Terms and Conditions governing use of the Bodilicious website, products, and intellectual property.",
+    h1: "Terms of Conditions",
+    body: [
+      p("Welcome to Bodilicious. By accessing or using our website, you agree to be bound by the Terms and Conditions set forth below. If you do not agree, please do not use this website."),
+      h("Use of the Site & Features"),
+      p("The Bodilicious.in website is provided solely for your personal use. You may not use this website for any commercial purpose without our express written consent. We grant you a limited, revocable, and non-exclusive license to access and make personal use of the website."),
+      h("Intellectual Property"),
+      p("All content available on the website, including text, graphics, logos, images, and software, is the property of Bodilicious or its content suppliers and is protected by intellectual property laws."),
+      h("Liability & Disputes"),
+      ul([
+        "Product Descriptions: We strive to ensure accuracy, but errors may occur. If we discover an error in price, we will inform you as soon as possible.",
+        "Indemnification: You agree to indemnify and hold harmless Bodilicious from any claims arising from your use of this website.",
+        "Disputes: Any dispute relating to your visit shall be submitted to confidential arbitration in India, except for small claims court."
+      ])
+    ]
   },
   "/privacy": {
     title: "Privacy Policy \u2014 Bodilicious",
-    description: "Read the Bodilicious Privacy Policy to understand how we collect, use, and protect your personal data when you shop with us."
+    description: "The Bodilicious Privacy Policy \u2014 how we collect, use, and protect your personal data when you shop.",
+    h1: "Privacy Policy",
+    body: [
+      p("Welcome to Bodilicious. We are committed to protecting your privacy and ensuring you have a seamless, secure experience on our platform. By using our website, you agree to the practices described below."),
+      h("Data We Collect"),
+      ul([
+        "Personal Data: email, first/last name, phone number, and address details.",
+        "Usage & Interaction Data: product views, items added to your cart, and wishlist activity, alongside standard analytics.",
+        "Cookies: small pieces of data stored on your device to track activity on our website."
+      ]),
+      h("How We Use It"),
+      ul([
+        "To provide and maintain our website",
+        "To notify you about changes",
+        "To provide customer support",
+        "To personalize recommendations and analyze shopping behaviors to improve our website",
+        "To monitor usage and detect technical issues"
+      ]),
+      h("Transfer & Disclosure"),
+      p("Your information may be transferred to computers located outside of your jurisdiction; we take all necessary steps to ensure data is treated securely. We do not sell, trade, or transfer your personally identifiable information to outside parties unless we provide advance notice.")
+    ]
   },
   "/shipping-refund": {
     title: "Shipping & Returns Policy \u2014 Bodilicious",
-    description: "Free shipping on orders over \u20B91500. Learn about Bodilicious delivery timelines, international shipping, 7-day returns, and our hassle-free refund process."
+    description: "Free shipping over \u20B91500. Bodilicious delivery timelines, international shipping, and 7-day returns.",
+    h1: "Shipping & Refund Policy",
+    body: [
+      p("We are committed to delivering your Bodilicious rituals with speed, accuracy, and care."),
+      h("Shipping Policy"),
+      ul([
+        "Methods & Costs: shipping costs are calculated based on the shipping method selected, weight, dimensions, and delivery address.",
+        "Domestic Shipping: orders are shipped on business days only; a tracking number is provided once your order has shipped.",
+        "International Shipping: rates and fees vary by destination; customs fees or taxes are the responsibility of the customer.",
+        "Delivery Times: influenced by product availability, geographic location, and the chosen shipping carrier."
+      ]),
+      h("Refund Policy"),
+      ul([
+        "Returns: a 7-day return policy for products in original, unused condition with the original receipt.",
+        "Exchanges & Replacements: return the original item for a refund and place a new order to exchange for a different size or colour.",
+        "Refund Process: refunds are processed to the original payment method within 7-10 business days of receiving the returned item.",
+        "Return Shipping: the customer is responsible for return shipping costs unless the item is defective or incorrect."
+      ])
+    ]
   }
 };
 function stripHtml(html) {
@@ -181,7 +280,7 @@ __name(buildBlogHeadline, "buildBlogHeadline");
 function buildBlogOgAlt(post) {
   const title = (post?.title || "").trim();
   if (!title) return void 0;
-  const secondary = post ? nthOf(post.seo_keywords, "secondary", 0) : "";
+  const secondary = post ? groupOf(post.seo_keywords, "secondary")[0] : "";
   return secondary ? `${title} - ${secondary}` : title;
 }
 __name(buildBlogOgAlt, "buildBlogOgAlt");
@@ -200,7 +299,7 @@ function buildProductH1(product) {
 }
 __name(buildProductH1, "buildProductH1");
 function buildProductH2s(product) {
-  const overrides = (product?.seo_h2 || []).map((h) => String(h).trim()).filter(Boolean);
+  const overrides = (product?.seo_h2 || []).map((h2) => String(h2).trim()).filter(Boolean);
   if (overrides.length) return overrides;
   if (!product) return [];
   const name = (product.name || "").trim();
@@ -214,22 +313,104 @@ function buildProductH2s(product) {
 __name(buildProductH2s, "buildProductH2s");
 
 // seoUtils.js
-var BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|amazonbot|meta-externalagent|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
+var BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|perplexity-user|amazonbot|meta-externalagent|ccbot|bytespider|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
 function isBot(request) {
   const userAgent = request.headers.get("user-agent") || "";
   return BOT_UA_PATTERNS.test(userAgent);
 }
 __name(isBot, "isBot");
+var LEGACY_COLLECTION_MAP = {
+  all: "/shop",
+  "shop-all": "/shop",
+  "skin-care": "/shop?category=skin",
+  skincare: "/shop?category=skin",
+  "hair-care": "/shop?category=hair",
+  haircare: "/shop?category=hair",
+  "body-care": "/shop?category=body",
+  lipcare: "/shop?category=lip",
+  "lip-care": "/shop?category=lip",
+  makeup: "/shop?category=makeup",
+  foundation: "/shop?category=makeup"
+};
+var LEGACY_PAGE_MAP = {
+  "brand-story": "/brand-story",
+  about: "/about",
+  "about-us": "/about",
+  contact: "/contact",
+  "contact-us": "/contact",
+  faq: "/faqs",
+  faqs: "/faqs",
+  "shipping-policy": "/shipping-refund",
+  "refund-policy": "/shipping-refund",
+  "return-policy": "/shipping-refund",
+  "terms-of-service": "/terms",
+  "terms-conditions": "/terms",
+  "privacy-policy": "/privacy"
+};
+var LEGACY_GONE_PATTERNS = [
+  /^\/products\/[^/]+\.json$/,
+  /^\/products\.json$/,
+  /^\/collections\.json$/,
+  /^\/collections\/[^/]+\.json$/,
+  /^\/sitemap_products_\d+\.xml$/,
+  /^\/sitemap_collections_\d+\.xml$/,
+  /^\/sitemap_pages_\d+\.xml$/,
+  /^\/cdn\/shop\//,
+  /^\/cart\.js$/,
+  /^\/cart\/[^/]+\.js$/,
+  /^\/checkouts\//,
+  /^\/apps\//,
+  /^\/wpm@/
+];
+function getLegacyShopifyAction(pathname) {
+  for (const pattern of LEGACY_GONE_PATTERNS) {
+    if (pattern.test(pathname)) return { type: "gone" };
+  }
+  const isLegacySlug = /* @__PURE__ */ __name((segment) => /^[a-zA-Z0-9_-]+$/.test(segment), "isLegacySlug");
+  const productMatch = pathname.match(/^\/products\/([^/]+)\/?$/);
+  if (productMatch && isLegacySlug(productMatch[1])) {
+    return { type: "redirect", to: "/shop" };
+  }
+  const collectionMatch = pathname.match(/^\/collections\/([^/]+)\/?$/);
+  if (collectionMatch && isLegacySlug(collectionMatch[1])) {
+    const to = LEGACY_COLLECTION_MAP[collectionMatch[1].toLowerCase()] || "/shop";
+    return { type: "redirect", to };
+  }
+  const pageMatch = pathname.match(/^\/pages\/([^/]+)\/?$/);
+  if (pageMatch && isLegacySlug(pageMatch[1])) {
+    const to = LEGACY_PAGE_MAP[pageMatch[1].toLowerCase()] || "/about";
+    return { type: "redirect", to };
+  }
+  return null;
+}
+__name(getLegacyShopifyAction, "getLegacyShopifyAction");
 function safeJsonLd(obj) {
   return JSON.stringify(obj).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
 }
 __name(safeJsonLd, "safeJsonLd");
+function toAbsoluteUrl(url, frontendUrl) {
+  if (!url) return "";
+  return url.startsWith("http") ? url : `${frontendUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+__name(toAbsoluteUrl, "toAbsoluteUrl");
+function renderTrustFooter(frontendUrl) {
+  return `<footer>
+    <p>Dermatologically tested, science-backed skincare and haircare \u2014 Bodilicious is a certified, registered Indian beauty brand.</p>
+    <nav aria-label="Company">
+      <a href="${frontendUrl}/about">About Bodilicious</a>
+      <a href="${frontendUrl}/contact">Contact Us</a>
+      <a href="${frontendUrl}/privacy">Privacy Policy</a>
+      <a href="${frontendUrl}/terms">Terms &amp; Conditions</a>
+    </nav>
+  </footer>`;
+}
+__name(renderTrustFooter, "renderTrustFooter");
 function buildProductSchema(product, frontendUrl) {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    image: product.images?.[0] || "",
+    image: toAbsoluteUrl(product.images?.[0], frontendUrl),
     description: product.description || "",
     sku: product.pid,
     brand: { "@type": "Brand", name: "Bodilicious" },
@@ -240,7 +421,22 @@ function buildProductSchema(product, frontendUrl) {
       availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
       url: `${frontendUrl}/product/${product.pid}`,
-      seller: { "@type": "Organization", name: "Bodilicious" }
+      seller: { "@type": "Organization", name: "Bodilicious" },
+      // Matches the real policy on /shipping-refund: 7-day window on unused
+      // items with the original receipt, customer pays return shipping
+      // unless the item is defective or incorrect. Not adding shippingDetails
+      // alongside this — the real shipping cost is "calculated based on
+      // method, weight, dimensions, and address" (i.e. genuinely variable
+      // below the ₹1500 free-shipping threshold), so there's no single
+      // honest flat rate to declare here.
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "IN",
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: 7,
+        returnMethod: "https://schema.org/ReturnByMail",
+        returnFees: "https://schema.org/ReturnShippingFees"
+      }
     },
     ...product.rating && product.ratingCount && product.ratingCount > 0 ? {
       aggregateRating: {
@@ -288,6 +484,7 @@ function renderProductHtml(product, frontendUrl) {
   const productDesc = buildProductDescription(product);
   const h1 = buildProductH1(product);
   const h2s = buildProductH2s(product);
+  const absImage = toAbsoluteUrl(product.images?.[0], frontendUrl);
   const list = /* @__PURE__ */ __name((items) => items && items.length ? `<ul>${items.map((i) => `<li>${escapeHtml(String(i))}</li>`).join("")}</ul>` : "", "list");
   const ing = product.ingredients || {};
   const allIngredients = [
@@ -310,16 +507,16 @@ function renderProductHtml(product, frontendUrl) {
   const reviewBlock = (product.reviews || []).slice(0, 5).filter((r) => r && r.comment).map((r) => `<blockquote><p>${escapeHtml(String(r.comment))}</p>
       <cite>${escapeHtml(String(r.user || "Customer"))} \u2014 ${escapeHtml(String(r.rating ?? ""))}/5</cite></blockquote>`).join("");
   const sections = [
-    product.benefits?.length ? `<h2>${escapeHtml(h2s[0] || "Benefits")}</h2>${list(product.benefits)}` : "",
-    allIngredients.length ? `<h2>${escapeHtml(h2s[1] || "Key Ingredients")}</h2>${list(allIngredients)}` : "",
-    product.how_to_use?.length || usageLine ? `<h2>${escapeHtml(h2s[2] || "How to Use")}</h2>${list(product.how_to_use)}${usageLine ? `<p>${escapeHtml(usageLine)}</p>` : ""}` : "",
-    product.concerns_targeted?.length ? `<h2>Targets</h2>${list(product.concerns_targeted.map(titleCase))}` : "",
-    product.warnings?.length ? `<h2>Warnings</h2>${list(product.warnings)}` : "",
-    reviewBlock ? `<h2>Customer Reviews</h2>${reviewBlock}` : "",
-    faqs.length ? `<h2>Frequently Asked Questions</h2>${faqs.map((f) => `<h3>${escapeHtml(f.question)}</h3><p>${escapeHtml(f.answer)}</p>`).join("")}` : "",
-    relatedBlogs.length ? `<h2>Read More</h2><ul>${relatedBlogs.map(
+    product.benefits?.length ? `<section aria-labelledby="benefits-h"><h2 id="benefits-h">${escapeHtml(h2s[0] || "Benefits")}</h2>${list(product.benefits)}</section>` : "",
+    allIngredients.length ? `<section aria-labelledby="ingredients-h"><h2 id="ingredients-h">${escapeHtml(h2s[1] || "Key Ingredients")}</h2>${list(allIngredients)}</section>` : "",
+    product.how_to_use?.length || usageLine ? `<section aria-labelledby="how-to-use-h"><h2 id="how-to-use-h">${escapeHtml(h2s[2] || "How to Use")}</h2>${list(product.how_to_use)}${usageLine ? `<p>${escapeHtml(usageLine)}</p>` : ""}</section>` : "",
+    product.concerns_targeted?.length ? `<section aria-labelledby="targets-h"><h2 id="targets-h">Targets</h2>${list(product.concerns_targeted.map(titleCase))}</section>` : "",
+    product.warnings?.length ? `<section aria-labelledby="warnings-h"><h2 id="warnings-h">Warnings</h2>${list(product.warnings)}</section>` : "",
+    reviewBlock ? `<section aria-labelledby="reviews-h"><h2 id="reviews-h">Customer Reviews</h2>${reviewBlock}</section>` : "",
+    faqs.length ? `<section aria-labelledby="faq-h"><h2 id="faq-h">Frequently Asked Questions</h2>${faqs.map((f) => `<h3>${escapeHtml(f.question)}</h3><p>${escapeHtml(f.answer)}</p>`).join("")}</section>` : "",
+    relatedBlogs.length ? `<section aria-labelledby="read-more-h"><h2 id="read-more-h">Read More</h2><ul>${relatedBlogs.map(
       (b) => `<li><a href="${frontendUrl}/blogs/${encodeURIComponent(b.slug)}">${escapeHtml(b.title)}</a></li>`
-    ).join("")}</ul>` : ""
+    ).join("")}</ul></section>` : ""
   ].filter(Boolean).join("\n  ");
   const schemas = [
     buildProductSchema(product, frontendUrl),
@@ -335,28 +532,46 @@ function renderProductHtml(product, frontendUrl) {
   <meta name="keywords" content="${escapeHtml(mergedKeywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/product/${product.pid}">
-  
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
+
   <meta property="og:type" content="product" />
   <meta property="og:url" content="${frontendUrl}/product/${product.pid}" />
   <meta property="og:title" content="${escapeHtml(pageTitle)}" />
   <meta property="og:description" content="${escapeHtml(productDesc)}" />
-  <meta property="og:image" content="${escapeHtml(product.images?.[0] ?? "")}" />
+  <meta property="og:image" content="${escapeHtml(absImage)}" />
   <meta property="og:image:alt" content="${escapeHtml(ogAlt)}" />
-  
+
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
   <meta name="twitter:description" content="${escapeHtml(productDesc)}" />
-  <meta name="twitter:image" content="${escapeHtml(product.images?.[0] ?? "")}" />
+  <meta name="twitter:image" content="${escapeHtml(absImage)}" />
 
   <script type="application/ld+json">
     ${safeJsonLd(schemas)}
   <\/script>
 </head>
 <body>
-  <h1>${escapeHtml(h1)}</h1>
-  <p>${escapeHtml(product.description || "")}</p>
-  <p>Price: \u20B9${escapeHtml(String(product.price))}</p>
-  ${sections}
+  <main>
+    <article>
+      <header>
+        <h1>${escapeHtml(h1)}</h1>
+        <p>${escapeHtml(product.description || "")}</p>
+        <p>Price: \u20B9${escapeHtml(String(product.price))}</p>
+        ${product.rating && product.ratingCount ? `<p>Rated ${escapeHtml(String(product.rating.toFixed ? product.rating.toFixed(1) : product.rating))} out of 5 (${escapeHtml(String(product.ratingCount))} reviews)</p>` : ""}
+        <!-- Same trust badges as the real product page's trust bar (ProductPage.tsx) \u2014
+             previously only present as aggregateRating in JSON-LD, with no visible
+             trust signal in the body text a crawler could actually read. -->
+        <ul aria-label="Trust signals">
+          <li>7-Day Returns \u2014 Hassle-free</li>
+          <li>Secure SSL \u2014 100% Secure</li>
+          <li>Delivery SLA \u2014 Fast Shipping</li>
+          <li>Verified Science \u2014 Dermatologically Tested</li>
+        </ul>
+      </header>
+      ${sections}
+    </article>
+  </main>
+  ${renderTrustFooter(frontendUrl)}
 </body>
 </html>`;
 }
@@ -390,10 +605,10 @@ function renderBlogHtml(post, frontendUrl) {
   const keywords = buildBlogKeywords(post) || "";
   const ogAlt = buildBlogOgAlt(post) || "";
   const url = `${frontendUrl}/blogs/${encodeURIComponent(post.slug || "")}`;
-  const image = post.coverImage || "";
+  const image = toAbsoluteUrl(post.coverImage, frontendUrl);
   const published = post.publishedAt || post.createdAt || null;
   const modified = post.updatedAt || published;
-  const relatedProducts = (post.relatedProducts || []).filter((p) => p && p.pid && p.name);
+  const relatedProducts = (post.relatedProducts || []).filter((p2) => p2 && p2.pid && p2.name);
   const schemas = [
     {
       "@context": "https://schema.org",
@@ -434,6 +649,7 @@ function renderBlogHtml(post, frontendUrl) {
   <meta name="keywords" content="${escapeHtml(keywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${url}">
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${url}" />
@@ -455,17 +671,22 @@ function renderBlogHtml(post, frontendUrl) {
   <\/script>
 </head>
 <body>
-  <article>
-    <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
-    ${published ? `<p><time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time></p>` : ""}
-    ${sanitizeBlogHtml(post.content)}
-  </article>
-  ${relatedProducts.length ? `<section>
-    <h2>Products mentioned in this guide</h2>
-    <ul>${relatedProducts.map(
-    (p) => `<li><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a> \u2014 \u20B9${escapeHtml(String(p.price))}</li>`
+  <main>
+    <article>
+      <header>
+        <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
+        <p class="byline">By ${escapeHtml(post.author?.name || "Bodilicious Team")}${published ? ` \xB7 <time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time>` : ""}</p>
+      </header>
+      ${sanitizeBlogHtml(post.content)}
+    </article>
+    ${relatedProducts.length ? `<section aria-labelledby="related-products-h">
+      <h2 id="related-products-h">Products mentioned in this guide</h2>
+      <ul>${relatedProducts.map(
+    (p2) => `<li><a href="${frontendUrl}/product/${escapeHtml(p2.pid)}">${escapeHtml(p2.name)}</a> \u2014 \u20B9${escapeHtml(String(p2.price))}</li>`
   ).join("")}</ul>
-  </section>` : ""}
+    </section>` : ""}
+  </main>
+  ${renderTrustFooter(frontendUrl)}
 </body>
 </html>`;
 }
@@ -483,7 +704,20 @@ function rewriteStaticMeta(response, pathname, frontendUrl) {
     element(el) {
       el.setInnerContent(meta.title);
     }
-  }).on('meta[name="description"]', setAttr("content", meta.description)).on('link[rel="canonical"]', setAttr("href", url)).on('meta[property="og:title"]', setAttr("content", meta.title)).on('meta[property="og:description"]', setAttr("content", meta.description)).on('meta[property="og:url"]', setAttr("content", url)).on('meta[name="twitter:title"]', setAttr("content", meta.title)).on('meta[name="twitter:description"]', setAttr("content", meta.description)).transform(response);
+  }).on('meta[name="description"]', setAttr("content", meta.description)).on('link[rel="canonical"]', setAttr("href", url)).on('meta[property="og:title"]', setAttr("content", meta.title)).on('meta[property="og:description"]', setAttr("content", meta.description)).on('meta[property="og:url"]', setAttr("content", url)).on('meta[name="twitter:title"]', setAttr("content", meta.title)).on('meta[name="twitter:description"]', setAttr("content", meta.description)).on("div#root", {
+    element(el) {
+      const blockHtml = meta.body.map((block) => {
+        if (block.type === "heading") return `<h2>${escapeHtml(block.text)}</h2>`;
+        if (block.type === "list") return `<ul>${block.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+        return `<p>${escapeHtml(block.text)}</p>`;
+      }).join("");
+      el.prepend(
+        `<main><article><h1>${escapeHtml(meta.h1)}</h1>${blockHtml}</article></main>`,
+        { html: true }
+      );
+      el.append(renderTrustFooter(frontendUrl), { html: true });
+    }
+  }).transform(response);
 }
 __name(rewriteStaticMeta, "rewriteStaticMeta");
 function rewriteBlogIndex(response, posts, frontendUrl) {
@@ -492,21 +726,28 @@ function rewriteBlogIndex(response, posts, frontendUrl) {
     "@type": "ItemList",
     name: STATIC_PAGE_SEO["/blogs"].title,
     numberOfItems: posts.length,
-    itemListElement: posts.slice(0, 50).map((p, i) => ({
+    itemListElement: posts.slice(0, 50).map((p2, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: `${frontendUrl}/blogs/${encodeURIComponent(p.slug)}`,
-      name: buildBlogHeadline(p)
+      url: `${frontendUrl}/blogs/${encodeURIComponent(p2.slug)}`,
+      name: buildBlogHeadline(p2)
     }))
   } : null;
   const withMeta = rewriteStaticMeta(response, "/blogs", frontendUrl);
-  if (!itemList) return withMeta;
+  if (!posts.length) return withMeta;
+  const postLinks = posts.slice(0, 50).map((p2) => `<li><a href="${frontendUrl}/blogs/${encodeURIComponent(p2.slug)}">${escapeHtml(buildBlogHeadline(p2))}</a></li>`).join("");
   return new HTMLRewriter().on("head", {
     element(el) {
-      el.append(
-        `<script type="application/ld+json">${safeJsonLd(itemList)}<\/script>`,
-        { html: true }
-      );
+      if (itemList) {
+        el.append(
+          `<script type="application/ld+json">${safeJsonLd(itemList)}<\/script>`,
+          { html: true }
+        );
+      }
+    }
+  }).on("div#root", {
+    element(el) {
+      el.append(`<ul>${postLinks}</ul>`, { html: true });
     }
   }).transform(withMeta);
 }
@@ -551,6 +792,119 @@ function titleCase(s) {
   return s.replace(/[_\-/]+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 __name(titleCase, "titleCase");
+function renderHomeHtml(products, frontendUrl) {
+  const title = "Bodilicious \u2014 Premium Skincare & Haircare";
+  const description = "Dermatologically tested skincare & haircare with science-backed actives. Free shipping over \u20B91500. Shop now.";
+  const image = `${frontendUrl}/og-image.png`;
+  const orgSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Bodilicious",
+    url: frontendUrl,
+    logo: { "@type": "ImageObject", url: `${frontendUrl}/logo.webp` },
+    description: "Premium skincare and haircare brand offering dermatologically tested, science-backed beauty products.",
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "3/1, Varadaraja Perumal Koil St, Sanjeevarayanpet, Tondiarpet",
+      addressLocality: "Chennai",
+      addressRegion: "Tamil Nadu",
+      postalCode: "600081",
+      addressCountry: "IN"
+    }
+  };
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Bodilicious",
+    url: frontendUrl,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${frontendUrl}/shop?search={search_term_string}` },
+      "query-input": "required name=search_term_string"
+    }
+  };
+  const itemList = products.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Bodilicious Best Sellers",
+    numberOfItems: products.length,
+    itemListElement: products.map((p2, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${frontendUrl}/product/${p2.pid}`,
+      item: {
+        "@type": "Product",
+        name: p2.name,
+        url: `${frontendUrl}/product/${p2.pid}`,
+        ...p2.images?.[0] ? { image: toAbsoluteUrl(p2.images[0], frontendUrl) } : {},
+        ...p2.price != null ? {
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "INR",
+            price: String(p2.price),
+            availability: p2.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+          }
+        } : {}
+      }
+    }))
+  } : null;
+  const schemas = [orgSchema, websiteSchema, ...itemList ? [itemList] : []];
+  const categoryLinks = [
+    ["skin", "Skin Care"],
+    ["hair", "Hair Care"],
+    ["body", "Body Care"],
+    ["lip", "Lip Care"],
+    ["makeup", "Makeup"]
+  ].map(([slug, label]) => `<li><a href="${frontendUrl}/shop?category=${slug}">${escapeHtml(label)}</a></li>`).join("");
+  const productListHtml = products.map(
+    (p2) => `<article><h3><a href="${frontendUrl}/product/${escapeHtml(p2.pid)}">${escapeHtml(p2.name)}</a></h3><p>\u20B9${escapeHtml(String(p2.price))}</p></article>`
+  ).join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${frontendUrl}/">
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${frontendUrl}/" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+
+  <script type="application/ld+json">
+    ${safeJsonLd(schemas)}
+  <\/script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Bodilicious \u2014 Premium Skincare &amp; Haircare</h1>
+      <p>Bodilicious is a certified, registered Indian beauty brand making dermatologically tested, science-backed skincare and haircare \u2014 hand-made, chemical-free formulations targeting specific concerns like acne, pigmentation, aging, hair loss, and dandruff. Free shipping across India on orders over \u20B91500.</p>
+    </header>
+    <nav aria-labelledby="categories-h">
+      <h2 id="categories-h">Shop by Category</h2>
+      <ul>${categoryLinks}</ul>
+    </nav>
+    <section aria-labelledby="products-h">
+      <h2 id="products-h">Best Selling Products</h2>
+      ${productListHtml}
+      <p><a href="${frontendUrl}/shop">View all products</a></p>
+    </section>
+  </main>
+  ${renderTrustFooter(frontendUrl)}
+</body>
+</html>`;
+}
+__name(renderHomeHtml, "renderHomeHtml");
 function renderShopHtml({ category, type, concern }, products, frontendUrl) {
   const facetParam = category ? `category=${encodeURIComponent(category)}` : type ? `type=${encodeURIComponent(type)}` : concern ? `concern=${encodeURIComponent(concern)}` : null;
   const canonicalUrl = facetParam ? `${frontendUrl}/shop?${facetParam}` : `${frontendUrl}/shop`;
@@ -573,21 +927,21 @@ function renderShopHtml({ category, type, concern }, products, frontendUrl) {
     "@type": "ItemList",
     name: pageTitle,
     numberOfItems: products.length,
-    itemListElement: products.slice(0, 20).map((p, i) => ({
+    itemListElement: products.slice(0, 20).map((p2, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: `${frontendUrl}/product/${p.pid}`,
+      url: `${frontendUrl}/product/${p2.pid}`,
       item: {
         "@type": "Product",
-        name: p.name,
-        url: `${frontendUrl}/product/${p.pid}`,
-        ...p.images?.[0] ? { image: p.images[0] } : {},
-        ...p.price != null ? {
+        name: p2.name,
+        url: `${frontendUrl}/product/${p2.pid}`,
+        ...p2.images?.[0] ? { image: toAbsoluteUrl(p2.images[0], frontendUrl) } : {},
+        ...p2.price != null ? {
           offers: {
             "@type": "Offer",
             priceCurrency: "INR",
-            price: String(p.price),
-            availability: p.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+            price: String(p2.price),
+            availability: p2.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
           }
         } : {}
       }
@@ -595,7 +949,7 @@ function renderShopHtml({ category, type, concern }, products, frontendUrl) {
   } : null;
   const schemas = [breadcrumb, ...itemList ? [itemList] : []];
   const productListHtml = products.slice(0, 30).map(
-    (p) => `<article><h2><a href="${frontendUrl}/product/${escapeHtml(p.pid)}">${escapeHtml(p.name)}</a></h2><p>\u20B9${escapeHtml(String(p.price))}</p></article>`
+    (p2) => `<article><h2><a href="${frontendUrl}/product/${escapeHtml(p2.pid)}">${escapeHtml(p2.name)}</a></h2><p>\u20B9${escapeHtml(String(p2.price))}</p></article>`
   ).join("");
   return `<!doctype html>
 <html lang="en">
@@ -605,6 +959,7 @@ function renderShopHtml({ category, type, concern }, products, frontendUrl) {
   <meta name="description" content="${escapeHtml(description)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${canonicalUrl}">
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
   <meta property="og:type" content="website">
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(pageTitle)}">
@@ -613,9 +968,17 @@ function renderShopHtml({ category, type, concern }, products, frontendUrl) {
 </head>
 <body>
   <nav aria-label="breadcrumb"><a href="${frontendUrl}/">Home</a> \u203A <a href="${frontendUrl}/shop">Shop</a>${label ? ` \u203A ${escapeHtml(label)}` : ""}</nav>
-  <h1>${escapeHtml(pageTitle.replace(" \u2014 Bodilicious", ""))}</h1>
-  <p>${escapeHtml(intro)}</p>
-  ${productListHtml}
+  <main>
+    <header>
+      <h1>${escapeHtml(pageTitle.replace(" \u2014 Bodilicious", ""))}</h1>
+      <p>${escapeHtml(intro)}</p>
+    </header>
+    <section aria-labelledby="product-list-h">
+      <h2 id="product-list-h" class="sr-only">Products</h2>
+      ${productListHtml}
+    </section>
+  </main>
+  ${renderTrustFooter(frontendUrl)}
 </body>
 </html>`;
 }
@@ -652,6 +1015,20 @@ var worker_default = {
     if (pathname === "/sitemap.xml") {
       return handleSitemap(env);
     }
+    const legacyAction = getLegacyShopifyAction(pathname);
+    if (legacyAction) {
+      const frontendUrl = env.FRONTEND_URL || "https://bodilicious.in";
+      if (legacyAction.type === "redirect") {
+        return Response.redirect(`${frontendUrl}${legacyAction.to}`, 301);
+      }
+      return new Response(
+        '<!doctype html><html lang="en"><head><title>Gone</title><meta name="robots" content="noindex, nofollow"></head><body>This resource no longer exists.</body></html>',
+        { status: 410, headers: { "Content-Type": "text/html;charset=UTF-8" } }
+      );
+    }
+    if (pathname === "/product-feed.xml") {
+      return handleProductFeed(env);
+    }
     if (env.SEO_BOT_RENDER_ENABLED !== "true") {
       return fetchFromOrigin();
     }
@@ -674,6 +1051,9 @@ var worker_default = {
     }
     if (pathname === "/blogs" && !url.search) {
       return handleBlogIndex(request, env, fetchFromOrigin);
+    }
+    if (pathname === "/" && !url.search) {
+      return handleHome(request, env, ctx);
     }
     if (STATIC_PAGE_SEO[pathname]) {
       const originResponse = await fetchFromOrigin();
@@ -698,6 +1078,45 @@ var worker_default = {
     return fetchFromOrigin();
   }
 };
+async function handleHome(request, env, ctx) {
+  try {
+    const now = Date.now();
+    const cacheKey = "home";
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return new Response(cached.html, {
+        headers: {
+          "Content-Type": "text/html;charset=UTF-8",
+          "Cache-Control": "public, max-age=300, s-maxage=300",
+          "X-Cache": "HIT"
+        }
+      });
+    }
+    const apiUrl = env.API_BASE_URL || "https://bodilicious-cxow.onrender.com";
+    const frontendUrl = env.FRONTEND_URL || "https://bodilicious.in";
+    let products = [];
+    try {
+      const res = await fetchWithTimeout(`${apiUrl}/api/v1/products?slim=true&limit=24`);
+      if (res.ok) {
+        const data = await res.json();
+        products = (data.data || data.products || []).filter((p2) => p2.isActive !== false).sort((a, b) => Number(b.rating || 0) * Number(b.ratingCount || 0) - Number(a.rating || 0) * Number(a.ratingCount || 0)).slice(0, 12);
+      }
+    } catch (_) {
+    }
+    const html = renderHomeHtml(products, frontendUrl);
+    cache.set(cacheKey, { html, expiresAt: now + TTL_MS });
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html;charset=UTF-8",
+        "Cache-Control": "public, max-age=300, s-maxage=300"
+      }
+    });
+  } catch (error) {
+    console.error("[SEO Worker] Error rendering homepage:", error.message);
+    return fetch(request);
+  }
+}
+__name(handleHome, "handleHome");
 async function handleShop({ category, type, concern }, request, env, ctx) {
   try {
     const apiUrl = env.API_BASE_URL || "https://bodilicious.onrender.com";
@@ -848,7 +1267,7 @@ async function handleBlogIndex(request, env, fetchFromOrigin) {
       const res = await fetchWithTimeout(`${apiUrl}/api/v1/blogs?limit=100`);
       if (res.ok) {
         const data = await res.json();
-        posts = (data.data || data.blogs || []).filter((p) => p && p.slug);
+        posts = (data.data || data.blogs || []).filter((p2) => p2 && p2.slug);
       }
     } catch (apiErr) {
       console.error("[SEO Worker] Blog index list fetch failed:", apiErr.name);
@@ -924,12 +1343,12 @@ async function handleSitemap(env) {
     <priority>0.7</priority>
   </url>`);
     });
-    allProducts.forEach((p) => {
-      if (p.availability !== "Discontinued") {
-        const lastmod = p.updatedAt ? p.updatedAt.substring(0, 10) : (/* @__PURE__ */ new Date()).toISOString().substring(0, 10);
+    allProducts.forEach((p2) => {
+      if (p2.availability !== "Discontinued") {
+        const lastmod = p2.updatedAt ? p2.updatedAt.substring(0, 10) : (/* @__PURE__ */ new Date()).toISOString().substring(0, 10);
         urls.push(`
   <url>
-    <loc>${frontendUrl}/product/${p.pid}</loc>
+    <loc>${frontendUrl}/product/${p2.pid}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
@@ -983,6 +1402,87 @@ ${urls.join("")}
   }
 }
 __name(handleSitemap, "handleSitemap");
+var GOOGLE_PRODUCT_CATEGORY = {
+  skin: "Health & Beauty > Personal Care > Cosmetics > Skin Care",
+  hair: "Health & Beauty > Personal Care > Hair Care",
+  body: "Health & Beauty > Personal Care > Cosmetics > Skin Care > Body Care",
+  makeup: "Health & Beauty > Personal Care > Cosmetics > Makeup",
+  lip: "Health & Beauty > Personal Care > Cosmetics > Makeup > Lip Makeup",
+  other: "Health & Beauty > Personal Care"
+};
+function escapeXml(unsafe) {
+  return String(unsafe ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+__name(escapeXml, "escapeXml");
+async function handleProductFeed(env) {
+  try {
+    const apiUrl = env.API_BASE_URL || "https://bodilicious.onrender.com";
+    const frontendUrl = env.FRONTEND_URL || "https://bodilicious.in";
+    let allProducts = [];
+    let page = 1;
+    const PAGE_SIZE = 100;
+    let totalPages = 1;
+    const MAX_PAGES = 50;
+    do {
+      let res;
+      try {
+        res = await fetchWithTimeout(`${apiUrl}/api/v1/products?limit=${PAGE_SIZE}&page=${page}`);
+      } catch (pageError) {
+        console.error(`[SEO Worker] Product feed page ${page} fetch failed:`, pageError.name);
+        break;
+      }
+      if (!res.ok) break;
+      const data = await res.json();
+      const products = data.data || [];
+      if (products.length === 0) break;
+      allProducts = allProducts.concat(products);
+      totalPages = data.totalPages || 1;
+      page++;
+    } while (page <= totalPages && page <= MAX_PAGES);
+    const items = allProducts.filter((p2) => p2.price != null && Array.isArray(p2.images) && p2.images.length > 0).map((p2) => {
+      const availability = Number(p2.stock) > 0 ? "in stock" : "out of stock";
+      const toAbsolute = /* @__PURE__ */ __name((img) => img.startsWith("http") ? img : `${frontendUrl}${img}`, "toAbsolute");
+      const [primaryImage, ...restImages] = p2.images;
+      const extraImageTags = restImages.slice(0, 10).map((img) => `
+    <g:additional_image_link>${escapeXml(toAbsolute(img))}</g:additional_image_link>`).join("");
+      return `
+  <item>
+    <g:id>${escapeXml(p2.pid)}</g:id>
+    <title>${escapeXml(p2.name)}</title>
+    <description>${escapeXml(p2.description || p2.name)}</description>
+    <link>${frontendUrl}/product/${escapeXml(p2.pid)}</link>
+    <g:image_link>${escapeXml(toAbsolute(primaryImage))}</g:image_link>${extraImageTags}
+    <g:availability>${availability}</g:availability>
+    <g:price>${Number(p2.price).toFixed(2)} INR</g:price>
+    <g:brand>${escapeXml(p2.brand || "Bodilicious")}</g:brand>
+    <g:condition>new</g:condition>
+    <g:identifier_exists>no</g:identifier_exists>
+    <g:google_product_category>${escapeXml(GOOGLE_PRODUCT_CATEGORY[p2.category] || GOOGLE_PRODUCT_CATEGORY.other)}</g:google_product_category>
+  </item>`;
+    }).join("");
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
+<channel>
+  <title>Bodilicious Product Feed</title>
+  <link>${frontendUrl}</link>
+  <description>Bodilicious skincare, hair, and body care products</description>${items}
+</channel>
+</rss>`;
+    return new Response(feed, {
+      headers: {
+        "Content-Type": "application/xml",
+        "Cache-Control": "public, max-age=3600"
+      }
+    });
+  } catch (error) {
+    console.error("Error generating product feed:", error);
+    return new Response("Error generating product feed", {
+      status: 500,
+      headers: { "Content-Type": "text/plain;charset=UTF-8" }
+    });
+  }
+}
+__name(handleProductFeed, "handleProductFeed");
 
 // ../../../../AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
 var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
@@ -1031,7 +1531,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-UpmMQL/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-PbwbS5/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -1063,7 +1563,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-UpmMQL/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-PbwbS5/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

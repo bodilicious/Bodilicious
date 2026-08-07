@@ -11,6 +11,7 @@ import { COUNTRIES } from '../utils/countries';
 import { formatCurrency } from '../utils/currencies';
 import { useCurrency } from '../hooks/useCurrency';
 import { useSEO } from '../hooks/useSEO';
+import { toTrustedScriptURL } from '../utils/trustedTypes';
 
 // ─── Checkout session timeout constants ──────────────────────────────────────
 // ⚠️ TEST VALUES — restore for production:
@@ -47,7 +48,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
             return;
         }
         const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.src = toTrustedScriptURL('https://checkout.razorpay.com/v1/checkout.js');
         script.onload = () => { clearTimeout(timeout); resolve(!!(window as any).Razorpay); };
         script.onerror = () => { clearTimeout(timeout); resolve(false); };
         document.body.appendChild(script);

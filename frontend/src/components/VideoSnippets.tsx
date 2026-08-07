@@ -76,25 +76,12 @@ function LazyVideo({ src, className, poster }: { src: string; className: string;
     return (
         <div className="absolute inset-0 w-full h-full">
             {/* Shimmer placeholder — visible until the video has buffered its first frame.
-                Fades out once onLoadedData fires. Prevents the jarring black-box flash. */}
+                Uses .shimmer-box (index.css) which animates via transform:translateX
+                on a pseudo-element — composited on the GPU, zero paint cost. */}
             {!loaded && (
-                <div
-                    className="absolute inset-0 z-10 overflow-hidden"
-                    style={{
-                        background: 'linear-gradient(135deg, #f5e6e8 0%, #e8d5d8 40%, #f0e0e2 60%, #f5e6e8 100%)',
-                        backgroundSize: '200% 200%',
-                        animation: 'shimmer-pan 1.8s ease-in-out infinite',
-                    }}
-                >
-                    <style>{`
-                        @keyframes shimmer-pan {
-                            0% { background-position: 0% 50%; }
-                            50% { background-position: 100% 50%; }
-                            100% { background-position: 0% 50%; }
-                        }
-                    `}</style>
-                </div>
+                <div className="absolute inset-0 z-10 shimmer-box" />
             )}
+
             <video
                 ref={videoRef}
                 id={`video-container-${src}`}

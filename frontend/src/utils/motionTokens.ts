@@ -1,4 +1,3 @@
- 
 import { Variants, Transition } from "framer-motion";
 
 // --- Durations ---
@@ -6,7 +5,7 @@ export const durations = {
     fast: 0.25,
     medium: 0.5,
     slow: 1.0,
-    pageTransition: 0.45, // Reduced from 0.8s â€” pages now feel immediate, not frozen
+    pageTransition: 0.45, // Reduced from 0.8s — pages now feel immediate, not frozen
 };
 
 // --- Easings ---
@@ -80,14 +79,16 @@ export const pageTransitionVariant: Variants = {
 
 /**
  * Stagger Container
- * Used to sequentially reveal children components (e.g., a product grid)
+ * Used to sequentially reveal children components (e.g., a product grid).
+ * staggerChildren reduced from 0.2 -> 0.06 to prevent scheduling 37+ sequential
+ * JS animation tasks that cause main-thread jank.
  */
 export const staggerContainerVariant: Variants = {
     hidden: { opacity: 0 },
     visible: {
         opacity: 1,
         transition: {
-            staggerChildren: 0.2, // Increased delay between items
+            staggerChildren: 0.06,
             delayChildren: 0.1,
         }
     }

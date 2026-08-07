@@ -17,6 +17,71 @@ import {
 const cache = new Map();
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// ─── Security headers ────────────────────────────────────────────────────────
+// Applied to every response this worker returns, including the ones proxied
+// straight through from the Render origin — this worker is the actual public
+// edge for bodilicious.in, so it's the only place that can guarantee these
+// land on every request regardless of what the origin sends.
+//
+// CSP ships as Content-Security-Policy-Report-Only for now: the site depends
+// on Firebase Auth (Google sign-in popup), Razorpay Checkout (script + modal
+// iframe), and PostHog analytics, none of which could be exercised end-to-end
+// in the environment this policy was written in. Report-Only logs violations
+// to the browser console without blocking anything, so it's safe to ship
+// immediately — watch the console on sign-in and a real checkout, fix any
+// gaps, then switch the header name to the enforcing `Content-Security-Policy`.
+//
+// script-src's hash covers the single static inline <script> in index.html
+// (the gtag bootstrap snippet). If that snippet's contents ever change, this
+// hash must be recomputed — see frontend/index.html for the source.
+const GTAG_INLINE_SCRIPT_HASH = "'sha256-0ZKCLuJt1ufyFVMehULEakKDT1sqnq7/wqcAONtkfw8='";
+
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  `script-src 'self' ${GTAG_INLINE_SCRIPT_HASH} https://www.googletagmanager.com https://analytics.ahrefs.com https://checkout.razorpay.com https://apis.google.com https://www.gstatic.com`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https://res.cloudinary.com https://*.razorpay.com https://*.gstatic.com https://images.pexels.com",
+  "connect-src 'self' https://bodilicious-cxow.onrender.com https://bodilicious-front.onrender.com https://us.i.posthog.com https://*.posthog.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com https://analytics.ahrefs.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com",
+  "frame-src https://checkout.razorpay.com https://api.razorpay.com https://www.instagram.com https://accounts.google.com https://*.firebaseapp.com",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  // Only these two named policies are allowed to wrap strings as Trusted
+  // Types — see frontend/src/utils/trustedTypes.ts for where they're created
+  // and what they guard (sanitized blog HTML, the Razorpay script URL).
+  'trusted-types dompurify-html razorpay-script',
+  "require-trusted-types-for 'script'",
+  'upgrade-insecure-requests',
+].join('; ');
+
+/**
+ * Clones `response` and layers security headers onto it without touching
+ * status/body. Applied once, right before the worker's fetch handler returns,
+ * so every code path (bot-rendered HTML, proxied origin responses, XML
+ * feeds, 404s) gets the same treatment.
+ */
+function withSecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.set('Content-Security-Policy-Report-Only', CSP_DIRECTIVES);
+  // same-origin-allow-popups (not the stricter same-origin) because Firebase's
+  // Google sign-in popup relies on window.opener communication between this
+  // page and the popup — same-origin would silently break that flow.
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  // Belt-and-braces with frame-ancestors above, and — unlike the CSP directive
+  // above — enforced immediately: nothing on this site legitimately needs to
+  // be iframed, so this is zero-risk to turn on now.
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 /**
  * fetchWithTimeout: wraps fetch() with an AbortController timeout.
  * Cloudflare Workers have a 30s CPU limit. Without a timeout, a hung
@@ -37,6 +102,12 @@ async function fetchWithTimeout(url, timeoutMs = 25000) {
 
 export default {
   async fetch(request, env, ctx) {
+    const response = await route(request, env, ctx);
+    return withSecurityHeaders(response);
+  }
+};
+
+async function route(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
@@ -169,8 +240,7 @@ export default {
 
     // For everything else, pass through to origin.
     return fetchFromOrigin();
-  }
-};
+}
 
 /**
  * Bot renderer for "/". No facets to key the cache on, so a single fixed key.

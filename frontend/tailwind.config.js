@@ -6,6 +6,7 @@ export default {
       colors: {
         'dark-red': '#3D0A05',
         'grey-beige': '#A58570',
+        'grey-beige-dark': '#735D4E',
         'ruby-red': '#7F1F0E',
         'silk': '#DAC1B1',
         'indian-red': '#AC746C',

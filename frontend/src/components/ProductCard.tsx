@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import StarRating from './StarRating';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { hoverLift, hoverLiftSubtle } from '../utils/motionTokens';
+import { cloudinaryUrl } from '../utils/cloudinary';
 
 interface ProductCardProps {
   product: Product;
@@ -71,7 +72,6 @@ export default memo(function ProductCard({
       className="group relative bg-white transition-all duration-500 hover:shadow-[0_20px_40px_-5px_rgba(139,0,0,0.08)] rounded-sm"
       style={{ contentVisibility: 'auto', containIntrinsicSize: '0 420px' }}
       whileHover={lift}
-      layout
     >
       {/* ── Image area ─────────────────────────────────────── */}
       <Link
@@ -81,8 +81,10 @@ export default memo(function ProductCard({
         <m.img
           whileHover={subtleLift}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          src={product.images[0]}
+          src={cloudinaryUrl(product.images[0], { w: 600 })}
           alt={product.name}
+          width={600}
+          height={900}
           loading="lazy"
           decoding="async"
           className="w-full h-full object-cover scale-100 group-hover:scale-105 transition-transform duration-700 ease-out mix-blend-multiply"

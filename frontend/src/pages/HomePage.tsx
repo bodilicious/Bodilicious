@@ -1,4 +1,4 @@
-import { ArrowRight, Leaf, Sparkles, ChevronRight, Loader2, FlaskConical, CheckCircle2, MessageCircle } from 'lucide-react';
+import { ArrowRight, Leaf, Sparkles, ChevronRight, Loader2, FlaskConical, CheckCircle2, MessageCircle, Settings2 } from 'lucide-react';
 import { useMemo, useCallback, useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
@@ -15,13 +15,13 @@ import EditableBlock from '../components/EditableBlock';
 import EditableList from '../components/EditableList';
 import ImageUploadField from '../components/ImageUploadField';
 import ProductPickerModal from '../admin/ProductPickerModal';
-import { Settings2 } from 'lucide-react';
+import { cloudinaryUrl } from '../utils/cloudinary';
 
-// Fallback assets
-import haircareImg from '../assets/banners/haircare0.webp';
-import bodyImg from '../assets/banners/body0.webp';
-import lipImg from '../assets/banners/lip0.webp';
-import makeupImg from '../assets/banners/makeup.webp';
+// Fallback banner assets — served from /public so they are NOT bundled into JS
+const haircareImg = '/assets/banners/haircare0.webp';
+const bodyImg = '/assets/banners/body0.webp';
+const lipImg = '/assets/banners/lip0.webp';
+const makeupImg = '/assets/banners/makeup.webp';
 
 // ─── Hardcoded fallback content (used when DB has not been seeded) ────────────
 const DEFAULT_CATEGORIES = [
@@ -575,7 +575,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                   )}
                 </m.div>
                 {!isEditing && (
-                  <m.button variants={fadeUp} onClick={() => handleShop('all')} className="flex items-center gap-1 mt-4 md:mt-0 text-xs font-sans tracking-widest uppercase text-grey-beige hover:text-ruby-red transition-colors">
+                  <m.button variants={fadeUp} onClick={() => handleShop('all')} className="flex items-center gap-1 mt-4 md:mt-0 py-1.5 text-xs font-sans tracking-widest uppercase text-grey-beige-dark hover:text-ruby-red transition-colors">
                     View All <ChevronRight size={14} />
                   </m.button>
                 )}
@@ -631,7 +631,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                     )}
                   </m.div>
                   {!isEditing && (
-                    <m.button variants={fadeUp} onClick={() => handleShop('all')} className="flex items-center gap-1 mt-4 md:mt-0 text-xs font-sans tracking-widest uppercase text-grey-beige hover:text-ruby-red transition-colors">
+                    <m.button variants={fadeUp} onClick={() => handleShop('all')} className="flex items-center gap-1 mt-4 md:mt-0 py-1.5 text-xs font-sans tracking-widest uppercase text-grey-beige-dark hover:text-ruby-red transition-colors">
                       View All <ChevronRight size={14} />
                     </m.button>
                   )}
@@ -833,7 +833,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                   <button
                     onClick={() => setReviewTab('website')}
                     className={`px-5 py-2 rounded-full text-xs font-sans tracking-widest uppercase transition-all duration-200 ${
-                      reviewTab === 'website' ? 'bg-dark-red text-silk shadow-sm' : 'text-grey-beige hover:text-dark-red'
+                      reviewTab === 'website' ? 'bg-dark-red text-silk shadow-sm' : 'text-grey-beige-dark hover:text-dark-red'
                     }`}
                   >
                     Customer Reviews
@@ -841,7 +841,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                   <button
                     onClick={() => setReviewTab('amazon')}
                     className={`px-5 py-2 rounded-full text-xs font-sans tracking-widest uppercase transition-all duration-200 ${
-                      reviewTab === 'amazon' ? 'bg-dark-red text-silk shadow-sm' : 'text-grey-beige hover:text-dark-red'
+                      reviewTab === 'amazon' ? 'bg-dark-red text-silk shadow-sm' : 'text-grey-beige-dark hover:text-dark-red'
                     }`}
                   >
                     From Our Customers
@@ -875,9 +875,9 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] font-sans text-grey-beige mt-0.5 leading-none">{review.productName}</p>
+                              <p className="text-[10px] font-sans text-grey-beige-dark mt-0.5 leading-none">{review.productName}</p>
                             </div>
-                            <p className="text-[10px] font-sans text-grey-beige">
+                            <p className="text-[10px] font-sans text-grey-beige-dark">
                               {review.createdAt ? new Date((review as any).createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
                             </p>
                           </div>
@@ -924,10 +924,10 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                               <EditableBlock
                                 isEditing={isEditing} value={review.productName}
                                 onChange={(v) => { const r = [...amazonReviews]; r[idx] = { ...r[idx], productName: v }; handleListChange('amazonReviews', r); }}
-                                tagName="p" className="text-[10px] font-sans text-grey-beige mt-0.5 leading-none block"
+                                tagName="p" className="text-[10px] font-sans text-grey-beige-dark mt-0.5 leading-none block"
                               />
                             </div>
-                            <p className="text-[10px] font-sans text-grey-beige">{review.date}</p>
+                            <p className="text-[10px] font-sans text-grey-beige-dark">{review.date}</p>
                           </div>
                         </m.div>
                       )}
@@ -1005,7 +1005,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
                 <EditableBlock 
                   isEditing={isEditing} value={titles.ctaDescription} multiline
                   onChange={v => handleTextChange('sectionTitles.ctaDescription', v)}
-                  tagName="p" className="font-sans text-grey-beige text-sm leading-relaxed mb-8 block" 
+                  tagName="p" className="font-sans text-grey-beige-dark text-sm leading-relaxed mb-8 block"
                 />
               </m.div>
               <m.div variants={fadeUp}>

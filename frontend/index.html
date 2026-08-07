@@ -27,28 +27,29 @@
     <!-- Preconnect to reduce TCP/TLS overhead for first-party API requests -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Preload the two font files every page needs for its first paint (body text
-         + headings, both weight 400/normal/latin) so the browser fetches the actual
-         font binary in parallel with the stylesheet below, instead of discovering it
-         only after that CSS has downloaded and parsed. Other weights/styles/unicode
-         subsets are still served normally via the stylesheet — this just warms the
-         two that matter for above-the-fold text. Pinned to Google Fonts' current
-         file hashes (v20 Inter / v40 Playfair Display); if the stylesheet URL below
-         ever changes version, re-fetch it and update these two hrefs to match, or
-         the preload silently stops matching anything and this optimization lapses
-         (harmless — the page just loses the head start, nothing breaks). -->
+    <!-- Preload the two font files every page needs for its first paint -->
     <link rel="preload" as="font" type="font/woff2" crossorigin
           href="https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" />
     <link rel="preload" as="font" type="font/woff2" crossorigin
           href="https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2" />
-    <!-- Loaded as a real <link> (not CSS @import) so the browser's preload scanner
-         discovers and fetches it in parallel instead of waiting on index.css to parse -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" />
+    <!-- Non-blocking Google Fonts load: media=print tricks the browser into treating
+         it as non-render-blocking. The onload handler swaps it to media=all once
+         the stylesheet is ready, so fonts still apply normally. -->
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap"
+          media="print"
+          onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" />
+    </noscript>
     <!-- Preconnect to Render backend — cuts TCP/TLS latency on first API call -->
     <link rel="dns-prefetch" href="https://bodilicious-cxow.onrender.com" />
     <link rel="preconnect" href="https://bodilicious-cxow.onrender.com" crossorigin />
-    <!-- Preconnect for GTM — loaded async in <head> above, first script users wait on -->
+    <!-- Preconnect for critical third-party origins to cut DNS/TCP/TLS latency -->
     <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://analytics.ahrefs.com" />
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 
     <!-- Preload the first hero carousel image (LCP element) -->
     <link rel="preload" as="image" href="/assets/hero_carousel_1.webp" fetchpriority="high" />

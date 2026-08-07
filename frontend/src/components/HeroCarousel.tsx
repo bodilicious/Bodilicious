@@ -10,6 +10,7 @@ const FALLBACK_SLIDES = [
     id: 's1',
     imageUrl: '/assets/hero_carousel_1.webp',
     mobileImage: '/assets/hero_mobile_1.webp',
+    imageAlt: 'Bodilicious skincare products arranged in a beauty flat-lay',
     eyebrow: 'Dermatologically Tested • Science-Backed • Skin-Safe',
     title: 'Skincare That',
     highlight: 'Goes Beyond the Surface',
@@ -24,6 +25,7 @@ const FALLBACK_SLIDES = [
     id: 's2',
     imageUrl: '/assets/hero_carousel_2.webp',
     mobileImage: '/assets/hero_mobile_2.webp',
+    imageAlt: 'Bodilicious hair care products with natural botanical ingredients',
     eyebrow: 'Bhringraj • Hibiscus • Keratin • Ashwagandha',
     title: 'Hair Care Rooted',
     highlight: "in Nature's Wisdom",
@@ -38,6 +40,7 @@ const FALLBACK_SLIDES = [
     id: 's3',
     imageUrl: '/assets/hero_carousel_3.webp',
     mobileImage: '/assets/hero_mobile_3.webp',
+    imageAlt: 'Bodilicious body care oils, scrubs, and lotions',
     eyebrow: 'Rose • Turmeric • Sandalwood • Coconut',
     title: 'Body Rituals',
     highlight: "You'll Love Every Day",
@@ -52,6 +55,7 @@ const FALLBACK_SLIDES = [
     id: 's4',
     imageUrl: '/assets/hero_carousel_4.webp',
     mobileImage: '/assets/hero_mobile_4.webp',
+    imageAlt: 'Complete Bodilicious skincare routine with serums and sunscreens',
     eyebrow: 'Niacinamide • Retinol • Hyaluronic Acid • Salicylic Acid',
     title: 'Complete Routines',
     highlight: 'Built for Real Skin',
@@ -66,6 +70,7 @@ const FALLBACK_SLIDES = [
     id: 's5',
     imageUrl: '/assets/hero_carousel_5.webp',
     mobileImage: '/assets/hero_mobile_5.webp',
+    imageAlt: 'Sustainably packaged Bodilicious vegan, cruelty-free beauty products',
     eyebrow: 'Vegan • Cruelty-Free • Earth-Friendly',
     title: 'Conscious Beauty',
     highlight: 'For a Better Tomorrow',
@@ -80,6 +85,7 @@ const FALLBACK_SLIDES = [
     id: 's6',
     imageUrl: '/assets/hero_carousel_6.webp',
     mobileImage: '/assets/hero_mobile_6.webp',
+    imageAlt: 'Bodilicious brightening skincare products for radiant, glowing skin',
     eyebrow: 'Vitamin C • Peptides • Bakuchiol • Squalane',
     title: 'Glow With',
     highlight: 'Unstoppable Radiance',
@@ -313,7 +319,15 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
             />
           ) : visited.has(idx) ? (
             <picture className="absolute inset-0 w-full h-full">
-              <img src={s.imageUrl} alt={s.imageAlt} className="w-full h-full object-cover object-center" loading={idx === 0 ? "eager" : "lazy"} />
+              <img
+                src={s.imageUrl}
+                alt={s.imageAlt || s.title || ''}
+                width={1920}
+                height={1080}
+                className="w-full h-full object-cover object-center"
+                loading={idx === 0 ? "eager" : "lazy"}
+                fetchPriority={idx === 0 ? "high" : "auto"}
+              />
             </picture>
           ) : null}
 
@@ -397,6 +411,7 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
       {!isEditing && (['prev', 'next'] as const).map((dir) => (
         <button
           key={dir} onClick={dir === 'prev' ? prev : next} disabled={isAnimating}
+          aria-label={dir === 'prev' ? 'Previous slide' : 'Next slide'}
           className={`hidden sm:flex absolute top-1/2 -translate-y-1/2 z-20 ${dir === 'prev' ? 'left-5 md:left-8' : 'right-5 md:right-8'} w-11 h-11 md:w-13 md:h-13 rounded-full border border-white/25 bg-black/15 backdrop-blur-md items-center justify-center text-white transition-all duration-300 hover:bg-white/20 hover:border-white/50 hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed group`}
         >
           {dir === 'prev' ? <ChevronLeft size={19} /> : <ChevronRight size={19} />}
@@ -404,12 +419,18 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
       ))}
 
       {!isEditing && (
-        <div className="absolute bottom-6 md:bottom-9 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 md:gap-2.5">
+        <div className="absolute bottom-6 md:bottom-9 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 md:gap-1.5">
           {activeSlides.map((s, idx) => (
             <button
               key={s._id || s.id || idx} onClick={() => goTo(idx)}
-              className={`rounded-full transition-all duration-500 ease-out ${idx === current ? 'w-7 md:w-9 h-[5px] md:h-[6px] bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'w-[5px] md:w-[6px] h-[5px] md:h-[6px] bg-white/35 hover:bg-white/60'}`}
-            />
+              aria-label={`Go to slide ${idx + 1} of ${TOTAL}`}
+              aria-current={idx === current ? 'true' : undefined}
+              className="flex items-center justify-center p-2.5"
+            >
+              <span
+                className={`block rounded-full transition-all duration-500 ease-out ${idx === current ? 'w-7 md:w-9 h-[5px] md:h-[6px] bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'w-[5px] md:w-[6px] h-[5px] md:h-[6px] bg-white/35 hover:bg-white/60'}`}
+              />
+            </button>
           ))}
         </div>
       )}
