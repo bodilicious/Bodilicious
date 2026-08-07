@@ -183,6 +183,12 @@ export function buildProductSchema(product, frontendUrl) {
     description: product.description || '',
     sku: product.pid,
     brand: { '@type': 'Brand', name: 'Bodilicious' },
+    // Must stay identical to <g:google_product_category> for this pid in
+    // product-feed.xml — Googlebot sees this rendering, not the React one.
+    // Omitted when unset rather than guessed from `category`.
+    ...(product.google_product_category
+      ? { category: product.google_product_category }
+      : {}),
     offers: {
       '@type': 'Offer',
       priceCurrency: 'INR',

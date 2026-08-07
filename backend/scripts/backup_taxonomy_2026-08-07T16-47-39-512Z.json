@@ -1,0 +1,338 @@
+[
+  {
+    "pid": "BD-SER-NIA-SPF30",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Face serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-RET",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Night serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-VITC",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Face serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-SAL",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Face serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-MOIST-PEP",
+    "category": "skin",
+    "sub_category": "moisturizer",
+    "product_type": "Face moisturizer",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-CLE-ROSE",
+    "category": "body",
+    "sub_category": "face_body_wash",
+    "product_type": "Face & body wash",
+    "item_form": "Gel cleanser",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-GEL-SAF",
+    "category": "skin",
+    "sub_category": "soothing_gel",
+    "product_type": "Hydrating gel",
+    "item_form": "Gel",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SOAP-GOAT",
+    "category": "body",
+    "sub_category": "soap",
+    "product_type": "Soap bar",
+    "item_form": "Solid bar",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-LIP-BEET",
+    "category": "lip",
+    "sub_category": "lip_balm",
+    "product_type": "Tinted lip balm",
+    "item_form": "Balm",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SUN-LIQ",
+    "category": "skin",
+    "sub_category": "sunscreen",
+    "product_type": "Liquid sunscreen",
+    "item_form": "Liquid",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-LIP-SUN",
+    "category": "lip",
+    "sub_category": "lip_balm",
+    "product_type": "Lip balm with SPF",
+    "item_form": "Balm",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-CLE-ACNE",
+    "category": "skin",
+    "sub_category": "cleanser",
+    "product_type": "Face wash",
+    "item_form": "Gel cleanser",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-EYE-DAY",
+    "category": "skin",
+    "sub_category": "eye_care",
+    "product_type": "Eye cream",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-EYE-NIGHT",
+    "category": "skin",
+    "sub_category": "eye_care",
+    "product_type": "Eye cream",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-FOUND-FRESH",
+    "category": "makeup",
+    "sub_category": "foundation",
+    "product_type": "Liquid foundation",
+    "item_form": "Liquid",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-LIP-MATT",
+    "category": "makeup",
+    "sub_category": "lipstick",
+    "product_type": "Liquid lipstick",
+    "item_form": "Liquid",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-HAIR-SER",
+    "category": "hair",
+    "sub_category": "hair_serum",
+    "product_type": "Hair serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-HAIR-OIL-HERB",
+    "category": "hair",
+    "sub_category": "hair_oil",
+    "product_type": "Hair oil",
+    "item_form": "Oil",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SHAM-BAR",
+    "category": "hair",
+    "sub_category": "shampoo",
+    "product_type": "Shampoo bar",
+    "item_form": "Solid bar",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-AHA-BHA",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Exfoliating serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-AZE",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Face serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-HA",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Hydrating serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SOAP-OLIVE",
+    "category": "body",
+    "sub_category": "soap",
+    "product_type": "Soap bar",
+    "item_form": "Solid bar",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-LIP-CARROT",
+    "category": "lip",
+    "sub_category": "lip_balm",
+    "product_type": "Lip balm",
+    "item_form": "Balm",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-CLAY-KAOLIN",
+    "category": "skin",
+    "sub_category": "cleanser",
+    "product_type": "Clay cleanser",
+    "item_form": "Powder",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SHAM-DAND",
+    "category": "hair",
+    "sub_category": "shampoo",
+    "product_type": "Shampoo",
+    "item_form": "Liquid",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-HAIR-GROWTH",
+    "category": "hair",
+    "sub_category": "scalp_treatment",
+    "product_type": "Scalp serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-HAIR-BABY",
+    "category": "hair",
+    "sub_category": "scalp_treatment",
+    "product_type": "Hair serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-RET-CREAM",
+    "category": "skin",
+    "sub_category": "night_cream",
+    "product_type": "Night cream",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-COQ10",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Anti-aging serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-CLE-STRAW",
+    "category": "body",
+    "sub_category": "face_body_wash",
+    "product_type": "Face & body wash",
+    "item_form": "Gel cleanser",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-MOIST-OATS",
+    "category": "skin",
+    "sub_category": "moisturizer",
+    "product_type": "skincare",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-MOIST-SILICA-OATS",
+    "category": "skin",
+    "sub_category": "moisturizer",
+    "product_type": "Skin care",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SER-GLOW",
+    "category": "skin",
+    "sub_category": "serum",
+    "product_type": "Barrier repair serum",
+    "item_form": "Serum",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SHAM-BANANA",
+    "category": "hair",
+    "sub_category": "shampoo",
+    "product_type": "Hair shampoo",
+    "item_form": "Liquid",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-COND-KERATIN",
+    "category": "hair",
+    "sub_category": "conditioner",
+    "product_type": "Hair conditioner",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-CLE-KOJIC-GLY",
+    "category": "body",
+    "sub_category": "face_body_wash",
+    "product_type": "Face wash",
+    "item_form": "Gel cleanser",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SUN-PHYS-SPF50",
+    "category": "skin",
+    "sub_category": "sunscreen",
+    "product_type": "Skin care",
+    "item_form": "Cream",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SUN-HYD-SPF50-SPRAY",
+    "category": "skin",
+    "sub_category": "sunscreen",
+    "product_type": "Sunscreen spray",
+    "item_form": "Spray",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SOAP-RED-SANDAL-100G",
+    "category": "skin",
+    "sub_category": "soap",
+    "product_type": "cleansing bar",
+    "item_form": "bar",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SOAP-TEMPLE-100G",
+    "category": "skin",
+    "sub_category": "soap",
+    "product_type": "cleansing bar",
+    "item_form": "bar",
+    "google_product_category": ""
+  },
+  {
+    "pid": "BD-SOAP-FRANKINCENSE-100G",
+    "category": "skin",
+    "sub_category": "soap",
+    "product_type": "cleansing bar",
+    "item_form": "bar",
+    "google_product_category": ""
+  }
+]

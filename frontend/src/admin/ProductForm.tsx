@@ -63,10 +63,38 @@ function ArrayField({ label, value, onChange }: {
   );
 }
 
+/**
+ * The Google product taxonomy nodes this catalogue uses, verbatim from
+ * https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
+ * (numeric IDs in the labels for cross-checking in Merchant Center).
+ *
+ * Kept in sync with the `G` map in backend/scripts/fix_product_taxonomy.js.
+ * Add a node here only by copying it from the file above — Merchant Center
+ * drops the attribute and auto-classifies the item on any inexact string.
+ */
+const GOOGLE_PRODUCT_CATEGORY_OPTIONS = [
+  { value: '', label: 'Auto (fall back to Category default)' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Skin Care', label: '567 · Skin Care (generic — serums)' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Acne Treatments & Kits', label: '481 · Skin Care > Acne Treatments & Kits' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Lotion & Moisturizer', label: '2592 · Skin Care > Lotion & Moisturizer' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Sunscreen', label: '2844 · Skin Care > Sunscreen' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Facial Cleansers', label: '2526 · Skin Care > Facial Cleansers' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Lip Balms & Treatments > Lip Balms', label: '543573 · Skin Care > Lip Balms' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Bath & Body > Bar Soap', label: '2503 · Bath & Body > Bar Soap' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Bath & Body > Body Wash', label: '2747 · Bath & Body > Body Wash' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Makeup > Face Makeup > Foundations & Concealers', label: '2765 · Makeup > Foundations & Concealers' },
+  { value: 'Health & Beauty > Personal Care > Cosmetics > Makeup > Lip Makeup > Lipstick', label: '3021 · Makeup > Lipstick' },
+  { value: 'Health & Beauty > Personal Care > Hair Care', label: '486 · Hair Care (generic — oils, scalp)' },
+  { value: 'Health & Beauty > Personal Care > Hair Care > Shampoo & Conditioner > Shampoo', label: '543615 · Hair Care > Shampoo' },
+  { value: 'Health & Beauty > Personal Care > Hair Care > Shampoo & Conditioner > Conditioners', label: '543616 · Hair Care > Conditioners' },
+  { value: 'Health & Beauty > Personal Care > Hair Care > Hair Styling Products', label: '1901 · Hair Care > Hair Styling Products' },
+];
+
 const defaultFormData = {
   pid: '', name: '', slug: '', brand: 'Bodilicious',
   description: '', category: '', sub_category: '',
   product_type: '', item_form: '', texture: '',
+  google_product_category: '',
   images: [] as string[],
   benefits: [] as string[],
   concerns_targeted: [] as string[],
@@ -418,6 +446,20 @@ const ProductForm: React.FC = () => {
             <InputField label="Sub Category" field="sub_category" />
             <InputField label="Product Type" field="product_type" />
             <InputField label="Item Form" field="item_form" />
+            <div className="mb-4 md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-2">Google Product Category</label>
+              <Select
+                value={formData.google_product_category}
+                onChange={val => setFormData(prev => ({ ...prev, google_product_category: val as string }))}
+                options={GOOGLE_PRODUCT_CATEGORY_OPTIONS}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Sent to Google Merchant Center as <code>google_product_category</code>. A dropdown, not
+                free text, because Merchant Center silently ignores any value that isn&apos;t an exact
+                node in Google&apos;s taxonomy. Leave on &quot;Auto&quot; and the feed falls back to a
+                coarse default for the chosen Category.
+              </p>
+            </div>
           </div>
         </section>
 

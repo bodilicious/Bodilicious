@@ -158,6 +158,13 @@ export default function ProductPage() {
         description: product.description || '',
         sku: product.pid,
         brand: { '@type': 'Brand', name: 'Bodilicious' },
+        // Google reads schema.org `category` when classifying a product it
+        // crawls rather than reads from the feed, so keep it identical to the
+        // <g:google_product_category> the feed emits for this pid. Omitted
+        // entirely when unset — a wrong category is worse than none.
+        ...(product.google_product_category
+          ? { category: product.google_product_category }
+          : {}),
         offers: {
           '@type': 'Offer',
           priceCurrency: 'INR',

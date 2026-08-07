@@ -47,6 +47,9 @@ export interface Product {
   sub_category?: string;
   product_type?: string;
   item_form?: string;
+  /** Exact Google product taxonomy path — drives <g:google_product_category>
+   *  in the Merchant Center feed and schema.org `category` on the product page. */
+  google_product_category?: string;
 
   ingredients?: IngredientData;
   benefits?: string[];

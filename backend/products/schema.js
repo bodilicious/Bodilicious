@@ -22,6 +22,11 @@ export const createProductSchema = z
     sub_category: z.string().optional(),
     product_type: z.string().optional(),
     item_form: z.string().optional(),
+    // Exact Google product taxonomy path — see the note on the Mongoose field.
+    // Not enum-validated here because the taxonomy has ~5,500 nodes and Google
+    // revises it; `scripts/fix_product_taxonomy.js` validates against the real
+    // list. Kept in this .strict() schema so an admin edit isn't rejected 400.
+    google_product_category: z.string().max(300).optional(),
 
     ingredients: z.object({
       key_actives: z.array(z.string()).optional(),

@@ -80,6 +80,17 @@ const productSchema = new mongoose.Schema(
     product_type: { type: String, trim: true },
     item_form: { type: String, trim: true },
 
+    // Full Google product taxonomy path, e.g.
+    // "Health & Beauty > Personal Care > Cosmetics > Skin Care > Sunscreen".
+    // Emitted as <g:google_product_category> in the Merchant Center feed
+    // (cloudflare-worker/worker.js) and as schema.org `category` on the product
+    // page. MUST be an exact node from Google's taxonomy — Merchant Center
+    // rejects the attribute outright on any string that isn't in the list, and
+    // then silently auto-classifies the item instead:
+    //   https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
+    // Left blank, the worker falls back to a coarse per-`category` default.
+    google_product_category: { type: String, trim: true, default: "" },
+
     ingredients: { type: ingredientSchema, default: () => ({}) },
     benefits: { type: [String], default: [] },
     concerns_targeted: { type: [String], default: [] },

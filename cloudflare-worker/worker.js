@@ -698,14 +698,49 @@ ${urls.join('')}
 // g: namespace format Merchant Center expects. Once live, submit
 // https://bodilicious.in/product-feed.xml under Products > Feeds in Merchant
 // Center Next (scheduled fetch, e.g. daily).
+// Per-`category` FALLBACK only. The accurate value is the product's own
+// `google_product_category` (set by scripts/fix_product_taxonomy.js); this map
+// covers products created since that ran which nobody has classified yet.
+//
+// Every string here must be an exact node in Google's taxonomy —
+// https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt —
+// because Merchant Center drops the attribute on an unrecognised value and
+// falls back to auto-classification. The previous `body` entry, "… > Skin Care
+// > Body Care", was not a real node, so every soap and body wash in the feed
+// was being shipped with an invalid category.
 const GOOGLE_PRODUCT_CATEGORY = {
-  skin: 'Health & Beauty > Personal Care > Cosmetics > Skin Care',
-  hair: 'Health & Beauty > Personal Care > Hair Care',
-  body: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Body Care',
-  makeup: 'Health & Beauty > Personal Care > Cosmetics > Makeup',
-  lip: 'Health & Beauty > Personal Care > Cosmetics > Makeup > Lip Makeup',
-  other: 'Health & Beauty > Personal Care',
+  skin: 'Health & Beauty > Personal Care > Cosmetics > Skin Care',                     // 567
+  hair: 'Health & Beauty > Personal Care > Hair Care',                                 // 486
+  body: 'Health & Beauty > Personal Care > Cosmetics > Bath & Body',                   // 474
+  makeup: 'Health & Beauty > Personal Care > Cosmetics > Makeup',                      // 477
+  // `lip` is lip BALM, which Google files under Skin Care, not Makeup. Lipstick
+  // lives in the `makeup` category and carries its own per-product override.
+  lip: 'Health & Beauty > Personal Care > Cosmetics > Skin Care > Lip Balms & Treatments', // 482
+  other: 'Health & Beauty > Personal Care',                                            // 2915
 };
+
+/** Our own taxonomy breadcrumb for <g:product_type>, e.g. "Skin > Serum > Face Serum". */
+function buildFeedProductType(p) {
+  const titleCase = (s) => String(s)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return [p.category, p.sub_category, p.product_type]
+    .filter(Boolean)
+    .map(titleCase)
+    // Drop adjacent levels that say the same thing, ignoring punctuation and
+    // spacing — sub_category "face_body_wash" and product_type "Face & Body
+    // Wash" are the same level twice, and "Body > Face Body Wash > Face & Body
+    // Wash" reads as a broken breadcrumb in Merchant Center.
+    // Of a duplicated pair we keep the LATER one: product_type is the
+    // hand-written label ("Face & Body Wash"), sub_category the slug-derived
+    // one ("Face Body Wash").
+    .filter((seg, i, arr) => {
+      if (i === arr.length - 1) return true;
+      const key = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return key(seg) !== key(arr[i + 1]);
+    })
+    .join(' > ');
+}
 
 function escapeXml(unsafe) {
   return String(unsafe ?? '')
@@ -751,8 +786,23 @@ async function handleProductFeed(env) {
     // in-stock/out-of-stock from stock count rather than the (always-undefined) field.
     const items = allProducts
       .filter(p => p.price != null && Array.isArray(p.images) && p.images.length > 0)
+      // scripts/seed_test_order.js seeds an active "QA Test Serum" at ₹1499 with
+      // a placehold.co image whenever QA runs, and it is a normal active product
+      // as far as the API is concerned. A placeholder image is a Merchant Center
+      // disapproval and counts against account quality, so keep test fixtures out
+      // of the feed rather than relying on someone remembering --cleanup.
+      .filter(p => !/^https?:\/\/([^/]*\.)?placehold\.co\//i.test(p.images[0] || '') && !/^qa-/i.test(p.pid || ''))
       .map(p => {
         const availability = Number(p.stock) > 0 ? 'in stock' : 'out of stock';
+        // Per-product classification wins; the category map is only a backstop
+        // for products created after the taxonomy migration ran.
+        const googleCategory = (p.google_product_category || '').trim()
+          || GOOGLE_PRODUCT_CATEGORY[p.category]
+          || GOOGLE_PRODUCT_CATEGORY.other;
+        const ownProductType = buildFeedProductType(p);
+        const productTypeTag = ownProductType
+          ? `\n    <g:product_type>${escapeXml(ownProductType)}</g:product_type>`
+          : '';
         const toAbsolute = (img) => (img.startsWith('http') ? img : `${frontendUrl}${img}`);
         const [primaryImage, ...restImages] = p.images;
         const extraImageTags = restImages
@@ -772,7 +822,7 @@ async function handleProductFeed(env) {
     <g:brand>${escapeXml(p.brand || 'Bodilicious')}</g:brand>
     <g:condition>new</g:condition>
     <g:identifier_exists>no</g:identifier_exists>
-    <g:google_product_category>${escapeXml(GOOGLE_PRODUCT_CATEGORY[p.category] || GOOGLE_PRODUCT_CATEGORY.other)}</g:google_product_category>
+    <g:google_product_category>${escapeXml(googleCategory)}</g:google_product_category>${productTypeTag}
   </item>`;
       })
       .join('');
