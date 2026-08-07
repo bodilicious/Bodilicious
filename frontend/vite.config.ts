@@ -7,6 +7,14 @@ const isAnalyze = process.env.ANALYZE === 'true';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // esbuild keeps /** @license */-style comments by default, which duplicates
+  // the same lucide-react and firebase license banners across every chunk
+  // that pulls those packages in — real bytes shipped to every visitor for
+  // no runtime benefit. Stripping them is standard practice for compiled
+  // web bundles (not a redistributed library), unlike source-level headers.
+  esbuild: {
+    legalComments: 'none',
+  },
   plugins: [
     react(),
     // Pre-compress all JS/CSS/HTML/SVG at build time — zero CPU cost per request on Render's CDN

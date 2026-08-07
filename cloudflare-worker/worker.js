@@ -72,7 +72,14 @@ const CSP_DIRECTIVES = [
  * Anything else (HTML, API responses, XML feeds) is left untouched.
  */
 function getStaticCacheControl(pathname) {
-  if (/^\/assets\/.+-[A-Za-z0-9_]{6,}\.(js|css)$/.test(pathname)) {
+  // Matches any file directly under /assets/ (no further subdirectory) — every
+  // .js/.css there is Vite build output; nothing hand-placed lives at that
+  // level (verified against frontend/public/assets, which only has
+  // subdirectories like banners/ and payment-badges/, never loose .js/.css).
+  // Deliberately NOT trying to pattern-match the hash itself: Vite's hash
+  // alphabet includes '-' and '_' (e.g. "CustomerDetails-CezoLDY-.js"), which
+  // made an earlier, stricter version of this regex silently fail to match.
+  if (/^\/assets\/[^/]+\.(js|css)$/.test(pathname)) {
     return 'public, max-age=31536000, immutable';
   }
   if (/\.(webp|png|jpe?g|avif|gif|svg|ico|woff2?)$/i.test(pathname)) {

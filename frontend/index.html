@@ -51,8 +51,11 @@
     <link rel="dns-prefetch" href="https://analytics.ahrefs.com" />
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
 
-    <!-- Preload the first hero carousel image (LCP element) -->
+    <!-- Preload the first hero carousel image (LCP element on desktop) -->
     <link rel="preload" as="image" href="/assets/hero_carousel_1.webp" fetchpriority="high" />
+    <!-- Preload the navbar logo (LCP element on mobile — the hero carousel
+         sits lower in the mobile layout, so the logo paints first there) -->
+    <link rel="preload" as="image" href="/logo.webp" fetchpriority="high" />
 
     <!-- Primary SEO -->
 
