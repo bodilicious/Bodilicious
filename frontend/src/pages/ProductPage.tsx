@@ -62,6 +62,8 @@ import {
 } from '../utils/seo';
 import { usePostHog } from 'posthog-js/react';
 import { useCurrency } from '../hooks/useCurrency';
+import DOMPurify from 'dompurify';
+import { toTrustedHTML } from '../utils/trustedTypes';
 
 const AccordionItem = ({
   title,
@@ -852,9 +854,30 @@ export default function ProductPage() {
               {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
             </p>
 
-            <p className="text-dark-red/80 font-sans text-sm sm:text-base leading-7 mb-7 sm:mb-8 max-w-2xl">
-              {product.description}
-            </p>
+            <div
+              className="prose prose-sm max-w-2xl mb-7 sm:mb-8
+                prose-p:text-dark-red/80 prose-p:font-sans prose-p:leading-7
+                prose-strong:text-dark-red prose-strong:font-semibold
+                prose-h2:text-dark-red prose-h2:font-serif prose-h2:text-xl
+                prose-h3:text-dark-red prose-h3:font-serif prose-h3:text-lg
+                prose-ul:text-dark-red/80 prose-ol:text-dark-red/80
+                prose-li:font-sans prose-li:text-sm sm:prose-li:text-base
+                prose-blockquote:border-l-dark-red/30 prose-blockquote:text-dark-red/70
+                prose-a:text-ruby-red hover:prose-a:text-dark-red"
+              dangerouslySetInnerHTML={{
+                __html: toTrustedHTML(
+                  DOMPurify.sanitize(product.description || '', {
+                    ALLOWED_TAGS: [
+                      'p','br','strong','em','u','s','h1','h2','h3','h4','h5','h6',
+                      'ul','ol','li','blockquote','pre','code',
+                      'a','img','figure','figcaption','hr',
+                    ],
+                    ALLOWED_ATTR: ['href','target','rel','src','alt','class','title'],
+                    FORCE_BODY: true,
+                  })
+                )
+              }}
+            />
 
             {product.skin_type_suitable && product.skin_type_suitable.length > 0 && (
               <div className="mb-8">
