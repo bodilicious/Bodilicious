@@ -253,7 +253,7 @@ export default function ProductPage() {
 
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
-  const [activeAccordion, setActiveAccordion] = useState<string | null>('details');
+  const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -345,7 +345,7 @@ export default function ProductPage() {
   useEffect(() => {
     setActiveImage(0);
     setQty(1);
-    setActiveAccordion('details');
+    setActiveAccordion(null);
     setOpenFaqIndex(0);
     setShowIngredientSidebar(false);
     setZoomStyle({ display: 'none', backgroundPosition: '0% 0%' });
@@ -1028,28 +1028,7 @@ export default function ProductPage() {
             )}
 
             <div className="mb-4">
-              <AccordionItem
-                title="Product Details"
-                isOpen={activeAccordion === 'details'}
-                onClick={() => toggleAccordion('details')}
-                content={
-                  <div>
-                    <p className="mb-4">
-                      Experience the ultimate luxury with our meticulously crafted formula.
-                      Designed to deeply nourish and restore your skin&apos;s natural radiance,
-                      {` ${product.name} `}
-                      targets your most pressing skincare concerns with gentle, effective
-                      botanical extracts and cutting-edge clinical ingredients.
-                    </p>
 
-                    <ul className="list-disc pl-4 space-y-2">
-                      {(product.benefits ?? []).map((b, i) => (
-                        <li key={i}>{b}</li>
-                      ))}
-                    </ul>
-                  </div>
-                }
-              />
 
               <AccordionItem
                 title="Full Ingredients"
