@@ -10,6 +10,17 @@ import {
   buildProductH2s,
   buildProductOgAlt,
 } from '../utils/seo';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import TiptapImage from '@tiptap/extension-image';
+import TiptapLink from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
+import {
+  Bold, Italic, UnderlineIcon, List, ListOrdered,
+  Heading2, Heading3, Quote, Undo, Redo,
+  ImagePlus, Link2,
+} from 'lucide-react';
 
 function ArrayField({ label, value, onChange }: {
   label: string;
@@ -62,6 +73,25 @@ function ArrayField({ label, value, onChange }: {
     </div>
   );
 }
+
+// ── Tiptap toolbar button ─────────────────────────────────────────────────────
+const ToolbarBtn: React.FC<{
+  onClick: () => void;
+  active?: boolean;
+  title: string;
+  children: React.ReactNode;
+}> = ({ onClick, active, title, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    className={`p-1.5 rounded transition-colors ${
+      active ? 'bg-[#8B2E2E] text-white' : 'text-gray-600 hover:bg-gray-100'
+    }`}
+  >
+    {children}
+  </button>
+);
 
 /**
  * The Google product taxonomy nodes this catalogue uses, verbatim from
@@ -129,6 +159,21 @@ const ProductForm: React.FC = () => {
   const [errors, setErrors] = useState<string[]>([]);
   const API_URL = import.meta.env.VITE_API_URL || '';
 
+  // ── Tiptap editor for description ──────────────────────────────────────────
+  const descriptionEditor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      TiptapImage,
+      TiptapLink.configure({ openOnClick: false }),
+      Placeholder.configure({ placeholder: 'Describe the product in an engaging way…' }),
+    ],
+    content: '',
+    onUpdate: ({ editor }) => {
+      setFormData(prev => ({ ...prev, description: editor.getHTML() }));
+    },
+  });
+
   useEffect(() => {
     if (!isEditMode) return;
     const fetchProduct = async () => {
@@ -155,6 +200,10 @@ const ProductForm: React.FC = () => {
             seo_image_alt: data.data.seo_image_alt ?? '',
             usage: { ...prev.usage, ...data.data.usage }
           }));
+          // Populate the rich text editor with existing description
+          if (data.data.description) {
+            descriptionEditor?.commands.setContent(data.data.description);
+          }
         } else {
           toast.error("Failed to load product");
         }
@@ -509,18 +558,34 @@ const ProductForm: React.FC = () => {
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">3. Content</h2>
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-2">Description *</label>
-            <textarea
-              className="w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20 min-h-[120px]"
-              value={formData.description}
-              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe the product in an engaging way. Press Enter to create new paragraphs. Example: 'Lightweight serum formulated with... This serum doubles as... With consistent use over...'"
-            />
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              {/* Toolbar */}
+              <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-gray-100 bg-gray-50">
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleBold().run()} active={descriptionEditor?.isActive('bold')} title="Bold"><Bold size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleItalic().run()} active={descriptionEditor?.isActive('italic')} title="Italic"><Italic size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleUnderline().run()} active={descriptionEditor?.isActive('underline')} title="Underline"><UnderlineIcon size={14} /></ToolbarBtn>
+                <div className="w-px h-5 bg-gray-200 mx-1" />
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleHeading({ level: 2 }).run()} active={descriptionEditor?.isActive('heading', { level: 2 })} title="Heading 2"><Heading2 size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleHeading({ level: 3 }).run()} active={descriptionEditor?.isActive('heading', { level: 3 })} title="Heading 3"><Heading3 size={14} /></ToolbarBtn>
+                <div className="w-px h-5 bg-gray-200 mx-1" />
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleBulletList().run()} active={descriptionEditor?.isActive('bulletList')} title="Bullet list"><List size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleOrderedList().run()} active={descriptionEditor?.isActive('orderedList')} title="Numbered list"><ListOrdered size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().toggleBlockquote().run()} active={descriptionEditor?.isActive('blockquote')} title="Blockquote"><Quote size={14} /></ToolbarBtn>
+                <div className="w-px h-5 bg-gray-200 mx-1" />
+                <ToolbarBtn onClick={() => { const url = window.prompt('URL:'); if (url) descriptionEditor?.chain().focus().setLink({ href: url }).run(); }} active={descriptionEditor?.isActive('link')} title="Add link"><Link2 size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => { const url = window.prompt('Image URL:'); if (url) descriptionEditor?.chain().focus().setImage({ src: url }).run(); }} title="Insert image"><ImagePlus size={14} /></ToolbarBtn>
+                <div className="flex-1" />
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().undo().run()} title="Undo"><Undo size={14} /></ToolbarBtn>
+                <ToolbarBtn onClick={() => descriptionEditor?.chain().focus().redo().run()} title="Redo"><Redo size={14} /></ToolbarBtn>
+              </div>
+              <EditorContent
+                editor={descriptionEditor}
+                className="prose prose-sm max-w-none p-4 min-h-[180px] focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror-focused]:outline-none"
+              />
+            </div>
             <p className="text-xs text-gray-500 mt-2">
-              💡 Tip: Press <strong>Enter</strong> to separate paragraphs instead of bullet points.
-              Customers read descriptions better when broken into shorter, readable sections.
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {formData.description.length} characters
+              💡 Use <strong>headings</strong> and <strong>bullet lists</strong> to make the description scannable.
+              Rich formatting is rendered on the product page.
             </p>
           </div>
           <div className="mb-4">
