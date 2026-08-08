@@ -16,6 +16,7 @@ import {
   buildBlogOgAlt,
   buildBlogHeadline,
   STATIC_PAGE_SEO,
+  stripHtml,
 } from '../frontend/src/utils/seo.ts';
 
 // Re-exported so worker.js can route on it without reaching into the frontend.
@@ -180,7 +181,8 @@ export function buildProductSchema(product, frontendUrl) {
     '@type': 'Product',
     name: product.name,
     image: toAbsoluteUrl(product.images?.[0], frontendUrl),
-    description: product.description || '',
+    // Strip HTML tags — description is now Tiptap HTML; schema.org requires plain text.
+    description: stripHtml(product.description || ''),
     sku: product.pid,
     brand: { '@type': 'Brand', name: 'Bodilicious' },
     // Must stay identical to <g:google_product_category> for this pid in
@@ -379,7 +381,7 @@ export function renderProductHtml(product, frontendUrl) {
     <article>
       <header>
         <h1>${escapeHtml(h1)}</h1>
-        <p>${escapeHtml(product.description || '')}</p>
+        <p>${escapeHtml(stripHtml(product.description || ''))}</p>
         <p>Price: ₹${escapeHtml(String(product.price))}</p>
         ${product.rating && product.ratingCount
           ? `<p>Rated ${escapeHtml(String(product.rating.toFixed ? product.rating.toFixed(1) : product.rating))} out of 5 (${escapeHtml(String(product.ratingCount))} reviews)</p>`
