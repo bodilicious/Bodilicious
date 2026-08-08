@@ -513,7 +513,15 @@ const ProductForm: React.FC = () => {
               className="w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20 min-h-[120px]"
               value={formData.description}
               onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Describe the product in an engaging way. Press Enter to create new paragraphs. Example: 'Lightweight serum formulated with... This serum doubles as... With consistent use over...'"
             />
+            <p className="text-xs text-gray-500 mt-2">
+              💡 Tip: Press <strong>Enter</strong> to separate paragraphs instead of bullet points.
+              Customers read descriptions better when broken into shorter, readable sections.
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {formData.description.length} characters
+            </p>
           </div>
           <div className="mb-4">
             <label className="block text-sm font-bold text-gray-700 mb-2">Custom SEO Keywords</label>
