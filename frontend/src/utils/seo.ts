@@ -135,14 +135,14 @@ export function secondaryKeyword(product?: SeoProductLike | null, notContainedIn
 export function buildProductTitle(product?: SeoProductLike | null): string {
   // An editorially-set title always wins — a human chose it deliberately.
   const override = (product?.seo_title || '').trim();
-  if (override) return override;
+  if (override) return withBrandOnce(override);
 
   const name = (product?.name || '').trim();
   if (!name) return `Product — ${BRAND}`;
 
   const nameLower = name.toLowerCase();
   const hasBrand = nameLower.includes(BRAND.toLowerCase());
-  const base = hasBrand ? name : `${name} — ${BRAND}`;
+  const base = hasBrand ? name : `${name} | ${BRAND}`;
 
   const candidates = groupOf(product?.seo_keywords, 'primary')
     .filter(k => !nameLower.includes(k.toLowerCase()));
