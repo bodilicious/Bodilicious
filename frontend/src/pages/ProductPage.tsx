@@ -157,7 +157,9 @@ export default function ProductPage() {
           if (!img) return '';
           return img.startsWith('http') ? img : `https://bodilicious.in${img.startsWith('/') ? '' : '/'}${img}`;
         })(),
-        description: product.description || '',
+        // schema.org description must be plain text — strip Tiptap HTML.
+        // productDesc is already stripped by buildProductDescription, reuse it.
+        description: productDesc,
         sku: product.pid,
         brand: { '@type': 'Brand', name: 'Bodilicious' },
         // Google reads schema.org `category` when classifying a product it
@@ -239,7 +241,11 @@ export default function ProductPage() {
     description: productDesc,
     keywords: productKeywords,
     canonical: `/product/${product?.pid || productId}`,
-    ogImage: product?.images[0],
+    ogImage: (() => {
+      const img = product?.images[0];
+      if (!img) return undefined;
+      return img.startsWith('http') ? img : `https://bodilicious.in${img.startsWith('/') ? '' : '/'}${img}`;
+    })(),
     ogImageAlt: ogAlt,
     jsonLd: productJsonLd,
   });

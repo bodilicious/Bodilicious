@@ -557,7 +557,9 @@ export function buildProductDescription(product?: SeoProductLike | null): string
   const override = (product?.seo_description || '').trim();
   if (override) return truncateAtWord(override, MAX_DESCRIPTION_LENGTH);
 
-  const description = (product?.description || '').trim();
+  // Strip HTML tags before using as plain-text meta description — description
+  // is now stored as Tiptap HTML so raw <p>/<strong> tags must be removed.
+  const description = stripHtml(product?.description || '').trim();
   if (description) return truncateAtWord(description, MAX_DESCRIPTION_LENGTH);
 
   return 'Premium skincare and haircare from Bodilicious. Dermatologically tested, science-backed formulas.';

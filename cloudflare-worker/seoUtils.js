@@ -381,7 +381,7 @@ export function renderProductHtml(product, frontendUrl) {
     <article>
       <header>
         <h1>${escapeHtml(h1)}</h1>
-        <p>${escapeHtml(stripHtml(product.description || ''))}</p>
+        <div>${sanitizeBlogHtml(product.description || '')}</div>
         <p>Price: ₹${escapeHtml(String(product.price))}</p>
         ${product.rating && product.ratingCount
           ? `<p>Rated ${escapeHtml(String(product.rating.toFixed ? product.rating.toFixed(1) : product.rating))} out of 5 (${escapeHtml(String(product.ratingCount))} reviews)</p>`
