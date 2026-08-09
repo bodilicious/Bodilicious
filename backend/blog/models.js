@@ -66,6 +66,10 @@ const blogSchema = new mongoose.Schema(
     categories: [{ type: mongoose.Schema.Types.ObjectId, ref: "BlogCategory" }],
     tags: { type: [String], default: [] },
 
+    // Admin-curated Product `pid`s to show as "Products mentioned in this guide".
+    // Takes priority over the auto-matched relatedProducts fallback in the controller.
+    products: { type: [String], default: [] },
+
     // SEO fields — description is more important than keywords for modern search engines.
     seo_title:       { type: String, trim: true, maxlength: 300, default: "" },
     seo_description: { type: String, trim: true, maxlength: 500, default: "" },

@@ -50,7 +50,7 @@ export const createBlog = async (req, res) => {
   try {
     const {
       title, content, excerpt, coverImage,
-      categories, tags,
+      categories, tags, products,
       seo_title, seo_description, seo_keywords,
       status,
     } = req.body;
@@ -73,6 +73,7 @@ export const createBlog = async (req, res) => {
       author: req.user._id,
       categories: categories || [],
       tags: tags || [],
+      products: Array.isArray(products) ? products.filter((p) => typeof p === "string") : [],
       seo_title: seo_title || "",
       seo_description: seo_description || "",
       seo_keywords: seo_keywords || "",
@@ -160,7 +161,18 @@ export const getAdminBlogById = async (req, res) => {
       .populate("categories", "name slug");
 
     if (!blog) return res.status(404).json({ success: false, message: "Blog not found" });
-    res.json({ success: true, data: blog });
+
+    // Hydrate the manually-selected product pids with card-level details so the
+    // edit form can render them without a second round trip.
+    const data = blog.toObject({ virtuals: true });
+    if (data.products?.length) {
+      const { default: Product } = await import("../products/models.js");
+      data.productDetails = await Product.find({ pid: { $in: data.products } })
+        .select("pid name price images")
+        .lean();
+    }
+
+    res.json({ success: true, data });
   } catch (err) {
     console.error("Blog getAdminBlogById Error:", err);
     res.status(500).json({ success: false, message: "Failed to fetch blog" });
@@ -177,7 +189,7 @@ export const updateBlog = async (req, res) => {
 
     const {
       title, content, excerpt, coverImage,
-      categories, tags,
+      categories, tags, products,
       seo_title, seo_description, seo_keywords,
       status,
     } = req.body;
@@ -196,6 +208,9 @@ export const updateBlog = async (req, res) => {
     }
     if (categories !== undefined) updates.categories = categories;
     if (tags !== undefined) updates.tags = tags;
+    if (products !== undefined) {
+      updates.products = Array.isArray(products) ? products.filter((p) => typeof p === "string") : [];
+    }
     if (seo_title !== undefined) updates.seo_title = seo_title;
     if (seo_description !== undefined) updates.seo_description = seo_description;
     if (seo_keywords !== undefined) updates.seo_keywords = seo_keywords;
@@ -418,27 +433,38 @@ export const getPublicBlogBySlug = async (req, res) => {
     const data = blog.toObject({ virtuals: true });
     try {
       const { default: Product } = await import("../products/models.js");
-      // Title is included as a source because tags currently hold editorial
-      // placeholder text rather than real tags — see utils/topicMatch.js.
-      const patterns = buildTopicPatterns([
-        blog.title,
-        ...(blog.tags || []),
-        ...((blog.categories || []).map(c => c?.name).filter(Boolean)),
-      ]);
 
-      if (patterns.length) {
-        data.relatedProducts = await Product.find({
-          isActive: true,
-          $or: [
-            { name: { $in: patterns } },
-            { concerns_targeted: { $in: patterns } },
-            { product_type: { $in: patterns } },
-          ],
-        })
+      if (blog.products?.length) {
+        // Admin-curated selection (set from the blog editor) takes priority
+        // over auto-matching. Preserve the order the admin picked.
+        const found = await Product.find({ pid: { $in: blog.products }, isActive: true })
           .select("pid name price images rating ratingCount")
-          .sort({ ratingCount: -1, rating: -1 })
-          .limit(3)
           .lean();
+        const byPid = new Map(found.map((p) => [p.pid, p]));
+        data.relatedProducts = blog.products.map((pid) => byPid.get(pid)).filter(Boolean);
+      } else {
+        // Title is included as a source because tags currently hold editorial
+        // placeholder text rather than real tags — see utils/topicMatch.js.
+        const patterns = buildTopicPatterns([
+          blog.title,
+          ...(blog.tags || []),
+          ...((blog.categories || []).map(c => c?.name).filter(Boolean)),
+        ]);
+
+        if (patterns.length) {
+          data.relatedProducts = await Product.find({
+            isActive: true,
+            $or: [
+              { name: { $in: patterns } },
+              { concerns_targeted: { $in: patterns } },
+              { product_type: { $in: patterns } },
+            ],
+          })
+            .select("pid name price images rating ratingCount")
+            .sort({ ratingCount: -1, rating: -1 })
+            .limit(3)
+            .lean();
+        }
       }
     } catch (relErr) {
       console.error("[Blog] Related products lookup failed:", relErr.message);

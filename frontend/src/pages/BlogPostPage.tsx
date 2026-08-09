@@ -413,7 +413,7 @@ const BlogPostPage: React.FC = () => {
               {related.map(r => (
                 <Link key={r._id} to={`/blogs/${r.slug}`} className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-silk-light flex flex-col">
                   {r.coverImage && (
-                    <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                    <div className="aspect-[16/9] bg-gray-100 overflow-hidden">
                       <img src={r.coverImage} alt={r.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     </div>
                   )}

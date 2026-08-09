@@ -7,6 +7,7 @@ import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useApp } from '../context/AppContext';
+import BlogProductPicker, { ProductLite } from './BlogProductPicker';
 import toast from 'react-hot-toast';
 import {
   Bold, Italic, UnderlineIcon, List, ListOrdered,
@@ -25,6 +26,7 @@ interface BlogData {
   coverImage: string;
   categories: string[];
   tags: string[];
+  products: string[];
   seo_title: string;
   seo_description: string;
   seo_keywords: any;
@@ -108,7 +110,7 @@ const toSlug = (str: string) =>
 // ─────────────────────────────────────────────────────────────────────────────
 const EMPTY_FORM: BlogData = {
   title: '', slug: '', content: '', excerpt: '',
-  coverImage: '', categories: [], tags: [],
+  coverImage: '', categories: [], tags: [], products: [],
   seo_title: '', seo_description: '', seo_keywords: { primary: [], secondary: [] },
   status: 'draft',
 };
@@ -133,6 +135,9 @@ const BlogForm: React.FC = () => {
   const [coverPreview, setCoverPreview]   = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Product details for hydrating the picker when editing an existing post
+  const [productDetails, setProductDetails] = useState<ProductLite[]>([]);
 
   // Track dirty state
   useEffect(() => {
@@ -197,6 +202,7 @@ const BlogForm: React.FC = () => {
           coverImage: b.coverImage,
           categories: b.categories.map((c: Category) => c._id),
           tags: b.tags,
+          products: b.products || [],
           seo_title: b.seo_title,
           seo_description: b.seo_description,
           seo_keywords: typeof b.seo_keywords === 'string'
@@ -207,6 +213,7 @@ const BlogForm: React.FC = () => {
         setForm(loaded);
         setInitialForm(loaded);
         setCoverPreview(b.coverImage);
+        setProductDetails(b.productDetails || []);
         setSlugManuallyEdited(true); // Don't auto-update slug when editing
         editor?.commands.setContent(b.content);
       } catch (err: any) {
@@ -540,6 +547,17 @@ const BlogForm: React.FC = () => {
                 </span>
               ))}
             </div>
+          </div>
+
+          {/* Products mentioned */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-1">Products Mentioned</h3>
+            <p className="text-xs text-gray-400 mb-3">Shown on the post as "Products mentioned in this guide". Overrides auto-matching.</p>
+            <BlogProductPicker
+              selected={form.products}
+              onChange={products => setForm(f => ({ ...f, products }))}
+              initialDetails={productDetails}
+            />
           </div>
 
           {/* SEO */}

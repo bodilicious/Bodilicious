@@ -157,7 +157,7 @@ const BlogListPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-silk-light flex flex-col h-full">
-                <div className="aspect-[4/3] bg-gray-200 animate-pulse w-full"></div>
+                <div className="aspect-[16/9] bg-gray-200 animate-pulse w-full"></div>
                 <div className="p-6 flex flex-col flex-grow">
                   <div className="flex gap-2 mb-3">
                     <div className="h-4 bg-gray-200 animate-pulse rounded-full w-16"></div>
@@ -191,7 +191,7 @@ const BlogListPage: React.FC = () => {
                 className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-silk-light flex flex-col h-full motion-reduce:transition-none motion-reduce:hover:transform-none"
               >
                 {post.coverImage ? (
-                  <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                  <div className="aspect-[16/9] overflow-hidden bg-gray-100">
                     <img
                       src={post.coverImage}
                       alt={post.title || 'Blog post cover'}
@@ -199,7 +199,7 @@ const BlogListPage: React.FC = () => {
                     />
                   </div>
                 ) : (
-                  <div className="aspect-[4/3] bg-gradient-to-br from-silk-light to-silk flex items-center justify-center">
+                  <div className="aspect-[16/9] bg-gradient-to-br from-silk-light to-silk flex items-center justify-center">
                     <BookOpen size={48} className="text-b-burgundy/20" />
                   </div>
                 )}
