@@ -11,6 +11,7 @@ import {
   SITEMAP_CONCERNS,
   SITEMAP_TYPES,
   getLegacyShopifyAction,
+  stripHtml,
 } from './seoUtils.js';
 
 // Cache for bot rendered HTML
@@ -810,11 +811,22 @@ async function handleProductFeed(env) {
           .map((img) => `\n    <g:additional_image_link>${escapeXml(toAbsolute(img))}</g:additional_image_link>`)
           .join('');
 
+        // Editorial seo_title/seo_description win when set — same override
+        // pattern as the on-page/bot-rendered title (frontend/src/utils/seo.ts),
+        // so a compliance fix made there actually reaches the Shopping feed too.
+        // description is Tiptap HTML; strip tags rather than dumping raw markup
+        // (as literal "&lt;p&gt;" text) into a field Merchant Center expects as
+        // plain prose.
+        const feedTitle = (p.seo_title || p.name || '').trim();
+        const feedDescription = (p.seo_description || '').trim()
+          || stripHtml(p.description || '').trim()
+          || feedTitle;
+
         return `
   <item>
     <g:id>${escapeXml(p.pid)}</g:id>
-    <title>${escapeXml(p.name)}</title>
-    <description>${escapeXml(p.description || p.name)}</description>
+    <title>${escapeXml(feedTitle)}</title>
+    <description>${escapeXml(feedDescription)}</description>
     <link>${frontendUrl}/product/${escapeXml(p.pid)}</link>
     <g:image_link>${escapeXml(toAbsolute(primaryImage))}</g:image_link>${extraImageTags}
     <g:availability>${availability}</g:availability>
