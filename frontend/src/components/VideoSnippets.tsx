@@ -33,30 +33,33 @@ function LazyVideo({ src, className, poster }: { src: string; className: string;
 
     useEffect(() => {
         if (isInstagram) return;
-        
-        const observer = new IntersectionObserver((entries) => {
-            const entry = entries[0];
-            if (entry.isIntersecting) {
-                setInView(true);
-            } else {
-                // Pause when scrolled out of view to save bandwidth and CPU
-                if (videoRef.current) {
-                    videoRef.current.pause();
-                }
-            }
-        }, { threshold: 0.5 }); // Play when at least 50% of the video is visible
-        
-        const el = document.getElementById(`video-container-${src}`);
-        if (el) observer.observe(el);
-        
+        const node = videoRef.current;
+        if (!node) return;
+
+        // Observe the actual <video> node directly (rather than looking it up by
+        // id) so this can't silently miss its target.
+        const observer = new IntersectionObserver(
+            ([entry]) => setInView(entry.isIntersecting),
+            { threshold: 0.5 } // Play when at least 50% of the video is visible
+        );
+        observer.observe(node);
+
         return () => observer.disconnect();
-    }, [src, isInstagram]);
+    }, [isInstagram]);
 
     useEffect(() => {
-        if (inView && videoRef.current) {
-            videoRef.current.play().catch(() => {});
+        const node = videoRef.current;
+        if (!node || isInstagram) return;
+        // Tying both directions to `inView` (rather than only pausing imperatively
+        // on exit) ensures playback actually resumes when scrolled back into view —
+        // previously `inView` stayed `true` after the first play, so re-entering
+        // view never re-triggered this effect and the video stayed paused forever.
+        if (inView) {
+            node.play().catch(() => {});
+        } else {
+            node.pause();
         }
-    }, [inView]);
+    }, [inView, isInstagram]);
 
     if (isInstagram) {
         return (
@@ -84,12 +87,15 @@ function LazyVideo({ src, className, poster }: { src: string; className: string;
 
             <video
                 ref={videoRef}
-                id={`video-container-${src}`}
                 className={`${className} transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
                 loop
                 muted
                 playsInline
-                preload="none"
+                // Load eagerly once in view so the first frame (and `onLoadedData`)
+                // arrives even if autoplay itself gets blocked by the browser —
+                // otherwise the shimmer placeholder could spin forever on a
+                // successfully-loaded-but-not-autoplaying video.
+                preload={inView ? 'auto' : 'none'}
                 disablePictureInPicture
                 controlsList="nodownload nofullscreen noremoteplayback"
                 poster={poster}
