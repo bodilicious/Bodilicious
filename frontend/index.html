@@ -27,11 +27,10 @@
     <!-- Preconnect to reduce TCP/TLS overhead for first-party API requests -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Preload the two font files every page needs for its first paint -->
-    <link rel="preload" as="font" type="font/woff2" crossorigin
-          href="https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" />
-    <link rel="preload" as="font" type="font/woff2" crossorigin
-          href="https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgA.woff2" />
+    <!-- Preconnect hints are enough — hardcoded woff2 preload URLs break when
+         Google Fonts rotates content-addressed hashes, causing a 404 and a
+         "preloaded but not used" warning. The preconnect below keeps the
+         DNS/TCP handshake fast without pinning a stale URL. -->
     <!-- Non-blocking Google Fonts load: media=print tricks the browser into treating
          it as non-render-blocking. The onload handler swaps it to media=all once
          the stylesheet is ready, so fonts still apply normally. -->
