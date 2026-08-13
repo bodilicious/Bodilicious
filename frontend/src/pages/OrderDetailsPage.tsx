@@ -458,6 +458,9 @@ export default function OrderDetailsPage() {
                                                     <a href="#" className="text-sm font-serif text-dark-red hover:text-ruby-red transition-colors truncate block">
                                                         {item.product?.name || 'Unknown Product'}
                                                     </a>
+                                                    {item.variant && (
+                                                        <p className="font-sans text-[10px] text-dark-red/70 uppercase tracking-wider mt-0.5">Shade: {item.variant}</p>
+                                                    )}
                                                     <p className="text-xs font-sans text-grey-beige mt-1 uppercase tracking-wider">{item.product?.category || 'Standard'}</p>
                                                 </div>
                                                 <div className="text-right text-sm font-sans text-gray-500">

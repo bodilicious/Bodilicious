@@ -61,6 +61,8 @@ export interface SeoProductLike {
   seo_h1?: string;
   seo_h2?: string[];
   seo_image_alt?: string;
+  /** Named shades/sizes — used by the structured data builder to emit per-variant Offers. */
+  variants?: string[];
 }
 
 /** Trim to a whole word rather than mid-word, appending an ellipsis. */
@@ -175,6 +177,8 @@ export function buildProductKeywords(product?: SeoProductLike | null): string | 
     product.sub_category,
     product.product_type,
     ...(product.concerns_targeted || []),
+    // Surface shade names as keywords — "Fair Skin foundation", etc.
+    ...(product.variants || []).map(v => `${product.name} ${v}`),
     BRAND,
     'dermatologically tested',
   ].filter(Boolean) as string[];

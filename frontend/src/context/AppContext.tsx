@@ -134,13 +134,13 @@ interface AppContextType {
   setShopFilter: (f: 'all' | 'skin' | 'hair' | 'body' | 'lip' | 'makeup' | 'other') => void;
   fetchProducts: (query?: string) => Promise<void>;
 
-  addToCart: (product: Product, quantity?: number, skipRedirect?: boolean) => void;
-  removeFromCart: (pid: string) => void;
-  updateQuantity: (pid: string, qty: number) => void;
+  addToCart: (product: Product, quantity?: number, skipRedirect?: boolean, variant?: string | null) => void;
+  removeFromCart: (pid: string, variant?: string | null) => void;
+  updateQuantity: (pid: string, qty: number, variant?: string | null) => void;
 
   checkout: (shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, couponCode?: string) => Promise<{ order: Order }>;
-  initRazorpayOrder: (items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, quoteId?: string, couponCode?: string) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
-  verifyPayment: (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string, items: { productId: string; quantity: number }[], shippingDetails: ShippingDetails) => Promise<Order>;
+  initRazorpayOrder: (items: { productId: string; quantity: number, variant?: string | null }[], shippingDetails: ShippingDetails, billingDetails?: ShippingDetails | null, quoteId?: string, couponCode?: string) => Promise<{ razorpayOrder: any; calculatedAmount: number }>;
+  verifyPayment: (razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string, items: { productId: string; quantity: number, variant?: string | null }[], shippingDetails: ShippingDetails) => Promise<Order>;
   fetchShippingQuote: (items: any[], shippingDetails: any, couponCode?: string) => Promise<any>;
 
   appliedCoupon: string | null;
@@ -877,7 +877,7 @@ const triggerPasswordReset = async (email: string) => {
           .filter(i => i.product)
           .map(i => {
             const productId = resolveProductId(i.product);
-            return productId ? { productId, pid: i.product.pid, quantity: i.quantity } : null;
+            return productId ? { productId, pid: i.product.pid, quantity: i.quantity, variant: i.variant || null } : null;
           })
           .filter(Boolean),
       }),
@@ -889,13 +889,13 @@ const triggerPasswordReset = async (email: string) => {
     syncCartToBackendRef.current = syncCartToBackend;
   }, [syncCartToBackend]);
 
-  const addToCart = (product: Product, quantity: number = 1, skipRedirect: boolean = false) => {
+  const addToCart = (product: Product, quantity: number = 1, skipRedirect: boolean = false, variant: string | null = null) => {
     if (!product) return;
 
     setCartItems(prev => {
       let isMutated = false;
       const newItems = prev.map(i => {
-        if (i.product && i.product.pid === product.pid) {
+        if (i.product && i.product.pid === product.pid && (i.variant || null) === (variant || null)) {
           isMutated = true;
           return { ...i, quantity: Number(i.quantity ?? 0) + Number(quantity) };
         }
@@ -903,7 +903,7 @@ const triggerPasswordReset = async (email: string) => {
       });
 
       if (!isMutated) {
-        newItems.push({ product, quantity });
+        newItems.push({ product, quantity, variant });
       }
 
       // Sync inside the updater so `newItems` is always the authoritative
@@ -969,18 +969,20 @@ const triggerPasswordReset = async (email: string) => {
     }
   };
 
-  const removeFromCart = (pid: string) => {
+  const removeFromCart = (pid: string, variant: string | null = null) => {
     setCartItems(prev => {
-      const nextCart = prev.filter(i => i.product && i.product.pid !== pid);
+      const nextCart = prev.filter(i => !(i.product && i.product.pid === pid && (i.variant || null) === (variant || null)));
       setTimeout(() => syncCartToBackend(nextCart), 0);
       return nextCart;
     });
   };
 
-  const updateQuantity = (pid: string, qty: number) => {
+  const updateQuantity = (pid: string, qty: number, variant: string | null = null) => {
     setCartItems(prev => {
       const nextCart = prev.map(i =>
-        i.product && i.product.pid === pid ? { ...i, quantity: Number(qty) } : i
+        (i.product && i.product.pid === pid && (i.variant || null) === (variant || null)) 
+          ? { ...i, quantity: Number(qty) } 
+          : i
       );
       setTimeout(() => syncCartToBackend(nextCart), 0);
       return nextCart;
@@ -1008,9 +1010,9 @@ const triggerPasswordReset = async (email: string) => {
       .filter(i => i.product)
       .map(i => {
         const productId = resolveProductId(i.product);
-        return productId ? { productId, pid: i.product.pid, quantity: i.quantity } : null;
+        return productId ? { productId, pid: i.product.pid, quantity: i.quantity, variant: i.variant || null } : null;
       })
-      .filter(Boolean) as { productId: string; quantity: number }[];
+      .filter(Boolean) as { productId: string; quantity: number, variant?: string | null }[];
 
     if (items.length === 0) throw new Error('Cart items are missing product IDs. Refresh and add again.');
 
@@ -1079,9 +1081,9 @@ const triggerPasswordReset = async (email: string) => {
     }
 
     // Only remove purchased items from local cart to match backend $pull logic
-    const purchasedProductIds = new Set(order.items.map((i: any) => i.product._id || i.product));
+    const purchasedKeys = new Set(order.items.map((i: any) => `${i.product._id || i.product}:${i.variant || ''}`));
     setCartItems(prev => {
-      const newCart = prev.filter(item => !purchasedProductIds.has(item.product._id));
+      const newCart = prev.filter(item => !purchasedKeys.has(`${item.product._id}:${item.variant || ''}`));
       if (newCart.length === 0) {
         localStorage.removeItem(CART_STORAGE_KEY);
       } else {
@@ -1101,7 +1103,7 @@ const triggerPasswordReset = async (email: string) => {
      Init Razorpay Order (no DB record created)
   ============================== */
   const initRazorpayOrder = async (
-    items: { productId: string; quantity: number }[],
+    items: { productId: string; quantity: number, variant?: string | null }[],
     shippingDetails: ShippingDetails,
     billingDetails?: ShippingDetails | null,
     quoteId?: string,
@@ -1148,7 +1150,7 @@ const triggerPasswordReset = async (email: string) => {
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string,
-    items: { productId: string; quantity: number }[],
+    items: { productId: string; quantity: number, variant?: string | null }[],
     shippingDetails: ShippingDetails
   ): Promise<Order> => {
     const headers = await getAuthHeaders();

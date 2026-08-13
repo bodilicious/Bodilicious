@@ -18,6 +18,10 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  variant: {
+    type: String,
+    default: null,
+  },
 });
 
 

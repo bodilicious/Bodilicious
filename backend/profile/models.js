@@ -97,6 +97,10 @@ const userProfileSchema = new mongoose.Schema(
           required: true,
           default: 1,
         },
+        variant: {
+          type: String,
+          default: null,
+        },
       }
     ],
 

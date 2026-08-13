@@ -169,18 +169,54 @@ export default function ProductPage() {
         ...(product.google_product_category
           ? { category: product.google_product_category }
           : {}),
-        offers: {
-          '@type': 'Offer',
-          priceCurrency: 'INR',
-          price: String(product.price),
-          availability:
-            product.stock > 0
-              ? 'https://schema.org/InStock'
-              : 'https://schema.org/OutOfStock',
-          itemCondition: 'https://schema.org/NewCondition',
-          url: `https://bodilicious.in/product/${product.pid}`,
-          seller: { '@type': 'Organization', name: 'Bodilicious' },
-        },
+        // When the product has named shades/variants, tell Google that colour
+        // is the differentiating dimension. This signals the product is part
+        // of a product group and helps Google surface the right variant in
+        // Shopping results.
+        ...(product.variants && product.variants.length > 0
+          ? { variesBy: 'https://schema.org/color' }
+          : {}),
+        offers: product.variants && product.variants.length > 0
+          ? {
+              '@type': 'AggregateOffer',
+              priceCurrency: 'INR',
+              lowPrice: String(product.price),
+              highPrice: String(product.price),
+              offerCount: String(product.variants.length),
+              availability:
+                product.stock > 0
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+              itemCondition: 'https://schema.org/NewCondition',
+              url: `https://bodilicious.in/product/${product.pid}`,
+              seller: { '@type': 'Organization', name: 'Bodilicious' },
+              // Individual per-variant offers so Google can distinguish shades
+              offers: product.variants.map(v => ({
+                '@type': 'Offer',
+                name: `${product.name} — ${v}`,
+                priceCurrency: 'INR',
+                price: String(product.price),
+                availability:
+                  product.stock > 0
+                    ? 'https://schema.org/InStock'
+                    : 'https://schema.org/OutOfStock',
+                itemCondition: 'https://schema.org/NewCondition',
+                url: `https://bodilicious.in/product/${product.pid}?shade=${encodeURIComponent(v)}`,
+                seller: { '@type': 'Organization', name: 'Bodilicious' },
+              })),
+            }
+          : {
+              '@type': 'Offer',
+              priceCurrency: 'INR',
+              price: String(product.price),
+              availability:
+                product.stock > 0
+                  ? 'https://schema.org/InStock'
+                  : 'https://schema.org/OutOfStock',
+              itemCondition: 'https://schema.org/NewCondition',
+              url: `https://bodilicious.in/product/${product.pid}`,
+              seller: { '@type': 'Organization', name: 'Bodilicious' },
+            },
         ...(product.rating && product.ratingCount && product.ratingCount > 0
           ? {
               aggregateRating: {
@@ -254,6 +290,7 @@ export default function ProductPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -346,6 +383,7 @@ export default function ProductPage() {
     setActiveImage(0);
     setQty(1);
     setActiveAccordion(null);
+    setSelectedVariant(null);
     setOpenFaqIndex(0);
     setShowIngredientSidebar(false);
     setZoomStyle({ display: 'none', backgroundPosition: '0% 0%' });
@@ -460,11 +498,19 @@ export default function ProductPage() {
     setActiveImage((i) => (i === (product?.images.length || 1) - 1 ? 0 : i + 1));
   }, [product?.images.length]);
 
+  const [variantError, setVariantError] = useState(false);
+
   const handleAddToCart = useCallback(() => {
     if (product) {
-      addToCart(product, qty);
+      if (product.variants && product.variants.length > 0 && !selectedVariant) {
+        setVariantError(true);
+        setTimeout(() => setVariantError(false), 1800);
+        return;
+      }
+      setVariantError(false);
+      addToCart(product, qty, false, selectedVariant);
     }
-  }, [qty, addToCart, product]);
+  }, [qty, addToCart, product, selectedVariant]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     // Disable hover-zoom on touch devices / smaller screens
@@ -919,6 +965,86 @@ export default function ProductPage() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {product.variants && product.variants.length > 0 && (
+              <div className="mb-6">
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] sm:text-[11px] font-sans tracking-[0.12em] uppercase text-dark-red/70 font-medium">
+                    Select Shade <span className="text-ruby-red">*</span>
+                  </p>
+                  {selectedVariant && (
+                    <span className="text-[11px] font-sans text-ruby-red font-medium tracking-wide">
+                      {selectedVariant}
+                    </span>
+                  )}
+                </div>
+
+                {/* Swatch grid */}
+                <div className="flex flex-wrap gap-3">
+                  {product.variants.map((v) => {
+                    const swatchColor: Record<string, string> = {
+                      'Fair Skin':   '#F5D5C0',
+                      'Medium Skin': '#C8956C',
+                      'Bold Skin':   '#7B4A2D',
+                    };
+                    const color = swatchColor[v] ?? '#C8956C';
+                    const isSelected = selectedVariant === v;
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => { setSelectedVariant(v); setVariantError(false); }}
+                        aria-pressed={isSelected}
+                        aria-label={`Select shade: ${v}`}
+                        className={`group flex items-center gap-2.5 px-3.5 py-2.5 border rounded-sm transition-all duration-200 ${
+                          isSelected
+                            ? 'border-ruby-red bg-ruby-red/[0.04] shadow-[0_0_0_1px] shadow-ruby-red/30'
+                            : 'border-silk/70 bg-white/70 hover:border-dark-red/40 hover:bg-silk-light/40'
+                        }`}
+                      >
+                        {/* Colour swatch circle */}
+                        <span
+                          className={`w-5 h-5 rounded-full shrink-0 transition-all duration-200 ${
+                            isSelected ? 'ring-2 ring-offset-1 ring-ruby-red/60' : 'ring-1 ring-black/10'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          aria-hidden="true"
+                        />
+                        {/* Label */}
+                        <span
+                          className={`text-[11px] sm:text-xs font-sans transition-colors duration-200 ${
+                            isSelected ? 'text-ruby-red font-semibold' : 'text-dark-red/75 group-hover:text-dark-red'
+                          }`}
+                        >
+                          {v}
+                        </span>
+                        {/* Selected tick */}
+                        {isSelected && (
+                          <svg className="w-3 h-3 text-ruby-red shrink-0" fill="none" viewBox="0 0 12 12" aria-hidden="true">
+                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+
+                {/* Inline error */}
+                {variantError && (
+                  <p
+                    className="mt-2.5 text-[11px] font-sans text-ruby-red flex items-center gap-1.5 animate-shake"
+                    role="alert"
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 16 16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                    Please select a shade to continue
+                  </p>
+                )}
               </div>
             )}
 

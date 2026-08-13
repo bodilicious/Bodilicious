@@ -365,8 +365,9 @@ export const getOrderQuote = async (req, res) => {
             const id = item.productId || item.pid;
             if (!id) return res.status(400).json({ success: false, message: "Invalid item ID" });
             
-            if (!mergedItemsMap[id]) mergedItemsMap[id] = { ...item, quantity: 0 };
-            mergedItemsMap[id].quantity += item.quantity;
+            const key = `${id}:${item.variant || ''}`;
+            if (!mergedItemsMap[key]) mergedItemsMap[key] = { ...item, quantity: 0 };
+            mergedItemsMap[key].quantity += item.quantity;
         }
         const mergedItems = Object.values(mergedItemsMap);
 
@@ -621,8 +622,9 @@ export const initRazorpayOrder = async (req, res) => {
             const id = item.productId || item.pid;
             if (!id) return res.status(400).json({ success: false, message: "Invalid item ID" });
             
-            if (!mergedItemsMap[id]) mergedItemsMap[id] = { ...item, quantity: 0 };
-            mergedItemsMap[id].quantity += item.quantity;
+            const key = `${id}:${item.variant || ''}`;
+            if (!mergedItemsMap[key]) mergedItemsMap[key] = { ...item, quantity: 0 };
+            mergedItemsMap[key].quantity += item.quantity;
         }
         const mergedItems = Object.values(mergedItemsMap);
 
@@ -655,6 +657,7 @@ export const initRazorpayOrder = async (req, res) => {
                 product: product._id,
                 quantity: item.quantity,
                 priceAtPurchase: product.price,
+                variant: item.variant || null,
             });
         }
 

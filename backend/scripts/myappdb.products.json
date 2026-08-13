@@ -3382,6 +3382,11 @@
   "sub_category": "foundation",
   "product_type": "Liquid foundation",
   "item_form": "Liquid",
+  "variants": [
+    "Fair Skin",
+    "Bold Skin",
+    "Medium Skin"
+  ],
   "ingredients": {
     "key_actives": [],
     "botanical_extracts": [

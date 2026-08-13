@@ -201,7 +201,7 @@ export default function CartPage() {
               </div>
             )}
             {validCartItems.map(item => (
-              <div key={item.product.pid} className="flex gap-5 py-6">
+              <div key={`${item.product.pid}-${item.variant || ''}`} className="flex gap-5 py-6">
                 <button
                   onClick={() => navigateTo('product', item.product.pid)}
                   className="w-24 h-28 bg-silk-light overflow-hidden flex-shrink-0"
@@ -228,6 +228,11 @@ export default function CartPage() {
                         }[item.product.category] || 'Body Care'}
                       </p>
                       <h3 className="font-serif text-dark-red text-base">{item.product.name}</h3>
+                      {item.variant && (
+                        <p className="font-sans text-xs text-dark-red/70 mt-1 uppercase tracking-wider">
+                          Shade: {item.variant}
+                        </p>
+                      )}
                     </div>
                     <span className="font-sans font-semibold text-dark-red whitespace-nowrap">
                       {formatPrice(item.product.price * item.quantity)}
@@ -244,7 +249,7 @@ export default function CartPage() {
                       <button
                         onClick={() => {
                           if (item.quantity > 1) {
-                            updateQuantity(item.product.pid, item.quantity - 1);
+                            updateQuantity(item.product.pid, item.quantity - 1, item.variant);
                           }
                         }}
                         className="w-8 h-8 flex items-center justify-center text-dark-red hover:bg-silk-light"
@@ -255,14 +260,14 @@ export default function CartPage() {
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() => updateQuantity(item.product.pid, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product.pid, item.quantity + 1, item.variant)}
                         className="w-8 h-8 flex items-center justify-center text-dark-red hover:bg-silk-light"
                       >
                         <Plus size={12} />
                       </button>
                     </div>
                     <button
-                      onClick={() => removeFromCart(item.product.pid)}
+                      onClick={() => removeFromCart(item.product.pid, item.variant)}
                       className="text-grey-beige hover:text-ruby-red transition-colors"
                     >
                       <Trash2 size={15} />

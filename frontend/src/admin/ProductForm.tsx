@@ -137,6 +137,7 @@ const defaultFormData = {
   ingredients: { key_actives: [] as string[], botanical_extracts: [] as string[], others: [] as string[] },
   seo_keywords: { primary: [] as string[], secondary: [] as string[] },
   seo_title: '', seo_description: '', seo_h1: '', seo_image_alt: '',
+  variants: [] as string[],
   seo_h2: [] as string[],
   faqs: [] as { question: string; answer: string }[],
   usage: { time: '', frequency: '', routine_step: '' },
@@ -198,6 +199,7 @@ const ProductForm: React.FC = () => {
             seo_description: data.data.seo_description ?? '',
             seo_h1: data.data.seo_h1 ?? '',
             seo_image_alt: data.data.seo_image_alt ?? '',
+            variants: Array.isArray(data.data.variants) ? data.data.variants : [],
             usage: { ...prev.usage, ...data.data.usage }
           }));
           // Populate the rich text editor with existing description
@@ -843,6 +845,9 @@ const ProductForm: React.FC = () => {
                 ]}
               />
             </div>
+          </div>
+          <div className="mt-4">
+            <ArrayField label="Variants (e.g. shades, sizes)" value={formData.variants || []} onChange={v => setFormData(prev => ({ ...prev, variants: v }))} />
           </div>
         </section>
 

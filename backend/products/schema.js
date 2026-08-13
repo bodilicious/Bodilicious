@@ -75,6 +75,14 @@ export const createProductSchema = z
     seo_h2: z.array(z.string()).optional(),
     seo_image_alt: z.string().max(300).optional(),
 
+    variants: z
+      .array(z.string().min(1, "Variant names cannot be empty").trim())
+      .refine(
+        (items) => new Set(items).size === items.length,
+        "Variant names must be unique"
+      )
+      .optional(),
+
     // Both fields required per entry — a question with no answer makes the
     // whole FAQPage block invalid, so reject it at the edge rather than
     // emitting broken structured data.

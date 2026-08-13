@@ -157,13 +157,13 @@ export const getAllProducts = async (req, res) => {
     // Use space-separated strings for projection to guarantee Mongoose strictly excludes other fields.
     // Using $slice in the projection object causes MongoDB to return the entire document (including heavy descriptions and reviews).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive'
+      ? 'pid name price images rating ratingCount stock category brand isActive variants'
       // sub_category / product_type / google_product_category / seo_title /
       // seo_description are here for the Merchant Center feed, which reads
       // this endpoint (worker.js handleProductFeed) and has no other source
       // for them. A few short strings per item — negligible next to
       // description + reviews.
-      : 'pid name price images rating ratingCount stock category sub_category product_type google_product_category brand isActive description ingredients reviews seo_title seo_description';
+      : 'pid name price images rating ratingCount stock category sub_category product_type google_product_category brand isActive description ingredients reviews seo_title seo_description variants';
 
     let productQuery = Product.find(query).select(projection).sort(sortObj).skip(skip).limit(numLimit);
 
@@ -304,8 +304,8 @@ export const getProductByPid = async (req, res) => {
     // Slim mode: only return card-level fields — used by pages that don't render
     // reviews, description, or ingredients (e.g. homepage best-seller section).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive'
-      : 'pid name brand images description category sub_category product_type google_product_category item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords seo_title seo_description seo_h1 seo_h2 seo_image_alt faqs';
+      ? 'pid name price images rating ratingCount stock category brand isActive variants'
+      : 'pid name brand images description category sub_category product_type google_product_category item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords seo_title seo_description seo_h1 seo_h2 seo_image_alt faqs variants';
 
     let productQuery = Product.findOne({
       pid: req.params.pid,

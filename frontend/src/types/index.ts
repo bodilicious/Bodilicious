@@ -76,12 +76,14 @@ export interface Product {
   warnings?: string[];
   is_active_based?: boolean;
   seo_keywords?: SeoKeywords | string; // keeping string for backwards compatibility during transition
+  variants?: string[];
   createdAt?: string;
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
+  variant?: string | null;
 }
 
 export type Page = 'home' | 'shop' | 'product' | 'signin' | 'signup' | 'cart' | 'wishlist' | 'account' | 'tracking' | 'order-details' | 'chat' | 'payment' | 'shipping' | 'confirmation' | 'ritual-finder' | 'about' | 'contact' | 'faqs' | 'stores' | 'accessibility' | 'careers' | 'students' | 'privacy' | 'terms' | 'shipping-refund' | 'admin' | 'admin/products' | 'admin/orders' | 'admin/users' | 'admin/analytics' | 'admin/logs' | 'not-found';
@@ -173,6 +175,7 @@ export interface Order {
     product: Product;
     quantity: number;
     priceAtPurchase: number;
+    variant?: string | null;
   }[];
   // Return / Refund
   returnStatus?: 'none' | 'requested' | 'approved' | 'rejected' | 'completed';

@@ -12,7 +12,7 @@ export const getProfile = async (req, res) => {
   try {
     // Slim projections: only send what the frontend actually uses.
     // cartHistory and productViewCounts are analytics-only and never read by the client.
-    const productCardFields = 'pid name price images rating ratingCount stock category brand';
+    const productCardFields = 'pid name price images rating ratingCount stock category brand variants';
 
     const user = await UserProfile.findById(req.user._id, {
       // Exclude heavy analytics arrays that the frontend never reads
@@ -195,12 +195,30 @@ export const syncCart = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const oldCartMap = new Map(user.cart.map(i => [i.product ? i.product.toString() : "unknown", i.quantity]));
-    const newCartMap = new Map(cartItems.map(i => [i.productId ? i.productId.toString() : "unknown", i.quantity]));
+    const getItemKey = (pid, variant) => `${pid || "unknown"}:${variant || ""}`;
+    
+    const oldCartMap = new Map(user.cart.map(i => [getItemKey(i.product?.toString(), i.variant), i.quantity]));
+    const newCartMap = new Map(cartItems.map(i => [getItemKey(i.productId?.toString(), i.variant), i.quantity]));
+
+    const Product = (await import("../products/models.js")).default;
+    const products = await Product.find({ _id: { $in: cartItems.map(i => i.productId) } });
+    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
+    for (const item of cartItems) {
+      const key = getItemKey(item.productId, item.variant);
+      const oldQty = oldCartMap.get(key) || 0;
+      if (item.quantity > oldQty) {
+        const product = productMap.get(item.productId);
+        if (product && product.variants && product.variants.length > 0 && !item.variant) {
+          return res.status(400).json({ message: `Variant selection required for ${product.name}` });
+        }
+      }
+    }
 
     user.cart = cartItems.map(item => ({
       product: item.productId,
       quantity: item.quantity,
+      variant: item.variant || null,
     }));
 
     user.cartUpdatedAt = new Date();
@@ -209,8 +227,9 @@ export const syncCart = async (req, res) => {
 
     // 🚀 Audit Cart Changes & Update cartHistory
     const bulkOps = [];
-    for (const [pid, newQty] of newCartMap.entries()) {
-      const oldQty = oldCartMap.get(pid) || 0;
+    for (const [key, newQty] of newCartMap.entries()) {
+      const [pid, variant] = key.split(":");
+      const oldQty = oldCartMap.get(key) || 0;
       if (newQty > oldQty) {
         const addedQty = newQty - oldQty;
         
@@ -301,10 +320,11 @@ export const syncCart = async (req, res) => {
         }).catch(err => console.error("Cart Item Removed Audit Failed:", err));
       }
     }
-    
-    for (const pid of oldCartMap.keys()) {
-      if (!newCartMap.has(pid)) {
-        const removedQty = oldCartMap.get(pid);
+    // Handle items completely removed
+    for (const [key, oldQty] of oldCartMap.entries()) {
+      if (!newCartMap.has(key)) {
+        const [pid, variant] = key.split(":");
+        const removedQty = oldQty;
         
         bulkOps.push({
           updateOne: {
@@ -353,7 +373,7 @@ export const syncCart = async (req, res) => {
       await UserProfile.bulkWrite(bulkOps).catch(err => console.error("Failed to bulk write cartHistory:", err));
     }
 
-    const productCardFields = 'pid name price images rating ratingCount stock category brand';
+    const productCardFields = 'pid name price images rating ratingCount stock category brand variants';
     const userWithPopulatedCart = await UserProfile.findById(user._id)
       .populate('cart.product', productCardFields)
       .lean();
@@ -407,7 +427,7 @@ export const getMyOrders = async (req, res) => {
 */
 export const getRecentlyBought = async (req, res) => {
   try {
-    const productCardFields = 'pid name price images rating ratingCount stock category brand';
+    const productCardFields = 'pid name price images rating ratingCount stock category brand variants';
     const user = await UserProfile.findById(req.user._id)
       .populate('recentlyBought', productCardFields)
       .lean();

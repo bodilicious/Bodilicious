@@ -1077,6 +1077,9 @@ export default function PaymentPage() {
                                             </div>
                                             <div className="flex-1 min-w-0 flex flex-col justify-center">
                                                 <h3 className="font-serif text-sm text-dark-red truncate">{item.product.name}</h3>
+                                                {item.variant && (
+                                                    <p className="font-sans text-[10px] text-dark-red/70 uppercase tracking-wider mt-0.5">Shade: {item.variant}</p>
+                                                )}
                                                 <p className="font-sans text-xs text-gray-500 mt-1">Qty: {item.quantity}</p>
                                             </div>
                                             <div className="shrink-0 flex items-center font-sans text-sm font-semibold text-gray-900">

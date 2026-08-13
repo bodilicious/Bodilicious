@@ -154,6 +154,8 @@ const productSchema = new mongoose.Schema(
     ratingCount: { type: Number, default: 0, min: 0 },
     reviews: { type: [reviewSchema], default: [] },
 
+    variants: { type: [String], default: [] },
+
     isActive: { type: Boolean, default: true },
     lowStockThreshold: { type: Number, default: 5 },
   },
