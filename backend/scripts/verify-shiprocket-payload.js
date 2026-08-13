@@ -55,7 +55,8 @@ const runTest = async () => {
                     product_weight_g: 250
                 },
                 quantity: 2,
-                priceAtPurchase: 600
+                priceAtPurchase: 600,
+                variant: "Large Size"
             }
         ]
     };

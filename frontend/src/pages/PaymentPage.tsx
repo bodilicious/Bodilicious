@@ -207,9 +207,9 @@ export default function PaymentPage() {
                     const match = products.find((x: any) => x.pid === item.product.pid) as any;
                     if (match?._id) productId = String(match._id);
                 }
-                return productId ? { productId, pid: item.product.pid, quantity: item.quantity } : null;
+                return productId ? { productId, pid: item.product.pid, quantity: item.quantity, variant: item.variant || null } : null;
             })
-            .filter(Boolean) as { productId: string; quantity: number }[];
+            .filter(Boolean) as { productId: string; quantity: number; variant: any }[];
     }, [validCartItems, products]);
 
     // ── Redirect if no shipping details ──────────────────────────────────────
