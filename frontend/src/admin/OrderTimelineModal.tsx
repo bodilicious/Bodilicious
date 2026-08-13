@@ -149,20 +149,32 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
                       const product = item.product || {};
                       const isPopulated = typeof product === 'object' && product.name;
                       const pName = isPopulated ? product.name : `Product ID: ${item.product}`;
-                      const pImage = isPopulated && product.images?.[0] ? (product.images[0].startsWith('http') ? product.images[0] : `${API_URL}${product.images[0]}`) : null;
+                      const getImageUrl = (path: string) => {
+                        if (!path) return null;
+                        if (path.startsWith('http')) return path;
+                        const cleanPath = path.replace(/\\/g, '/').replace(/^\//, '');
+                        return `${API_URL}/${cleanPath}`;
+                      };
+                      const pImage = isPopulated && product.images?.[0] ? getImageUrl(product.images[0]) : null;
                       
                       return (
                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 flex items-center gap-3">
+                          <td className="px-4 py-3 flex items-center gap-3 whitespace-normal min-w-[250px]">
                             {pImage ? (
-                              <img src={pImage} alt={pName} className="w-8 h-10 object-cover rounded shadow-sm border border-slate-200" />
+                              <img src={pImage} alt={pName} className="w-10 h-10 object-cover rounded shadow-sm border border-slate-200 shrink-0" />
                             ) : (
-                              <div className="w-8 h-10 bg-slate-100 rounded flex items-center justify-center border border-slate-200">
+                              <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center border border-slate-200 shrink-0">
                                 <Package size={14} className="text-slate-400" />
                               </div>
                             )}
                             <div>
-                              <p className="font-medium text-slate-900 text-sm max-w-[200px] truncate" title={pName}>{pName}</p>
+                              {isPopulated && product.slug ? (
+                                <a href={`/shop/product/${product.slug}`} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-900 text-sm hover:text-blue-600 transition-colors">
+                                  {pName}
+                                </a>
+                              ) : (
+                                <p className="font-medium text-slate-900 text-sm">{pName}</p>
+                              )}
                               {isPopulated && product.pid && <p className="font-mono text-[10px] text-slate-400 mt-0.5">{product.pid}</p>}
                             </div>
                           </td>

@@ -17,6 +17,7 @@ const orderItemSchema = z.object({
   // It is used server-side as a fallback lookup when findById(productId) fails.
   // Must be declared here so Zod's parse() does NOT strip it before the controller sees it.
   pid: z.string().optional(),
+  variant: z.string().optional().nullable(),
   quantity: z
     .number({
       required_error: "Quantity is required",
