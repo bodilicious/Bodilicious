@@ -173,8 +173,10 @@ export const createOrder = async (req, res) => {
         const id = item.productId || item.pid;
         if (!id) throw new Error("Invalid item ID");
         
-        if (!mergedItemsMap[id]) mergedItemsMap[id] = { ...item, quantity: 0 };
-        mergedItemsMap[id].quantity += item.quantity;
+        const key = `${id}:${item.variant || ''}`;
+        
+        if (!mergedItemsMap[key]) mergedItemsMap[key] = { ...item, quantity: 0 };
+        mergedItemsMap[key].quantity += item.quantity;
     }
     const mergedItems = Object.values(mergedItemsMap);
 
