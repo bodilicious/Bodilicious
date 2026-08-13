@@ -401,9 +401,15 @@ export const pushOrderToShiprocket = async (order, opts = {}) => {
 
     const shiprocketItems = order.items.map(item => {
       const product = item.product || {};
+      const baseName = product.name || "Product";
+      const baseSku = product.pid || product._id?.toString() || "SKU";
+      
+      const variantSuffix = item.variant ? ` - ${item.variant}` : '';
+      const variantSkuSuffix = item.variant ? `-${item.variant.replace(/\s+/g, '')}` : '';
+
       return {
-        name: product.name || "Product",
-        sku: product.pid || product._id?.toString() || "SKU",
+        name: baseName + variantSuffix,
+        sku: baseSku + variantSkuSuffix,
         units: item.quantity,
         selling_price: item.priceAtPurchase || product.price || 0,
         discount: 0,

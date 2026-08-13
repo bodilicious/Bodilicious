@@ -223,6 +223,7 @@ export const createOrder = async (req, res) => {
         product: product._id,
         quantity: item.quantity,
         priceAtPurchase: product.price,
+        variant: item.variant || null,
       });
     }
 
