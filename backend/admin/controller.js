@@ -356,7 +356,7 @@ export const createProductAdmin = async (req, res) => {
       brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
       usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
       product_weight_g, product_weight_ml, availability, is_active_based,
-      slug, isActive, seo_keywords,
+      slug, isActive, seo_keywords, variants,
       seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
     } = req.body;
 
@@ -367,7 +367,7 @@ export const createProductAdmin = async (req, res) => {
         brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
         usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
         product_weight_g, product_weight_ml, availability, is_active_based,
-        slug, isActive, seo_keywords,
+        slug, isActive, seo_keywords, variants,
         // Editorial SEO overrides — a field missing from this allowlist is
         // dropped silently: 200 response, no saved change, no error anywhere.
         seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
@@ -395,7 +395,7 @@ export const updateProductAdmin = async (req, res) => {
       brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
       usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
       product_weight_g, product_weight_ml, availability, is_active_based,
-      slug, isActive, seo_keywords,
+      slug, isActive, seo_keywords, variants,
       seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
     } = req.body;
 
@@ -406,7 +406,7 @@ export const updateProductAdmin = async (req, res) => {
         brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
         usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
         product_weight_g, product_weight_ml, availability, is_active_based,
-        slug, isActive, seo_keywords,
+        slug, isActive, seo_keywords, variants,
         // Editorial SEO overrides — a field missing from this allowlist is
         // dropped silently: 200 response, no saved change, no error anywhere.
         seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
