@@ -3,7 +3,7 @@ import { Heart, ShoppingBag, Eye } from 'lucide-react';
 import { Product } from '../types';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../hooks/useCurrency';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import StarRating from './StarRating';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { hoverLift, hoverLiftSubtle } from '../utils/motionTokens';
@@ -58,10 +58,19 @@ export default memo(function ProductCard({
   };
   const categoryLabel = CATEGORY_LABELS[product.category] ?? 'Beauty';
 
+  const navigate = useNavigate();
+
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (product.stock === 0) return;
+    
+    // If product has variants, direct user to product page to select one
+    if (product.variants && product.variants.length > 0) {
+      navigate(`/product/${product.pid}`);
+      return;
+    }
+
     addToCart(product);
     setAddedFlash(true);
     setTimeout(() => setAddedFlash(false), 1400);
@@ -150,7 +159,7 @@ export default memo(function ProductCard({
             }`}
           >
             <ShoppingBag size={14} />
-            {product.stock === 0 ? 'Sold out' : addedFlash ? 'Added!' : 'Add to bag'}
+            {product.stock === 0 ? 'Sold out' : addedFlash ? 'Added!' : (product.variants && product.variants.length > 0) ? 'Select Option' : 'Add to bag'}
           </button>
         </AnimatePresence>
       </Link>

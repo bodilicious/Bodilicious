@@ -653,7 +653,8 @@ export default function RitualFinderPage() {
         logRitualEvent('placed_order'); // Event though it is just add to cart, it marks intent
         recommendedRoutine.forEach((r, idx) => {
             const isLast = idx === recommendedRoutine.length - 1;
-            addToCart(r.product, 1, !isLast);
+            const defaultVariant = r.product.variants && r.product.variants.length > 0 ? r.product.variants[0] : null;
+            addToCart(r.product, 1, !isLast, defaultVariant);
         });
         toast.success(`✨ ${recommendedRoutine.length} products added to your bag!`);
     };

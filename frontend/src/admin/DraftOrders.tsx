@@ -22,7 +22,7 @@ const DraftOrders: React.FC = () => {
   
   // Selection States
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
-  const [cartItems, setCartItems] = useState<{ product: any, quantity: number }[]>([]);
+  const [cartItems, setCartItems] = useState<{ product: any, quantity: number, variant?: string | null }[]>([]);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('razorpay');
@@ -101,15 +101,16 @@ const DraftOrders: React.FC = () => {
   };
 
   const addToCart = (product: any) => {
-    const exists = cartItems.find(item => item.product._id === product._id);
+    const defaultVariant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
+    const exists = cartItems.find(item => item.product._id === product._id && item.variant === defaultVariant);
     if (exists) {
       setCartItems(cartItems.map(item => 
-        item.product._id === product._id 
+        (item.product._id === product._id && item.variant === defaultVariant)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
     } else {
-      setCartItems([...cartItems, { product, quantity: 1 }]);
+      setCartItems([...cartItems, { product, quantity: 1, variant: defaultVariant }]);
     }
     setProductSearch('');
     setProducts([]);
@@ -143,7 +144,7 @@ const DraftOrders: React.FC = () => {
       const headers = await getAuthHeaders();
       const payload = {
         userId: selectedUser ? (selectedUser._id || selectedUser.uid) : undefined,
-        items: cartItems.map(i => ({ productId: i.product._id, pid: i.product.pid, quantity: i.quantity })),
+        items: cartItems.map(i => ({ productId: i.product._id, pid: i.product.pid, quantity: i.quantity, variant: i.variant || null })),
         shippingDetails,
         manualDiscount,
         notes,

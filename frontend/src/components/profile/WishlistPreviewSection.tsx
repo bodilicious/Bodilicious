@@ -18,9 +18,9 @@ export default function WishlistPreviewSection({ wishlist, navigateTo }: Props) 
     const previewItems = wishlist.slice(0, 4);
 
     const handleQuickAdd = (product: Product) => {
-        // Required selection check: Makeup usually needs shade selection
-        if (product.category === 'makeup' || !product.price) {
-            toast.success("Please select your shade/size");
+        // Required selection check: Products with variants need selection
+        if ((product.variants && product.variants.length > 0) || !product.price) {
+            toast.success("Please select your option/size");
             navigateTo('product', product.pid);
             return;
         }

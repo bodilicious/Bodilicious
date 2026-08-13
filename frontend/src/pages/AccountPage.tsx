@@ -48,7 +48,7 @@ export default function AccountPage() {
     try {
       order.items.forEach(item => {
         if (item.product) {
-          addToCart(item.product, item.quantity);
+          addToCart(item.product, item.quantity, false, item.variant);
         }
       });
       toast.success("All items added to bag");
