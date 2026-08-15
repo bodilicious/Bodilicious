@@ -77,7 +77,7 @@ const processJob = async (job) => {
         await sendStaleCart(phone, {
           name: user.name,
           product_name: firstProductName,
-          cart_url: "cart",
+          cart_url: `${process.env.FRONTEND_URL || "https://www.bodilicious.in"}/cart`,
         });
 
         // Bump cartUpdatedAt to prevent spamming the user every 30 minutes
@@ -256,7 +256,9 @@ const processJob = async (job) => {
 
         await sendPaymentFailure(phone, {
           name: user?.name || order.shippingDetails?.name,
-          amount: data.amount !== undefined ? `₹${data.amount}` : "N/A",
+          amount: data.amount !== undefined
+            ? `${data.currency || "INR"} ${data.amount}`
+            : "N/A",
           retry_url_suffix: suffix,
         });
         break;

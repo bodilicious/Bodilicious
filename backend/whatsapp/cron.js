@@ -24,7 +24,7 @@ export const initWhatsAppCrons = () => {
       const filter = {
         "cart.0": { $exists: true },
         whatsappOptIn: true,
-        phone: { $exists: true, $ne: null, $ne: "" },
+        phone: { $exists: true, $nin: [null, ""] },
         $or: [
           { cartUpdatedAt: { $lt: thirtyDaysAgo } },
           { cartUpdatedAt: null }
@@ -69,7 +69,7 @@ export const initWhatsAppCrons = () => {
       const filter = {
         _id: { $nin: recentOrderUsers },
         whatsappOptIn: true,
-        phone: { $exists: true, $ne: null, $ne: "" },
+        phone: { $exists: true, $nin: [null, ""] },
         $or: [
           { lastReEngagementSentAt: null },
           { lastReEngagementSentAt: { $lt: fourteenDaysAgo } }
@@ -149,7 +149,7 @@ export const initWhatsAppCrons = () => {
 
          const filter = {
            whatsappOptIn: true,
-           phone: { $exists: true, $ne: null, $ne: "" },
+           phone: { $exists: true, $nin: [null, ""] },
          };
 
          let lastId = null;

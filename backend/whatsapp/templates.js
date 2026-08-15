@@ -59,7 +59,7 @@ export const sendOutForDelivery = async (phone, data) => {
       ]
     }
   ];
-  return sendWhatsAppTemplate(phone, "out_for_delivery", components);
+  return sendWhatsAppTemplate(phone, "delivery", components);
 };
 
 export const sendTicketRaised = async (phone, data) => {

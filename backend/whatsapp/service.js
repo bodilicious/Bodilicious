@@ -38,7 +38,7 @@ export const sendWhatsAppTemplate = async (phone, templateName, components) => {
     };
 
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
+      `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
