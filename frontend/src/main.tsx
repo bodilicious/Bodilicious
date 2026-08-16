@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
@@ -24,7 +24,9 @@ if (import.meta.env.VITE_POSTHOG_KEY) {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
+const rootEl = document.getElementById('root')!;
+
+const app = (
   <StrictMode>
     <PostHogProvider client={posthog}>
       <BrowserRouter>
@@ -33,3 +35,14 @@ createRoot(document.getElementById('root')!).render(
     </PostHogProvider>
   </StrictMode>
 );
+
+// If the server (prerender script) already baked HTML into #root, hydrate it so
+// React reuses the existing DOM nodes instead of wiping and rebuilding them.
+// This eliminates the flash-of-blank-content that createRoot().render() would
+// cause on prerendered pages. Falls back to createRoot for any page not in the
+// prerender set (admin routes, auth pages, etc.) where #root is empty.
+if (rootEl.hasChildNodes()) {
+  hydrateRoot(rootEl, app);
+} else {
+  createRoot(rootEl).render(app);
+}

@@ -358,6 +358,8 @@ export function renderProductHtml(product, frontendUrl) {
   <meta name="keywords" content="${escapeHtml(mergedKeywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/product/${product.pid}">
+  <link rel="alternate" hreflang="en-IN" href="${frontendUrl}/product/${product.pid}">
+  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
   <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="product" />
@@ -484,6 +486,8 @@ export function renderBlogHtml(post, frontendUrl) {
   <meta name="keywords" content="${escapeHtml(keywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${url}">
+  <link rel="alternate" hreflang="en-IN" href="${url}">
+  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
   <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="article" />
@@ -557,6 +561,8 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
     })
     .on('meta[name="description"]', setAttr('content', meta.description))
     .on('link[rel="canonical"]', setAttr('href', url))
+    .on('link[rel="alternate"][hreflang="en-IN"]', setAttr('href', url))
+    .on('link[rel="alternate"][hreflang="x-default"]', setAttr('href', `${frontendUrl}/`))
     .on('meta[property="og:title"]', setAttr('content', meta.title))
     .on('meta[property="og:description"]', setAttr('content', meta.description))
     .on('meta[property="og:url"]', setAttr('content', url))
@@ -782,6 +788,8 @@ export function renderHomeHtml(products, frontendUrl) {
   <meta name="description" content="${escapeHtml(description)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/">
+  <link rel="alternate" hreflang="en-IN" href="${frontendUrl}/">
+  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
   <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="website" />
@@ -899,8 +907,10 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
   <meta charset="UTF-8">
   <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(description)}">
-  <meta name="robots" content="index, follow">
+  <meta name="robots" content="${facetParam ? 'noindex, follow' : 'index, follow'}">
   <link rel="canonical" href="${canonicalUrl}">
+  <link rel="alternate" hreflang="en-IN" href="${canonicalUrl}">
+  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
   <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
   <meta property="og:type" content="website">
   <meta property="og:url" content="${canonicalUrl}">

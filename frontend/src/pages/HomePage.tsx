@@ -516,6 +516,11 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
       <AnimatePresence>
         <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
           
+          {/* SEO: visually-hidden H1 — Ahrefs/Googlebot require a non-empty h1 on every
+              indexable page. The HeroCarousel renders h2/h3 only, so we inject the page
+              title here via sr-only (invisible to sighted users, readable by crawlers). */}
+          <h1 className="sr-only">Bodilicious — Premium Skincare &amp; Haircare</h1>
+
           <HeroCarousel 
             slides={contentData?.heroSlides} 
             isEditing={isEditing} 

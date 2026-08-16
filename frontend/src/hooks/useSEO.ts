@@ -87,6 +87,7 @@ export function useSEO({
   useEffect(() => {
     const fullTitle = title.includes(BRAND) ? title : `${title} | ${BRAND}`;
     const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : `${BASE_URL}/`;
+    const xDefaultUrl = `${BASE_URL}/`;
     const image = ogImage || DEFAULT_IMAGE;
 
     // ── 1. Title ───────────────────────────────────────────────
@@ -156,7 +157,27 @@ export function useSEO({
     const prevCanonical = canonicalEl.href;
     canonicalEl.href = canonicalUrl;
 
-    // ── 8. JSON-LD — synchronous remove-then-insert ────────────
+    // ── 8. Hreflang — self-referencing en-IN + x-default ──────
+    // Fixes: "Self-reference hreflang annotation missing",
+    //        "Hreflang to non-canonical",
+    //        "X-default hreflang annotation missing"
+    const upsertHreflang = (hreflang: string, href: string): HTMLLinkElement => {
+      let el = document.querySelector<HTMLLinkElement>(`link[rel="alternate"][hreflang="${hreflang}"]`);
+      if (!el) {
+        el = document.createElement('link');
+        el.rel = 'alternate';
+        el.setAttribute('hreflang', hreflang);
+        document.head.appendChild(el);
+      }
+      el.href = href;
+      return el;
+    };
+    const prevEnIN    = document.querySelector<HTMLLinkElement>('link[rel="alternate"][hreflang="en-IN"]')?.href ?? '';
+    const prevXDef    = document.querySelector<HTMLLinkElement>('link[rel="alternate"][hreflang="x-default"]')?.href ?? '';
+    const hreflangEnIN   = upsertHreflang('en-IN', canonicalUrl);
+    const hreflangXDef   = upsertHreflang('x-default', xDefaultUrl);
+
+    // ── 9. JSON-LD — synchronous remove-then-insert ────────────
     // Remove all stale page-level LD tags first (includes legacy id= tag)
     removePageLdTags();
 
@@ -170,6 +191,9 @@ export function useSEO({
     return () => {
       document.title = prevTitle;
       if (canonicalEl) canonicalEl.href = prevCanonical;
+      // Restore hreflang to homepage defaults on unmount
+      if (hreflangEnIN) hreflangEnIN.href = prevEnIN || xDefaultUrl;
+      if (hreflangXDef) hreflangXDef.href = prevXDef || xDefaultUrl;
       // Remove page-level LD tags on route change
       removePageLdTags();
     };

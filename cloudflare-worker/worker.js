@@ -193,6 +193,13 @@ async function route(request, env, ctx) {
       return fetchFromOrigin(); 
     }
 
+    // HYBRID MODE SCOPING:
+    // Only intercept parameterized /shop routes. The new Render SSG pipeline 
+    // natively handles products, blogs, and static pages, so we pass those through.
+    if ((pathname !== '/shop' && pathname !== '/shop/') || !url.search) {
+      return fetchFromOrigin();
+    }
+
     // 2. Only intercept for bots
     if (!isBot(request)) {
       return fetchFromOrigin();
@@ -606,21 +613,14 @@ async function handleSitemap(env) {
   </url>`);
     });
 
-    // Add /shop facet landing pages — handleShop() already renders bot HTML for
-    // each of these, but without sitemap entries crawlers had no way to find them.
-    const facets = [
-      ...SITEMAP_CATEGORIES.map(v => ['category', v]),
-      ...SITEMAP_TYPES.map(v => ['type', v]),
-      ...SITEMAP_CONCERNS.map(v => ['concern', v]),
-    ];
-    facets.forEach(([key, value]) => {
-      urls.push(`
-  <url>
-    <loc>${frontendUrl}/shop?${key}=${encodeURIComponent(value)}</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>`);
-    });
+    // NOTE: /shop facet URLs (/shop?category=, /shop?type=, /shop?concern=) are
+    // intentionally excluded from the sitemap.
+    // ShopPage.tsx sets canonical=/shop for all multi-filter combos and dynamically
+    // self-canonicalizes single-facet URLs — but Googlebot sees the sitemap entry
+    // BEFORE it renders JS, so it reads the facet URL as a unique page while the
+    // canonical (set via JS) points back to /shop. Google resolves the conflict by
+    // marking the facet page "non-canonical" — exactly the Ahrefs error we were seeing.
+    // All facet traffic is captured through /shop.
 
     // Add active products — filter out Discontinued on our side
     // (isActive:false products are already excluded by the API default query)

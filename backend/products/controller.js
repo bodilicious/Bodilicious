@@ -5,6 +5,7 @@ import escapeStringRegexp from "escape-string-regexp";
 import { logAuditEvent } from "../audit/logger.js";
 import { buildTopicPatterns } from "../utils/topicMatch.js";
 import { pingIndexNow } from "../utils/indexNow.js";
+import { triggerFrontendDeploy } from "../utils/deployHook.js";
 
 /**
  * CREATE PRODUCT
@@ -19,6 +20,7 @@ export const createProduct = async (req, res) => {
     });
 
     pingIndexNow([`https://bodilicious.in/product/${product.pid}`]);
+    triggerFrontendDeploy();
 
     res.status(201).json({
       success: true,
@@ -465,6 +467,7 @@ export const updateProductByPid = async (req, res) => {
     }
 
     pingIndexNow([`https://bodilicious.in/product/${product.pid}`]);
+    triggerFrontendDeploy();
 
     res.json({
       success: true,
@@ -497,9 +500,11 @@ export const deleteProductByPid = async (req, res) => {
       });
     }
 
+    triggerFrontendDeploy();
+
     res.json({
       success: true,
-      message: "Product deactivated",
+      message: "Product soft deleted",
     });
   } catch (err) {
     res.status(400).json({
