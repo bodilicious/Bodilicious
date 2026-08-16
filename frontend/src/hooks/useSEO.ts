@@ -145,6 +145,7 @@ export function useSEO({
     setTwitter('twitter:title', fullTitle);
     setTwitter('twitter:description', description);
     setTwitter('twitter:image', image);
+    setTwitter('twitter:url', canonicalUrl);
     if (ogImageAlt) setTwitter('twitter:image:alt', ogImageAlt);
 
     // ── 7. Canonical ───────────────────────────────────────────
