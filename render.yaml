@@ -122,10 +122,10 @@ services:
       # from the matching directory, not the root SPA shell.
       - type: rewrite
         source: /product/*
-        destination: /product/:splat/index.html
+        destination: /product/*/index.html
       - type: rewrite
         source: /blogs/*
-        destination: /blogs/:splat/index.html
+        destination: /blogs/*/index.html
       - type: rewrite
         source: /blogs
         destination: /blogs/index.html
