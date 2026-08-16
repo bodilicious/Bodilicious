@@ -115,6 +115,55 @@ services:
       - type: redirect
         source: /pages/*
         destination: /
+      # ── SSG pass-throughs ──────────────────────────────────────────────────
+      # These routes have prerendered index.html files written by prerender.js
+      # at build time (e.g. dist/product/BD-SER-COQ10/index.html).
+      # They must come BEFORE the /* catch-all so Render serves the baked file
+      # from the matching directory, not the root SPA shell.
+      - type: rewrite
+        source: /product/*
+        destination: /product/:splat/index.html
+      - type: rewrite
+        source: /blogs/*
+        destination: /blogs/:splat/index.html
+      - type: rewrite
+        source: /blogs
+        destination: /blogs/index.html
+      - type: rewrite
+        source: /about
+        destination: /about/index.html
+      - type: rewrite
+        source: /brand-story
+        destination: /brand-story/index.html
+      - type: rewrite
+        source: /contact
+        destination: /contact/index.html
+      - type: rewrite
+        source: /faqs
+        destination: /faqs/index.html
+      - type: rewrite
+        source: /shipping-refund
+        destination: /shipping-refund/index.html
+      - type: rewrite
+        source: /terms
+        destination: /terms/index.html
+      - type: rewrite
+        source: /privacy
+        destination: /privacy/index.html
+      - type: rewrite
+        source: /how-to-order
+        destination: /how-to-order/index.html
+      - type: rewrite
+        source: /ritual-finder
+        destination: /ritual-finder/index.html
+      - type: rewrite
+        source: /shop
+        destination: /shop/index.html
+      - type: rewrite
+        source: /offers
+        destination: /offers/index.html
+      # ── SPA fallback ─────────────────────────────────────────────────────────
+      # Catch-all for any routes without a prerendered file (e.g. /cart, /account)
       - type: rewrite
         source: /*
         destination: /index.html
