@@ -107,11 +107,8 @@ export function useSEO({
       return el;
     };
 
-    // ── 3. Meta description & Keywords ─────────────────────────
+    // ── 3. Meta description ─────────────────────────
     setMeta('meta[name="description"]', 'content', description);
-    if (keywords) {
-      setMeta('meta[name="keywords"]', 'content', keywords);
-    }
 
     // ── 4. Robots ──────────────────────────────────────────────
     setMeta('meta[name="robots"]', 'content', noIndex ? 'noindex, nofollow' : 'index, follow');
