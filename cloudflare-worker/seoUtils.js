@@ -355,7 +355,6 @@ export function renderProductHtml(product, frontendUrl) {
   <meta charset="UTF-8">
   <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(productDesc)}">
-  <meta name="keywords" content="${escapeHtml(mergedKeywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/product/${product.pid}">
   <link rel="alternate" hreflang="en-IN" href="${frontendUrl}/product/${product.pid}">
@@ -395,7 +394,7 @@ export function renderProductHtml(product, frontendUrl) {
           <li>7-Day Returns — Hassle-free</li>
           <li>Secure SSL — 100% Secure</li>
           <li>Delivery SLA — Fast Shipping</li>
-          <li>Verified Science — Dermatologically Tested</li>
+          <li>Verified Science — Proven Actives</li>
         </ul>
       </header>
       ${sections}
@@ -483,7 +482,6 @@ export function renderBlogHtml(post, frontendUrl) {
   <meta charset="UTF-8">
   <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(description)}">
-  <meta name="keywords" content="${escapeHtml(keywords)}">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${url}">
   <link rel="alternate" hreflang="en-IN" href="${url}">

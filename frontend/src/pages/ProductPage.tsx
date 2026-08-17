@@ -1107,7 +1107,7 @@ export default function ProductPage() {
                 { label: '7-Day Returns', icon: RefreshCw, desc: 'Hassle-free' },
                 { label: 'Secure SSL', icon: ShieldCheck, desc: '100% Secure' },
                 { label: 'Delivery SLA', icon: Truck, desc: 'Fast Shipping' },
-                { label: 'Verified Science', icon: FlaskConical, desc: 'Derm Tested' },
+                { label: 'Verified Science', icon: FlaskConical, desc: 'Proven Actives' },
               ].map((badge, i) => (
                 <div key={i} className="flex flex-col items-center text-center gap-1.5 group">
                   <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:bg-ruby-red group-hover:text-white transition-all duration-300">
