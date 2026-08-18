@@ -115,25 +115,13 @@ services:
       - type: redirect
         source: /pages/*
         destination: /
-      # ── SSG pass-throughs ──────────────────────────────────────────────────
-      # These routes have prerendered index.html files written by prerender.js
-      # at build time (e.g. dist/product/BD-SER-COQ10/index.html).
-      # IMPORTANT: New products/blogs published after a deploy have NO prerendered
-      # file. Previously the /product/* and /blogs/* rewrites below pointed to the
-      # per-slug prerendered file, which returned an empty 404 body for new content
-      # — the SPA never mounted and users saw a blank page.
-      # Render evaluates rewrite rules in order and stops on the first match.
-      # Pointing to /index.html here means:
-      #   - Existing prerendered slugs: Render serves dist/product/<slug>/index.html
-      #     BEFORE reaching this rewrite (static file match wins).
-      #   - New slugs without a prerendered file: SPA shell is served, React Router
-      #     handles the route client-side and fetches data from the API.
-      - type: rewrite
-        source: /product/*
-        destination: /index.html
-      - type: rewrite
-        source: /blogs/*
-        destination: /index.html
+      # ── SSG static page rewrites ──────────────────────────────────────────
+      # Fixed static pages have prerendered index.html files at build time.
+      # Dynamic routes (/product/*, /blogs/*) are intentionally NOT listed here:
+      #   - Bots: Cloudflare Worker renders full HTML directly from the API.
+      #   - Humans: The /* catch-all below serves /index.html (SPA shell), and
+      #     React Router fetches the data client-side. This handles both existing
+      #     and newly published products/blogs without requiring a redeploy.
       - type: rewrite
         source: /blogs
         destination: /blogs/index.html
