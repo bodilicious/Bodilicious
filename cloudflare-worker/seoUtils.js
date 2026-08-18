@@ -864,12 +864,13 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
   // numberOfItems tells Google the list is a complete collection rather than a
   // truncated sample, and embedding the Product with its offer makes each entry
   // eligible for price/availability annotations instead of a bare link.
+  const ITEM_LIMIT = 20;
   const itemList = products.length > 0 ? {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
     name: pageTitle,
-    numberOfItems: products.length,
-    itemListElement: products.slice(0, 20).map((p, i) => ({
+    numberOfItems: Math.min(products.length, ITEM_LIMIT),
+    itemListElement: products.slice(0, ITEM_LIMIT).map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
       url: `${frontendUrl}/product/${p.pid}`,
@@ -905,7 +906,7 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
   <meta charset="UTF-8">
   <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(description)}">
-  <meta name="robots" content="${facetParam ? 'noindex, follow' : 'index, follow'}">
+  <meta name="robots" content="index, follow">
   <link rel="canonical" href="${canonicalUrl}">
   <link rel="alternate" hreflang="en-IN" href="${canonicalUrl}">
   <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
@@ -914,6 +915,12 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
   <meta property="og:url" content="${canonicalUrl}">
   <meta property="og:title" content="${escapeHtml(pageTitle)}">
   <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image" content="${frontendUrl}/og-image.png">
+  <meta property="og:image:alt" content="${escapeHtml(pageTitle)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${frontendUrl}/og-image.png">
   <script type="application/ld+json">${safeJsonLd(schemas)}</script>
 </head>
 <body>

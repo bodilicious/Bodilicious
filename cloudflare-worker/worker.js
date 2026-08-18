@@ -193,14 +193,7 @@ async function route(request, env, ctx) {
       return fetchFromOrigin(); 
     }
 
-    // HYBRID MODE SCOPING:
-    // Only intercept parameterized /shop routes. The new Render SSG pipeline 
-    // natively handles products, blogs, and static pages, so we pass those through.
-    if ((pathname !== '/shop' && pathname !== '/shop/') || !url.search) {
-      return fetchFromOrigin();
-    }
-
-    // 2. Only intercept for bots
+    // 2. Only intercept for bots — humans always get the real SPA.
     if (!isBot(request)) {
       return fetchFromOrigin();
     }
@@ -266,7 +259,7 @@ async function route(request, env, ctx) {
     // 4. Handle Shop / category filter pages — these were previously served as
     // plain index.html to bots, causing Google to read the hardcoded homepage
     // canonical and ignore the facet page entirely.
-    if (pathname === '/shop') {
+    if (pathname === '/shop' || pathname === '/shop/') {
       const category = url.searchParams.get('category');
       const type = url.searchParams.get('type');
       const concern = url.searchParams.get('concern');
@@ -341,7 +334,7 @@ async function handleHome(request, env, ctx) {
 
 async function handleShop({ category, type, concern }, request, env, ctx) {
   try {
-    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
 
     // Build the cache key from the active facet
@@ -409,7 +402,7 @@ async function handleProduct(pid, request, env, ctx) {
       });
     }
 
-    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
     
     const res = await fetchWithTimeout(`${apiUrl}/api/v1/products/${pid}`);
@@ -478,7 +471,7 @@ async function handleBlog(slug, request, env, ctx) {
       });
     }
 
-    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
 
     const res = await fetchWithTimeout(`${apiUrl}/api/v1/blogs/${encodeURIComponent(slug)}`);
@@ -529,7 +522,7 @@ async function handleBlogIndex(request, env, fetchFromOrigin) {
     const contentType = originResponse.headers.get('content-type') || '';
     if (!contentType.includes('text/html')) return originResponse;
 
-    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     let posts = [];
     try {
       const res = await fetchWithTimeout(`${apiUrl}/api/v1/blogs?limit=100`);
@@ -551,7 +544,7 @@ async function handleBlogIndex(request, env, fetchFromOrigin) {
 
 async function handleSitemap(env) {
   try {
-    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
 
     // BUG FIX A: `inStock=false` means "only OUT OF STOCK items" in the API
@@ -754,7 +747,7 @@ function escapeXml(unsafe) {
 
 async function handleProductFeed(env) {
   try {
-    const apiUrl = env.API_BASE_URL || 'https://bodilicious.onrender.com';
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
 
     // Same pagination approach as handleSitemap: the API hard-caps limit at 100
