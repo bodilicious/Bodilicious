@@ -120,6 +120,44 @@ export default function ConfirmationPage() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, [orderLoaded, resolvedState]);
 
+    // ── Conversion Tracking ──────────────────────────────────────────────────
+    const conversionTrackedRef = useRef(false);
+    useEffect(() => {
+        if (!orderLoaded || !order || conversionTrackedRef.current) return;
+        
+        const isSuccess = resolvedState?.status === 'success' || order.paymentStatus === 'paid' || order.paymentMethod === 'cod';
+        if (!isSuccess) return;
+        
+        const trackedKey = `tracked_conv_${order._id}`;
+        if (sessionStorage.getItem(trackedKey)) return;
+        
+        conversionTrackedRef.current = true;
+        sessionStorage.setItem(trackedKey, '1');
+
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+            const hasPeptide = order.items.some((item: any) => item.product?.pid === 'BD-MOIST-PEP');
+            const hasLiquidSunscreen = order.items.some((item: any) => item.product?.pid === 'BD-SUN-LIQ');
+
+            if (hasPeptide) {
+                (window as any).gtag('event', 'conversion', {
+                    'send_to': 'AW-306323373/FIH7CMaFyeQcEK2_iJIB',
+                    'value': 1.0,
+                    'currency': 'INR',
+                    'transaction_id': order._id
+                });
+            }
+
+            if (hasLiquidSunscreen) {
+                (window as any).gtag('event', 'conversion', {
+                    'send_to': 'AW-306323373/SFjACMmFyeQcEK2_iJIB',
+                    'value': 1.0,
+                    'currency': 'INR',
+                    'transaction_id': order._id
+                });
+            }
+        }
+    }, [orderLoaded, order, resolvedState?.status]);
+
     // ── Redirect if no state at all ──────────────────────────────────────────
     useEffect(() => {
         window.scrollTo(0, 0);
