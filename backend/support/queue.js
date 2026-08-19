@@ -4,24 +4,21 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Reuse the same Redis connection URL as whatsapp/queue.js
-const connection = {
-  url: process.env.REDIS_URL,
-};
-
-export const supportQueue = new Queue("support_jobs", {
-  connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: "exponential", delay: 3000 },
-    removeOnComplete: true,
-    removeOnFail: 200,
-  },
-});
+export const supportQueue = process.env.REDIS_URL
+  ? new Queue("support_jobs", {
+      connection: { url: process.env.REDIS_URL },
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 3000 },
+        removeOnComplete: true,
+        removeOnFail: 200,
+      },
+    })
+  : null;
 
 export const enqueueTicketLookup = async (ticketId, type, orderId) => {
   try {
-    if (!process.env.REDIS_URL) {
-      console.warn("[Support Queue] REDIS_URL not set, skipping enqueue.");
+    if (!supportQueue || !process.env.REDIS_URL) {
       return;
     }
     // Deterministic jobId to prevent double processing on double clicks
