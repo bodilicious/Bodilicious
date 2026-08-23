@@ -8,6 +8,7 @@
     "prebuild": "node scripts/generate-sitemap.js",
     "build": "vite build && node scripts/prerender.js",
     "prerender": "node scripts/prerender.js",
+    "ping-indexnow": "PRERENDER=true node scripts/ping-indexnow.js",
     "generate-sitemap": "node scripts/generate-sitemap.js",
     "lint": "eslint .",
     "preview": "vite preview",
