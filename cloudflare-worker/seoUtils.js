@@ -23,7 +23,7 @@ import {
 export { STATIC_PAGE_SEO, stripHtml };
 
 // Includes major search engines, social media unfurlers, AI crawlers, and generic HTTP clients (used by AI assistants in sandboxes)
-export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|perplexity-user|amazonbot|meta-externalagent|ccbot|bytespider|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
+export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|msnbot|microsoftpreview|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|perplexity-user|amazonbot|meta-externalagent|ccbot|bytespider|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
 
 export function isBot(request) {
   const userAgent = request.headers.get("user-agent") || "";

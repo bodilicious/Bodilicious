@@ -64,6 +64,20 @@ Allow: /
 User-agent: Bytespider
 Allow: /
 
+# Microsoft Copilot — bingbot handles search indexing (feeds Copilot answers),
+# MicrosoftPreview handles link-unfurling inside Copilot chat and Edge.
+# Both are already allowed by User-agent: * but explicit entries ensure Bing
+# Webmaster Tools reports them correctly and they get the same treatment as
+# other named AI crawlers above.
+User-agent: bingbot
+Allow: /
+
+User-agent: MicrosoftPreview
+Allow: /
+
+User-agent: msnbot
+Allow: /
+
 # LLM-readable site summary (products, policies, contact) — https://llmstxt.org
 # llms.txt: https://bodilicious.in/llms.txt
 
