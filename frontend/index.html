@@ -150,6 +150,36 @@
     <div id="root">
       <h1 class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Bodilicious — Premium Skincare &amp; Haircare</h1>
     </div>
+    <!-- Fallback content for crawlers that do not execute JavaScript.
+         Prerender.js bakes full HTML into dist/ for bots, but this noscript
+         block ensures even non-JS crawlers (e.g. Bing, older Googlebot passes)
+         see meaningful text and links instead of a completely empty page. -->
+    <noscript>
+      <header>
+        <h1>Bodilicious — Premium Skincare &amp; Haircare</h1>
+        <nav>
+          <a href="/shop">Shop All Products</a>
+          <a href="/shop?category=skin">Skincare</a>
+          <a href="/shop?category=hair">Haircare</a>
+          <a href="/shop?category=body">Body Care</a>
+          <a href="/blogs">Blog</a>
+          <a href="/about">About Us</a>
+        </nav>
+      </header>
+      <main>
+        <p>Dermatologically tested skincare &amp; haircare with science-backed actives. Free shipping on orders over &#8377;1500. Made in India.</p>
+        <ul>
+          <li><a href="/product/BD-SER-VITC">Vitamin C Serum</a></li>
+          <li><a href="/product/BD-SER-HA">Hyaluronic Acid Serum</a></li>
+          <li><a href="/product/BD-SUN-PHYS-SPF50">SPF 50 Physical Sunscreen</a></li>
+          <li><a href="/product/BD-SER-NIA-SPF30">Niacinamide Serum SPF 30</a></li>
+          <li><a href="/product/BD-MOIST-PEP">Peptide Ceramide Moisturizer</a></li>
+          <li><a href="/product/BD-HAIR-OIL-HERB">Herbal Hair Growth Oil</a></li>
+          <li><a href="/product/BD-SHAM-DAND">Anti-Dandruff Shampoo</a></li>
+          <li><a href="/shop">View All Products</a></li>
+        </ul>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

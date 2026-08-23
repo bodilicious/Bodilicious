@@ -189,6 +189,34 @@ function buildBlogEntries(slugs) {
   return lines.join('\n');
 }
 
+// ── Refresh lastmod on all static hand-coded URLs ────────────────────────────
+// Replaces every <lastmod> date that is NOT inside the auto-generated
+// PRODUCTS_START...PRODUCTS_END or BLOG_START...BLOG_END blocks with today's
+// ISO date. This keeps the homepage, shop, about, policy, etc. dates fresh on
+// every deploy so crawlers don't deprioritize them as stale.
+
+function refreshStaticLastmods(sitemapXml) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Split around the auto-generated blocks so we only touch the static parts
+  const dynamicBlockRe =
+    /(<!--\s*(?:PRODUCTS|BLOG)_START[\s\S]*?<!--\s*(?:PRODUCTS|BLOG)_END\s*-->)/g;
+
+  const parts = sitemapXml.split(dynamicBlockRe);
+
+  return parts
+    .map((part, idx) => {
+      // Odd-indexed parts are the captured dynamic blocks — leave untouched
+      if (idx % 2 === 1) return part;
+      // Even-indexed parts are static sections — update their lastmod dates
+      return part.replace(
+        /(<lastmod>)\d{4}-\d{2}-\d{2}(<\/lastmod>)/g,
+        `$1${today}$2`
+      );
+    })
+    .join('');
+}
+
 // ── Inject into sitemap.xml ───────────────────────────────────────────────────
 
 function injectSection(sitemapXml, startMarkerRegex, endMarkerRegex, fullRegex, newXml, fallbackAnchor) {
@@ -273,6 +301,10 @@ async function main() {
     console.warn('[sitemap] WARNING: Sitemap injection produced an invalid result. Skipping write.');
     process.exit(0);
   }
+
+  // Refresh lastmod dates on static hand-coded sections to today
+  updated = refreshStaticLastmods(updated);
+  console.log('[sitemap] ✓ Refreshed lastmod dates on static URL entries.');
 
   // Atomic write
   fs.writeFileSync(SITEMAP_TMP, updated, 'utf-8');
