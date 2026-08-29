@@ -159,6 +159,26 @@ async function route(request, env, ctx) {
       return fetch(modifiedRequest);
     };
 
+    // fetchFromOriginNoCache: used exclusively as a graceful-degradation fallback
+    // inside bot-render handlers (handleBlog, handleProduct, handleShop, handleHome).
+    // When the API is unavailable (cold start timeout, non-200, JSON parse error),
+    // the handler falls back to serving the Render origin's SPA shell. That shell
+    // contains the hardcoded homepage canonical — if Cloudflare cached it at
+    // max-age=300 (the CDN s-maxage on normal responses), Googlebot would read the
+    // wrong canonical for up to 5 minutes on every subsequent request.
+    // Cache-Control: no-store prevents that: the CDN will always revalidate on the
+    // next crawl, giving the bot-render a fresh shot once the backend wakes up.
+    const fetchFromOriginNoCache = async () => {
+      const originRes = await fetchFromOrigin();
+      const headers = new Headers(originRes.headers);
+      headers.set('Cache-Control', 'no-store');
+      return new Response(originRes.body, {
+        status: originRes.status,
+        statusText: originRes.statusText,
+        headers,
+      });
+    };
+
     // BUG FIX 1: Sitemap must bypass the kill-switch — it is always valid public content.
     if (pathname === '/sitemap.xml') {
       return handleSitemap(env);
@@ -328,7 +348,7 @@ async function handleHome(request, env, ctx) {
     });
   } catch (error) {
     console.error('[SEO Worker] Error rendering homepage:', error.message);
-    return fetch(request);
+    return fetchFromOriginNoCache();
   }
 }
 
@@ -379,7 +399,7 @@ async function handleShop({ category, type, concern }, request, env, ctx) {
     });
   } catch (error) {
     console.error(`[SEO Worker] Error rendering shop page:`, error.message);
-    return fetch(request);
+    return fetchFromOriginNoCache();
   }
 }
 
@@ -416,7 +436,8 @@ async function handleProduct(pid, request, env, ctx) {
     
     if (!res.ok) {
       // Fall through to origin on API error (graceful degradation)
-      return fetch(request);
+      // no-store: don't let the CDN cache this degraded SPA shell response
+      return fetchFromOriginNoCache();
     }
 
     const data = await res.json();
@@ -446,8 +467,8 @@ async function handleProduct(pid, request, env, ctx) {
     } else {
       console.error(`[SEO Worker] Error fetching product ${pid}:`, error.message);
     }
-    // On any error, fall through to origin (graceful degradation)
-    return fetch(request);
+    // no-store: don't let the CDN cache the degraded SPA shell response
+    return fetchFromOriginNoCache();
   }
 }
 
@@ -506,7 +527,8 @@ async function handleBlog(slug, request, env, ctx) {
     } else {
       console.error(`[SEO Worker] Error fetching blog ${slug}:`, error.message);
     }
-    return fetch(request);
+    // no-store: don't let the CDN cache the degraded SPA shell response
+    return fetchFromOriginNoCache();
   }
 }
 

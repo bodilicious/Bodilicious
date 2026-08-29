@@ -130,6 +130,26 @@ async function renderPage(browser, urlPath) {
       console.warn(`[prerender]   ⚠ #root remained empty after timeout on ${urlPath} — saving shell HTML`);
     });
 
+    // Wait for useSEO() to update the canonical link away from the static
+    // index.html default (https://bodilicious.in/). React's useEffect fires
+    // after paint — networkidle0 + #root check above don't guarantee it has
+    // run yet. Without this, Puppeteer can capture page.content() while the
+    // canonical still points to the homepage, causing Google to treat every
+    // blog post and product page as a duplicate of the homepage.
+    // Skipped for '/' since the homepage canonical IS bodilicious.in/.
+    if (urlPath !== '/') {
+      await page.waitForFunction(
+        (origin) => {
+          const el = document.querySelector('link[rel="canonical"]');
+          return el && el.href && !el.href.endsWith(origin + '/') && el.href !== origin;
+        },
+        { timeout: 8000 },
+        SITE_ORIGIN
+      ).catch(() => {
+        console.warn(`[prerender]   ⚠ Canonical did not update on ${urlPath} — saving with current canonical`);
+      });
+    }
+
     const html = await page.content();
     writeHtml(urlPath, html);
     return { path: urlPath, ok: true };
