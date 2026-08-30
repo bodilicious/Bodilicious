@@ -358,7 +358,7 @@ export function renderProductHtml(product, frontendUrl) {
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${frontendUrl}/product/${product.pid}">
   <link rel="alternate" hreflang="en-IN" href="${frontendUrl}/product/${product.pid}">
-  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
+  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/product/${product.pid}">
   <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="product" />
@@ -485,7 +485,7 @@ export function renderBlogHtml(post, frontendUrl) {
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="${url}">
   <link rel="alternate" hreflang="en-IN" href="${url}">
-  <link rel="alternate" hreflang="x-default" href="${frontendUrl}/">
+  <link rel="alternate" hreflang="x-default" href="${url}">
   <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
 
   <meta property="og:type" content="article" />
@@ -560,7 +560,7 @@ export function rewriteStaticMeta(response, pathname, frontendUrl) {
     .on('meta[name="description"]', setAttr('content', meta.description))
     .on('link[rel="canonical"]', setAttr('href', url))
     .on('link[rel="alternate"][hreflang="en-IN"]', setAttr('href', url))
-    .on('link[rel="alternate"][hreflang="x-default"]', setAttr('href', `${frontendUrl}/`))
+    .on('link[rel="alternate"][hreflang="x-default"]', setAttr('href', url))
     .on('meta[property="og:title"]', setAttr('content', meta.title))
     .on('meta[property="og:description"]', setAttr('content', meta.description))
     .on('meta[property="og:url"]', setAttr('content', url))

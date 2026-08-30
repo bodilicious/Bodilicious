@@ -87,7 +87,7 @@ export function useSEO({
   useEffect(() => {
     const fullTitle = title.includes(BRAND) ? title : `${title} | ${BRAND}`;
     const canonicalUrl = canonical ? `${BASE_URL}${canonical}` : `${BASE_URL}/`;
-    const xDefaultUrl = `${BASE_URL}/`;
+    const xDefaultUrl = canonicalUrl;
     const image = ogImage || DEFAULT_IMAGE;
 
     // ── 1. Title ───────────────────────────────────────────────
