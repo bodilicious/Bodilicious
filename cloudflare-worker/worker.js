@@ -226,7 +226,7 @@ async function route(request, env, ctx) {
       const rawPid = pathname.split('/')[2];
       const pid = rawPid ? decodeURIComponent(rawPid).trim() : null;
       if (pid) {
-        return handleProduct(pid, request, env, ctx);
+        return handleProduct(pid, request, env, ctx, fetchFromOriginNoCache);
       }
     }
 
@@ -240,7 +240,7 @@ async function route(request, env, ctx) {
       const rawSlug = pathname.split('/')[2];
       const slug = rawSlug ? decodeURIComponent(rawSlug).trim() : null;
       if (slug) {
-        return handleBlog(slug, request, env, ctx);
+        return handleBlog(slug, request, env, ctx, fetchFromOriginNoCache);
       }
     }
 
@@ -253,7 +253,7 @@ async function route(request, env, ctx) {
     // on the isBot() allowlist) got the bare <div id="root"></div> SPA shell.
     // The single highest-traffic entry point on the site.
     if (pathname === '/' && !url.search) {
-      return handleHome(request, env, ctx);
+      return handleHome(request, env, ctx, fetchFromOriginNoCache);
     }
 
     // 3d. Remaining static content pages. These fell through to the SPA shell,
@@ -291,7 +291,7 @@ async function route(request, env, ctx) {
         || url.searchParams.has('priceMax') || url.searchParams.has('sub_category')
         || (url.searchParams.get('page') && url.searchParams.get('page') !== '1');
       if (facetCount <= 1 && !hasOtherParams) {
-        return handleShop({ category, type, concern }, request, env, ctx);
+        return handleShop({ category, type, concern }, request, env, ctx, fetchFromOriginNoCache);
       }
     }
 
@@ -305,7 +305,7 @@ async function route(request, env, ctx) {
  * the API doesn't expose a dedicated bestseller flag, so this is the closest
  * honest signal available without inventing one.
  */
-async function handleHome(request, env, ctx) {
+async function handleHome(request, env, ctx, fetchFromOriginNoCache) {
   try {
     const now = Date.now();
     const cacheKey = 'home';
@@ -352,7 +352,7 @@ async function handleHome(request, env, ctx) {
   }
 }
 
-async function handleShop({ category, type, concern }, request, env, ctx) {
+async function handleShop({ category, type, concern }, request, env, ctx, fetchFromOriginNoCache) {
   try {
     const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
@@ -403,7 +403,7 @@ async function handleShop({ category, type, concern }, request, env, ctx) {
   }
 }
 
-async function handleProduct(pid, request, env, ctx) {
+async function handleProduct(pid, request, env, ctx, fetchFromOriginNoCache) {
   try {
     const now = Date.now();
     // NOTE: Cloudflare Workers in-memory cache (Map) is per-isolate.
@@ -477,7 +477,7 @@ async function handleProduct(pid, request, env, ctx) {
  * 404 for unknown slugs, and graceful fall-through to origin on any API error
  * so a backend hiccup degrades to the SPA rather than serving a broken page.
  */
-async function handleBlog(slug, request, env, ctx) {
+async function handleBlog(slug, request, env, ctx, fetchFromOriginNoCache) {
   try {
     const now = Date.now();
     const cacheKey = `blog:${slug}`;
@@ -503,7 +503,7 @@ async function handleBlog(slug, request, env, ctx) {
     );
 
     if (res.status === 404) return notFound();
-    if (!res.ok) return fetch(request);
+    if (!res.ok) return fetchFromOriginNoCache();
 
     const data = await res.json();
     const post = data.data || data.blog;

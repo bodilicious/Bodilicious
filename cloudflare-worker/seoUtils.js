@@ -413,24 +413,39 @@ export function renderProductHtml(product, frontendUrl) {
  * Blog content is admin-authored Tiptap HTML. The React page runs it through
  * DOMPurify, but DOMPurify needs a DOM and this runs in a Worker — so we do the
  * conservative thing: drop dangerous elements entirely, keep a small structural
- * allowlist, and strip every attribute (which kills href/src/onerror vectors in
- * one move). Headings survive, which is the part that carries SEO weight.
  */
 const BLOG_ALLOWED_TAGS = new Set([
   'p', 'br', 'h2', 'h3', 'h4', 'ul', 'ol', 'li',
   'strong', 'em', 'b', 'i', 'blockquote',
+  'figure', 'figcaption', 'img', 'a',
 ]);
 
 export function sanitizeBlogHtml(html) {
   return String(html || '')
     // Remove these elements *with* their contents, not just the tags.
     .replace(/<(script|style|iframe|object|embed|form|svg)[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<(script|style|iframe|object|embed|form|svg)[^>]*\/?>/gi, '')
-    // Keep allowlisted tags but with no attributes; drop everything else.
+    .replace(/<(script|style|iframe|object|embed|form|svg)[^>]*\/?>\s*/gi, '')
+    // Keep allowlisted tags. For img, preserve src and alt. For a, preserve href.
     .replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (match, tag) => {
       const name = tag.toLowerCase();
       if (!BLOG_ALLOWED_TAGS.has(name)) return '';
-      return match.startsWith('</') ? `</${name}>` : `<${name}>`;
+      if (match.startsWith('</')) return `</${name}>`;
+      if (name === 'img') {
+        const src = (match.match(/\bsrc="([^"]+)"/) || [])[1] || '';
+        const alt = (match.match(/\balt="([^"]*?)"/) || [])[1] || '';
+        if (src && src.startsWith('https://res.cloudinary.com/')) {
+          return `<img src="${src}" alt="${alt.replace(/"/g, '&quot;')}" loading="lazy">`;
+        }
+        return '';
+      }
+      if (name === 'a') {
+        const href = (match.match(/\bhref="([^"]+)"/) || [])[1] || '';
+        if (href && (href.startsWith('/') || href.startsWith('https://bodilicious.in'))) {
+          return `<a href="${href}">`;
+        }
+        return '';
+      }
+      return `<${name}>`;
     });
 }
 
@@ -513,6 +528,7 @@ export function renderBlogHtml(post, frontendUrl) {
       <header>
         <h1>${escapeHtml(buildBlogHeadline(post))}</h1>
         <p class="byline">By ${escapeHtml(post.author?.name || 'Bodilicious Team')}${published ? ` · <time datetime="${escapeHtml(published)}">${escapeHtml(String(published).slice(0, 10))}</time>` : ''}</p>
+        ${image ? `<figure><img src="${escapeHtml(image)}" alt="${escapeHtml(ogAlt || buildBlogHeadline(post))}" loading="eager"></figure>` : ''}
       </header>
       ${sanitizeBlogHtml(post.content)}
     </article>
