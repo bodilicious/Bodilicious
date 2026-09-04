@@ -77,6 +77,7 @@ export interface Product {
   is_active_based?: boolean;
   seo_keywords?: SeoKeywords | string; // keeping string for backwards compatibility during transition
   variants?: string[];
+  amazon_link?: string;
   createdAt?: string;
 }
 

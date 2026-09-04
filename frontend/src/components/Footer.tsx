@@ -1,6 +1,7 @@
 import { Instagram, Facebook, Youtube, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import AmazonBadge from './AmazonBadge';
 
 export default function Footer() {
   const { user, authStatus } = useApp();
@@ -71,7 +72,7 @@ export default function Footer() {
             <h3 className="text-[10px] font-sans font-bold tracking-widest uppercase text-dark-red mb-4">
               Social
             </h3>
-            <div className="flex gap-4 flex-wrap">
+            <div className="flex gap-4 flex-wrap mb-8">
               {[
                 { Icon: Instagram, label: 'Instagram', url: 'https://www.instagram.com/bodilicious.in/' },
                 { Icon: Facebook, label: 'Facebook', url: 'https://www.facebook.com/bodilicious.in/' },
@@ -88,8 +89,12 @@ export default function Footer() {
                   <Icon size={20} />
                 </a>
               ))}
-              
             </div>
+
+            <h3 className="text-[10px] font-sans font-bold tracking-widest uppercase text-dark-red mb-4">
+              Available On
+            </h3>
+            <AmazonBadge variant="badge" />
           </div>
         </div>
 

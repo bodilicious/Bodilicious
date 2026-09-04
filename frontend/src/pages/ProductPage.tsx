@@ -47,6 +47,7 @@ import StarRating from '../components/StarRating';
 import Footer from '../components/Footer';
 import ProductCard from '../components/ProductCard';
 import IngredientTooltip from '../components/IngredientTooltip';
+import AmazonBadge from '../components/AmazonBadge';
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { getIngredientData } from '../data/ingredientMeta';
@@ -1100,6 +1101,10 @@ export default function ProductPage() {
                   ? 'In stock and ready to ship'
                   : 'We are restocking soon'}
             </p>
+
+            <div className="mb-8">
+              <AmazonBadge url={product.amazon_link || "https://www.amazon.in/s?k=bodilicious"} className="w-full sm:w-auto justify-center" />
+            </div>
 
             {/* Trust Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-6 py-8 border-y border-silk/60 mb-10 bg-silk-light/20 rounded-sm px-4">
