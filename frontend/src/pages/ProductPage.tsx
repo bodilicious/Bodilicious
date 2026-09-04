@@ -51,6 +51,8 @@ import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { getIngredientData } from '../data/ingredientMeta';
 import { useSEO } from '../hooks/useSEO';
+import AmazonBadge from '../components/AmazonBadge';
+import { getAmazonUrl } from '../data/amazonLinks';
 import {
   buildProductTitle,
   buildProductKeywords,
@@ -162,6 +164,12 @@ export default function ProductPage() {
         description: productDesc,
         sku: product.pid,
         brand: { '@type': 'Brand', name: 'Bodilicious' },
+        // sameAs links this product entity to its Amazon listing (if available).
+        // Placed at the Product level — not inside Offer — per schema.org spec.
+        // Helps Google disambiguate the entity across platforms.
+        ...(getAmazonUrl(product.pid)
+          ? { sameAs: getAmazonUrl(product.pid) }
+          : {}),
         // Google reads schema.org `category` when classifying a product it
         // crawls rather than reads from the feed, so keep it identical to the
         // <g:google_product_category> the feed emits for this pid. Omitted
@@ -1125,6 +1133,8 @@ export default function ProductPage() {
               ))}
             </div>
 
+
+
             {/* Key Actives Highlight */}
             {ingredientsHighlights.length > 0 && (
               <div className="mb-10">
@@ -1185,6 +1195,16 @@ export default function ProductPage() {
                 content="Complimentary shipping on all orders over ₹1,500. We gladly accept returns of unused or gently used items within 7 days of purchase. Bodilicious is dedicated to your complete satisfaction."
               />
             </div>
+
+            {/* Secondary Amazon availability badge — moved down here to be less prominent per UI/UX rules */}
+            {(() => {
+              const amazonUrl = getAmazonUrl(product.pid);
+              return amazonUrl ? (
+                <div className="mt-8 pt-6 border-t border-silk/60">
+                  <AmazonBadge amazonUrl={amazonUrl} productName={product.name} />
+                </div>
+              ) : null;
+            })()}
           </m.div>
         </m.div>
 

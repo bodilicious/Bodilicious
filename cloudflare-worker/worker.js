@@ -179,6 +179,18 @@ async function route(request, env, ctx) {
       });
     };
 
+    // Trailing-slash redirect — must run before every other handler and for ALL
+    // requests (not just bots). Without this, /blogs/slug/ and /blogs/slug both
+    // return 200 with identical content. The slug/ version declares canonical as
+    // /slug (no slash), so Google sees two live pages and marks the trailing-slash
+    // one as "Alternate page with proper canonical tag" — which blocks indexing.
+    // A permanent 301 collapses both URLs to one signal in Google's index.
+    if (pathname !== '/' && pathname.endsWith('/')) {
+      const canonical = new URL(request.url);
+      canonical.pathname = pathname.slice(0, -1); // strip exactly one trailing slash
+      return Response.redirect(canonical.toString(), 301);
+    }
+
     // BUG FIX 1: Sitemap must bypass the kill-switch — it is always valid public content.
     if (pathname === '/sitemap.xml') {
       return handleSitemap(env);
