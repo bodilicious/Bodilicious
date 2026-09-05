@@ -262,14 +262,14 @@ export const createOrder = async (req, res) => {
     // with no error. Validate + apply it the same way the Razorpay path does.) ──
     let coupon = null;
     if (couponCode) {
-        const couponValidationResult = await validateCouponAtCheckout(couponCode, totalAmount, userId, []);
+        const couponValidationResult = await validateCouponAtCheckout(couponCode, totalAmount, userId, [], orderItems);
         if (!couponValidationResult.valid) {
             throw new Error(couponValidationResult.error || "Invalid coupon code");
         }
         coupon = couponValidationResult.coupon;
     }
 
-    const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount }, coupon);
+    const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount }, coupon, orderItems);
     // pricing.shippingCost (not the outer `shippingCost`) is authoritative from
     // here on — a free_shipping coupon zeroes it out, and finalAmount is
     // computed against that effective value.

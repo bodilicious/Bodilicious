@@ -65,12 +65,23 @@ const couponSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Empty array = applies to the whole cart (default, backward-compatible).
+    // Populated = coupon is restricted to those product IDs only.
+    // free_shipping coupons ignore this field (applicableProducts is treated as
+    // empty regardless of what is stored) — enforced in the controller.
+    applicableProducts: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+    }],
   },
   { timestamps: true }
 );
 
 couponSchema.index({ isActive: 1 });
 couponSchema.index({ expiresAt: 1 });
+// Sparse: only index documents that actually have product restrictions,
+// so existing whole-cart coupons add no index overhead.
+couponSchema.index({ applicableProducts: 1 }, { sparse: true });
 
 /* =========================================
    Coupon Use Schema (attribution join table)

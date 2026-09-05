@@ -17,7 +17,11 @@ export const getCoupons = async (req, res) => {
     if (active === "false") query.isActive = false;
 
     const [coupons, total] = await Promise.all([
-      Coupon.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Coupon.find(query)
+        .populate('applicableProducts', 'name pid')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
       Coupon.countDocuments(query),
     ]);
 
@@ -33,13 +37,17 @@ export const getCoupons = async (req, res) => {
  */
 export const createCoupon = async (req, res) => {
   try {
-    const { code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description } = req.body;
+    const { code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, applicableProducts } = req.body;
 
     if (!code || !type) {
       return res.status(400).json({ success: false, message: "code and type are required" });
     }
     if (type === "percentage" && (value < 1 || value > 100)) {
       return res.status(400).json({ success: false, message: "Percentage value must be between 1 and 100" });
+    }
+    // free_shipping is always whole-order — product restrictions don't apply
+    if (type === "free_shipping" && Array.isArray(applicableProducts) && applicableProducts.length > 0) {
+      return res.status(400).json({ success: false, message: "free_shipping coupons cannot be restricted to specific products" });
     }
 
     const existing = await Coupon.findOne({ code: code.toUpperCase().trim() });
@@ -48,10 +56,12 @@ export const createCoupon = async (req, res) => {
     }
 
     const coupon = await Coupon.create({
-      code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive: true,
+      code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description,
+      applicableProducts: Array.isArray(applicableProducts) ? applicableProducts : [],
+      isActive: true,
     });
 
-    await logAction(req, "coupon_created", "coupon", coupon._id.toString(), { code: coupon.code, type, value });
+    await logAction(req, "coupon_created", "coupon", coupon._id.toString(), { code: coupon.code, type, value, applicableProducts: coupon.applicableProducts });
     res.status(201).json({ success: true, data: coupon });
   } catch (err) {
     console.error("CreateCoupon Error:", err);
@@ -64,12 +74,23 @@ export const createCoupon = async (req, res) => {
  */
 export const updateCoupon = async (req, res) => {
   try {
-    const { code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive } = req.body;
+    const { code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive, applicableProducts } = req.body;
+
+    // Same guard as createCoupon — enforce via API, not just the UI
+    if ((type === "free_shipping" || !type) && Array.isArray(applicableProducts) && applicableProducts.length > 0) {
+      // Check if the existing coupon is free_shipping when type is not being changed
+      const existing = await Coupon.findById(req.params.id).select('type').lean();
+      if (existing?.type === 'free_shipping' || type === 'free_shipping') {
+        return res.status(400).json({ success: false, message: "free_shipping coupons cannot be restricted to specific products" });
+      }
+    }
+
     const allowedFields = Object.fromEntries(
-      Object.entries({ code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive })
+      Object.entries({ code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive, applicableProducts })
       .filter(([, v]) => v !== undefined)
     );
-    const coupon = await Coupon.findByIdAndUpdate(req.params.id, { $set: allowedFields }, { new: true, runValidators: true });
+    const coupon = await Coupon.findByIdAndUpdate(req.params.id, { $set: allowedFields }, { new: true, runValidators: true })
+      .populate('applicableProducts', 'name pid');
     if (!coupon) return res.status(404).json({ success: false, message: "Coupon not found" });
 
     await logAction(req, "coupon_updated", "coupon", coupon._id.toString(), req.body);
@@ -127,7 +148,7 @@ export const getExpiringCoupons = async (req, res) => {
  */
 export const getCouponStats = async (req, res) => {
   try {
-    const coupon = await Coupon.findById(req.params.id);
+    const coupon = await Coupon.findById(req.params.id).populate('applicableProducts', 'name pid');
     if (!coupon) return res.status(404).json({ success: false, message: "Coupon not found" });
 
     const since = new Date();
@@ -181,7 +202,21 @@ export const getCouponStats = async (req, res) => {
  * Checkout helper — validate coupon and check stacking.
  * Returns { valid, coupon, error }.
  */
-export const validateCouponAtCheckout = async (code, cartTotal, userId, activeCouponIds = []) => {
+/**
+ * Validates a coupon at checkout time.
+ *
+ * @param {string}   code             - Raw coupon code from the user.
+ * @param {number}   cartTotal        - Full server-computed cart subtotal (used for whole-cart min check).
+ * @param {*}        userId           - UserProfile ObjectId.
+ * @param {Array}    activeCouponIds  - Already-applied coupon IDs (stacking guard).
+ * @param {Array}    serverCartItems  - Server-fetched line items: [{ product: ObjectId, priceAtPurchase, quantity }].
+ *                                     Pass [] (default) for whole-cart coupons or when items aren't yet available.
+ *
+ * For product-restricted coupons (applicableProducts non-empty, type !== 'free_shipping'):
+ *   - Checks that at least one eligible item exists in the cart.
+ *   - Validates minOrderValue against eligibleSubtotal, not cartTotal.
+ */
+export const validateCouponAtCheckout = async (code, cartTotal, userId, activeCouponIds = [], serverCartItems = []) => {
   try {
     if (!code || typeof code !== 'string') return { valid: false, error: "Invalid coupon code" };
     const normalizedCode = code.toUpperCase().trim();
@@ -195,9 +230,33 @@ export const validateCouponAtCheckout = async (code, cartTotal, userId, activeCo
       return { valid: false, error: "This coupon has expired" };
     }
 
-    // Min order value
-    if (cartTotal < coupon.minOrderValue) {
-      return { valid: false, error: `Minimum order value of ${coupon.minOrderValue} required to use this coupon` };
+    // ── Min order value (branched on product-restriction) ───────────────────
+    const isProductRestricted =
+      coupon.applicableProducts?.length > 0 && coupon.type !== 'free_shipping';
+
+    if (isProductRestricted) {
+      // Compute eligibleSubtotal from server-fetched items.
+      // item.product is an ObjectId — toString() for Set membership.
+      // No fallback: a missing field throws visibly rather than silently matching wrong.
+      const eligibleIds = new Set(coupon.applicableProducts.map(id => id.toString()));
+      const eligibleSubtotal = serverCartItems.reduce((sum, item) =>
+        eligibleIds.has(item.product.toString())
+          ? sum + (item.priceAtPurchase * item.quantity)
+          : sum,
+        0
+      );
+
+      if (eligibleSubtotal === 0) {
+        return { valid: false, error: "This coupon is not applicable to the items in your cart." };
+      }
+      if (eligibleSubtotal < coupon.minOrderValue) {
+        return { valid: false, error: `Minimum eligible purchase of ₹${coupon.minOrderValue} required for this coupon.` };
+      }
+    } else {
+      // Whole-cart coupon: check against full cart total
+      if (cartTotal < coupon.minOrderValue) {
+        return { valid: false, error: `Minimum order value of ₹${coupon.minOrderValue} required to use this coupon` };
+      }
     }
 
     // Total cap

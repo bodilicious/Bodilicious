@@ -415,6 +415,14 @@ export const getOrderQuote = async (req, res) => {
             totalWeightGrams += itemWeightG * item.quantity;
         }
 
+        // Build serverCartItems in the canonical shape used by validateCouponAtCheckout
+        // and calculateDiscount. Derived from the same server-fetched product map,
+        // so prices are authoritative — client-supplied prices are never used.
+        const serverCartItems = mergedItems.map(item => {
+            const product = resolveProduct(item, productMapById, productMapByPid);
+            return { product: product._id, priceAtPurchase: product.price, quantity: item.quantity };
+        });
+
         const shippingCost = await calculateShippingCost({
             isIndia,
             totalAmount,
@@ -448,7 +456,7 @@ export const getOrderQuote = async (req, res) => {
 
         let coupon = null;
         if (couponCode && typeof couponCode === 'string' && userId) {
-            const couponValidationResult = await validateCouponAtCheckout(couponCode, totalAmount, userId, []);
+            const couponValidationResult = await validateCouponAtCheckout(couponCode, totalAmount, userId, [], serverCartItems);
             if (couponValidationResult.valid) {
                 coupon = couponValidationResult.coupon;
             } else {
@@ -458,7 +466,7 @@ export const getOrderQuote = async (req, res) => {
             return res.status(400).json({ success: false, message: "Please log in to apply a coupon.", invalidCoupon: true });
         }
 
-        const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount }, coupon);
+        const pricing = calculateDiscount(totalAmount, shippingCost, { existingOrdersCount }, coupon, serverCartItems);
 
         // ── Currency selection ────────────────────────────────────────────────
         // Display currency = what the user selected (any of 160+)
@@ -524,6 +532,10 @@ export const getOrderQuote = async (req, res) => {
             isWelcomeOfferApplied: pricing.isWelcomeOfferApplied,
             isFreeShippingCouponApplied: pricing.isFreeShippingCouponApplied,
             couponCode: coupon ? coupon.code : null,
+            // eligibleSubtotal is the portion of the cart this coupon touched.
+            // Equals subtotal for whole-cart coupons; less for product-restricted ones.
+            // Signed here so the cart UI can display "off eligible items" accurately.
+            eligibleSubtotal: applyConversion(pricing.eligibleSubtotal),
             expiry,
             country: shippingDetails.country.trim(),
             currency: checkoutCurrency,
@@ -547,6 +559,10 @@ export const getOrderQuote = async (req, res) => {
                 shippingCost: convertedShippingCost,
                 discountAmount: convertedDiscountAmount,
                 totalAmount: convertedFinalAmount,
+                // Subset of the subtotal that this coupon applies to.
+                // Equals subtotal for whole-cart coupons.
+                // Cart UI can show "discount applied to eligible items" when < subtotal.
+                eligibleSubtotal: applyConversion(pricing.eligibleSubtotal),
                 // Included in, not added to, totalAmount — see calculateInclusiveTax.
                 taxAmount: convertedTaxAmount,
                 taxRatePercent: taxRate,
@@ -717,7 +733,7 @@ export const initRazorpayOrder = async (req, res) => {
 
         let coupon = null;
         if (payload.couponCode) {
-            const couponValidationResult = await validateCouponAtCheckout(payload.couponCode, subtotal, userId, []);
+            const couponValidationResult = await validateCouponAtCheckout(payload.couponCode, subtotal, userId, [], orderItems);
             if (couponValidationResult.valid) {
                 coupon = couponValidationResult.coupon;
             } else {
@@ -725,7 +741,7 @@ export const initRazorpayOrder = async (req, res) => {
             }
         }
 
-        const pricing = calculateDiscount(subtotal, shippingCost, { existingOrdersCount }, coupon);
+        const pricing = calculateDiscount(subtotal, shippingCost, { existingOrdersCount }, coupon, orderItems);
         const targetCurrencyForCheck = payload.currency || "INR";
         const applyConversion = (val) => roundForCurrency(val * (payload.exchangeRate || 1), targetCurrencyForCheck);
         const convertedFinalAmount = applyConversion(pricing.finalAmount);

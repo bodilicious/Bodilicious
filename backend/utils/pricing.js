@@ -44,21 +44,62 @@ export const calculateShippingCost = async ({ isIndia, totalAmount, settings, co
     return dynamicRate !== null ? dynamicRate : settings.internationalShippingCost;
 };
 
-export const calculateDiscount = (subtotal, shippingCost, userStats, coupon = null) => {
+/**
+ * Compute the discount amount and final price for a cart.
+ *
+ * @param {number} subtotal          - Full cart subtotal (server-computed).
+ * @param {number} shippingCost      - Shipping cost before any coupon.
+ * @param {object} userStats         - { existingOrdersCount } for welcome-offer eligibility.
+ * @param {object|null} coupon       - Mongoose Coupon document (or null).
+ * @param {Array}  serverCartItems   - Server-fetched line items: [{ product: ObjectId, priceAtPurchase, quantity }].
+ *                                     Defaults to [] so existing callers that don't pass it get unchanged behaviour.
+ *
+ * Product-restricted coupons (applicableProducts non-empty, type !== 'free_shipping'):
+ *   - eligibleSubtotal = sum(priceAtPurchase × quantity) for matching items only.
+ *   - Discount is computed against eligibleSubtotal and capped at eligibleSubtotal.
+ *   - Shipping is never touched by a product-restricted coupon.
+ * free_shipping coupons ignore applicableProducts entirely (whole-order).
+ * Whole-cart coupons (applicableProducts empty): eligibleSubtotal === subtotal.
+ *
+ * The returned `eligibleSubtotal` lets callers display "off eligible items" accurately
+ * in cart previews and invoices without doing a second pass.
+ */
+export const calculateDiscount = (subtotal, shippingCost, userStats, coupon = null, serverCartItems = []) => {
     let discountAmount = 0;
     let isWelcomeOfferApplied = false;
     let isFreeShippingCouponApplied = false;
     let effectiveShippingCost = shippingCost;
 
+    // ── Determine eligible subtotal ──────────────────────────────────────────
+    // For product-restricted coupons, only the matching line items count.
+    // item.product is always an ObjectId at these call sites — toString() for
+    // Set membership. No fallback intentionally: a missing field throws visibly
+    // instead of silently matching wrong and producing bad discount math.
+    let eligibleSubtotal = subtotal;
+    const isProductRestricted =
+        coupon?.applicableProducts?.length > 0 && coupon.type !== 'free_shipping';
+
+    if (isProductRestricted && serverCartItems.length > 0) {
+        const eligibleIds = new Set(coupon.applicableProducts.map(id => id.toString()));
+        eligibleSubtotal = serverCartItems.reduce((sum, item) =>
+            eligibleIds.has(item.product.toString())
+                ? sum + (item.priceAtPurchase * item.quantity)
+                : sum,
+            0
+        );
+    }
+
     if (coupon) {
         if (coupon.type === "percentage") {
-            let val = Math.round(subtotal * (coupon.value / 100));
+            let val = Math.round(eligibleSubtotal * (coupon.value / 100));
             if (coupon.maxDiscountCap && val > coupon.maxDiscountCap) {
                 val = coupon.maxDiscountCap;
             }
-            discountAmount = val;
+            // Additional cap: cannot exceed eligible subtotal
+            discountAmount = Math.min(val, eligibleSubtotal);
         } else if (coupon.type === "flat") {
-            discountAmount = coupon.value;
+            // Cap flat discount at eligible subtotal so we never over-discount
+            discountAmount = Math.min(coupon.value, eligibleSubtotal);
         } else if (coupon.type === "free_shipping") {
             isFreeShippingCouponApplied = true;
             discountAmount = 0;
@@ -69,7 +110,7 @@ export const calculateDiscount = (subtotal, shippingCost, userStats, coupon = nu
         discountAmount = Math.round(subtotal * 0.10);
     }
 
-    // Rule: Total discount cannot exceed subtotal
+    // Safety net: total discount cannot exceed the whole-cart subtotal
     discountAmount = Math.min(discountAmount, subtotal);
 
     const originalAmount = subtotal + shippingCost;
@@ -77,6 +118,9 @@ export const calculateDiscount = (subtotal, shippingCost, userStats, coupon = nu
 
     return {
         subtotal,
+        // Exposed so callers can display "discount applies to eligible items only"
+        // without a second pass. Equals subtotal for whole-cart coupons.
+        eligibleSubtotal,
         shippingCost: effectiveShippingCost,
         discountAmount,
         originalAmount,
