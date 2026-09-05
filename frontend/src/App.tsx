@@ -11,6 +11,7 @@ import { Toaster } from 'react-hot-toast';
 import AdminRoute from './components/AdminRoute';
 import SessionTracker from './components/SessionTracker';
 import LaunchModal from './components/LaunchModal';
+import OffersPopup from './components/OffersPopup';
 
 // Lazy load page components
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -209,8 +210,9 @@ export default function App() {
   return (
     <AppProvider>
       <SessionTracker />
-      <LaunchModal />
       <LazyMotion features={domAnimation} strict>
+        <LaunchModal />
+        <OffersPopup />
         <Toaster
           position="top-center"
           toastOptions={{

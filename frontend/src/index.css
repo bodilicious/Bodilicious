@@ -137,3 +137,11 @@
   outline: none;
 }
 
+/* ── Teachers Day popup card: mobile = bottom sheet, sm+ = floating card ── */
+@media (min-width: 640px) {
+  .teachers-popup-card {
+    border-radius: 28px !important;
+    border: 1px solid rgba(239, 171, 132, 0.35) !important;
+    box-shadow: 0 20px 60px rgba(180, 60, 20, 0.15), 0 8px 24px rgba(180, 60, 20, 0.08) !important;
+  }
+}

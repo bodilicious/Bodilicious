@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -31,7 +31,7 @@ export default function LaunchModal() {
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           {/* Backdrop */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -40,7 +40,7 @@ export default function LaunchModal() {
           />
 
           {/* Modal */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -59,25 +59,25 @@ export default function LaunchModal() {
             {/* Graphic / Image Area */}
             <div className="h-48 w-full relative bg-gradient-to-br from-rose-100 via-rose-50 to-white flex items-center justify-center overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/60 via-transparent to-transparent opacity-80" />
-              <motion.div
+              <m.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
                 className="absolute -right-12 -top-12 w-48 h-48 bg-ruby-red/10 rounded-full blur-3xl pointer-events-none"
               />
-              <motion.div
+              <m.div
                 animate={{ rotate: -360 }}
                 transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
                 className="absolute -left-12 -bottom-12 w-48 h-48 bg-rose-200/20 rounded-full blur-3xl pointer-events-none"
               />
 
-              <motion.div
+              <m.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2, duration: 0.6 }}
                 className="relative z-10 text-center w-full px-6"
               >
                 {modal.image ? (
-                  <motion.div
+                  <m.div
                     animate={{ y: [0, -8, 0] }}
                     transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                   >
@@ -86,10 +86,10 @@ export default function LaunchModal() {
                       alt={modal.title}
                       className="w-full h-32 object-contain mx-auto drop-shadow-2xl"
                     />
-                  </motion.div>
+                  </m.div>
                 ) : (
                   <div className="relative">
-                    <motion.div
+                    <m.div
                       animate={{ y: [0, -8, 0] }}
                       transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                       className="w-16 h-24 mx-auto bg-gradient-to-b from-rose-200 to-rose-300 rounded-lg shadow-lg border border-white/80 flex items-center justify-center relative z-10"
@@ -99,20 +99,20 @@ export default function LaunchModal() {
                         <div className="w-1 h-3 border border-dark-red rounded-sm" />
                         <div className="w-1 h-3 border border-dark-red rounded-sm" />
                       </div>
-                    </motion.div>
-                    <motion.div
+                    </m.div>
+                    <m.div
                       animate={{ scale: [1, 0.8, 1], opacity: [0.5, 0.3, 0.5] }}
                       transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                       className="w-12 h-2 bg-dark-red/20 rounded-[100%] mx-auto mt-4 blur-[2px]"
                     />
                   </div>
                 )}
-              </motion.div>
+              </m.div>
             </div>
 
             {/* Content */}
             <div className="p-8 text-center bg-white">
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
@@ -136,9 +136,9 @@ export default function LaunchModal() {
                   {modal.ctaLabel}
                   <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
                 </Link>
-              </motion.div>
+              </m.div>
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

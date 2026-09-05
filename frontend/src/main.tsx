@@ -36,12 +36,10 @@ const app = (
   </StrictMode>
 );
 
-// If the server (prerender script) already baked HTML into #root, hydrate it so
-// React reuses the existing DOM nodes instead of wiping and rebuilding them.
-// This eliminates the flash-of-blank-content that createRoot().render() would
-// cause on prerendered pages. Falls back to createRoot for any page not in the
-// prerender set (admin routes, auth pages, etc.) where #root is empty.
-if (rootEl.hasChildNodes()) {
+// Hydrate only when a prerender script has baked real HTML into #root
+// (production only). In dev / non-prerendered pages the root is empty,
+// so always fall through to createRoot to avoid hydration mismatches.
+if (import.meta.env.PROD && rootEl.childElementCount > 0) {
   hydrateRoot(rootEl, app);
 } else {
   createRoot(rootEl).render(app);
