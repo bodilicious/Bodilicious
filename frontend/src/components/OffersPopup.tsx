@@ -263,21 +263,6 @@ function isTeachersDayWindow(): boolean {
   return month === 9 && day >= 1 && day <= 10;
 }
 
-/** Local-storage keys scoped to the popups. */
-const TD_DISMISSED_KEY = 'td_2026_sep_popup_v2';
-
-const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
-
-function shouldShow(key: string) {
-  const last = sessionStorage.getItem(key);
-  if (!last) return true;
-  return Date.now() - Number(last) > COOLDOWN_MS;
-}
-
-function markDismissed(key: string) {
-  sessionStorage.setItem(key, String(Date.now()));
-}
-
 export default function OffersPopup() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
@@ -286,7 +271,7 @@ export default function OffersPopup() {
   const isSuppressed = location.pathname !== '/';
 
   useEffect(() => {
-    if (isSuppressed || !isTeachersDayWindow() || !shouldShow(TD_DISMISSED_KEY)) {
+    if (isSuppressed || !isTeachersDayWindow()) {
       setIsOpen(false);
       return;
     }
@@ -297,7 +282,6 @@ export default function OffersPopup() {
 
   const handleClose = () => {
     setIsOpen(false);
-    markDismissed(TD_DISMISSED_KEY);
   };
 
   if (!isOpen) return null;
