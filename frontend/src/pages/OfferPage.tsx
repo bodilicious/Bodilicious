@@ -1,11 +1,9 @@
 import { useApp } from '../context/AppContext';
+import { Link } from 'react-router-dom';
 import {
   Sparkles,
   ShoppingBag,
   Gift,
-  CheckCircle,
-  XCircle,
-  Clock,
   ChevronRight,
   Instagram,
   Facebook,
@@ -52,6 +50,7 @@ interface ProductItem {
   gradient: string;
   accentColor: string;
   emoji: string;
+  pid: string;
 }
 
 function ProductCard({ product, index }: { product: ProductItem; index: number }) {
@@ -60,51 +59,56 @@ function ProductCard({ product, index }: { product: ProductItem; index: number }
       variants={fadeUp}
       whileHover={{ y: -6, scale: 1.015 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className="relative overflow-hidden rounded-3xl p-7 flex flex-col gap-4"
-      style={{
-        background: product.gradient,
-        border: '1px solid rgba(255,255,255,0.5)',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)',
-      }}
     >
-      {/* Number badge */}
-      <span
-        className="absolute top-5 right-6 font-sans text-[11px] font-bold tracking-[0.15em]"
-        style={{ color: product.accentColor, opacity: 0.6 }}
+      <Link
+        to={`/product/${product.pid}`}
+        className="relative overflow-hidden rounded-3xl p-7 flex flex-col gap-4 h-full cursor-pointer block"
+        style={{
+          background: product.gradient,
+          border: '1px solid rgba(255,255,255,0.5)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)',
+        }}
       >
-        0{index + 1}
-      </span>
-
-      {/* Emoji */}
-      <span className="text-4xl" aria-hidden="true">{product.emoji}</span>
-
-      {/* Icon */}
-      <div
-        className="w-10 h-10 rounded-2xl flex items-center justify-center"
-        style={{ background: 'rgba(255,255,255,0.55)', color: product.accentColor }}
-        aria-hidden="true"
-      >
-        {product.icon}
-      </div>
-
-      <div>
-        <h3
-          className="font-serif text-xl mb-1.5"
-          style={{ color: '#2C1208' }}
+        {/* Number badge */}
+        <span
+          className="absolute top-5 right-6 font-sans text-[11px] font-bold tracking-[0.15em]"
+          style={{ color: product.accentColor, opacity: 0.6 }}
         >
-          {product.name}
-        </h3>
-        <p className="font-sans text-sm leading-relaxed" style={{ color: '#5D3820' }}>
-          {product.tagline}
-        </p>
-      </div>
+          0{index + 1}
+        </span>
+
+        {/* Emoji */}
+        <span className="text-4xl" aria-hidden="true">{product.emoji}</span>
+
+        {/* Icon */}
+        <div
+          className="w-10 h-10 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.55)', color: product.accentColor }}
+          aria-hidden="true"
+        >
+          {product.icon}
+        </div>
+
+        <div>
+          <h3
+            className="font-serif text-xl mb-1.5"
+            style={{ color: '#2C1208' }}
+          >
+            {product.name}
+          </h3>
+          <p className="font-sans text-sm leading-relaxed" style={{ color: '#5D3820' }}>
+            {product.tagline}
+          </p>
+        </div>
+      </Link>
     </motion.div>
   );
 }
 
+
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 export default function OfferPage() {
-  const { user, authStatus, navigateTo } = useApp();
+  const { navigateTo } = useApp();
   const heroRef = useRef<HTMLElement>(null);
   const [codeCopied, setCodeCopied] = useState(false);
 
@@ -143,10 +147,6 @@ export default function OfferPage() {
   const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '25%']);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
-  const welcomeOffer = (user as any)?.welcomeOffer;
-  const isEligible = welcomeOffer?.eligible === true;
-  const isAuthenticated = authStatus === 'authenticated';
-
   const products: ProductItem[] = [
     {
       emoji: '🍌',
@@ -155,6 +155,7 @@ export default function OfferPage() {
       tagline: 'Nourishing, soft-scented, everyday hair care.',
       gradient: 'linear-gradient(135deg, #FEF9C3 0%, #FEF3C7 60%, #FDE68A 100%)',
       accentColor: '#92400E',
+      pid: 'BD-SHAM-BANANA',
     },
     {
       emoji: '🌹',
@@ -163,14 +164,16 @@ export default function OfferPage() {
       tagline: 'Calming and floral, for a gentle daily cleanse.',
       gradient: 'linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 60%, #FECDD3 100%)',
       accentColor: '#9F1239',
+      pid: 'BD-CLE-ROSE',
     },
     {
       emoji: '🍓',
       icon: <Apple size={18} />,
       name: 'Strawberry Face & Body Wash',
-      tagline: 'Bright, fruity, and refreshing for skin that needs a little pick-me-up.',
-      gradient: 'linear-gradient(135deg, #FFF1F0 0%, #FECACA 60%, #FCA5A5 100%)',
-      accentColor: '#991B1B',
+      tagline: 'Bright, sweet, and perfectly refreshing.',
+      gradient: 'linear-gradient(135deg, #FFE4E6 0%, #FECDD3 60%, #FDA4AF 100%)',
+      accentColor: '#BE123C',
+      pid: 'BD-CLE-STRAW',
     },
   ];
 
@@ -180,15 +183,6 @@ export default function OfferPage() {
     'Cannot be combined with other ongoing offers.',
     'Available only in the Fruity & Floral bundle format.',
     'Use code BLOOM4TEACHERS at checkout to redeem your offer.',
-  ];
-
-  const welcomeTerms = [
-    'Exclusive to your first Bodilicious collection purchase.',
-    'Value of 10% discount applied automatically at checkout.',
-    'No expiration—expires only upon first successful order.',
-    'Offer remains active if preliminary orders are cancelled.',
-    'Independent of other ongoing brand promotions.',
-    'Designed for one unique beautiful soul per account.',
   ];
 
   return (
@@ -545,105 +539,6 @@ export default function OfferPage() {
               Use code <span className="font-bold tracking-widest" style={{ color: '#FDE68A' }}>BLOOM4TEACHERS</span> at checkout
             </p>
           </motion.div>
-        </motion.div>
-      </section>
-
-      {/* ── Welcome Offer Status Card ──────────────────────────────────────── */}
-      <section className="max-w-4xl mx-auto w-full px-6 py-12" aria-label="Your offer status">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          {!isAuthenticated ? (
-            <div
-              className="rounded-3xl p-8 flex flex-col md:flex-row items-center gap-6"
-              style={{ background: '#fff', border: '1px solid #E8D5C8', boxShadow: '0 4px 24px rgba(180,60,20,0.07)' }}
-            >
-              <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#F4EBE4' }}>
-                <Clock size={28} style={{ color: '#9CA3AF' }} aria-hidden="true" />
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <p className="font-serif text-2xl mb-2" style={{ color: '#9A3412' }}>Personalize Your Offer</p>
-                <p className="font-sans text-sm leading-relaxed" style={{ color: '#7C3E2C', maxWidth: '380px' }}>
-                  Sign in to confirm your eligibility and unlock your personalized welcome ritual benefits.
-                </p>
-              </div>
-              <button
-                onClick={() => navigateTo('signin')}
-                className="flex-shrink-0 px-8 py-4 rounded-2xl text-xs font-sans font-bold tracking-widest uppercase transition-all hover:scale-[1.02] cursor-pointer"
-                style={{ background: '#2C1208', color: '#fff', boxShadow: '0 4px 16px rgba(44,18,8,0.25)' }}
-              >
-                Continue to Login
-              </button>
-            </div>
-          ) : isEligible ? (
-            <div
-              className="rounded-3xl p-8 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden"
-              style={{ background: '#fff', border: '1px solid #E8D5C8', boxShadow: '0 4px 24px rgba(180,60,20,0.08)' }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 blur-3xl" style={{ background: 'rgba(251,146,60,0.15)' }} aria-hidden="true" />
-              <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#F4EBE4' }}>
-                <CheckCircle size={28} style={{ color: '#9A3412' }} aria-hidden="true" />
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <p className="font-serif text-2xl mb-2" style={{ color: '#9A3412' }}>Your welcome gift is waiting</p>
-                <p className="font-sans text-sm leading-relaxed" style={{ color: '#7C3E2C', maxWidth: '380px' }}>
-                  The 10% welcome discount is active and will apply automatically at checkout.
-                </p>
-              </div>
-              <button
-                onClick={() => navigateTo('shop')}
-                className="flex-shrink-0 px-8 py-4 rounded-2xl text-xs font-sans font-bold tracking-widest uppercase transition-all hover:scale-[1.02] flex items-center gap-3 cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, #9A3412, #7C2D12)', color: '#fff', boxShadow: '0 4px 16px rgba(124,45,18,0.3)' }}
-              >
-                <ShoppingBag size={16} aria-hidden="true" />
-                Build Your Ritual
-              </button>
-            </div>
-          ) : (
-            <div
-              className="rounded-3xl p-8 flex flex-col md:flex-row items-center gap-6 opacity-75"
-              style={{ background: '#fff', border: '1px solid #E8D5C8' }}
-            >
-              <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#F5F5F5' }}>
-                <XCircle size={28} style={{ color: '#9CA3AF' }} aria-hidden="true" />
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                <p className="font-serif text-2xl mb-2" style={{ color: '#374151' }}>Offer Realized</p>
-                <p className="font-sans text-sm leading-relaxed" style={{ color: '#6B7280', maxWidth: '380px' }}>
-                  You've already embarked on your Bodilicious journey. Explore our collections for more.
-                </p>
-              </div>
-              <button
-                onClick={() => navigateTo('shop')}
-                className="flex-shrink-0 px-8 py-4 rounded-2xl text-xs font-sans font-bold tracking-widest uppercase transition-all hover:bg-gray-50 cursor-pointer"
-                style={{ border: '1px solid #E5E7EB', color: '#374151' }}
-              >
-                Back to Collections
-              </button>
-            </div>
-          )}
-
-          {(!isAuthenticated || isEligible) && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mt-6 p-6 rounded-2xl"
-              style={{ background: '#FDF9F5', border: '1px dashed #E8D5C8' }}
-            >
-              <h3 className="font-serif text-lg mb-4" style={{ color: '#5D3820' }}>Welcome Ritual Specifics</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-                {welcomeTerms.map((term, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <ChevronRight size={14} className="mt-0.5 shrink-0" style={{ color: '#9A3412' }} aria-hidden="true" />
-                    <p className="font-sans text-xs leading-relaxed" style={{ color: '#7C3E2C' }}>{term}</p>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
         </motion.div>
       </section>
 

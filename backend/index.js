@@ -13,6 +13,7 @@ import analyticsRoutes from "./analytics/routes.js";
 import settingsRoutes from "./settings/routes.js";
 import whatsappRoutes from "./whatsapp/routes.js";
 import { adminRouter as blogAdminRoutes, categoryRouter as blogCategoryRoutes, publicRouter as blogPublicRoutes } from "./blog/routes.js";
+import { publicOffers } from "./coupons/controller.js";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/settings", settingsRoutes);
 router.use("/support", supportRoutes);
 router.use("/whatsapp", whatsappRoutes);
 router.use("/blogs", blogPublicRoutes);
+router.get("/offers", publicOffers);
 
 export default router;

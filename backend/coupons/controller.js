@@ -345,3 +345,31 @@ export const claimCouponUsage = async ({ couponId, userId, orderId, orderTotal, 
 
   return { claimed: true };
 };
+
+/**
+ * GET /api/v1/offers
+ * Returns active coupons for the frontend display
+ */
+export const publicOffers = async (req, res) => {
+  try {
+    const now = new Date();
+    
+    // Find active coupons that haven't expired
+    // We sort by createdAt to get the newest offers
+    const coupons = await Coupon.find({
+      isActive: true,
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: now } }
+      ]
+    })
+    .populate('applicableProducts', 'name pid')
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+    res.json({ success: true, data: coupons });
+  } catch (err) {
+    console.error("PublicOffers Error:", err);
+    res.status(500).json({ success: false, message: "Error fetching offers" });
+  }
+};

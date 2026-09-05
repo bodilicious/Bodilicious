@@ -1,22 +1,7 @@
 import { useState, useEffect } from 'react';
 import { m, AnimatePresence, Variants } from 'framer-motion';
-import { X, ShoppingBag, ChevronRight, Sparkles } from 'lucide-react';
+import { X, ChevronRight, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-interface Offer {
-  _id: string;
-  code: string;
-  type: string;
-  value: number;
-  minOrderValue: number;
-  description: string;
-  expiresAt: string | null;
-  applicableProducts: any[];
-  tags?: string[];
-}
 
 /* ─── Floating Petal Particle ────────────────────────────────────────────── */
 function Petal({ index }: { index: number }) {
@@ -54,18 +39,16 @@ function Petal({ index }: { index: number }) {
 /* ─── Teachers Day Popup ─────────────────────────────────────────────────── */
 function TeachersDayPopup({ onClose }: { onClose: () => void }) {
   const containerVariants: Variants = {
-    hidden: { opacity: 0, y: 60, scale: 0.92 },
+    hidden: { opacity: 0, scale: 0.92 },
     visible: {
       opacity: 1,
-      y: 0,
       scale: 1,
       transition: { type: 'spring' as const, damping: 22, stiffness: 280 },
     },
     exit: {
       opacity: 0,
-      y: 80,
-      scale: 0.9,
-      transition: { duration: 0.25, ease: 'easeIn' as const },
+      scale: 0.95,
+      transition: { duration: 0.2, ease: 'easeIn' as const },
     },
   };
 
@@ -80,33 +63,43 @@ function TeachersDayPopup({ onClose }: { onClose: () => void }) {
   };
 
   const products = [
-    { emoji: '🍌', label: 'Banana Shampoo' },
-    { emoji: '🌹', label: 'Rose Face & Body Wash' },
-    { emoji: '🍓', label: 'Strawberry Face & Body Wash' },
+    { emoji: '🍌', label: 'Banana Shampoo', pid: 'BD-SHAM-BANANA' },
+    { emoji: '🌹', label: 'Rose Face & Body Wash', pid: 'BD-CLE-ROSE' },
+    { emoji: '🍓', label: 'Strawberry Face & Body Wash', pid: 'BD-CLE-STRAW' },
   ];
 
   return (
-    <m.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-auto sm:right-6 sm:w-[400px] z-[90]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Teachers Day Week special offer"
-    >
-      {/* Card — sheet on mobile, floating card on sm+ */}
-      <div
-        className="teachers-popup-card relative overflow-hidden flex flex-col"
-        style={{
-          background: 'linear-gradient(145deg, #FFF8F3 0%, #FFF1E8 50%, #FEF2F2 100%)',
-          borderRadius: '28px 28px 0 0',
-          border: '1px solid rgba(239,171,132,0.35)',
-          borderBottom: 'none',
-          boxShadow: '0 -8px 40px rgba(180,60,20,0.12), 0 -2px 12px rgba(180,60,20,0.06)',
-        }}
+    <>
+      {/* Backdrop */}
+      <m.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-[89] bg-black/40 backdrop-blur-[2px]"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      <m.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Teachers Day Week special offer"
       >
+        <div
+          className="teachers-popup-card relative overflow-hidden flex flex-col w-full max-w-[400px] max-h-[90vh]"
+          style={{
+            background: 'linear-gradient(145deg, #FFF8F3 0%, #FFF1E8 50%, #FEF2F2 100%)',
+            borderRadius: '28px',
+            border: '1px solid rgba(239,171,132,0.35)',
+            boxShadow: '0 20px 60px rgba(180,60,20,0.18), 0 8px 24px rgba(180,60,20,0.1)',
+          }}
+        >
 
         {/* Floating petals */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -181,11 +174,16 @@ function TeachersDayPopup({ onClose }: { onClose: () => void }) {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 + i * 0.07, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="flex items-center gap-3 rounded-2xl px-4 py-2.5"
-                style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(239,171,132,0.25)', backdropFilter: 'blur(4px)' }}
               >
-                <span className="text-base" aria-hidden="true">{p.emoji}</span>
-                <span className="font-sans text-sm font-medium" style={{ color: '#3D0A05' }}>{p.label}</span>
+                <Link
+                  to={`/product/${p.pid}`}
+                  onClick={onClose}
+                  className="flex items-center gap-3 rounded-2xl px-4 py-2.5 hover:scale-[1.02] transition-transform cursor-pointer"
+                  style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(239,171,132,0.25)', backdropFilter: 'blur(4px)' }}
+                >
+                  <span className="text-base" aria-hidden="true">{p.emoji}</span>
+                  <span className="font-sans text-sm font-medium" style={{ color: '#3D0A05' }}>{p.label}</span>
+                </Link>
               </m.div>
             ))}
           </m.div>
@@ -238,7 +236,7 @@ function TeachersDayPopup({ onClose }: { onClose: () => void }) {
         <Link
           to="/offers"
           onClick={onClose}
-          className="relative z-10 flex items-center justify-center gap-1.5 py-3.5 px-6 font-sans text-xs font-medium transition-colors duration-200 cursor-pointer"
+          className="relative z-10 flex items-center justify-center gap-1.5 py-3.5 px-6 font-sans text-xs font-medium transition-colors duration-200 cursor-pointer rounded-b-[28px]"
           style={{
             borderTop: '1px solid rgba(239,171,132,0.25)',
             color: '#9A3412',
@@ -251,120 +249,7 @@ function TeachersDayPopup({ onClose }: { onClose: () => void }) {
         </Link>
       </div>
     </m.div>
-  );
-}
-
-/* ─── Standard Offer Popup ───────────────────────────────────────────────── */
-function StandardOfferPopup({
-  offer,
-  isWelcomeEligible,
-  onClose,
-}: {
-  offer: Offer | null;
-  isWelcomeEligible: boolean;
-  onClose: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (code: string) => {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(code);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = code;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // silent
-    }
-  };
-
-  return (
-    <m.div
-      initial={{ y: 100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 100, opacity: 0 }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed bottom-0 left-0 right-0 sm:bottom-6 sm:left-auto sm:right-6 sm:w-96 z-[90]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Special offer"
-    >
-      <div className="bg-white border-t sm:border border-silk-light rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col relative group">
-        {/* Background flourish */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" aria-hidden="true" />
-
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 bg-gray-50/80 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors z-10 cursor-pointer"
-          aria-label="Close offers popup"
-        >
-          <X size={16} />
-        </button>
-
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <ShoppingBag size={16} className="text-ruby-red" aria-hidden="true" />
-            <span className="text-[10px] font-sans font-bold tracking-[0.2em] uppercase text-ruby-red">
-              Special Offer
-            </span>
-          </div>
-
-          {offer ? (
-            <>
-              <h2 className="font-serif text-xl text-dark mb-1">
-                {offer.type === 'percentage' ? `${offer.value}% OFF` :
-                  offer.type === 'flat' ? `₹${offer.value} OFF` : 'Free Shipping'}
-              </h2>
-              <p className="font-sans text-sm text-grey-beige mb-5 line-clamp-2">
-                {offer.description || 'Apply this code at checkout to claim your discount.'}
-              </p>
-
-              <div className="flex gap-2">
-                <div className="flex-1 bg-silk-light/40 border border-silk-light rounded-xl px-4 py-3 font-mono font-bold text-dark flex items-center justify-center tracking-widest text-sm">
-                  {offer.code}
-                </div>
-                <button
-                  onClick={() => handleCopy(offer.code)}
-                  className="bg-dark-red hover:bg-ruby-red text-white px-5 py-3 rounded-xl transition-colors flex items-center justify-center shrink-0 cursor-pointer text-xs font-bold font-sans"
-                  aria-label={copied ? 'Code copied!' : 'Copy code'}
-                >
-                  {copied ? '✓ Copied' : 'Copy'}
-                </button>
-              </div>
-            </>
-          ) : isWelcomeEligible ? (
-            <>
-              <h2 className="font-serif text-xl text-dark mb-1">10% OFF Your First Order</h2>
-              <p className="font-sans text-sm text-grey-beige mb-5">
-                Welcome to Bodilicious! Your welcome gift will be applied automatically at checkout.
-              </p>
-              <Link
-                to="/shop"
-                onClick={onClose}
-                className="block w-full bg-dark-red hover:bg-ruby-red text-white text-center py-3 rounded-xl font-sans text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer"
-              >
-                Shop Now
-              </Link>
-            </>
-          ) : null}
-        </div>
-
-        <Link
-          to="/offers"
-          onClick={onClose}
-          className="bg-silk-light/20 border-t border-silk-light py-3 px-6 flex items-center justify-center gap-2 text-xs font-medium text-dark-red hover:text-ruby-red hover:bg-silk-light/40 transition-colors cursor-pointer"
-        >
-          View all offers <ChevronRight size={14} aria-hidden="true" />
-        </Link>
-      </div>
-    </m.div>
+    </>
   );
 }
 
@@ -380,101 +265,39 @@ function isTeachersDayWindow(): boolean {
 
 /** Local-storage keys scoped to the popups. */
 const TD_DISMISSED_KEY = 'td_2026_sep_popup_v2';
-const OFFERS_DISMISSED_KEY = 'offers_popup_dismissed';
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
 
 function shouldShow(key: string) {
-  const last = localStorage.getItem(key);
+  const last = sessionStorage.getItem(key);
   if (!last) return true;
   return Date.now() - Number(last) > COOLDOWN_MS;
 }
 
 function markDismissed(key: string) {
-  localStorage.setItem(key, String(Date.now()));
+  sessionStorage.setItem(key, String(Date.now()));
 }
 
 export default function OffersPopup() {
-  const { user } = useApp();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [offer, setOffer] = useState<Offer | null>(null);
-  const [isTeachersDay, setIsTeachersDay] = useState(false);
 
-  const welcomeOffer = (user as any)?.welcomeOffer;
-  const isWelcomeEligible = welcomeOffer?.eligible === true;
-
-  const suppressOn = ['/offers', '/cart', '/payment', '/checkout'];
-  const isSuppressed =
-    suppressOn.includes(location.pathname) || location.pathname.startsWith('/admin');
+  // Only show the popup on the home page
+  const isSuppressed = location.pathname !== '/';
 
   useEffect(() => {
-    if (isSuppressed) {
+    if (isSuppressed || !isTeachersDayWindow() || !shouldShow(TD_DISMISSED_KEY)) {
       setIsOpen(false);
       return;
     }
 
-    // Teachers Day fast-path — show after short delay
-    if (isTeachersDayWindow()) {
-      if (shouldShow(TD_DISMISSED_KEY)) {
-        setIsTeachersDay(true);
-        const t = setTimeout(() => setIsOpen(true), 1500);
-        return () => clearTimeout(t);
-      }
-    }
-
-    // Standard offer slow-path
-    if (!shouldShow(OFFERS_DISMISSED_KEY)) return;
-
-    let timer: ReturnType<typeof setTimeout>;
-
-    const fetchOffers = async () => {
-      try {
-        const res = await fetch(`${API}/api/v1/offers`);
-        const data = await res.json();
-        let activeOffer: Offer | null = null;
-        let isTDCampaign = false;
-
-        if (data.success && data.data.length > 0) {
-          activeOffer = data.data[0];
-          isTDCampaign =
-            activeOffer?.tags?.includes('teachers-day') ||
-            /teacher/i.test(activeOffer?.description || '') ||
-            /fruity.*floral|floral.*fruity/i.test(activeOffer?.description || '');
-        }
-
-        // If the API returned a Teachers Day offer, but we recently dismissed the TD popup, skip it
-        if (isTDCampaign && !shouldShow(TD_DISMISSED_KEY)) {
-          activeOffer = null;
-          isTDCampaign = false;
-        }
-
-        if (activeOffer) {
-          setOffer(activeOffer);
-          setIsTeachersDay(isTDCampaign);
-        }
-
-        if (activeOffer || isWelcomeEligible) {
-          timer = setTimeout(() => setIsOpen(true), 3000);
-        }
-      } catch {
-        if (isWelcomeEligible) {
-          timer = setTimeout(() => setIsOpen(true), 3000);
-        }
-      }
-    };
-
-    fetchOffers();
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setIsOpen(true), 1500);
+    return () => clearTimeout(t);
   }, [isSuppressed]);
 
   const handleClose = () => {
     setIsOpen(false);
-    if (isTeachersDay) {
-      markDismissed(TD_DISMISSED_KEY);
-    } else {
-      markDismissed(OFFERS_DISMISSED_KEY);
-    }
+    markDismissed(TD_DISMISSED_KEY);
   };
 
   if (!isOpen) return null;
@@ -482,15 +305,7 @@ export default function OffersPopup() {
   return (
     <AnimatePresence>
       {isOpen && (
-        isTeachersDay ? (
-          <TeachersDayPopup onClose={handleClose} />
-        ) : (
-          <StandardOfferPopup
-            offer={offer}
-            isWelcomeEligible={isWelcomeEligible}
-            onClose={handleClose}
-          />
-        )
+        <TeachersDayPopup onClose={handleClose} />
       )}
     </AnimatePresence>
   );
