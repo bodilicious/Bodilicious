@@ -107,6 +107,22 @@ export function useSEO({
       return el;
     };
 
+    // ── Snapshot previous values before mutating ───────────────
+    // Required so cleanup can fully restore every tag we touch,
+    // preventing stale meta from leaking between route transitions.
+    const prevDescription  = document.querySelector<HTMLMetaElement>('meta[name="description"]')?.content ?? '';
+    const prevRobots       = document.querySelector<HTMLMetaElement>('meta[name="robots"]')?.content ?? 'index, follow';
+    const prevOgTitle      = document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.content ?? '';
+    const prevOgDesc       = document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.content ?? '';
+    const prevOgUrl        = document.querySelector<HTMLMetaElement>('meta[property="og:url"]')?.content ?? '';
+    const prevOgImage      = document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content ?? '';
+    const prevOgImageAlt   = document.querySelector<HTMLMetaElement>('meta[property="og:image:alt"]')?.content ?? '';
+    const prevTwTitle      = document.querySelector<HTMLMetaElement>('meta[name="twitter:title"]')?.content ?? '';
+    const prevTwDesc       = document.querySelector<HTMLMetaElement>('meta[name="twitter:description"]')?.content ?? '';
+    const prevTwImage      = document.querySelector<HTMLMetaElement>('meta[name="twitter:image"]')?.content ?? '';
+    const prevTwUrl        = document.querySelector<HTMLMetaElement>('meta[name="twitter:url"]')?.content ?? '';
+    const prevTwImageAlt   = document.querySelector<HTMLMetaElement>('meta[name="twitter:image:alt"]')?.content ?? '';
+
     // ── 3. Meta description ─────────────────────────
     setMeta('meta[name="description"]', 'content', description);
 
@@ -185,9 +201,24 @@ export function useSEO({
       injectLdTags(schemas);
     }
 
-    // ── Cleanup: restore defaults on unmount ───────────────────
+    // ── Cleanup: restore ALL mutated tags on unmount ───────────
+    // Every tag touched above must be restored here so that a component
+    // unmounting without an immediate successor (e.g. error boundary,
+    // loading race, noindex page) does not leak stale metadata sitewide.
     return () => {
       document.title = prevTitle;
+      setMeta('meta[name="description"]', 'content', prevDescription);
+      setMeta('meta[name="robots"]',      'content', prevRobots);
+      setOg('og:title',     prevOgTitle);
+      setOg('og:description', prevOgDesc);
+      setOg('og:url',       prevOgUrl);
+      setOg('og:image',     prevOgImage);
+      if (prevOgImageAlt)  setOg('og:image:alt', prevOgImageAlt);
+      setTwitter('twitter:title',       prevTwTitle);
+      setTwitter('twitter:description', prevTwDesc);
+      setTwitter('twitter:image',       prevTwImage);
+      setTwitter('twitter:url',         prevTwUrl);
+      if (prevTwImageAlt) setTwitter('twitter:image:alt', prevTwImageAlt);
       if (canonicalEl) canonicalEl.href = prevCanonical;
       // Restore hreflang to homepage defaults on unmount
       if (hreflangEnIN) hreflangEnIN.href = prevEnIN || xDefaultUrl;
