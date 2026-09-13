@@ -39,8 +39,52 @@ export default function OfferPage() {
     <main className="min-h-screen bg-[#F8F4EF] flex flex-col selection:bg-ruby-red/10">
       {/* Hero */}
       <section className="relative overflow-hidden bg-[#3E2C23] py-24 px-6 text-white text-center">
-        {/* Decorative background */}
-        <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=2000')] bg-cover bg-center mix-blend-overlay" />
+        {/* Animated decorative background */}
+        {/* Floating orbs */}
+        {[
+          { size: 320, x: '-10%', y: '-20%', delay: 0, dur: 8 },
+          { size: 200, x: '70%',  y: '60%',  delay: 1.5, dur: 10 },
+          { size: 140, x: '85%',  y: '-15%', delay: 0.8, dur: 7 },
+          { size: 100, x: '20%',  y: '75%',  delay: 2,   dur: 9 },
+        ].map(({ size, x, y, delay, dur }, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              width: size,
+              height: size,
+              left: x,
+              top: y,
+              background: 'radial-gradient(circle, rgba(255,220,190,0.18) 0%, transparent 70%)',
+              filter: 'blur(2px)',
+            }}
+            animate={{ y: [0, -18, 0], scale: [1, 1.06, 1], opacity: [0.7, 1, 0.7] }}
+            transition={{ repeat: Infinity, duration: dur, delay, ease: 'easeInOut' }}
+          />
+        ))}
+        {/* Sparkle dots */}
+        {[
+          { cx: '15%', cy: '30%', r: 2.5, delay: 0 },
+          { cx: '82%', cy: '20%', r: 1.8, delay: 0.6 },
+          { cx: '55%', cy: '80%', r: 2,   delay: 1.2 },
+          { cx: '90%', cy: '65%', r: 1.5, delay: 0.3 },
+          { cx: '30%', cy: '55%', r: 1.5, delay: 1.8 },
+          { cx: '65%', cy: '40%', r: 2.2, delay: 0.9 },
+        ].map(({ cx, cy, r, delay }, i) => (
+          <motion.div
+            key={`dot-${i}`}
+            className="absolute rounded-full bg-[#D4A882] pointer-events-none"
+            style={{ left: cx, top: cy, width: r * 2, height: r * 2, translateX: '-50%', translateY: '-50%' }}
+            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.3, 0.8] }}
+            transition={{ repeat: Infinity, duration: 3 + delay, delay, ease: 'easeInOut' }}
+          />
+        ))}
+        {/* Subtle diagonal line accents */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.07] pointer-events-none" preserveAspectRatio="none">
+          <line x1="0" y1="100%" x2="100%" y2="0" stroke="#D4A882" strokeWidth="1" />
+          <line x1="0" y1="80%"  x2="60%"  y2="0" stroke="#D4A882" strokeWidth="0.5" />
+          <line x1="40%" y1="100%" x2="100%" y2="20%" stroke="#D4A882" strokeWidth="0.5" />
+        </svg>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#3E2C23]/80" />
         
         <motion.div 

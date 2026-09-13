@@ -3,7 +3,8 @@ import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import {
   Save, Loader2, Store, Truck, Bell, CreditCard,
-  RotateCcw, Star, Shield, AlertTriangle, Settings2, CheckCircle2
+  RotateCcw, Star, Shield, AlertTriangle, Settings2, CheckCircle2,
+  Sparkles, ArrowRight, X, Eye,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -320,13 +321,92 @@ export default function StoreSettings() {
                 <Field label="Announcement Link" description="Optional — clicking the bar navigates here"><Input value={s.announcementBar?.link} onChange={(v: string) => update('announcementBar.link', v)} placeholder="/shop" /></Field>
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-800 mb-2">Launch Modal</h4>
-                <Toggle checked={!!s.launchModal?.isActive} onChange={v => update('launchModal.isActive', v)} label="Show Launch Modal" description="Pop-up shown on first visit (email capture / promotion)" />
+                <h4 className="text-sm font-bold text-slate-800 mb-2">Launch Modal / Popup Banner</h4>
+                <p className="text-xs text-slate-500 mb-4">Customize the popup banner shown to visitors when they first land on your site.</p>
+                <Toggle checked={!!s.launchModal?.isActive} onChange={v => update('launchModal.isActive', v)} label="Show Launch Modal" description="Pop-up shown after 2.5 seconds on first visit" />
                 <Field label="Badge Text"><Input value={s.launchModal?.badge} onChange={(v: string) => update('launchModal.badge', v)} placeholder="Just Launched" /></Field>
                 <Field label="Title"><Input value={s.launchModal?.title} onChange={(v: string) => update('launchModal.title', v)} /></Field>
-                <Field label="Description"><Input value={s.launchModal?.description} onChange={(v: string) => update('launchModal.description', v)} /></Field>
-                <Field label="CTA Label"><Input value={s.launchModal?.ctaLabel} onChange={(v: string) => update('launchModal.ctaLabel', v)} placeholder="Explore Collection" /></Field>
-                <Field label="CTA Link"><Input value={s.launchModal?.ctaLink} onChange={(v: string) => update('launchModal.ctaLink', v)} placeholder="/shop" /></Field>
+                <Field label="Description">
+                  <textarea
+                    value={s.launchModal?.description ?? ''}
+                    onChange={e => update('launchModal.description', e.target.value)}
+                    rows={3}
+                    placeholder="Describe your offer or announcement…"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white resize-none transition-shadow"
+                  />
+                </Field>
+                <Field label="CTA Button Label"><Input value={s.launchModal?.ctaLabel} onChange={(v: string) => update('launchModal.ctaLabel', v)} placeholder="Explore Collection" /></Field>
+                <Field label="CTA Button Link"><Input value={s.launchModal?.ctaLink} onChange={(v: string) => update('launchModal.ctaLink', v)} placeholder="/shop" /></Field>
+                <Field label="Image URL" description="Optional — paste a product or banner image URL. Leave blank for the default sparkle graphic.">
+                  <Input value={s.launchModal?.image} onChange={(v: string) => update('launchModal.image', v)} placeholder="https://…" />
+                  {s.launchModal?.image && (
+                    <img
+                      src={s.launchModal.image}
+                      alt="Modal preview"
+                      className="mt-2 h-20 object-contain rounded-lg border border-slate-200 bg-slate-50"
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
+                </Field>
+
+                {/* ── Live Preview ── */}
+                <div className="mt-6 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Eye size={14} className="text-dark-red" />
+                    <p className="text-xs font-bold text-slate-700 uppercase tracking-widest">Live Preview</p>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">This is exactly how the popup will appear to your visitors.</p>
+                  <div className="relative w-full max-w-sm mx-auto overflow-hidden bg-white/95 rounded-3xl shadow-2xl border border-slate-200">
+                    {/* Close button mock */}
+                    <div className="absolute top-3 right-3 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-white/80 text-slate-400 shadow-sm">
+                      <X size={13} />
+                    </div>
+                    {/* Image / graphic area */}
+                    <div className="h-40 w-full relative bg-gradient-to-br from-rose-100 via-rose-50 to-white flex items-center justify-center overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/60 via-transparent to-transparent opacity-80" />
+                      <div className="absolute -right-10 -top-10 w-40 h-40 bg-ruby-red/10 rounded-full blur-3xl pointer-events-none" />
+                      <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-rose-200/20 rounded-full blur-3xl pointer-events-none" />
+                      <div className="relative z-10 text-center w-full px-4">
+                        {s.launchModal?.image ? (
+                          <img
+                            src={s.launchModal.image}
+                            alt="modal"
+                            className="h-28 object-contain mx-auto drop-shadow-xl"
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="relative inline-block">
+                            <div className="w-14 h-20 mx-auto bg-gradient-to-b from-rose-200 to-rose-300 rounded-lg shadow-md border border-white/80 flex items-center justify-center">
+                              <Sparkles className="text-ruby-red opacity-60" size={18} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Content */}
+                    <div className="p-6 text-center bg-white">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-[10px] font-sans font-bold tracking-widest uppercase text-ruby-red mb-3">
+                        <Sparkles size={10} />
+                        {s.launchModal?.badge || 'Just Launched'}
+                      </div>
+                      <h3 className="text-xl font-serif text-dark-red mb-2 leading-tight">
+                        {s.launchModal?.title || 'New Collection'}
+                      </h3>
+                      <p className="text-xs font-sans text-slate-400 leading-relaxed mb-5 line-clamp-3">
+                        {s.launchModal?.description || 'Discover our latest additions, crafted with rare botanical extracts.'}
+                      </p>
+                      <div className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-dark-red to-ruby-red text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-md">
+                        {s.launchModal?.ctaLabel || 'Explore Collection'}
+                        <ArrowRight size={13} />
+                      </div>
+                    </div>
+                  </div>
+                  {!s.launchModal?.isActive && (
+                    <p className="text-center text-xs text-amber-600 mt-3 flex items-center justify-center gap-1">
+                      <AlertTriangle size={11} /> Modal is currently disabled — toggle "Show Launch Modal" to activate it.
+                    </p>
+                  )}
+                </div>
               </div>
             </SettingsCard>
 
