@@ -916,14 +916,12 @@ export default function StoreSettings() {
             <SettingsCard id="reviews" title="Reviews & Personalisation" description="Manage product reviews and user skin profiles.">
               <div className="mb-6 pb-6 border-b border-slate-100">
                 <h4 className="text-sm font-bold text-slate-800 mb-2">Review Features</h4>
-                <Toggle checked={!!s.reviewSkinTypeTaggingEnabled} onChange={v => update('reviewSkinTypeTaggingEnabled', v)} label="Skin Type Tagging" description="Allow reviewers to tag their skin type" />
-                <Toggle checked={!!s.reviewBeforeAfterPhotosEnabled} onChange={v => update('reviewBeforeAfterPhotosEnabled', v)} label="Before & After Photos" description="Allow photo uploads with reviews" />
                 <Toggle checked={!!s.reviewVerifiedBadgeEnabled} onChange={v => update('reviewVerifiedBadgeEnabled', v)} label="Verified Purchase Badge" description="Show 'Verified' badge on purchases reviews" />
                 <Toggle checked={!!s.reviewModerationEnabled} onChange={v => update('reviewModerationEnabled', v)} label="Review Moderation" description="Reviews require admin approval before appearing" />
               </div>
               <div className="mb-6 pb-6 border-b border-slate-100">
                 <h4 className="text-sm font-bold text-slate-800 mb-2">Review Incentives</h4>
-                <Toggle checked={!!s.reviewIncentiveEnabled} onChange={v => update('reviewIncentiveEnabled', v)} label="Discount for Leaving a Review" description="Automatically send a discount code after review submission" />
+                <Toggle checked={!!s.reviewIncentiveEnabled} onChange={v => update('reviewIncentiveEnabled', v)} label="Discount for Leaving a Review" description="Email a one-time discount code to verified buyers when their review is published" />
                 <Field label="Discount Percentage (%)"><Input value={s.reviewIncentiveDiscountPercent} onChange={(v: number) => update('reviewIncentiveDiscountPercent', v)} type="number" /></Field>
               </div>
               <div>

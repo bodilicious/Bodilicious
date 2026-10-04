@@ -1568,28 +1568,6 @@ export default function ProductPage() {
                         </div>
                       </div>
 
-                      {storeSettings.reviewSkinTypeTaggingEnabled && (
-                        <div>
-                          <label className="block text-[10px] font-sans tracking-[0.2em] uppercase text-ruby-red mb-3 opacity-50">
-                            Your Skin Type
-                          </label>
-                          <div className="w-full bg-[#FDFBF7]/50 border border-silk/60 p-4 font-sans text-sm text-dark-red/50 cursor-not-allowed select-none shadow-inner italic" title="Skin type tagging coming soon">
-                            Skin type selection (Coming Soon)
-                          </div>
-                        </div>
-                      )}
-
-                      {storeSettings.reviewBeforeAfterPhotosEnabled && (
-                        <div>
-                          <label className="block text-[10px] font-sans tracking-[0.2em] uppercase text-ruby-red mb-3 opacity-50">
-                            Before & After Photos
-                          </label>
-                          <div className="border border-dashed border-silk/60 rounded-none p-6 text-center bg-[#FDFBF7]/30 cursor-not-allowed">
-                            <p className="text-xs font-sans text-dark-red/50 italic">Photo uploads coming soon</p>
-                          </div>
-                        </div>
-                      )}
-
                       <div>
                         <label className="block text-[10px] font-sans tracking-[0.2em] uppercase text-ruby-red mb-3">
                           Share your experience
