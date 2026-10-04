@@ -153,8 +153,6 @@ const DEFAULT_FAQS = [
 const DEFAULT_SECTION_TITLES = {
   bestSellersTitle: 'Best Sellers',
   bestSellersSubtitle: 'Discover',
-  newArrivalsTitle: 'New Arrivals',
-  newArrivalsSubtitle: 'Just Landed',
   categoriesTitle: 'Category',
   categoriesSubtitle: 'Shop by',
   promisesTitle: 'Why Bodilicious?',
@@ -221,7 +219,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
   const hasSeenSplash = sessionStorage.getItem('splashShown');
   const [showSplash, setShowSplash] = useState(!hasSeenSplash && !isEditing);
   const [reviewTab, setReviewTab] = useState<'website' | 'amazon'>('website');
-  const [activePicker, setActivePicker] = useState<'bestSellers' | 'newArrivals' | null>(null);
+  const [activePicker, setActivePicker] = useState<'bestSellers' | null>(null);
   const [isPastBanner, setIsPastBanner] = useState(false);
 
   useEffect(() => {
@@ -418,22 +416,6 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4);
   }, [products, fetchedBestSellers, contentData?.bestSellerMode, contentData?.bestSellerPids]);
 
-  const newArrivals = useMemo(() => {
-    if (!products || !Array.isArray(products) || products.length === 0) return [];
-
-    if (contentData?.newArrivalMode === 'manual' && contentData.newArrivalPids?.length > 0) {
-      return contentData.newArrivalPids
-        .map((pid: string) => products.find(p => p.pid === pid))
-        .filter((p: any): p is NonNullable<typeof p> => !!p);
-    }
-
-    return [...products].filter(p => !!p.createdAt).sort((a, b) => {
-      const aTime = new Date(a.createdAt!).getTime() || 0;
-      const bTime = new Date(b.createdAt!).getTime() || 0;
-      return bTime - aTime;
-    }).slice(0, 6);
-  }, [products, contentData?.newArrivalMode, contentData?.newArrivalPids]);
-
   const [websiteReviews, setWebsiteReviews] = useState<any[]>([]);
 
   useEffect(() => {
@@ -543,12 +525,10 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
           <ProductPickerModal
             isOpen={activePicker !== null}
             onClose={() => setActivePicker(null)}
-            selectedPids={activePicker === 'bestSellers' ? (contentData?.bestSellerPids || []) : (contentData?.newArrivalPids || [])}
+            selectedPids={contentData?.bestSellerPids || []}
             onSave={(pids) => {
               if (activePicker === 'bestSellers') {
                 handleTextChange('bestSellerPids', pids as any);
-              } else if (activePicker === 'newArrivals') {
-                handleTextChange('newArrivalPids', pids as any);
               }
             }}
           />
@@ -607,63 +587,6 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
               </div>
             </m.div>
           </section>
-
-          {/* NEW ARRIVALS */}
-          {newArrivals.length > 0 && (
-            <section className="py-20 bg-silk-light overflow-hidden">
-              <m.div
-                className="max-w-7xl mx-auto px-6"
-                initial="hidden"
-                animate="visible"
-                variants={stagger}
-              >
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
-                  <m.div variants={fadeUp} className="relative flex-1 pr-12">
-                    <EditableBlock 
-                      isEditing={isEditing} value={titles.newArrivalsSubtitle} 
-                      onChange={v => handleTextChange('sectionTitles.newArrivalsSubtitle', v)}
-                      tagName="p" className="text-[10px] font-sans tracking-[0.3em] uppercase text-ruby-red mb-2" 
-                    />
-                    <EditableBlock 
-                      isEditing={isEditing} value={titles.newArrivalsTitle} 
-                      onChange={v => handleTextChange('sectionTitles.newArrivalsTitle', v)}
-                      tagName="h2" className="font-serif text-dark-red text-3xl md:text-4xl" 
-                    />
-                    {isEditing && (
-                      <div className="absolute right-0 top-0 flex flex-col items-end gap-2">
-                        <button
-                          onClick={() => handleTextChange('newArrivalMode', contentData?.newArrivalMode === 'manual' ? 'auto' : 'manual')}
-                          className="px-2 py-1 bg-white border border-slate-200 text-[10px] rounded hover:bg-slate-50 transition-colors uppercase font-sans tracking-widest text-slate-500"
-                        >
-                          Mode: {contentData?.newArrivalMode === 'manual' ? 'Manual' : 'Auto'}
-                        </button>
-                        {contentData?.newArrivalMode === 'manual' && (
-                          <button
-                            onClick={() => setActivePicker('newArrivals')}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-red text-white text-xs rounded hover:bg-ruby-red transition-colors font-sans uppercase tracking-widest"
-                          >
-                            <Settings2 size={14} /> Choose Products
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </m.div>
-                  {!isEditing && (
-                    <m.button variants={fadeUp} onClick={() => handleShop('all')} className="flex items-center gap-1 mt-4 md:mt-0 py-1.5 text-xs font-sans tracking-widest uppercase text-grey-beige-dark hover:text-ruby-red transition-colors">
-                      View All <ChevronRight size={14} />
-                    </m.button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                  {newArrivals.map((product: any) => (
-                    <m.div key={product.pid} variants={fadeUp}>
-                      <ProductCard product={product} />
-                    </m.div>
-                  ))}
-                </div>
-              </m.div>
-            </section>
-          )}
 
           {/* CATEGORY */}
           <section className="py-20 bg-white overflow-hidden">
