@@ -129,9 +129,6 @@ interface AppContextType {
     reviewSkinTypeTaggingEnabled: boolean;
     reviewBeforeAfterPhotosEnabled: boolean;
     reviewVerifiedBadgeEnabled: boolean;
-    reviewIncentiveEnabled: boolean;
-    reviewIncentiveDiscountPercent: number;
-    reviewModerationEnabled: boolean;
     autoCurrencySwitchingEnabled: boolean;
     detectedCountryCode: string;
     usdExchangeRate: number;
@@ -312,9 +309,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reviewSkinTypeTaggingEnabled: true,
     reviewBeforeAfterPhotosEnabled: true,
     reviewVerifiedBadgeEnabled: true,
-    reviewIncentiveEnabled: false,
-    reviewIncentiveDiscountPercent: 10,
-    reviewModerationEnabled: true,
     autoCurrencySwitchingEnabled: true,
     detectedCountryCode: 'IN',
     usdExchangeRate: 83.5,

@@ -6,8 +6,7 @@ import { logAuditEvent } from "../audit/logger.js";
 import { buildTopicPatterns } from "../utils/topicMatch.js";
 import { pingIndexNow } from "../utils/indexNow.js";
 import { triggerFrontendDeploy } from "../utils/deployHook.js";
-import { getSettings } from "../settings/cache.js";
-import { isPublishedReview, recalculateRatings, issueReviewReward } from "./reviewModeration.js";
+import { isPublishedReview, recalculateRatings } from "./reviewModeration.js";
 
 /**
  * CREATE PRODUCT
@@ -514,10 +513,8 @@ export const addReview = async (req, res) => {
       "items.product": product._id
     });
 
-    // The "Review moderation" setting existed (and the page told customers their
-    // review was "pending approval") but reviews were always published instantly.
-    const settings = await getSettings();
-    const status = settings?.reviewModerationEnabled ? "pending" : "approved";
+    // Reviews are not moderated: every review is published the moment it's posted.
+    const status = "approved";
 
     product.reviews.push({
       user: req.user._id,
@@ -529,26 +526,14 @@ export const addReview = async (req, res) => {
     const review = product.reviews[product.reviews.length - 1];
     recalculateRatings(product);
 
-    // Published straight away → the promised reward can be issued now; a pending
-    // review gets it when an admin approves it (admin/reviewController.js).
-    let reward = null;
-    if (status === "approved") {
-      reward = await issueReviewReward({ product, review, settings }).catch(err => {
-        console.error("[Reviews] Reward coupon failed:", err.message);
-        return null;
-      });
-    }
-
     await product.save();
 
     res.status(201).json({
       success: true,
-      message: status === "pending" ? "Review submitted and awaiting approval" : "Review added",
+      message: "Review added",
       data: {
         status,
         isVerified: review.isVerified,
-        rewardCode: reward?.code || null,
-        rewardPercent: reward?.percent || null,
       },
     });
   } catch (err) {

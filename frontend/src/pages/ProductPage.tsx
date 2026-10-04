@@ -365,19 +365,7 @@ export default function ProductPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to submit review');
 
-      // Driven by what the server actually did (it holds the review for approval
-      // when moderation is on, and issues the reward code to verified buyers).
-      const status = data?.data?.status;
-      const rewardCode = data?.data?.rewardCode;
-      let successMsg = status === 'pending'
-        ? 'Thanks! Your review is awaiting approval and will appear once it has been checked.'
-        : 'Review submitted successfully!';
-      if (rewardCode) {
-        successMsg += ` Here's your ${data.data.rewardPercent}% off code for your next order: ${rewardCode}`;
-      } else if (storeSettings.reviewIncentiveEnabled && status === 'pending' && data?.data?.isVerified) {
-        successMsg += ' Your thank-you code will be emailed to you once it is approved.';
-      }
-      setReviewFeedback({ type: 'success', msg: successMsg });
+      setReviewFeedback({ type: 'success', msg: 'Review submitted successfully!' });
       setReviewComment('');
       setReviewRating(5);
 
@@ -1523,15 +1511,6 @@ export default function ProductPage() {
                   <div className="absolute bottom-0 left-0 w-24 h-24 bg-dark-red/5 rounded-tr-full pointer-events-none" />
 
                   <h3 className="font-serif text-dark-red text-2xl mb-2">Write a Review</h3>
-                  {storeSettings.reviewIncentiveEnabled && (
-                    <div className="mb-6 bg-ruby-red/10 border border-ruby-red/20 rounded-xl p-3 flex items-start gap-2">
-                      <span className="text-ruby-red mt-0.5">⭐</span>
-                      <p className="text-xs font-sans text-dark-red">
-                        <strong>Review & Save!</strong> Bought this? Leave a review and get a {storeSettings.reviewIncentiveDiscountPercent}% off coupon for your next order (for verified buyers of this product).
-                      </p>
-                    </div>
-                  )}
-                  
                   <button
                     type="button"
                     onClick={() => setShowReviewForm(false)}

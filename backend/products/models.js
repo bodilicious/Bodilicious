@@ -23,18 +23,13 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    // StoreSettings.reviewModerationEnabled holds new reviews as "pending" until an
-    // admin approves them. Reviews from before moderation existed have no status and
+    // New reviews are always "approved" (reviews are not moderated). "pending" and
+    // "rejected" are left over from a removed moderation queue. Reviews with no status
     // count as approved (see products/reviewModeration.js → isPublishedReview).
     status: {
       type: String,
       enum: ["approved", "pending", "rejected"],
       default: "approved",
-    },
-    // The single-use "review & save" coupon issued for this review, if any.
-    rewardCouponCode: {
-      type: String,
-      default: null,
     },
   },
   { timestamps: true, _id: true }

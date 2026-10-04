@@ -22,8 +22,7 @@ import {
   Image,
   ChevronDown,
   Store,
-  FileText,
-  Star
+  FileText
 } from 'lucide-react';
 
 
@@ -163,7 +162,6 @@ const AdminLayout: React.FC = () => {
       title: 'Catalog',
       items: [
         { name: 'Products', path: '/admin/products', icon: Package },
-        { name: 'Reviews', path: '/admin/reviews', icon: Star },
         { name: 'Media Library', path: '/admin/media', icon: Image },
       ]
     },

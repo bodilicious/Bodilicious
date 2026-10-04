@@ -917,12 +917,6 @@ export default function StoreSettings() {
               <div className="mb-6 pb-6 border-b border-slate-100">
                 <h4 className="text-sm font-bold text-slate-800 mb-2">Review Features</h4>
                 <Toggle checked={!!s.reviewVerifiedBadgeEnabled} onChange={v => update('reviewVerifiedBadgeEnabled', v)} label="Verified Purchase Badge" description="Show 'Verified' badge on purchases reviews" />
-                <Toggle checked={!!s.reviewModerationEnabled} onChange={v => update('reviewModerationEnabled', v)} label="Review Moderation" description="Reviews require admin approval before appearing" />
-              </div>
-              <div className="mb-6 pb-6 border-b border-slate-100">
-                <h4 className="text-sm font-bold text-slate-800 mb-2">Review Incentives</h4>
-                <Toggle checked={!!s.reviewIncentiveEnabled} onChange={v => update('reviewIncentiveEnabled', v)} label="Discount for Leaving a Review" description="Email a one-time discount code to verified buyers when their review is published" />
-                <Field label="Discount Percentage (%)"><Input value={s.reviewIncentiveDiscountPercent} onChange={(v: number) => update('reviewIncentiveDiscountPercent', v)} type="number" /></Field>
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-800 mb-2">Skin Profile & Personalisation</h4>

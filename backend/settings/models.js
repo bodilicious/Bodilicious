@@ -195,9 +195,6 @@ const storeSettingsSchema = new mongoose.Schema(
     reviewSkinTypeTaggingEnabled: { type: Boolean, default: true },
     reviewBeforeAfterPhotosEnabled: { type: Boolean, default: true },
     reviewVerifiedBadgeEnabled: { type: Boolean, default: true },
-    reviewIncentiveEnabled: { type: Boolean, default: false },
-    reviewIncentiveDiscountPercent: { type: Number, default: 10 },
-    reviewModerationEnabled: { type: Boolean, default: true },
 
     // Audit
     lastUpdatedBy: { type: String, default: null },

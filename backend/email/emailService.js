@@ -561,41 +561,6 @@ export const sendPasswordResetEmail = async (userEmail, resetLink, userName = ""
 };
 
 /* ─────────────────────────────────────────────
-   REVIEW REWARD EMAIL
-   The coupon promised on the product page ("Review & Save") for a review that
-   was approved by a moderator.
-───────────────────────────────────────────── */
-export const sendReviewRewardEmail = async (userEmail, userName, code, percent, productName) => {
-  const settings = await getSettings();
-  if (!settings.emailAllEnabled || !userEmail) return;
-
-  const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
-  const content = `
-    <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">Thank you for your review ⭐</h2>
-    <p style="margin:0 0 14px;">
-      Your review of <strong>${esc(productName)}</strong> is now live. As a thank-you, here is
-      <strong>${Number(percent) || 0}% off</strong> your next order.
-    </p>
-    <div style="background:#fafafa; padding:18px; border:1px dashed #8B0000; border-radius:8px; margin:22px 0; text-align:center;">
-      <p style="margin:0 0 6px; font-size:12px; color:#777777; text-transform:uppercase; letter-spacing:0.08em;">Your code</p>
-      <p style="margin:0; font-size:24px; font-weight:bold; color:#8B0000; letter-spacing:0.12em;">${esc(code)}</p>
-      <p style="margin:8px 0 0; font-size:12px; color:#777777;">Single use · valid for 60 days</p>
-    </div>
-    <div style="text-align:center; margin:28px 0 0;">
-      <a href="${frontendUrl}/shop" style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block;">Shop Now</a>
-    </div>
-  `;
-
-  return await sendEmail({
-    from: FROM_DEFAULT,
-    to: userEmail,
-    subject: `Your ${Number(percent) || 0}% thank-you code | Bodilicious`,
-    html: buildEmailLayout(content, { customerName: userName }),
-    label: "Review reward email",
-  });
-};
-
-/* ─────────────────────────────────────────────
    RETURN APPROVED EMAIL
 ───────────────────────────────────────────── */
 export const sendReturnApprovedEmail = async (order, userEmail, userName) => {

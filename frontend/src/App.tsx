@@ -54,7 +54,6 @@ const CustomerDetails = lazy(() => import('./admin/CustomerDetails'));
 const AuditLogs = lazy(() => import('./admin/AuditLogs'));
 const ReturnsManagement = lazy(() => import('./admin/ReturnsManagement'));
 const CouponManagement = lazy(() => import('./admin/CouponManagement'));
-const ReviewModeration = lazy(() => import('./admin/ReviewModeration'));
 const Insights = lazy(() => import('./admin/Insights'));
 const AbandonedCheckouts = lazy(() => import('./admin/AbandonedCheckouts'));
 const DraftOrders = lazy(() => import('./admin/DraftOrders'));
@@ -182,7 +181,6 @@ function AppRoutes() {
                 <Route path="draft-orders" element={<DraftOrders />} />
                 <Route path="returns" element={<ReturnsManagement />} />
                 <Route path="coupons" element={<CouponManagement />} />
-                <Route path="reviews" element={<ReviewModeration />} />
                 <Route path="insights" element={<Insights />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="users/:id" element={<CustomerDetails />} />

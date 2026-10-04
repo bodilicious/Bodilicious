@@ -103,9 +103,6 @@ export const getSettings = async (req, res) => {
         reviewSkinTypeTaggingEnabled: settings.reviewSkinTypeTaggingEnabled ?? true,
         reviewBeforeAfterPhotosEnabled: settings.reviewBeforeAfterPhotosEnabled ?? true,
         reviewVerifiedBadgeEnabled: settings.reviewVerifiedBadgeEnabled ?? true,
-        reviewIncentiveEnabled: settings.reviewIncentiveEnabled ?? false,
-        reviewIncentiveDiscountPercent: settings.reviewIncentiveDiscountPercent ?? 10,
-        reviewModerationEnabled: settings.reviewModerationEnabled ?? true,
         autoCurrencySwitchingEnabled: settings.autoCurrencySwitchingEnabled ?? true,
         detectedCountryCode,
         usdExchangeRate: settings.usdExchangeRate || 83.5,
@@ -193,8 +190,7 @@ export const updateSettings = async (req, res) => {
       // Skin Profile
       "skinQuizEnabled", "productCompatibilityWarningsEnabled", "storeSkinProfileOnAccount",
       // Reviews
-      "reviewSkinTypeTaggingEnabled", "reviewBeforeAfterPhotosEnabled", "reviewVerifiedBadgeEnabled",
-      "reviewIncentiveEnabled", "reviewIncentiveDiscountPercent", "reviewModerationEnabled"
+      "reviewSkinTypeTaggingEnabled", "reviewBeforeAfterPhotosEnabled", "reviewVerifiedBadgeEnabled"
     ];
 
     for (const field of flatFields) {
