@@ -43,34 +43,42 @@ const ABANDONED_WINDOW_MS = 30 * 60 * 1000;
 const MEDIA_FOLDER = "bodilicious_products";
 
 /**
- * The single definition of an abandoned checkout.
- *
- * Built fresh on each call rather than held as a module constant: `createdAt` is
- * relative to now, and a constant would freeze the cutoff at server-boot time and
- * silently widen every day the process stayed up.
- *
- * Used two ways, and they must stay in agreement — the abandoned list shows exactly
- * what the other views exclude. When these were four copy-pasted literals, any edit
- * to one made orders disappear from both places at once.
- *   - `Order.find(abandonedCheckoutFilter())` — the dedicated abandoned view
- *   - `{ $nor: [abandonedCheckoutFilter()] }` — everywhere abandoned should be hidden
+ * A storefront online checkout that hasn't been paid: the Razorpay modal is still
+ * open, was closed, or the payment failed. initRazorpayOrder writes the order row
+ * before the modal opens, so every cancelled payment leaves one of these behind.
+ * They aren't orders yet, so every admin order view hides them as soon as they're
+ * created. Using only the age-gated abandoned filter showed each cancelled payment
+ * as a "pending" order for its first 30 minutes, which looked like a paid order
+ * waiting to ship.
  *
  * `needsManualReview` is deliberately excluded. When a payment is captured but order
  * creation fails, the claim is reverted to pending/failed and the order is flagged —
- * which otherwise looks exactly like an abandoned checkout. Those are the opposite of
- * abandoned: the customer's money is gone and ops must see them.
+ * which otherwise looks exactly like an unpaid checkout. Those are the opposite: the
+ * customer's money is gone and ops must see them.
  *
- * `orderStatus` covers both states an abandoned checkout can be in: "pending" before
+ * `orderStatus` covers both states an unpaid checkout can be in: "pending" before
  * the draft-cleanup cron (cron/draftOrders.js) reaches it, and "abandoned" after the
- * cron relabels it. Matching only "pending" left the Abandoned page permanently empty
- * — every checkout was swept to "abandoned" within one cron tick of becoming eligible.
+ * cron relabels it.
  */
-const abandonedCheckoutFilter = () => ({
+const unpaidOnlineCheckoutFilter = () => ({
   paymentMethod: { $ne: "cod" },          // COD is never "unpaid" in this sense
   source: { $ne: "admin_draft" },         // admin-created drafts aren't customer checkouts
   orderStatus: { $in: ["pending", "abandoned"] },
   paymentStatus: { $in: ["pending", "failed"] },
   needsManualReview: { $ne: true },       // money captured, order stuck — keep visible
+});
+
+/**
+ * The single definition of an abandoned checkout: an unpaid one old enough that the
+ * customer has walked away. Younger ones may still be mid-payment, so they're hidden
+ * from the order views but not yet listed here.
+ *
+ * Built fresh on each call rather than held as a module constant: `createdAt` is
+ * relative to now, and a constant would freeze the cutoff at server-boot time and
+ * silently widen every day the process stayed up.
+ */
+const abandonedCheckoutFilter = () => ({
+  ...unpaidOnlineCheckoutFilter(),
   createdAt: { $lt: new Date(Date.now() - ABANDONED_WINDOW_MS) },
 });
 
@@ -153,10 +161,10 @@ export const getDashboardSummary = async (req, res) => {
         { $match: { paymentStatus: "paid", orderStatus: { $ne: "cancelled" } } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } }
       ]),
-      // Total Orders (excludes cancelled and abandoned checkouts)
+      // Total Orders (excludes cancelled orders and unpaid online checkouts)
       Order.countDocuments({
         orderStatus: { $ne: "cancelled" },
-        $nor: [abandonedCheckoutFilter()]
+        $nor: [unpaidOnlineCheckoutFilter()]
       }),
       // Total Users
       UserProfile.countDocuments(),
@@ -261,7 +269,7 @@ export const getNotificationCounts = async (req, res) => {
     const usersCount = usersReqAttentionSet.size;
 
     // Same exclusion as the orders list, so the badge never counts orders the list hides.
-    const ordersQuery = { orderStatus: "pending", $nor: [abandonedCheckoutFilter()] };
+    const ordersQuery = { orderStatus: "pending", $nor: [unpaidOnlineCheckoutFilter()] };
     if (lastViewedOrders && !isNaN(Number(lastViewedOrders))) {
       ordersQuery.createdAt = { $gt: new Date(Number(lastViewedOrders)) };
     }
@@ -306,7 +314,10 @@ export const getRecentOrders = async (req, res) => {
   try {
     const limit = req.pagination?.limit ?? 5; // Fallback if middleware is skipped
     
-    const orders = await Order.find({ orderStatus: { $ne: "abandoned" } })
+    const orders = await Order.find({
+      orderStatus: { $ne: "abandoned" },
+      $nor: [unpaidOnlineCheckoutFilter()]  // same rows as the orders list
+    })
       .populate("user", "name email")
       .populate("items.product", "name pid images price")
       .select("user items totalAmount orderStatus paymentStatus paymentMethod createdAt shippingDetails.name shippingDetails.email")
@@ -710,11 +721,12 @@ export const getAllOrdersAdmin = async (req, res) => {
     const { limit, skip } = req.pagination;
     const { search, orderStatus, paymentStatus, startDate, endDate } = req.query;
 
-    // Exclude abandoned orders by default — they have their own dedicated section in the admin panel.
-    // Abandoned = frontend non-COD, orderStatus: pending, paymentStatus: pending/failed, older than 30 mins
+    // Only real orders: paid online orders, COD orders and admin drafts. Unpaid online
+    // checkouts (cancelled or failed payments) are hidden from the moment they're
+    // created; once 30 minutes old they appear in the Abandoned Checkouts section.
     const query = {
       orderStatus: { $ne: "abandoned" },   // set by the cleanup cron
-      $nor: [abandonedCheckoutFilter()]    // covers the gap before the cron runs
+      $nor: [unpaidOnlineCheckoutFilter()]
     };
 
     if (search) {
@@ -1379,10 +1391,10 @@ export const exportLogsCSV = async (req, res) => {
 export const exportOrdersCSV = async (req, res) => {
   try {
     const { startDate, endDate, orderStatus, paymentStatus } = req.query;
-    // Exclude abandoned orders just like the main view
+    // Exclude unpaid checkouts just like the main view
     const exportQuery = {
       orderStatus: { $ne: "abandoned" },
-      $nor: [abandonedCheckoutFilter()]   // keep the CSV consistent with the on-screen list
+      $nor: [unpaidOnlineCheckoutFilter()]   // keep the CSV consistent with the on-screen list
     };
     // The same status filters the list applies, so "Export" saves what's on screen.
     if (orderStatus) exportQuery.orderStatus = orderStatus;
