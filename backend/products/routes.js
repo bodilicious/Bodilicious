@@ -1,6 +1,7 @@
 import express from "express";
 import { validate } from "../middleware/validate.js";
 import { protect, adminOnly } from "../middleware/auth.js";
+import { cacheResponse } from "../utils/responseCache.js";
 import {
   createProductSchema,
   updateProductSchema,
@@ -21,13 +22,14 @@ const router = express.Router();
 
 router.post("/", protect, adminOnly, validate(createProductSchema), createProduct);
 
-router.get("/", getAllProducts);
+// Searches skip the cache so each one still reaches the handler and gets logged.
+router.get("/", cacheResponse(60_000, { skip: (req) => !!req.query.search }), getAllProducts);
 
-router.get("/filters", getProductFilters);
+router.get("/filters", cacheResponse(5 * 60_000), getProductFilters);
 
-router.get("/reviews/top", getTopReviews);
+router.get("/reviews/top", cacheResponse(10 * 60_000), getTopReviews);
 
-router.get("/:pid", getProductByPid);
+router.get("/:pid", cacheResponse(60_000), getProductByPid);
 
 router.patch("/:pid", protect, adminOnly, validate(updateProductSchema), updateProductByPid);
 

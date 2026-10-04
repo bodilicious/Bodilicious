@@ -3,6 +3,7 @@ import multer from "multer";
 import { fileTypeFromBuffer } from "file-type";
 import rateLimit from "express-rate-limit";
 import { protect, adminOnly } from "../middleware/auth.js";
+import { cacheResponse } from "../utils/responseCache.js";
 import {
   createTicket,
   getUserTickets,
@@ -65,7 +66,7 @@ const uploadLimiter = rateLimit({
   },
 });
 
-router.get("/faqs", getFaqs);
+router.get("/faqs", cacheResponse(10 * 60_000), getFaqs);
 
 // Admin: fetch all tickets
 router.get("/tickets", protect, adminOnly, getAllTickets);

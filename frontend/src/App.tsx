@@ -54,6 +54,7 @@ const CustomerDetails = lazy(() => import('./admin/CustomerDetails'));
 const AuditLogs = lazy(() => import('./admin/AuditLogs'));
 const ReturnsManagement = lazy(() => import('./admin/ReturnsManagement'));
 const CouponManagement = lazy(() => import('./admin/CouponManagement'));
+const ReviewModeration = lazy(() => import('./admin/ReviewModeration'));
 const Insights = lazy(() => import('./admin/Insights'));
 const AbandonedCheckouts = lazy(() => import('./admin/AbandonedCheckouts'));
 const DraftOrders = lazy(() => import('./admin/DraftOrders'));
@@ -84,7 +85,9 @@ function AppRoutes() {
     
     // Handle maintenance bypass
     const bypass = params.get('preview');
-    if (bypass) {
+    // "draft" is the Live Builder's preview flag (HomePage), not a bypass secret —
+    // storing it would overwrite a real bypass token the admin had saved.
+    if (bypass && bypass !== 'draft') {
       localStorage.setItem('maintenance_bypass', bypass);
       // Clean up URL if desired, or just leave it.
     }
@@ -179,6 +182,7 @@ function AppRoutes() {
                 <Route path="draft-orders" element={<DraftOrders />} />
                 <Route path="returns" element={<ReturnsManagement />} />
                 <Route path="coupons" element={<CouponManagement />} />
+                <Route path="reviews" element={<ReviewModeration />} />
                 <Route path="insights" element={<Insights />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="users/:id" element={<CustomerDetails />} />

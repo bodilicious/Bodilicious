@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import type { Order } from '../types';
 import { CheckCircle2, XCircle, PackageX, ChevronRight, FileText, Check, AlertTriangle } from 'lucide-react';
 import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/currencies';
 import { useSEO } from '../hooks/useSEO';
+import { productImage } from '../utils/productImage';
 
 const CONFIRMATION_STATE_KEY = 'bodilicious_confirmation_state';
 
@@ -38,9 +40,16 @@ export default function ConfirmationPage() {
         return null;
     });
 
-    // ── Order found in context? ──────────────────────────────────────────────
-     
-    const order = resolvedState ? orders.find(o => o._id === resolvedState.orderId) : undefined;
+    // ── The order ────────────────────────────────────────────────────────────
+    // Fetched from GET /orders/:id, which only answers once the order is finalised
+    // (paid + invoiced, or COD). The page used to read the account's order list: after
+    // a refresh that list has no shippingDetails, so rendering crashed, and polling
+    // stopped as soon as the order merely existed — before it was finalised and listed —
+    // leaving the spinner up forever. The checkout's own copy is used only when it is
+    // already complete, for an instant render.
+    const [fetchedOrder, setFetchedOrder] = useState<Order | null>(null);
+    const contextOrder = resolvedState ? orders.find(o => o._id === resolvedState.orderId) : undefined;
+    const order = fetchedOrder || (contextOrder?.shippingDetails ? contextOrder : undefined);
     const orderLoaded = !!order;
 
     // ── beforeunload guard while the order hasn't appeared yet ──────────────
@@ -65,20 +74,24 @@ export default function ConfirmationPage() {
     useEffect(() => {
         if (orderLoaded || !resolvedState) return; // already have it, or no state
 
+        let stopped = false;
         const run = async () => {
-            if (document.visibilityState === 'hidden') return;
+            if (stopped || document.visibilityState === 'hidden') return;
             try {
                 const headers = await getAuthHeaders();
-                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/orders/${resolvedState.orderId}/status`, { headers });
-                const json = await res.json();
-                
-                if (json.success && json.order) {
-                    // Once we confirm the order exists on the server, fetch full profile just once to sync UI state
-                    await refreshProfile();
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/orders/${resolvedState.orderId}`, { headers });
+                const json = await res.json().catch(() => ({}));
+
+                if (res.ok && json.success && json.data) {
+                    stopped = true;
                     if (pollRef.current) {
                         clearInterval(pollRef.current);
                         pollRef.current = null;
                     }
+                    setFetchedOrder(json.data as Order);
+                    // Keep the account's order list in sync too
+                    refreshProfile().catch(() => { /* non-critical */ });
+                    return;
                 }
             } catch (err) {
                 console.error("Failed to poll order status", err);
@@ -92,6 +105,7 @@ export default function ConfirmationPage() {
         pollRef.current = setInterval(run, 5000);
 
         return () => {
+            stopped = true;
             if (pollRef.current) clearInterval(pollRef.current);
         };
         // run only once on mount / when resolvedState changes
@@ -166,6 +180,11 @@ export default function ConfirmationPage() {
         }
     }, [resolvedState, navigate]);
 
+    // ── Clear sessionStorage once the invoice is displayed ───────────────────
+    useEffect(() => {
+        if (orderLoaded) sessionStorage.removeItem(CONFIRMATION_STATE_KEY);
+    }, [orderLoaded]);
+
     if (!resolvedState) return null;
 
     // ── Loading state while we wait for the order ───────────────────────────
@@ -199,9 +218,6 @@ export default function ConfirmationPage() {
             </div>
         );
     }
-
-    // ── Clear sessionStorage once invoice is displayed ───────────────────────
-    sessionStorage.removeItem(CONFIRMATION_STATE_KEY);
 
     const StepIndicator = ({ step, title, active, complete }: { step: number, title: string, active: boolean, complete: boolean }) => (
         <div className={`flex items-center gap-2 ${active ? 'text-dark-red' : complete ? 'text-green-700' : 'text-gray-300'}`}>
@@ -295,6 +311,9 @@ export default function ConfirmationPage() {
                                 <p className="font-sans text-sm text-gray-800 max-w-[250px] leading-relaxed mt-1">
                                     {order.shippingDetails.address}<br />
                                     {order.shippingDetails.city}, {order.shippingDetails.state} {order.shippingDetails.pincode}
+                                    {order.shippingDetails.country && !['india', 'in', 'bharat', 'ind'].includes(order.shippingDetails.country.toLowerCase().trim()) && (
+                                        <><br />{order.shippingDetails.country}</>
+                                    )}
                                 </p>
                                 <p className="font-sans text-sm text-gray-800 mt-2">Phone: {order.shippingDetails.phone}</p>
                             </div>
@@ -309,19 +328,21 @@ export default function ConfirmationPage() {
                                     <div key={idx} className="flex justify-between items-center bg-white p-3 border border-silk/30 shadow-sm">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 bg-silk-light shrink-0">
-                                                <img 
-                                                  loading="lazy"
-                                                  src={item.product?.images?.[0] || 'https://via.placeholder.com/40'} 
-                                                  alt="" 
-                                                  className="w-full h-full object-contain p-1 mix-blend-multiply" 
-                                                />
+                                                {item.product?.images?.[0] && (
+                                                    <img
+                                                      loading="lazy"
+                                                      src={productImage(item.product.images[0], 'thumb')}
+                                                      alt=""
+                                                      className="w-full h-full object-contain p-1 mix-blend-multiply"
+                                                    />
+                                                )}
                                             </div>
                                             <div>
                                                 <p className="font-serif text-sm text-dark-red line-clamp-1">{item.product?.name || 'Product'}</p>
                                                 <p className="font-sans text-xs text-gray-500">Qty: {item.quantity}</p>
                                             </div>
                                         </div>
-                                        <p className="font-sans text-sm font-semibold">{formatCurrency(item.priceAtPurchase * item.quantity, order.currency)}</p>
+                                        <p className="font-sans text-sm font-semibold">{formatCurrency(item.priceAtPurchase * item.quantity * ((order.currency && order.currency !== 'INR' && order.exchangeRate) ? order.exchangeRate : 1), order.currency)}</p>
                                     </div>
                                 ))}
                             </div>
@@ -329,10 +350,17 @@ export default function ConfirmationPage() {
                             <div className="border-t border-silk pt-4 space-y-2">
                                 {(() => {
                                     const rawShippingCost = order.shippingCost ?? 0;
+                                    const rawCodCharge = order.codCharge ?? 0;
                                     const rawDiscountAmount = order.discountAmount ?? 0;
                                     const rawTaxAmount = order.taxAmount ?? 0;
                                     const rawTotalAmount = order.totalAmount ?? 0;
-                                    const rawSubtotal = (order.originalAmount ?? rawTotalAmount) - rawShippingCost;
+                                    // From the line items — originalAmount − shippingCost over-stated it
+                                    // when a free-shipping coupon zeroed shippingCost.
+                                    const itemFx = (order.currency && order.currency !== 'INR' && order.exchangeRate) ? order.exchangeRate : 1;
+                                    const itemsSubtotal = order.items.reduce((sum, i) => sum + (i.priceAtPurchase || 0) * (i.quantity || 0), 0) * itemFx;
+                                    const rawSubtotal = itemsSubtotal > 0
+                                      ? itemsSubtotal
+                                      : (order.originalAmount ?? rawTotalAmount) - rawShippingCost - rawCodCharge;
                                     
                                     const _fmt = (amt: number) => formatCurrency(amt, order.currency);
 
@@ -348,9 +376,15 @@ export default function ConfirmationPage() {
                                                     {rawShippingCost <= 0 ? 'Free' : _fmt(rawShippingCost)}
                                                 </span>
                                             </div>
+                                            {rawCodCharge > 0 && (
+                                                <div className="flex justify-between items-center py-1">
+                                                    <span className="text-gray-500 text-sm font-sans">Cash on Delivery fee</span>
+                                                    <span className="text-sm font-sans text-gray-600">{_fmt(rawCodCharge)}</span>
+                                                </div>
+                                            )}
                                             {rawDiscountAmount > 0 && (
                                                 <div className="flex justify-between items-center py-1">
-                                                    <span className="text-gray-500 text-sm font-sans">Discount {order.isWelcomeOfferApplied ? '(Welcome Offer)' : ''}</span>
+                                                    <span className="text-gray-500 text-sm font-sans">Discount {order.isWelcomeOfferApplied ? '(Welcome Offer)' : order.couponCode ? `(${order.couponCode})` : ''}</span>
                                                     <span className="text-sm font-sans text-green-700">-{_fmt(rawDiscountAmount)}</span>
                                                 </div>
                                             )}

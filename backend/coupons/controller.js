@@ -76,6 +76,20 @@ export const updateCoupon = async (req, res) => {
   try {
     const { code, type, value, minOrderValue, perUserLimit, totalCap, allowsStacking, expiresAt, description, isActive, applicableProducts } = req.body;
 
+    // Same value bounds createCoupon enforces — an edit could otherwise set a 150% discount.
+    if (value !== undefined || type !== undefined) {
+      const current = await Coupon.findById(req.params.id).select("type value").lean();
+      if (!current) return res.status(404).json({ success: false, message: "Coupon not found" });
+      const effectiveType = type ?? current.type;
+      const effectiveValue = value ?? current.value;
+      if (typeof effectiveValue === "number" && effectiveValue < 0) {
+        return res.status(400).json({ success: false, message: "Value cannot be negative" });
+      }
+      if (effectiveType === "percentage" && (effectiveValue < 1 || effectiveValue > 100)) {
+        return res.status(400).json({ success: false, message: "Percentage value must be between 1 and 100" });
+      }
+    }
+
     // Same guard as createCoupon — enforce via API, not just the UI
     if ((type === "free_shipping" || !type) && Array.isArray(applicableProducts) && applicableProducts.length > 0) {
       // Check if the existing coupon is free_shipping when type is not being changed
@@ -347,6 +361,23 @@ export const claimCouponUsage = async ({ couponId, userId, orderId, orderTotal, 
 };
 
 /**
+ * Hands back the coupon slot an order claimed, when that order is cancelled. Without
+ * this a "one per customer" coupon on a cancelled order stayed spent — the customer
+ * was told they had already used it — and cancelled orders ate into totalCap.
+ * Idempotent: the CouponUse row is deleted first and the counters are only
+ * decremented if this call is the one that deleted it.
+ */
+export const releaseCouponUsage = async (orderId) => {
+  if (!orderId) return false;
+  const use = await CouponUse.findOneAndDelete({ order: orderId });
+  if (!use) return false;
+  const userKey = `usesByUser.${use.user.toString()}`;
+  await Coupon.updateOne({ _id: use.coupon, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } });
+  await Coupon.updateOne({ _id: use.coupon, [userKey]: { $gt: 0 } }, { $inc: { [userKey]: -1 } });
+  return true;
+};
+
+/**
  * GET /api/v1/offers
  * Returns active coupons for the frontend display
  */
@@ -358,6 +389,7 @@ export const publicOffers = async (req, res) => {
     // We sort by createdAt to get the newest offers
     const coupons = await Coupon.find({
       isActive: true,
+      isPrivate: { $ne: true },
       $or: [
         { expiresAt: null },
         { expiresAt: { $gt: now } }

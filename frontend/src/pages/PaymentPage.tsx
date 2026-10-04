@@ -12,6 +12,7 @@ import { formatCurrency } from '../utils/currencies';
 import { useCurrency } from '../hooks/useCurrency';
 import { useSEO } from '../hooks/useSEO';
 import { toTrustedScriptURL } from '../utils/trustedTypes';
+import { productImage } from '../utils/productImage';
 
 // ─── Checkout session timeout constants ──────────────────────────────────────
 // ⚠️ TEST VALUES — restore for production:
@@ -73,7 +74,7 @@ export default function PaymentPage() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string, currency: string, isFallback: boolean, subtotal?: number, taxAmount?: number, taxRatePercent?: number } | null>(null);
+    const [quoteData, setQuoteData] = useState<{ quoteId: string, shippingCost: number, total: number, deliveryEstimate: string, currency: string, isFallback: boolean, subtotal?: number, discountAmount?: number, couponCode?: string | null, taxAmount?: number, taxRatePercent?: number } | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(true);
     const [quoteError, setQuoteError] = useState<string | null>(null);
 
@@ -253,11 +254,14 @@ export default function PaymentPage() {
                     setQuoteData({
                         quoteId: data.quoteId,
                         shippingCost: data.shippingCost,
-                        total: data.totalAmount || data.total,
+                        // ?? not || — a fully discounted order has a legitimate total of 0.
+                        total: data.totalAmount ?? data.total,
                         deliveryEstimate: data.deliveryEstimate,
                         currency: data.currency || 'INR',
                         isFallback: !!data.isFallback,
                         subtotal: data.subtotal,
+                        discountAmount: data.discountAmount,
+                        couponCode: data.couponCode ?? null,
                         taxAmount: data.taxAmount,
                         taxRatePercent: data.taxRatePercent
                     });
@@ -285,7 +289,10 @@ export default function PaymentPage() {
                         }, 1000);
                     } else {
                         const isTimeout = err.name === 'AbortError' || err.message?.includes('aborted');
-                        toast.error(isTimeout ? 'Server is taking too long to respond. Please check your connection.' : 'Session expired — please review your cart.');
+                        // Show the server's reason (item no longer sold, out of stock, no
+                        // shipping to that country) — "Session expired" sent customers back
+                        // to the cart with no idea what to fix.
+                        toast.error(isTimeout ? 'Server is taking too long to respond. Please check your connection.' : (err.message || 'Please review your cart.'));
                         navigate('/cart', { replace: true });
                     }
                 }
@@ -381,14 +388,30 @@ export default function PaymentPage() {
     // never offers an option the backend will reject. The server remains the authority;
     // this only avoids a dead-end at submit time.
     const isDomesticOrder = isIndiaCountry(shippingDetails.country);
+    const quoteIsInr = (quoteData?.currency || 'INR') === 'INR';
+    // Admin "Minimum order for COD" and "COD extra charge" — enforced by createOrder,
+    // which compares the INR total after discounts (shipping included) to the minimum.
+    const codMinimum = Math.max(0, Number(storeSettings.minOrderValueForCOD) || 0);
+    const codFee = Math.max(0, Number(storeSettings.codExtraCharge) || 0);
+    const codRegionAllowed = isDomesticOrder || !!storeSettings.codInternationalEnabled;
+    const belowCodMinimum = codMinimum > 0 && quoteIsInr && total < codMinimum;
     const codAvailable =
-        storeSettings.codEnabled !== false &&
-        (isDomesticOrder || !!storeSettings.codInternationalEnabled);
+        storeSettings.codEnabled !== false && codRegionAllowed && !belowCodMinimum;
     const codUnavailableReason = codAvailable
         ? null
         : storeSettings.codEnabled === false
             ? 'Cash on Delivery is currently unavailable'
-            : 'Not available for international shipping';
+            : !codRegionAllowed
+                ? 'Not available for international shipping'
+                : `Available on orders of ₹${codMinimum.toLocaleString('en-IN')} or more`;
+    // A COD choice that stops being valid (a coupon dropped the total under the minimum,
+    // the address changed country) falls back to card instead of a disabled, still-checked
+    // COD radio that only fails at submit.
+    const isCod = paymentMethod === 'cod' && codAvailable;
+    const effectiveMethod = paymentMethod === 'cod' && !codAvailable ? 'card' : paymentMethod;
+    const codFeeApplied = isCod && quoteIsInr ? codFee : 0;
+    const displayTotal = total + codFeeApplied;
+    const quoteDiscount = quoteData?.discountAmount ?? 0;
 
 
     const billingErrors: Partial<BillingForm> = {};
@@ -435,7 +458,7 @@ export default function PaymentPage() {
             
             const finalBillingDetails = billingSameAsShipping ? null : billingDetails;
 
-            if (paymentMethod === 'cod') {
+            if (isCod) {
                 // Defensive: the radio is disabled when COD is unavailable, but settings
                 // can change between page load and submit. Fail here with a clear message
                 // rather than letting the server reject the order.
@@ -561,14 +584,16 @@ export default function PaymentPage() {
                     },
 
                     prefill: {
-                        name: shippingDetails.name || user?.displayName || 'Customer',
-                        email: shippingDetails.email || user?.email || 'customer@example.com',
-                        contact: shippingDetails.phone || '9999999999',
+                        // No placeholder email/phone: Razorpay sends the receipt to the
+                        // prefilled email, so a fake one sent it nowhere.
+                        name: shippingDetails.name || user?.displayName || undefined,
+                        email: shippingDetails.email || user?.email || undefined,
+                        contact: shippingDetails.phone || undefined,
                         method:
                             !isIndiaCountry(shippingDetails.country) ? undefined
-                            : paymentMethod === 'card' ? 'card'
-                            : paymentMethod === 'upi' ? 'upi'
-                            : paymentMethod === 'netbanking' ? 'netbanking'
+                            : effectiveMethod === 'card' ? 'card'
+                            : effectiveMethod === 'upi' ? 'upi'
+                            : effectiveMethod === 'netbanking' ? 'netbanking'
                             : undefined
                     },
 
@@ -832,7 +857,7 @@ export default function PaymentPage() {
                                                     type="radio"
                                                     name="payment"
                                                     value="card"
-                                                    checked={paymentMethod === 'card'}
+                                                    checked={effectiveMethod === 'card'}
                                                     onChange={() => setPaymentMethod('card')}
                                                     className="w-4 h-4 text-dark-red focus:ring-dark-red"
                                                 />
@@ -858,7 +883,7 @@ export default function PaymentPage() {
                                                             type="radio"
                                                             name="payment"
                                                             value="upi"
-                                                            checked={paymentMethod === 'upi'}
+                                                            checked={effectiveMethod === 'upi'}
                                                             onChange={() => setPaymentMethod('upi')}
                                                             className="w-4 h-4 text-dark-red focus:ring-dark-red"
                                                         />
@@ -874,7 +899,7 @@ export default function PaymentPage() {
                                                             type="radio"
                                                             name="payment"
                                                             value="netbanking"
-                                                            checked={paymentMethod === 'netbanking'}
+                                                            checked={effectiveMethod === 'netbanking'}
                                                             onChange={() => setPaymentMethod('netbanking')}
                                                             className="w-4 h-4 text-dark-red focus:ring-dark-red"
                                                         />
@@ -892,7 +917,7 @@ export default function PaymentPage() {
                                                     type="radio"
                                                     name="payment"
                                                     value="cod"
-                                                    checked={paymentMethod === 'cod'}
+                                                    checked={isCod}
                                                     onChange={() => {
                                                         if (codAvailable) setPaymentMethod('cod');
                                                     }}
@@ -901,6 +926,9 @@ export default function PaymentPage() {
                                                 />
                                                 <div className="ml-4 flex flex-col w-full">
                                                     <span className="font-sans text-sm tracking-wide text-gray-800">Cash on Delivery</span>
+                                                    {codAvailable && codFee > 0 && (
+                                                        <span className="font-sans text-[10px] text-gray-500 mt-0.5">+ {formatCurrency(codFee, 'INR')} COD fee</span>
+                                                    )}
                                                     {codUnavailableReason && (
                                                         <span className="font-sans text-[10px] text-gray-500 mt-0.5">{codUnavailableReason}</span>
                                                     )}
@@ -1041,7 +1069,7 @@ export default function PaymentPage() {
                                                 Processing…
                                             </>
                                         ) : (
-                                            <>Place Order ({formatCurrency(total, quoteData?.currency || 'INR')}) <ChevronRight size={16} /></>
+                                            <>Place Order ({formatCurrency(displayTotal, quoteData?.currency || 'INR')}) <ChevronRight size={16} /></>
                                         )}
                                     </button>
                                 </div>
@@ -1070,7 +1098,7 @@ export default function PaymentPage() {
                                             <div className="w-16 h-20 bg-silk-light shrink-0">
                                                 <img
                                                     loading="lazy"
-                                                    src={item.product.images[0]}
+                                                    src={productImage(item.product.images[0], 'thumb')}
                                                     alt=""
                                                     className="w-full h-full object-contain p-1 mix-blend-multiply"
                                                 />
@@ -1095,17 +1123,31 @@ export default function PaymentPage() {
                                         <span>Subtotal</span>
                                         <span>{quoteData?.subtotal !== undefined ? formatCurrency(quoteData.subtotal, quoteData.currency) : formatPrice(cartTotal)}</span>
                                     </div>
+                                    {/* The total already had the discount taken off, but no line
+                                        showed it — Subtotal + Shipping didn't add up to Total. */}
+                                    {quoteDiscount > 0 && (
+                                        <div className="flex justify-between text-green-700">
+                                            <span>Discount{quoteData?.couponCode ? ` (${quoteData.couponCode})` : ''}</span>
+                                            <span>-{formatCurrency(quoteDiscount, quoteData?.currency || 'INR')}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-gray-600">
                                         <span>Shipping</span>
                                         <span className={shippingCost === 0 ? 'text-green-700 font-medium' : 'text-gray-900'}>
                                             {shippingCost === 0 ? 'Free' : formatCurrency(shippingCost, quoteData?.currency || 'INR')}
                                         </span>
                                     </div>
+                                    {codFeeApplied > 0 && (
+                                        <div className="flex justify-between text-gray-600">
+                                            <span>Cash on Delivery fee</span>
+                                            <span className="text-gray-900">{formatCurrency(codFeeApplied, 'INR')}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="border-t border-silk mt-4 pt-4 flex justify-between font-serif text-xl text-dark-red">
                                     <span>Total</span>
-                                    <span>{formatCurrency(total, quoteData?.currency || 'INR')}</span>
+                                    <span>{formatCurrency(displayTotal, quoteData?.currency || 'INR')}</span>
                                 </div>
 
                                 {/* GST is contained within Total, not added to it — so this is a

@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSEO } from '../hooks/useSEO';
 import { getCountryNameFromIso } from '../utils/countries';
 import { formatCurrency } from '../utils/currencies';
+import { productImage } from '../utils/productImage';
 
 export default function CartPage() {
   useSEO({
@@ -71,9 +72,19 @@ export default function CartPage() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  // Problems with the bag itself (an item that's no longer sold, not enough stock).
+  // These used to be shown as a coupon error and silently removed the coupon.
+  const [cartError, setCartError] = useState<string | null>(null);
+  // Set when this effect itself clears the coupon from a quote it already has, so
+  // the appliedCoupon change doesn't trigger a second, identical quote request.
+  const skipNextQuoteRef = useRef(false);
 
   useEffect(() => {
     if (validCartItems.length === 0) return;
+    if (skipNextQuoteRef.current) {
+      skipNextQuoteRef.current = false;
+      return;
+    }
     let isMounted = true;
     
     // Prepare lightweight items list to send to the API (avoid sending full product objects)
@@ -98,8 +109,10 @@ export default function CartPage() {
             isWelcomeOfferApplied: data.isWelcomeOfferApplied,
             isFreeShippingCouponApplied: data.isFreeShippingCouponApplied
           });
+          setCartError(null);
           // Also set the applied coupon code from backend (in case it got invalidated e.g. min order value not met)
           if (appliedCoupon && !data.couponCode) {
+             skipNextQuoteRef.current = true;
              setAppliedCoupon(null);
              setCouponError("Coupon is no longer valid for this cart.");
           }
@@ -108,17 +121,26 @@ export default function CartPage() {
       .catch(err => {
          if (err.isRateLimit) {
             console.error("Rate limit hit");
-         } else if (isMounted) {
-            setAppliedCoupon(null);
-            setCouponError(err.message || "Invalid coupon");
-            // Re-fetch without the invalid coupon
-            fetchShippingQuote(itemsForQuote, { country: previewCountry }).then(d => {
-              if (isMounted) {
-                const s = storeSettingsRef.current;
-                setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, subtotal: d.subtotal, currency: d.currency || 'INR', isFetched: true, threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
-              }
-            }).catch(e => console.error("Fallback quote failed:", e));
+            return;
          }
+         if (!isMounted) return;
+         if (!appliedCoupon) {
+            setCartError(err.message || 'Could not price your bag. Please try again.');
+            return;
+         }
+         // Retry without the coupon to tell a bad coupon from a problem with the bag.
+         fetchShippingQuote(itemsForQuote, { country: previewCountry }).then(d => {
+           if (!isMounted) return;
+           const s = storeSettingsRef.current;
+           setQuoteData({ shippingCost: d.shippingCost, discountAmount: d.discountAmount, total: d.totalAmount, subtotal: d.subtotal, currency: d.currency || 'INR', isFetched: true, threshold: isPreviewIndia ? s.shippingThreshold : s.internationalShippingThreshold, isWelcomeOfferApplied: d.isWelcomeOfferApplied, isFreeShippingCouponApplied: d.isFreeShippingCouponApplied });
+           setCartError(null);
+           skipNextQuoteRef.current = true;
+           setAppliedCoupon(null);
+           setCouponError(err.message || "Invalid coupon");
+         }).catch(e => {
+           // Fails without the coupon too — the bag is the problem; keep the coupon.
+           if (isMounted) setCartError(e.message || 'Could not price your bag. Please try again.');
+         });
       });
       
     return () => { isMounted = false; };
@@ -208,7 +230,7 @@ export default function CartPage() {
                 >
                   <img
                     loading="lazy"
-                    src={item.product.images[0]}
+                    src={productImage(item.product.images?.[0], 'thumb')}
                     alt={item.product.name}
                     className="w-full h-full object-contain p-1 mix-blend-multiply"
                   />
@@ -225,7 +247,7 @@ export default function CartPage() {
                           makeup: 'Makeup',
                           lip: 'Lip Care',
                           other: 'Other'
-                        }[item.product.category] || 'Body Care'}
+                        }[item.product.category] || item.product.category || ''}
                       </p>
                       <h3 className="font-serif text-dark-red text-base">{item.product.name}</h3>
                       {item.variant && (
@@ -261,7 +283,9 @@ export default function CartPage() {
                       </span>
                       <button
                         onClick={() => updateQuantity(item.product.pid, item.quantity + 1, item.variant)}
-                        className="w-8 h-8 flex items-center justify-center text-dark-red hover:bg-silk-light"
+                        disabled={typeof item.product.stock === 'number' && item.quantity >= item.product.stock}
+                        title={typeof item.product.stock === 'number' && item.quantity >= item.product.stock ? `Only ${item.product.stock} in stock` : undefined}
+                        className="w-8 h-8 flex items-center justify-center text-dark-red hover:bg-silk-light disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         <Plus size={12} />
                       </button>
@@ -346,6 +370,13 @@ export default function CartPage() {
                         </button>
                       </div>
                       {couponError && <p className="text-xs text-ruby-red font-sans">{couponError}</p>}
+                      {/* Coupons don't stack with the welcome offer (pricing.js) — a smaller
+                          code would otherwise silently cost the customer their 10%. */}
+                      {quoteData.isWelcomeOfferApplied && (
+                        <p className="text-[11px] text-grey-beige font-sans">
+                          A promo code replaces your 10% welcome offer.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 px-3 py-2 text-sm">
@@ -368,6 +399,9 @@ export default function CartPage() {
                 </div>
               </div>
 
+              {cartError && (
+                <p className="text-xs text-ruby-red font-sans mb-3 border border-ruby-red/30 bg-ruby-red/5 px-3 py-2">{cartError}</p>
+              )}
               <button
                 onClick={() => {
                   // 🎯 Google Analytics/Ads Tracking - Begin Checkout

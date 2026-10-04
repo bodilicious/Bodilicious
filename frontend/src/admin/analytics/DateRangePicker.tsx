@@ -20,8 +20,24 @@ const PRESETS = [
   { label: 'All Time', specialized: 'all' },
 ];
 
+// Typing a year digit-by-digit makes a date input emit "0002-…", "0020-…", "0202-…".
+// Passing each of those up refetched the whole page per keystroke; only a complete,
+// plausible date is applied.
+const isPlausibleDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number(v.slice(0, 4)) >= 2000;
+
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ onRangeChange, currentRange }) => {
   const [isOpen, setIsOpen] = React.useState(false);
+  // Local drafts so the inputs stay editable while a partial date is being typed.
+  const [draftStart, setDraftStart] = React.useState(currentRange.startDate);
+  const [draftEnd, setDraftEnd] = React.useState(currentRange.endDate);
+  React.useEffect(() => { setDraftStart(currentRange.startDate); }, [currentRange.startDate]);
+  React.useEffect(() => { setDraftEnd(currentRange.endDate); }, [currentRange.endDate]);
+
+  const applyCustom = (startDate: string, endDate: string) => {
+    if (!isPlausibleDate(startDate) || !isPlausibleDate(endDate) || startDate > endDate) return;
+    if (startDate === currentRange.startDate && endDate === currentRange.endDate) return;
+    onRangeChange({ startDate, endDate, label: 'Custom' });
+  };
 
   const handlePresetSelect = (preset: any) => {
     const end = new Date();
@@ -81,16 +97,18 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ onRangeChange, curren
             <div className="border-t border-gray-50 mt-2 pt-2 px-2">
                <div className="px-2 pb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Custom Range</div>
                <div className="space-y-2">
-                 <input 
-                   type="date" 
-                   value={currentRange.startDate}
-                   onChange={(e) => onRangeChange({ ...currentRange, startDate: e.target.value, label: 'Custom' })}
+                 <input
+                   type="date"
+                   value={draftStart}
+                   max={draftEnd || undefined}
+                   onChange={(e) => { setDraftStart(e.target.value); applyCustom(e.target.value, draftEnd); }}
                    className="w-full text-xs p-2 border border-gray-100 rounded-lg outline-none focus:ring-1 ring-dark-red/20"
                  />
-                 <input 
-                   type="date" 
-                   value={currentRange.endDate}
-                   onChange={(e) => onRangeChange({ ...currentRange, endDate: e.target.value, label: 'Custom' })}
+                 <input
+                   type="date"
+                   value={draftEnd}
+                   min={draftStart || undefined}
+                   onChange={(e) => { setDraftEnd(e.target.value); applyCustom(draftStart, e.target.value); }}
                    className="w-full text-xs p-2 border border-gray-100 rounded-lg outline-none focus:ring-1 ring-dark-red/20"
                  />
                </div>

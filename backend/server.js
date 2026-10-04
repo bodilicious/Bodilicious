@@ -13,9 +13,11 @@ import { initDraftOrderCleanupCron } from "./cron/draftOrders.js";
 import { runSettingsMigration } from "./settings/migration.js";
 import { initAuditWorker } from "./audit/worker.js";
 import { getSettings } from "./settings/cache.js";
+import { runIndexMaintenance } from "./utils/indexMaintenance.js";
 
 import Order from "./tracker/models.js";
 import NotificationService from "./procurement/notificationService.js";
+import Notification from "./procurement/notificationModel.js";
 
 const gracefulShutdown = async (signal) => {
   console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
@@ -34,16 +36,28 @@ const gracefulShutdown = async (signal) => {
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
+// Node 15+ terminates the process on an unhandled promise rejection. One stray
+// fire-and-forget promise (an email, a notification, an event listener) would take
+// down the whole API — log it instead and keep serving.
+process.on("unhandledRejection", (reason) => {
+  console.error("[Process] Unhandled promise rejection:", reason?.stack || reason);
+});
+
 mongoose
   .connect(process.env.MONGO_URI, {
     dbName: process.env.DB_NAME,
-    maxPoolSize: 50, // Safe limit for M0 (500 max) when running separate web/worker dynos
+    // One small instance: 10 concurrent connections is plenty, and each idle one
+    // costs memory on a 512 MB box (and counts against M0's connection limit).
+    maxPoolSize: 10,
   })
   .then(async () => {
     console.log("MongoDB connected");
 
     await runSettingsMigration();
     await initProductCollection();
+    // Index housekeeping only (never deletes documents): makes sure no log index
+    // auto-expires and drops redundant indexes. Background + best-effort.
+    runIndexMaintenance(mongoose.connection.db).catch(err => console.error("[IndexMaintenance]", err.message));
     initAnalyticsCron(); // Start background aggregations
     initSupportCleanupCron(); // Start orphaned Cloudinary upload cleanup
     
@@ -82,13 +96,26 @@ mongoose
 
         if (stuckOrders.length > 0) {
           console.warn(`[Startup] ⚠️  ${stuckOrders.length} order(s) need manual review.`);
+          // Free Render instances sleep when idle and cold-start many times a day; this
+          // re-alerted every flagged order on each wake. Alert once per order per day.
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const recentlyAlerted = new Set(
+            (await Notification.find({
+              sourceModel: "Order",
+              title: /^⚠️ Manual Review Required/,
+              createdAt: { $gte: since },
+            }).select("sourceId").lean()).map(n => n.sourceId)
+          );
           for (const o of stuckOrders) {
+            if (recentlyAlerted.has(o._id.toString())) continue;
             await NotificationService.emit({
               title: `⚠️ Manual Review Required — Order ${o._id.toString().slice(-6).toUpperCase()}`,
+              // needsManualReview covers more than unfinished payments now (failed
+              // refunds, RTOs, international fulfilment) — so lead with the reason.
               // `|| "INR"` matters here: this is a .lean() query, and lean results
               // skip Mongoose schema defaults, so orders written before `currency`
               // existed come back undefined and would print "undefined 1499".
-              body: `Order ${o._id} (${o.currency || "INR"} ${o.totalAmount}) was paid (payment: ${o.razorpayPaymentId || "unknown"}) but was never fully processed. Reason: ${o.reviewReason || "unknown"}. Created: ${new Date(o.createdAt).toISOString()}`,
+              body: `Order ${o._id} (${o.currency || "INR"} ${o.totalAmount}) needs manual review. Reason: ${o.reviewReason || "unknown"}. Payment: ${o.razorpayPaymentId || "n/a"}. Created: ${new Date(o.createdAt).toISOString()}`,
               type: "critical",
               sourceModule: "orders",
               sourceModel: "Order",
@@ -108,4 +135,7 @@ mongoose
   })
   .catch((err) => {
     console.error("MongoDB connection failed:", err.message);
+    // Exit so the host restarts us. Staying alive with no DB and no listener left the
+    // service "running" but unreachable until someone noticed and redeployed.
+    process.exit(1);
   });

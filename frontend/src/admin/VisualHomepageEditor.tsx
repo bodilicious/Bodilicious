@@ -7,12 +7,13 @@ import { Loader2, Save, Undo2, Eye, MonitorSmartphone, Layers, ChevronLeft, Chec
 type ViewMode = 'desktop' | 'mobile';
 
 export default function VisualHomepageEditor() {
-  const { user, getAuthHeaders } = useApp();
+  const { getAuthHeaders } = useApp();
   const [draftContent, setDraftContent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
   const [lastPublishedInfo, setLastPublishedInfo] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -76,10 +77,12 @@ export default function VisualHomepageEditor() {
 
   // Debounced auto-save
   const debounceTimeoutRef = useRef<any>(null);
-  const debouncedSave = useCallback(
-    async (newContent: any) => {
-      clearTimeout(debounceTimeoutRef.current);
-      debounceTimeoutRef.current = setTimeout(async () => {
+  const latestContentRef = useRef<any>(null);       // newest edit, for flushing
+  const saveInFlightRef = useRef<Promise<boolean> | null>(null);
+
+  const saveDraft = useCallback(
+    (content: any): Promise<boolean> => {
+      const run = (async () => {
         setIsSaving(true);
         try {
           const headers = await getAuthHeaders();
@@ -89,26 +92,42 @@ export default function VisualHomepageEditor() {
               ...headers,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify(newContent)
+            body: JSON.stringify(content)
           });
           const data = await res.json();
           if (!res.ok || !data.success) {
             toast.error(data.message || 'Autosave failed');
-          } else {
-            setSavedAt(new Date());
-            setHasUnsavedChanges(false);
+            return false;
           }
+          setSavedAt(new Date());
+          if (latestContentRef.current === content) setHasUnsavedChanges(false);
+          return true;
         } catch (err: any) {
           toast.error('Autosave failed');
+          return false;
         } finally {
           setIsSaving(false);
         }
+      })();
+      saveInFlightRef.current = run;
+      return run;
+    },
+    [getAuthHeaders, API_URL]
+  );
+
+  const debouncedSave = useCallback(
+    (newContent: any) => {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = setTimeout(() => {
+        debounceTimeoutRef.current = null;
+        saveDraft(newContent);
       }, 1200);
     },
-    [user, API_URL]
+    [saveDraft]
   );
 
   const handleContentChange = (newContent: any) => {
+    latestContentRef.current = newContent;
     setDraftContent(newContent);
     setHasUnsavedChanges(true);
     debouncedSave(newContent);
@@ -119,6 +138,17 @@ export default function VisualHomepageEditor() {
 
     setIsPublishing(true);
     try {
+      // Publish copies the SERVER's draft. Edits from the last 1.2s (debounce) or a save
+      // still in flight weren't on the server yet, so they were silently left out of
+      // the published homepage while the UI said it published successfully.
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+        if (!(await saveDraft(latestContentRef.current))) return;
+      } else if (saveInFlightRef.current && !(await saveInFlightRef.current)) {
+        return;
+      }
+
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/api/v1/settings/homepage/publish`, {
         method: 'POST',
@@ -144,7 +174,16 @@ export default function VisualHomepageEditor() {
   const handleDiscard = async () => {
     if (!window.confirm('Are you sure you want to discard all unpublished changes? This will revert the editor to the live version.')) return;
 
-    setIsLoading(true);
+    // A pending autosave would otherwise fire after the revert and write the discarded
+    // edits straight back into the draft.
+    clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = null;
+    if (saveInFlightRef.current) await saveInFlightRef.current;
+
+    // Not setIsLoading: that unmounted the preview iframe, and the remounted one's
+    // "preview-ready" didn't change previewReady (already true), so it never received
+    // content and stayed blank until a page reload.
+    setIsDiscarding(true);
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/api/v1/settings/homepage/discard`, {
@@ -154,6 +193,7 @@ export default function VisualHomepageEditor() {
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success('Draft reverted to last published version.');
+        latestContentRef.current = data.data || {};
         setDraftContent(data.data || {});
         setHasUnsavedChanges(false);
       } else {
@@ -162,7 +202,7 @@ export default function VisualHomepageEditor() {
     } catch (err: any) {
       toast.error(err.message || 'Error discarding draft');
     } finally {
-      setIsLoading(false);
+      setIsDiscarding(false);
     }
   };
 
@@ -232,9 +272,10 @@ export default function VisualHomepageEditor() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleDiscard}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
+            disabled={isDiscarding || isPublishing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-sans font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200 disabled:opacity-50"
           >
-            <Undo2 size={13} /> Discard
+            {isDiscarding ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} Discard
           </button>
 
           <a
@@ -248,7 +289,7 @@ export default function VisualHomepageEditor() {
 
           <button
             onClick={handlePublish}
-            disabled={isPublishing}
+            disabled={isPublishing || isDiscarding}
             className="flex items-center gap-1.5 px-5 py-1.5 bg-dark-red text-white text-xs font-sans font-medium uppercase tracking-wider rounded-md hover:bg-ruby-red disabled:opacity-70 transition-colors shadow-sm"
           >
             {isPublishing ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}

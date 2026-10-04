@@ -23,6 +23,19 @@ const reviewSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // StoreSettings.reviewModerationEnabled holds new reviews as "pending" until an
+    // admin approves them. Reviews from before moderation existed have no status and
+    // count as approved (see products/reviewModeration.js → isPublishedReview).
+    status: {
+      type: String,
+      enum: ["approved", "pending", "rejected"],
+      default: "approved",
+    },
+    // The single-use "review & save" coupon issued for this review, if any.
+    rewardCouponCode: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true, _id: true }
 );
@@ -162,12 +175,12 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-productSchema.index({ category: 1 });
+// Removed: { category } (prefix of the compound below), { isActive } (boolean — no
+// selectivity) and { stock } — stock changes on every order, so that index was
+// rewritten on every purchase while no query filters by stock alone.
 productSchema.index({ product_type: 1 });
 productSchema.index({ concerns_targeted: 1 });
 productSchema.index({ price: 1 });
-productSchema.index({ stock: 1 });
-productSchema.index({ isActive: 1 });
 // Compound index for category/brand/price browse paths
 productSchema.index({ category: 1, brand: 1, price: 1 }, { background: true });
 
@@ -177,12 +190,14 @@ productSchema.index({ "reviews.user": 1 }, { sparse: true });
 
 productSchema.set("autoCreate", true);
 
+// Published reviews only — pending/rejected reviews never move the stars.
 productSchema.methods.calculateRatings = function () {
-  this.ratingCount = this.reviews.length;
+  const published = this.reviews.filter(r => r.status !== "pending" && r.status !== "rejected");
+  this.ratingCount = published.length;
   this.rating =
     this.ratingCount === 0
       ? 0
-      : this.reviews.reduce((sum, r) => sum + r.rating, 0) / this.ratingCount;
+      : published.reduce((sum, r) => sum + r.rating, 0) / this.ratingCount;
 };
 
 const Product =

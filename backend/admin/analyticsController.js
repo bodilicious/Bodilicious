@@ -4,6 +4,7 @@ import UserProfile from "../profile/models.js";
 import { Ticket } from "../support/models.js";
 import RitualResponse from "./ritualModels.js";
 import AuditLogV2 from "../audit/models.js";
+import { parseRangeEnd } from "../utils/dateRange.js";
 
 /**
  * GET /api/v1/admin/analytics/sales?startDate=&endDate=
@@ -13,11 +14,18 @@ export const getSalesAnalytics = async (req, res) => {
     res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=30");
     const { startDate, endDate } = req.query;
 
-    const query = {};
+    // Only orders that represent a sale: paid (or since refunded), or COD. Matching every
+    // order counted abandoned and never-paid checkouts as revenue — the sales page
+    // reported ₹71,953 against ₹31,765 actually taken, and inflated order count and AOV
+    // the same way. Cancelled/returned sales stay in gross and drop out of net below.
+    const query = {
+      orderStatus: { $ne: "abandoned" },
+      $or: [{ paymentStatus: { $in: ["paid", "refunded"] } }, { paymentMethod: "cod" }],
+    };
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      if (endDate) query.createdAt.$lte = parseRangeEnd(endDate);
     }
 
     // Gross vs Net Revenue Trend
@@ -56,7 +64,8 @@ export const getSalesAnalytics = async (req, res) => {
         $group: {
           _id: "$paymentMethod",
           count: { $sum: 1 },
-          revenue: { $sum: "$totalAmount" }
+          // INR only, like every other revenue figure here — a USD total summed into ₹ is meaningless.
+          revenue: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }, "$totalAmount", 0] } }
         }
       }
     ]);
@@ -90,13 +99,27 @@ export const getSalesAnalytics = async (req, res) => {
             }
           },
           totalOrders: { $sum: 1 },
+          // Denominator for AOV: the same INR, not-cancelled/returned orders netRevenue sums.
+          netInrOrders: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $not: { $in: ["$orderStatus", ["returned", "cancelled"]] } },
+                  { $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }
+                ]},
+                1,
+                0
+              ]
+            }
+          },
           newCustomers: { $addToSet: "$user" } // Rough estimate for now
         }
       }
     ]);
 
-    const summary = stats[0] || { totalRevenue: 0, netRevenue: 0, totalOrders: 0, newCustomers: [] };
-    const aov = summary.totalOrders > 0 ? (summary.netRevenue / summary.totalOrders).toFixed(2) : 0;
+    const summary = stats[0] || { totalRevenue: 0, netRevenue: 0, totalOrders: 0, netInrOrders: 0, newCustomers: [] };
+    // Net revenue over ALL orders (incl. cancelled and foreign) understated AOV.
+    const aov = summary.netInrOrders > 0 ? (summary.netRevenue / summary.netInrOrders).toFixed(2) : 0;
 
     res.json({ 
       success: true, 
@@ -127,7 +150,7 @@ export const getProductAnalytics = async (req, res) => {
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      if (endDate) query.createdAt.$lte = parseRangeEnd(endDate);
     }
 
     const [topSelling, categoryRevenue] = await Promise.all([
@@ -389,7 +412,7 @@ export const getCustomerAnalytics = async (req, res) => {
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      if (endDate) query.createdAt.$lte = parseRangeEnd(endDate);
     }
 
     const segments = ["new", "loyal", "at_risk", "high_value"];
@@ -404,7 +427,7 @@ export const getCustomerAnalytics = async (req, res) => {
         {
           $group: {
             _id: null,
-            revenue: { $sum: "$totalAmount" },
+            revenue: { $sum: { $cond: [{ $eq: [{ $ifNull: ["$currency", "INR"] }, "INR"] }, "$totalAmount", 0] } },
             orderCount: { $sum: 1 }
           }
         }
@@ -567,10 +590,15 @@ export const getCustomerAnalytics = async (req, res) => {
        }
     });
 
-    res.json({ 
-      success: true, 
-      data: { 
-        segmentStats, 
+    // A customer can be in several segments (`segment` is an array), so summing the
+    // segment counts double-counts some customers and misses unsegmented ones.
+    const totalCustomers = await UserProfile.countDocuments({ role: "user" });
+
+    res.json({
+      success: true,
+      data: {
+        segmentStats,
+        totalCustomers,
         funnelData,
         trendData,
         support: {
@@ -578,7 +606,7 @@ export const getCustomerAnalytics = async (req, res) => {
           topIssues,
           resolutionTimes
         }
-      } 
+      }
     });
   } catch (err) {
     console.error("Customer Analytics Error:", err);
@@ -597,7 +625,7 @@ export const getOperationAnalytics = async (req, res) => {
     if (startDate || endDate) {
       matchQuery.createdAt = {};
       if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
-      if (endDate) matchQuery.createdAt.$lte = new Date(endDate);
+      if (endDate) matchQuery.createdAt.$lte = parseRangeEnd(endDate);
     }
 
     // 1. Carrier Performance
@@ -817,8 +845,8 @@ export const getBehavioralAnalytics = async (req, res) => {
         auditQuery.timestamp_utc.$gte = new Date(startDate);
       }
       if (endDate) {
-        query.createdAt.$lte = new Date(endDate);
-        auditQuery.timestamp_utc.$lte = new Date(endDate);
+        query.createdAt.$lte = parseRangeEnd(endDate);
+        auditQuery.timestamp_utc.$lte = parseRangeEnd(endDate);
       }
     }
 

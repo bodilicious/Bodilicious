@@ -14,8 +14,20 @@ import settingsRoutes from "./settings/routes.js";
 import whatsappRoutes from "./whatsapp/routes.js";
 import { adminRouter as blogAdminRoutes, categoryRouter as blogCategoryRoutes, publicRouter as blogPublicRoutes } from "./blog/routes.js";
 import { publicOffers } from "./coupons/controller.js";
+import { cacheResponse, clearResponseCache } from "./utils/responseCache.js";
 
 const router = Router();
+
+// Any successful write that could change a cached public response (products, stock
+// via orders, reviews, homepage, blogs, coupons/offers, settings) clears the response
+// cache, so admins and shoppers never wait out a TTL to see a change.
+const CACHE_AFFECTING_WRITES = /^\/(admin|settings|products|blogs|orders|payment\/(verify|razorpay))/;
+router.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS" && CACHE_AFFECTING_WRITES.test(req.path)) {
+    res.on("finish", () => { if (res.statusCode < 400) clearResponseCache(); });
+  }
+  next();
+});
 
 router.use("/products", productRoutes);
 router.use("/user", profileRoutes);
@@ -33,6 +45,6 @@ router.use("/settings", settingsRoutes);
 router.use("/support", supportRoutes);
 router.use("/whatsapp", whatsappRoutes);
 router.use("/blogs", blogPublicRoutes);
-router.get("/offers", publicOffers);
+router.get("/offers", cacheResponse(5 * 60_000), publicOffers);
 
 export default router;

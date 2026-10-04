@@ -149,6 +149,8 @@ export interface Order {
   totalAmount: number;
   originalAmount?: number;
   shippingCost?: number;
+  // Cash-on-delivery fee (already included in totalAmount/originalAmount)
+  codCharge?: number;
   discountAmount?: number;
   taxAmount?: number;
   currency?: string;
@@ -171,7 +173,17 @@ export interface Order {
     city: string;
     state: string;
     pincode: string;
+    country?: string;
   };
+  billingDetails?: {
+    name?: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  } | null;
   items: {
     product: Product;
     quantity: number;

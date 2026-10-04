@@ -61,10 +61,11 @@ import {
   buildFaqSchema,
   usableFaqs,
 } from '../utils/seo';
-import { usePostHog } from 'posthog-js/react';
+import { track } from '../utils/analytics';
 import { useCurrency } from '../hooks/useCurrency';
 import DOMPurify from 'dompurify';
 import { toTrustedHTML } from '../utils/trustedTypes';
+import { productImage } from '../utils/productImage';
 
 const AccordionItem = ({
   title,
@@ -111,7 +112,6 @@ export default function ProductPage() {
   const { pid } = useParams<{ pid: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const posthog = usePostHog();
 
   const {
     selectedProductPid: contextPid,
@@ -365,9 +365,18 @@ export default function ProductPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to submit review');
 
-      const successMsg = storeSettings.reviewModerationEnabled 
-        ? 'Review submitted and is pending approval.' 
+      // Driven by what the server actually did (it holds the review for approval
+      // when moderation is on, and issues the reward code to verified buyers).
+      const status = data?.data?.status;
+      const rewardCode = data?.data?.rewardCode;
+      let successMsg = status === 'pending'
+        ? 'Thanks! Your review is awaiting approval and will appear once it has been checked.'
         : 'Review submitted successfully!';
+      if (rewardCode) {
+        successMsg += ` Here's your ${data.data.rewardPercent}% off code for your next order: ${rewardCode}`;
+      } else if (storeSettings.reviewIncentiveEnabled && status === 'pending' && data?.data?.isVerified) {
+        successMsg += ' Your thank-you code will be emailed to you once it is approved.';
+      }
       setReviewFeedback({ type: 'success', msg: successMsg });
       setReviewComment('');
       setReviewRating(5);
@@ -435,9 +444,9 @@ export default function ProductPage() {
   }, [product?.category, product?.pid]);
 
   // ── Product View Tracking ──
-  // Handled server-side: getProductByPid already creates a UserInteractionLog('view')
-  // for authenticated users and logs the event via logAuditEvent.
-  // PostHog client-side tracking is kept for funnel analysis.
+  // Reported to /admin/analytics/track (public, optional auth). The comment here used
+  // to say the product fetch tracked views server-side — it couldn't (that request
+  // carries no token and logged nothing), so admin product views/funnels stayed at 0.
   const viewTracked = useRef(false);
   useEffect(() => {
     if (!product?.pid || viewTracked.current) return;
@@ -446,15 +455,26 @@ export default function ProductPage() {
     viewTracked.current = true;
     sessionStorage.setItem(sessionKey, '1');
 
-    // 🚀 PostHog Client-Side Tracking
-    if (posthog) {
-      posthog.capture('Product Viewed', {
-        productId: product.pid,
-        name: product.name,
-        category: product.category,
-        price: product.price
-      });
-    }
+    // First-party view event (feeds the admin product-velocity ETL + CRM)
+    (async () => {
+      try {
+        const headers = await getAuthHeaders().catch(() => ({}));
+        await fetch(`${import.meta.env.VITE_API_URL}/api/v1/admin/analytics/track`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'product_viewed', productId: product._id, productName: product.name }),
+          keepalive: true,
+        });
+      } catch { /* tracking must never affect the page */ }
+    })();
+
+    // 🚀 PostHog Client-Side Tracking (queued until the lazily-loaded SDK is ready)
+    track('Product Viewed', {
+      productId: product.pid,
+      name: product.name,
+      category: product.category,
+      price: product.price
+    });
 
     // 🎯 Google Analytics/Ads Client-Side Tracking (Dynamic Remarketing)
     if (typeof window !== 'undefined' && (window as any).gtag) {
@@ -489,7 +509,7 @@ export default function ProductPage() {
         });
       }
     }
-  }, [product?.pid, product?.name, product?.category, product?.price, posthog, userCurrency]); // pid is the primary dep; viewTracked ref + sessionStorage deduplicate
+  }, [product?.pid, product?.name, product?.category, product?.price, userCurrency]); // pid is the primary dep; viewTracked ref + sessionStorage deduplicate
 
   const prevImage = useCallback(() => {
     setActiveImage((i) => (i === 0 ? (product?.images.length || 1) - 1 : i - 1));
@@ -1187,7 +1207,12 @@ export default function ProductPage() {
                 title="Shipping & Returns"
                 isOpen={activeAccordion === 'shipping'}
                 onClick={() => toggleAccordion('shipping')}
-                content="Complimentary shipping on all orders over ₹1,500. We gladly accept returns of unused or gently used items within 7 days of purchase. Bodilicious is dedicated to your complete satisfaction."
+                // From store settings — this hardcoded ₹1,500 / "7 days of purchase", which
+                // disagreed with the cart's real threshold and the server's return rule
+                // (N days from delivery).
+                content={`${storeSettings.shippingThreshold > 0
+                  ? `Complimentary shipping within India on orders over ${formatPrice(storeSettings.shippingThreshold)}. `
+                  : ''}We gladly accept returns of unused or gently used items within ${storeSettings.returnWindowDays ?? 7} days of delivery. Bodilicious is dedicated to your complete satisfaction.`}
               />
             </div>
           </m.div>
@@ -1502,7 +1527,7 @@ export default function ProductPage() {
                     <div className="mb-6 bg-ruby-red/10 border border-ruby-red/20 rounded-xl p-3 flex items-start gap-2">
                       <span className="text-ruby-red mt-0.5">⭐</span>
                       <p className="text-xs font-sans text-dark-red">
-                        <strong>Review & Save!</strong> Leave a review and get a {storeSettings.reviewIncentiveDiscountPercent}% off coupon on your next order.
+                        <strong>Review & Save!</strong> Bought this? Leave a review and get a {storeSettings.reviewIncentiveDiscountPercent}% off coupon for your next order (for verified buyers of this product).
                       </p>
                     </div>
                   )}
@@ -1690,7 +1715,7 @@ export default function ProductPage() {
           >
             <div className="flex items-center gap-3 max-w-xl mx-auto">
               <img
-                src={product.images[0]}
+                src={productImage(product.images[0], 'thumb')}
                 alt=""
                 aria-hidden="true"
                 className="w-11 h-11 rounded-md object-cover bg-white shrink-0 border border-silk/40"

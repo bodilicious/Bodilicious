@@ -1,7 +1,7 @@
 import { Ticket, FAQ } from "./models.js";
 import Order from "../tracker/models.js";
 import mongoose from "mongoose";
-import { enqueueTicketLookup } from "./queue.js";
+import { processLookup } from "./worker.js";
 import {
   sendTicketAcknowledgementEmail,
   sendTicketReplyEmail,
@@ -31,14 +31,40 @@ const redis = _redis ?? { incr: () => Promise.resolve(0) };
 const ownerTagFor = (userId) => signInternal(`support-upload:${userId}`).slice(0, 16);
 const OWNER_TAG_RE = /(?:^|\/)BD-SUP-o([0-9a-f]{16})-/;
 
+const TICKET_TYPES = ["shipping", "payment", "other"];
+const isStaff = (user) => user?.role === "admin" || user?.role === "primary_admin";
+
+// Attachments must be files uploaded through /support/upload (our Cloudinary folder)
+// — the body was stored verbatim, so any URL (e.g. a phishing link) could be planted
+// as an "attachment" in front of support staff.
+const sanitizeAttachments = (attachments) =>
+  (Array.isArray(attachments) ? attachments : [])
+    .filter(a => typeof a === "string" && /^https:\/\/res\.cloudinary\.com\/[^\s"'<>]+\/bodilicious_support\//.test(a))
+    .slice(0, 5);
+
+// Internal notes (visibleToCustomer: false — e.g. "Auto-lookup blocked…", gateway
+// errors) were returned to customers in the API payload; the page merely hid them.
+const customerView = (ticket) => {
+  const t = typeof ticket?.toObject === "function" ? ticket.toObject() : { ...ticket };
+  t.messages = (t.messages || []).filter(m => m.visibleToCustomer !== false);
+  return t;
+};
+
 // POST /api/v1/support/tickets
 export const createTicket = async (req, res) => {
   try {
     const { type, description, attachments, orderId } = req.body;
 
-    if (!type || !description) {
+    if (!type || !description || typeof description !== "string" || !description.trim()) {
       return res.status(400).json({ success: false, message: "Type and description are required" });
     }
+    if (!TICKET_TYPES.includes(type)) {
+      return res.status(400).json({ success: false, message: "Invalid ticket type" });
+    }
+    if (description.length > 5000) {
+      return res.status(400).json({ success: false, message: "Description is too long (max 5000 characters)" });
+    }
+    const cleanOrderId = typeof orderId === "string" ? orderId.trim().slice(0, 40) : "";
 
     const priority = type === "payment" ? "high" : "normal";
 
@@ -46,20 +72,18 @@ export const createTicket = async (req, res) => {
     const ticket = await Ticket.create({
       userId: req.user._id,
       type,
-      description,
+      description: description.trim(),
       priority,
       messages: [
         {
-          text: description,
+          text: description.trim(),
           authorId: req.user._id,
           authorRole: "customer",
-          attachments: attachments || [],
+          attachments: sanitizeAttachments(attachments),
         },
       ],
-      orderId: orderId || undefined,
+      orderId: cleanOrderId || undefined,
     });
-
-    await ticket.save();
 
     // Populate user for email
     await ticket.populate("userId", "name email");
@@ -79,6 +103,7 @@ export const createTicket = async (req, res) => {
       await enqueueWhatsApp("ticket_raised", { ticketId: ticket._id.toString() }).catch(err => console.error("Failed to enqueue WhatsApp ticket_raised:", err));
     }
 
+    // The ticket exists at this point — a notification failure must not turn it into a 500.
     await NotificationService.emit({
       title: "New Support Ticket",
       body: `Ticket #${ticket._id.toString().slice(-6).toUpperCase()} created for ${type}.`,
@@ -86,13 +111,19 @@ export const createTicket = async (req, res) => {
       sourceModule: "support",
       sourceModel: "Ticket",
       sourceId: ticket._id.toString(),
-    });
+    }).catch(err => console.error("Ticket notification failed:", err.message));
 
-    if (orderId && (type === "shipping" || type === "payment")) {
-      await enqueueTicketLookup(ticket._id.toString(), type, orderId);
+    // Order auto-lookup. This was pushed onto a BullMQ queue whose worker is never
+    // started, so the jobs piled up in Redis and no lookup ever ran. It's one DB read
+    // (plus a Razorpay fetch for payment tickets) — run it in-process, after responding.
+    if (cleanOrderId && (type === "shipping" || type === "payment")) {
+      setImmediate(() => {
+        processLookup({ data: { ticketId: ticket._id.toString(), type, orderId: cleanOrderId } })
+          .catch(err => console.error("[Support] Order auto-lookup failed:", err.message));
+      });
     }
 
-    return res.status(201).json({ success: true, ticket });
+    return res.status(201).json({ success: true, ticket: customerView(ticket) });
   } catch (error) {
     console.error("Error creating ticket:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -164,9 +195,12 @@ export const getUserTickets = async (req, res) => {
       queryUserId = req.user._id;
     }
 
+    if (!mongoose.isValidObjectId(queryUserId)) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
     const tickets = await Ticket.find({ userId: queryUserId }).sort({ createdAt: -1 });
 
-    return res.status(200).json({ success: true, tickets });
+    return res.status(200).json({ success: true, tickets: isAdmin ? tickets : tickets.map(customerView) });
   } catch (error) {
     console.error("Error fetching user tickets:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -202,10 +236,21 @@ export const getAllTickets = async (req, res) => {
 export const addMessage = async (req, res) => {
   try {
     const { id } = req.params;
-    const { text, attachments } = req.body;
+    const { attachments } = req.body;
+    const cleanAttachments = sanitizeAttachments(attachments);
+    // The reply box allows sending just an attachment; requiring text rejected those.
+    const text = typeof req.body.text === "string" && req.body.text.trim()
+      ? req.body.text
+      : (cleanAttachments.length ? "📎 Attachment" : "");
 
-    if (!text?.trim()) {
+    if (!text.trim()) {
       return res.status(400).json({ success: false, message: "Message text is required" });
+    }
+    if (text.length > 5000) {
+      return res.status(400).json({ success: false, message: "Message is too long (max 5000 characters)" });
+    }
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ success: false, message: "Ticket not found" });
     }
 
     const ticket = await Ticket.findById(id).populate("userId", "name email");
@@ -213,16 +258,17 @@ export const addMessage = async (req, res) => {
       return res.status(404).json({ success: false, message: "Ticket not found" });
     }
 
-    const isOwner = req.user._id.toString() === ticket.userId._id.toString();
-    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+    // userId is null if the customer's profile was deleted — that's not a server error.
+    const isOwner = !!ticket.userId && req.user._id.toString() === ticket.userId._id.toString();
+    const isAdmin = isStaff(req.user);
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
     // Block messages on closed threads
-    if (ticket.status === "resolved") {
-      return res.status(403).json({ success: false, message: "Cannot add messages to a resolved ticket" });
+    if (ticket.status === "resolved" || ticket.status === "cancelled") {
+      return res.status(403).json({ success: false, message: `Cannot add messages to a ${ticket.status} ticket` });
     }
 
     const authorRole = isAdmin ? "admin" : "customer";
@@ -231,7 +277,7 @@ export const addMessage = async (req, res) => {
       text: text.trim(),
       authorId: req.user._id,
       authorRole,
-      attachments: attachments || [],
+      attachments: cleanAttachments,
     });
 
     await ticket.save();
@@ -258,10 +304,10 @@ export const addMessage = async (req, res) => {
         sourceModule: "support",
         sourceModel: "Ticket",
         sourceId: ticket._id.toString(),
-      });
+      }).catch(err => console.error("Ticket reply notification failed:", err.message));
     }
 
-    return res.status(201).json({ success: true, ticket });
+    return res.status(201).json({ success: true, ticket: isAdmin ? ticket : customerView(ticket) });
   } catch (error) {
     console.error("Error adding message:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
@@ -277,17 +323,26 @@ export const updateTicketStatus = async (req, res) => {
     if (!status || !["open", "resolved", "cancelled"].includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status" });
     }
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(404).json({ success: false, message: "Ticket not found" });
+    }
 
     const ticket = await Ticket.findById(id).populate("userId", "name email");
     if (!ticket) {
       return res.status(404).json({ success: false, message: "Ticket not found" });
     }
 
-    const isOwner = req.user._id.toString() === ticket.userId._id.toString();
-    const isAdmin = req.user.role === "admin" || req.user.role === "primary_admin";
+    const isOwner = !!ticket.userId && req.user._id.toString() === ticket.userId._id.toString();
+    const isAdmin = isStaff(req.user);
 
     if (!isOwner && !isAdmin) {
       return res.status(403).json({ success: false, message: "Access denied" });
+    }
+    // Customers may cancel their own open ticket; resolving/reopening is staff work.
+    // A customer "resolving" a ticket emailed themselves a "your ticket is resolved"
+    // notice and closed the thread on support.
+    if (!isAdmin && !(status === "cancelled" && ticket.status === "open")) {
+      return res.status(403).json({ success: false, message: "You can only cancel an open ticket" });
     }
 
     const wasOpen = ticket.status === "open";
@@ -327,7 +382,7 @@ export const updateTicketStatus = async (req, res) => {
     // Invalidate users cache since tickets affect user stats/flags
     await redis.incr("admin:users:version");
 
-    return res.status(200).json({ success: true, ticket });
+    return res.status(200).json({ success: true, ticket: isAdmin ? ticket : customerView(ticket) });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
@@ -363,6 +418,7 @@ export const getTicketOrder = async (req, res) => {
       _id: order._id,
       shortId: order._id.toString().slice(-8).toUpperCase(),
       totalAmount: order.totalAmount,
+      currency: order.currency || "INR", // totalAmount is in this currency, not always INR
       paymentStatus: order.paymentStatus,
       orderStatus: order.orderStatus,
       createdAt: order.createdAt,

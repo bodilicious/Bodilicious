@@ -81,6 +81,7 @@ const ProductManagement: React.FC = () => {
         body: JSON.stringify({ isActive: !currentStatus })
       });
       if (res.ok) { toast.success(`Product ${!currentStatus ? 'activated' : 'deactivated'}`); fetchProducts(); }
+      else toast.error((await res.json().catch(() => ({}))).message || 'Failed to update status');
     } catch { toast.error('Failed to update status'); }
   };
 
@@ -95,18 +96,21 @@ const ProductManagement: React.FC = () => {
   };
 
   const saveStock = async (product: any) => {
-    const stock = parseInt(editingStockValue);
-    if (isNaN(stock) || stock < 0) { toast.error('Invalid stock value'); return; }
+    // Whole numbers only — parseInt accepted "12abc" as 12 and "1.5" as 1.
+    if (!/^\s*\d+\s*$/.test(editingStockValue)) { toast.error('Invalid stock value'); return; }
+    const stock = Number(editingStockValue);
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/api/v1/admin/products/${product._id}`, {
         method: 'PUT', headers,
         body: JSON.stringify({ stock })
       });
-      if (res.ok) { 
-        toast.success('Stock updated'); 
+      if (res.ok) {
+        toast.success('Stock updated');
         setEditingStockId(null);
-        fetchProducts(); 
+        fetchProducts();
+      } else {
+        toast.error((await res.json().catch(() => ({}))).message || 'Failed to update stock');
       }
     } catch { toast.error('Failed to update stock'); }
   };
@@ -127,6 +131,8 @@ const ProductManagement: React.FC = () => {
       if (res.ok) {
         toast.success(`${selectedIds.length} products ${isActive ? 'activated' : 'deactivated'}`);
         fetchProducts();
+      } else {
+        toast.error((await res.json().catch(() => ({}))).message || 'Bulk update failed');
       }
     } catch { toast.error('Bulk update failed'); }
   };

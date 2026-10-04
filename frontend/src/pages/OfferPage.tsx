@@ -11,7 +11,7 @@ export default function OfferPage() {
   useSEO({
     title: 'Welcome Offer — 10% Off Your First Order | Bodilicious',
     description:
-      'New to Bodilicious? Enjoy 10% off your first order. Dermatologically tested, free shipping over ₹1500.',
+      'New to Bodilicious? Enjoy 10% off your first order. Dermatologically tested, free shipping on qualifying orders.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     canonical: '/offers',
     ogImage: 'https://bodilicious.in/og-image.png',
@@ -236,7 +236,7 @@ export default function OfferPage() {
               'Value of 10% discount applied automatically at checkout.',
               'No expiration—expires only upon first successful order.',
               'Offer remains active if preliminary orders are cancelled.',
-              'Independent of other ongoing brand promotions.',
+              "Can't be combined with coupon codes — applying a coupon replaces the 10% welcome discount.",
               'Designed for one unique beautiful soul per account.',
             ].map((term, i) => (
               <div key={i} className="flex items-start gap-4">

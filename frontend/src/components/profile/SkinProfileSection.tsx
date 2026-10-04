@@ -23,13 +23,14 @@ export default function SkinProfileSection({ user, onSave, navigateTo }: Props) 
     const [skinConcerns, setSkinConcerns] = useState<string[]>([]);
     const [routine, setRoutine] = useState<string>('');
 
+    // Only while not editing — a background `user` refresh reset in-progress choices.
     useEffect(() => {
-        if (user) {
+        if (user && !isEditing) {
             setSkinType(user.skinType || '');
             setSkinConcerns(user.skinConcerns || []);
             setRoutine(user.preferredRoutine || '');
         }
-    }, [user]);
+    }, [user, isEditing]);
 
     const toggleConcern = (concern: string) => {
         if (!isEditing) return;

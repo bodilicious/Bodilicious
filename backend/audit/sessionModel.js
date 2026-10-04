@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 const userSessionSchema = new mongoose.Schema(
   {
     session_id: { type: String, required: true, unique: true },
-    user_id: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile", default: null, index: true },
+    // No single index: { user_id, start_time } below covers user_id lookups.
+    user_id: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile", default: null },
     start_time: { type: Date, required: true, default: Date.now },
     end_time: { type: Date, default: null },
     last_ping: { type: Date, required: true, default: Date.now },
@@ -21,8 +22,8 @@ const userSessionSchema = new mongoose.Schema(
 
 // Indexes
 userSessionSchema.index({ user_id: 1, start_time: -1 });
-// 6-month TTL for lightweight session history analytics
-userSessionSchema.index({ start_time: -1 }, { expireAfterSeconds: 180 * 24 * 60 * 60 });
+// Plain index — NOT a TTL: session history is kept permanently (owner's requirement).
+userSessionSchema.index({ start_time: -1 });
 
 // Static helper to cleanly resolve stale sessions at query time
 userSessionSchema.statics.resolveStaleSessions = function(sessions) {

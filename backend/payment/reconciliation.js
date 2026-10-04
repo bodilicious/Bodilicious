@@ -178,8 +178,13 @@ export async function runPaymentReconciliation({ force = false } = {}) {
                     syntheticReq
                 );
 
-                // Clear the manual review flag if it was set during a failed verifyPayment attempt
-                await Order.updateOne({ _id: order._id }, { $set: { needsManualReview: false } });
+                // Clear the manual review flag only if it was set by the failed verifyPayment
+                // attempt this run just recovered. An unconditional clear also wiped unrelated
+                // flags (e.g. "International order — arrange carrier manually").
+                await Order.updateOne(
+                    { _id: order._id, reviewReason: /^processPaidOrder failed/ },
+                    { $set: { needsManualReview: false, reviewReason: null } }
+                );
 
                 recovered++;
 

@@ -3,7 +3,7 @@ import { pushOrderToShiprocket, isIndiaOrder } from "../tracker/shiprocketservic
 import NotificationService from "../procurement/notificationService.js";
 import { sendOrderConfirmationAfterInvoice, sendAdminNewOrderAlert } from "../email/emailService.js";
 import UserProfile from "../profile/models.js";
-import Order from "../tracker/models.js";
+import Order, { ORDER_ITEM_PRODUCT_FIELDS } from "../tracker/models.js";
 import { trackServerEvent } from "../utils/posthog.js";
 import { enqueueWhatsApp } from "../whatsapp/queue.js";
 import { getSettings } from "../settings/cache.js";
@@ -106,7 +106,7 @@ orderEvents.on("order_placed", async (order) => {
         // 3. Email Generation
         try {
             // Re-fetch order to get the invoice number that might have been saved synchronously right after the event was emitted
-            const freshOrder = await Order.findById(order._id).populate("items.product");
+            const freshOrder = await Order.findById(order._id).populate("items.product", ORDER_ITEM_PRODUCT_FIELDS);
             const user = freshOrder.user ? await UserProfile.findById(freshOrder.user) : null;
             await sendOrderConfirmationAfterInvoice(freshOrder, user?.email);
             await sendAdminNewOrderAlert(freshOrder);

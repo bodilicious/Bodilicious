@@ -22,11 +22,17 @@ export async function emit({
   sourceModel = null,
   sourceId = null,
 }) {
+  // The model's enum is info | warning | critical. Callers also pass "error" (the
+  // payment, stock-restore and invoice failure alerts) — that failed validation, was
+  // swallowed below, and the most important alerts never reached the admin.
+  const normalizedType = ["info", "warning", "critical"].includes(type)
+    ? type
+    : type === "error" ? "critical" : "info";
   try {
     await Notification.create({
       title,
       body,
-      type,
+      type: normalizedType,
       sourceModule,
       sourceModel,
       sourceId: sourceId ? String(sourceId) : null,

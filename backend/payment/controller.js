@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
-import Order from "../tracker/models.js";
+import Order, { ORDER_ITEM_PRODUCT_FIELDS } from "../tracker/models.js";
 import UserProfile from "../profile/models.js";
 import Product from "../products/models.js";
 import { getShiprocketToken, getEstimatedDeliveryDate, pushOrderToShiprocket, getInternationalShippingRate } from "../tracker/shiprocketservice.js";
@@ -54,6 +54,7 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
     session.startTransaction();
 
     let populatedOrder;
+    let committed = false;
 
     // ── Atomic claim outside transaction ──
     // This ensures that if the transaction rolls back, the "paid" lock persists so we can retry or manually review.
@@ -74,7 +75,7 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
     try {
         if (!priorDoc) {
             // Already processed or not found
-            const existingOrder = await Order.findById(orderId).populate("items.product").session(session);
+            const existingOrder = await Order.findById(orderId).populate("items.product", ORDER_ITEM_PRODUCT_FIELDS).session(session);
             if (!existingOrder) throw new Error("Order not found");
             await session.abortTransaction();
             session.endSession();
@@ -130,8 +131,7 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             order.isStockRestored = false;
         }
 
-        // ── Weight calculation (read-only, no writes) — runs BEFORE the transaction ──
-        // Moved outside the session to avoid holding a transaction lock during product reads.
+        // ── Weight calculation (read-only, no session) ──
         // The weight is only used for EDD; it does not affect stock or payment amounts.
         let totalWeightGrams = 0;
         {
@@ -145,24 +145,13 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             }
         }
 
-        // EDD — only applicable for India orders (Shiprocket only covers Indian pincodes)
-        const isIndiaOrder = !order.shippingDetails.country || 
+        // EDD — only applicable for India orders (Shiprocket only covers Indian pincodes).
+        // Fetched AFTER the commit below: it's a Shiprocket network call, and inside the
+        // transaction a slow response held the order and stock locks open — concurrent
+        // checkouts of the same product hit write conflicts, and a call slower than the
+        // 60s transaction limit aborted an already-paid order.
+        const isIndiaOrder = !order.shippingDetails.country ||
             ['india', 'in', 'bharat', 'ind'].includes((order.shippingDetails.country || '').toLowerCase().trim());
-        
-        if (isIndiaOrder) {
-            const totalWeight = Math.max(0.5, totalWeightGrams / 1000);
-            try {
-                const eddResponse = await getEstimatedDeliveryDate(order.shippingDetails.pincode, totalWeight, false);
-                if (eddResponse) {
-                    order.estimatedDeliveryDate = eddResponse.estimatedDeliveryDate;
-                    order.estimatedDeliveryDays = eddResponse.estimatedDeliveryDays;
-                    order.estimatedCourierName = eddResponse.estimatedCourierName;
-                    order.eddCalculatedAt = new Date();
-                }
-            } catch (e) {
-                console.error("EDD fetch failed:", e.message);
-            }
-        }
 
         // paymentStatus and razorpayPaymentId were already set atomically before
         // starting the session — only update signature and other mutated fields here
@@ -172,12 +161,6 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
             invoiceNumber: `INV-${orderId.toString().toUpperCase()}`,
             invoiceGenerated: true
         };
-        if (order.estimatedDeliveryDate) {
-            updateFields.estimatedDeliveryDate = order.estimatedDeliveryDate;
-            updateFields.estimatedDeliveryDays = order.estimatedDeliveryDays;
-            updateFields.estimatedCourierName = order.estimatedCourierName;
-            updateFields.eddCalculatedAt = order.eddCalculatedAt;
-        }
         if (signature) {
             updateFields.razorpaySignature = signature;
         }
@@ -232,8 +215,26 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
 
         await session.commitTransaction();
         session.endSession();
+        committed = true;
 
-        populatedOrder = await Order.findById(order._id).populate("items.product");
+        // Best-effort EDD, outside the transaction (see note above).
+        if (isIndiaOrder) {
+            try {
+                const eddResponse = await getEstimatedDeliveryDate(order.shippingDetails.pincode, Math.max(0.5, totalWeightGrams / 1000), false);
+                if (eddResponse) {
+                    await Order.updateOne({ _id: order._id }, { $set: {
+                        estimatedDeliveryDate: eddResponse.estimatedDeliveryDate,
+                        estimatedDeliveryDays: eddResponse.estimatedDeliveryDays,
+                        estimatedCourierName: eddResponse.estimatedCourierName,
+                        eddCalculatedAt: new Date(),
+                    } });
+                }
+            } catch (e) {
+                console.error("EDD fetch failed:", e.message);
+            }
+        }
+
+        populatedOrder = await Order.findById(order._id).populate("items.product", ORDER_ITEM_PRODUCT_FIELDS);
 
         populatedOrder.invoiceNumber = `INV-${populatedOrder._id.toString().toUpperCase()}`;
         populatedOrder.invoiceGenerated = true;
@@ -242,6 +243,15 @@ export const processPaidOrder = async (orderId, paymentId, signature, req) => {
         orderEvents.emit("order_placed", populatedOrder);
 
     } catch (txErr) {
+        // The order is already committed — a failure after that point (re-reading the
+        // order, emitting events) must not "revert" the claim, which would mark a
+        // completed order unpaid and let reconciliation process it a second time.
+        if (committed) {
+            console.error(`[processPaidOrder] Post-commit step failed for order ${orderId}:`, txErr.message);
+            const order = populatedOrder || await Order.findById(orderId).populate("items.product", ORDER_ITEM_PRODUCT_FIELDS).catch(() => null);
+            return { success: true, message: "Payment verified and order created successfully", order };
+        }
+
         if (session.inTransaction()) await session.abortTransaction();
         session.endSession();
 
@@ -406,6 +416,11 @@ export const getOrderQuote = async (req, res) => {
             const product = resolveProduct(item, productMapById, productMapByPid);
             if (!product) {
                 return res.status(400).json({ success: false, message: "Product not found" });
+            }
+            // fetchProductMaps doesn't filter on isActive — a product hidden or
+            // discontinued by an admin could still be bought from an existing cart.
+            if (product.isActive === false) {
+                return res.status(400).json({ success: false, message: `${product.name} is no longer available. Please remove it from your cart.` });
             }
             if (product.stock < item.quantity) {
                 return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
@@ -662,6 +677,9 @@ export const initRazorpayOrder = async (req, res) => {
                 console.error("Product not found for item:", item);
                 return res.status(400).json({ success: false, message: "Product not found" });
             }
+            if (product.isActive === false) {
+                return res.status(400).json({ success: false, message: `${product.name} is no longer available. Please remove it from your cart.` });
+            }
             if (product.stock < item.quantity) {
                 return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}` });
             }
@@ -869,7 +887,10 @@ export const initRazorpayOrder = async (req, res) => {
 
     } catch (err) {
         console.error("Init Razorpay Order error:", err);
-        return res.status(500).json({ success: false, message: err.message });
+        // Stock races and an already-spent welcome offer are the customer's to resolve
+        // (refresh / adjust cart), not server faults — 409 lets the UI say so.
+        const isConflict = /Insufficient stock|Welcome offer could not be applied/.test(err.message || "");
+        return res.status(isConflict ? 409 : 500).json({ success: false, message: err.message });
     }
 };
 
@@ -944,7 +965,7 @@ export const verifyPayment = async (req, res) => {
             // If invoiceGenerated is false the atomic claim fired but the Mongoose
             // transaction aborted (stale lock). Fall through so processPaidOrder
             // can reprocess via the webhook stale-lock path or withRetry.
-            const populatedExisting = await Order.findById(existingOrder._id).populate("items.product");
+            const populatedExisting = await Order.findById(existingOrder._id).populate("items.product", ORDER_ITEM_PRODUCT_FIELDS);
             return res.status(200).json({
                 success: true,
                 message: "Payment already processed",
@@ -1296,6 +1317,32 @@ export const razorpayWebhook = async (req, res) => {
             const paymentId = refund.payment_id;
             
             const order = await Order.findOne({ razorpayPaymentId: paymentId });
+
+            // Total refunded so far vs captured, from Razorpay's payment entity (sent with
+            // refund events). Every refund used to be treated as a full one: a partial
+            // goodwill refund from the dashboard cancelled a live order, cancelled its
+            // Shiprocket shipment and restocked items the customer still had.
+            const paymentEntity = payload.payment?.entity;
+            const refundCurrency = (refund.currency || order?.currency || "INR").toUpperCase();
+            const capturedMinor = paymentEntity?.amount ?? (order ? toRazorpayMinorUnits(order.totalAmount, order.currency || "INR") : refund.amount);
+            const refundedMinor = paymentEntity?.amount_refunded ?? refund.amount;
+            const isFullRefund = refundedMinor >= capturedMinor;
+
+            if (order && !isFullRefund) {
+                await Order.updateOne({ _id: order._id }, { $set: {
+                    refundStatus: "processed",
+                    refundId: refund.id || order.refundId || null,
+                    refundAmount: fromRazorpayMinorUnits(refundedMinor, refundCurrency),
+                } });
+                await logAction(req, "partial_refund_confirmed", "order", order._id.toString(), {
+                    refundId: refund.id,
+                    amount: fromRazorpayMinorUnits(refund.amount, refundCurrency),
+                    totalRefunded: fromRazorpayMinorUnits(refundedMinor, refundCurrency),
+                    currency: refundCurrency,
+                }, { source: "razorpay-webhook" }).catch(err => console.error("Partial Refund Audit Failed:", err));
+                return res.status(200).json({ success: true, message: "Partial refund recorded" });
+            }
+
             if (order) {
                 order.paymentStatus = "refunded";
                 order.refundStatus = "processed";
@@ -1384,13 +1431,11 @@ export const razorpayWebhook = async (req, res) => {
                             paymentStatus: order.paymentStatus,
                             refundStatus: order.refundStatus,
                             refundId: refund.id || order.refundId || null,
-                            // Derive refund amount from the webhook entity itself — order.refundAmount
+                            // Derive refund amount from the webhook entities — order.refundAmount
                             // is only set on the auto-refund cancellation path, so it was always null
-                            // when a merchant manually refunds from the Razorpay dashboard.
-                            refundAmount: fromRazorpayMinorUnits(
-                                refund.amount,
-                                (refund.currency || order.currency || "INR").toUpperCase()
-                            ),
+                            // when a merchant manually refunds from the Razorpay dashboard. The
+                            // payment's running total covers a full refund made in several parts.
+                            refundAmount: fromRazorpayMinorUnits(refundedMinor, refundCurrency),
                             isStockRestored: order.isStockRestored
                         }
                     });

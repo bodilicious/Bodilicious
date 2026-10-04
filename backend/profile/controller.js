@@ -1,6 +1,7 @@
+import mongoose from "mongoose";
 import UserProfile from "./models.js";
 import Product from "../products/models.js";
-import Order from "../tracker/models.js";
+import Order, { customerVisibleOrderFilter } from "../tracker/models.js";
 import admin from "../config/firebaseAdmin.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../email/emailService.js";
 import { logAction } from "../admin/controller.js";
@@ -36,10 +37,10 @@ export const getProfile = async (req, res) => {
 
     // NOTE: Mongoose silently ignores `options.limit` for array ref populations.
     // Fetching orders via a separate query is the only way to guarantee the cap.
-    const recentOrders = await Order.find({ user: req.user._id })
+    const recentOrders = await Order.find(customerVisibleOrderFilter(req.user._id))
       .sort({ createdAt: -1 })
       .limit(20)
-      .select('items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb shippingCost discountAmount originalAmount currency')
+      .select('items totalAmount orderStatus paymentStatus paymentMethod createdAt estimatedDeliveryDate deliveredAt returnStatus invoiceNumber awb isWelcomeOfferApplied shippingCost codCharge discountAmount originalAmount currency exchangeRate taxAmount refundStatus customerComments')
       .populate('items.product', productCardFields)
       .lean();
 
@@ -95,26 +96,35 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const allowedUpdates = [
-      "name", "phone", "gender", "dateOfBirth",
+      "name", "avatar", "phone", "gender", "dateOfBirth",
       "skinType", "skinConcerns", "preferredRoutine"
     ];
 
+    // The account page uses Firebase-style names (displayName / photoURL).
+    const body = { ...req.body };
+    if (body.name === undefined && body.displayName !== undefined) body.name = body.displayName;
+    if (body.avatar === undefined && body.photoURL !== undefined) body.avatar = body.photoURL;
+
     const updates = {};
     for (const key of allowedUpdates) {
-      if (req.body[key] !== undefined) {
-        updates[key] = req.body[key];
+      if (body[key] !== undefined) {
+        updates[key] = body[key];
       }
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, message: "Nothing to update" });
     }
 
     const updatedUser = await UserProfile.findByIdAndUpdate(
       req.user._id,
       { $set: updates },
       { new: true, runValidators: true }
-    );
+    ).select("-cartHistory -productViewCounts -cart -wishlist -recentlyBought");
 
     res.json({ success: true, data: updatedUser });
   } catch (err) {
-    if (err.name === 'ValidationError') {
+    // CastError: e.g. an unparseable dateOfBirth — the client's input, not a server fault.
+    if (err.name === 'ValidationError' || err.name === 'CastError') {
       return res.status(400).json({ success: false, message: err.message });
     }
     res.status(500).json({ success: false, message: err.message });
@@ -129,7 +139,7 @@ export const addToWishlist = async (req, res) => {
   try {
     const { productId } = req.body;
 
-    if (!productId) {
+    if (!productId || !mongoose.isValidObjectId(productId)) {
       return res.status(400).json({ message: "Product ID required" });
     }
 
@@ -158,7 +168,7 @@ export const removeFromWishlist = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    if (!productId) {
+    if (!productId || !mongoose.isValidObjectId(productId)) {
       return res.status(400).json({ message: "Product ID required" });
     }
 
@@ -196,15 +206,33 @@ export const syncCart = async (req, res) => {
     }
 
     const getItemKey = (pid, variant) => `${pid || "unknown"}:${variant || ""}`;
-    
-    const oldCartMap = new Map(user.cart.map(i => [getItemKey(i.product?.toString(), i.variant), i.quantity]));
-    const newCartMap = new Map(cartItems.map(i => [getItemKey(i.productId?.toString(), i.variant), i.quantity]));
 
-    const Product = (await import("../products/models.js")).default;
-    const products = await Product.find({ _id: { $in: cartItems.map(i => i.productId) } });
+    // Sanitise what the browser sent. It was stored verbatim: a malformed id threw a
+    // CastError (500 — cart sync silently stopped working), and zero/negative/
+    // fractional quantities or deleted products were saved into the cart.
+    const validIds = [...new Set(cartItems
+      .map(i => i?.productId?.toString())
+      .filter(id => id && mongoose.isValidObjectId(id)))];
+    const products = await Product.find({ _id: { $in: validIds } }).select("name variants");
     const productMap = new Map(products.map(p => [p._id.toString(), p]));
 
-    for (const item of cartItems) {
+    const merged = new Map();
+    for (const raw of cartItems) {
+      const id = raw?.productId?.toString();
+      if (!id || !productMap.has(id)) continue;
+      const qty = Math.floor(Number(raw.quantity));
+      if (!Number.isFinite(qty) || qty < 1) continue;
+      const variant = typeof raw.variant === "string" && raw.variant.trim() ? raw.variant.trim() : null;
+      const key = getItemKey(id, variant);
+      const prev = merged.get(key);
+      merged.set(key, { productId: id, variant, quantity: Math.min((prev?.quantity || 0) + qty, 999) });
+    }
+    const cleanItems = [...merged.values()];
+
+    const oldCartMap = new Map(user.cart.map(i => [getItemKey(i.product?.toString(), i.variant), i.quantity]));
+    const newCartMap = new Map(cleanItems.map(i => [getItemKey(i.productId, i.variant), i.quantity]));
+
+    for (const item of cleanItems) {
       const key = getItemKey(item.productId, item.variant);
       const oldQty = oldCartMap.get(key) || 0;
       if (item.quantity > oldQty) {
@@ -215,15 +243,15 @@ export const syncCart = async (req, res) => {
       }
     }
 
-    user.cart = cartItems.map(item => ({
-      product: item.productId,
-      quantity: item.quantity,
-      variant: item.variant || null,
-    }));
-
-    user.cartUpdatedAt = new Date();
-
-    await user.save();
+    // Targeted update rather than user.save(): saving re-validated the whole profile,
+    // so one bad legacy field anywhere on it made every cart sync fail.
+    await UserProfile.updateOne(
+      { _id: user._id },
+      { $set: {
+        cart: cleanItems.map(item => ({ product: item.productId, quantity: item.quantity, variant: item.variant })),
+        cartUpdatedAt: new Date(),
+      } }
+    );
 
     // 🚀 Audit Cart Changes & Update cartHistory
     const bulkOps = [];
@@ -398,9 +426,9 @@ export const syncCart = async (req, res) => {
 */
 export const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id, orderStatus: { $ne: "abandoned" } })
+    const orders = await Order.find(customerVisibleOrderFilter(req.user._id))
       .sort({ createdAt: -1 })
-      .select('items totalAmount orderStatus paymentStatus createdAt estimatedDeliveryDate returnStatus invoiceNumber awb shippingCost discountAmount originalAmount currency')
+      .select('items totalAmount orderStatus paymentStatus paymentMethod createdAt estimatedDeliveryDate deliveredAt returnStatus invoiceNumber awb isWelcomeOfferApplied shippingCost codCharge discountAmount originalAmount currency exchangeRate taxAmount refundStatus customerComments')
       .populate('items.product', 'name images price pid slug')
       .lean();
 
@@ -458,8 +486,9 @@ export const addAddress = async (req, res) => {
     const { name, phone, houseNumber, addressLine, area, city, state, country, pincode, isDefault } = req.body;
     const user = await UserProfile.findById(req.user._id);
 
-    // If it's the first address, or isDefault is true, make it default
-    let makeDefault = isDefault || user.addresses.length === 0;
+    // If it's the first address, or isDefault is true, make it default.
+    // Strict: a form sending "false" (a truthy string) made every new address default.
+    let makeDefault = isDefault === true || isDefault === "true" || user.addresses.length === 0;
 
     if (makeDefault) {
       user.addresses.forEach(addr => addr.isDefault = false);
@@ -472,7 +501,8 @@ export const addAddress = async (req, res) => {
     await user.save();
     res.status(201).json({ success: true, data: user.addresses });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    // A missing required field is the client's error, not a server fault.
+    res.status(err.name === "ValidationError" ? 400 : 500).json({ success: false, message: err.message });
   }
 };
 
@@ -488,7 +518,7 @@ export const updateAddress = async (req, res) => {
       return res.status(404).json({ success: false, message: "Address not found" });
     }
 
-    if (isDefault) {
+    if (isDefault === true || isDefault === "true") {
       user.addresses.forEach(addr => addr.isDefault = false);
       address.isDefault = true;
     }
@@ -506,7 +536,7 @@ export const updateAddress = async (req, res) => {
     await user.save();
     res.json({ success: true, data: user.addresses });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(err.name === "ValidationError" ? 400 : 500).json({ success: false, message: err.message });
   }
 };
 

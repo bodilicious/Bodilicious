@@ -4,21 +4,18 @@ const userInteractionLogSchema = new mongoose.Schema(
   {
     userId: { 
       type: mongoose.Schema.Types.ObjectId, 
-      ref: "UserProfile", 
-      required: true,
-      index: true
+      ref: "UserProfile",
+      required: true
     },
     productId: { 
       type: mongoose.Schema.Types.ObjectId, 
-      ref: "Product", 
-      required: true,
-      index: true
+      ref: "Product",
+      required: true
     },
     eventType: {
       type: String,
       enum: ["view", "cart_add", "cart_remove"],
-      required: true,
-      index: true
+      required: true
     },
     quantity: {
       type: Number,
@@ -35,8 +32,10 @@ const userInteractionLogSchema = new mongoose.Schema(
   }
 );
 
-// Compound index for user activity timeline
-userInteractionLogSchema.index({ userId: 1, createdAt: -1 });
+// Kept permanently (owner's requirement — no TTL). Nothing in the app queries this
+// collection yet, so it carries no secondary indexes: the four it had were
+// rewritten on every product view / cart change for no reader. Add a query index
+// alongside the first feature that reads it.
 
 export const UserInteractionLog = mongoose.models.UserInteractionLog || mongoose.model("UserInteractionLog", userInteractionLogSchema);
 export default UserInteractionLog;

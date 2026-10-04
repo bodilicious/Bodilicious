@@ -181,8 +181,9 @@ userProfileSchema.index({ phone: 1 }, { background: true });
 userProfileSchema.index({ createdAt: -1 });
 userProfileSchema.index({ role: 1 });
 userProfileSchema.index({ lifetimeSpend: -1 });
-userProfileSchema.index({ "cartHistory.productId": 1 });
-userProfileSchema.index({ "productViewCounts.productId": 1 });
+// No multikey indexes on cartHistory/productViewCounts: they're only ever queried
+// together with _id (already unique), and each held up to 100 entries per user that
+// had to be re-indexed on every cart change and product view.
 
 const UserProfile =
   mongoose.models.UserProfile ||

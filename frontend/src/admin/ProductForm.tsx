@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -74,6 +74,76 @@ function ArrayField({ label, value, onChange }: {
   );
 }
 
+// ── Form fields ───────────────────────────────────────────────────────────────
+// Declared at module level on purpose. They used to be defined inside ProductForm,
+// which makes each one a brand-new component type on every render: React unmounted
+// and remounted the <input> on every keystroke, so every text field lost focus after
+// a single character. Form state comes in through `form` instead of a closure.
+type FormBinding = {
+  data: any;
+  set: (update: (prev: any) => any) => void;
+  onNameBlur: () => void;
+};
+
+/** Text field with a live character counter that turns amber past the limit. */
+function CountedField({ form, label, field, limit, hint, placeholder, multiline = false }: {
+  form: FormBinding; label: string; field: string; limit: number;
+  hint?: string; placeholder?: string; multiline?: boolean;
+}) {
+  const value = (form.data[field] ?? '') as string;
+  const over = value.length > limit;
+  const shared = {
+    className: `w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 transition-all ${
+      over ? 'ring-2 ring-amber-400' : 'ring-dark-red/20'
+    }`,
+    value,
+    placeholder,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      form.set(prev => ({ ...prev, [field]: e.target.value })),
+  };
+  return (
+    <div className="mb-4">
+      <div className="flex items-baseline justify-between mb-2">
+        <label className="block text-sm font-bold text-gray-700">{label}</label>
+        <span className={`text-xs tabular-nums ${over ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
+          {value.length}/{limit}
+        </span>
+      </div>
+      {multiline
+        ? <textarea {...shared} className={`${shared.className} min-h-[80px]`} />
+        : <input type="text" {...shared} />}
+      {hint && <p className="text-xs text-gray-500 mt-1.5">{hint}</p>}
+      {over && (
+        <p className="text-xs text-amber-600 mt-1">
+          Over {limit} characters — Google will truncate this.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function InputField({ form, label, field, type = 'text', required = false, readOnly = false, min }: {
+  form: FormBinding; label: string; field: string; type?: string;
+  required?: boolean; readOnly?: boolean; min?: string;
+}) {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-bold text-gray-700 mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        min={min}
+        className={`w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20 transition-all ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
+        value={form.data[field] ?? ''}
+        readOnly={readOnly}
+        onChange={e => form.set(prev => ({ ...prev, [field]: e.target.value }))}
+        onBlur={field === 'name' ? form.onNameBlur : undefined}
+      />
+    </div>
+  );
+}
+
 // ── Tiptap toolbar button ─────────────────────────────────────────────────────
 const ToolbarBtn: React.FC<{
   onClick: () => void;
@@ -141,11 +211,12 @@ const defaultFormData = {
   seo_h2: [] as string[],
   faqs: [] as { question: string; answer: string }[],
   usage: { time: '', frequency: '', routine_step: '' },
-  price: 0, price_inr: 0, stock: 0, lowStockThreshold: 5,
-  product_weight_ml: 0, product_weight_g: 0,
+  // Blank, not 0: clicking into a box showing "0" and typing 499 displayed "0499".
+  // handleSubmit turns any blank number into 0; validate() still requires a price.
+  price: '' as number | string, price_inr: '' as number | string, stock: '' as number | string, lowStockThreshold: 5,
+  product_weight_ml: '' as number | string, product_weight_g: '' as number | string,
   availability: 'In Stock',
   is_active_based: false, isActive: true,
-  supplier: '',
 };
 
 const ProductForm: React.FC = () => {
@@ -159,6 +230,10 @@ const ProductForm: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const API_URL = import.meta.env.VITE_API_URL || '';
+  // Stock as loaded. Saving always re-sent this snapshot, so any orders placed while the
+  // form was open had their stock deductions undone (oversell risk). Only an edited
+  // stock value is sent now.
+  const loadedStockRef = useRef<number | null>(null);
 
   // ── Tiptap editor for description ──────────────────────────────────────────
   const descriptionEditor = useEditor({
@@ -179,9 +254,14 @@ const ProductForm: React.FC = () => {
     if (!isEditMode) return;
     const fetchProduct = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/v1/products/${pid}`);
+        // Admin endpoint, not the public GET /products/:pid: that one only returns active
+        // products and omits admin-only fields (price_inr, lowStockThreshold, availability,
+        // is_active_based), which this form then saved back as its defaults.
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${API_URL}/api/v1/admin/products/${encodeURIComponent(pid!)}`, { headers });
         const data = await res.json();
         if (data.success) {
+          loadedStockRef.current = typeof data.data.stock === 'number' ? data.data.stock : null;
           // Merge with defaultFormData to ensure nested objects exist
           setFormData(prev => ({ 
             ...prev, 
@@ -216,7 +296,7 @@ const ProductForm: React.FC = () => {
       }
     };
     fetchProduct();
-  }, [pid, isEditMode, API_URL]);
+  }, [pid, isEditMode, API_URL, getAuthHeaders]);
 
   const generateSlug = (name: string) =>
     name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -245,9 +325,9 @@ const ProductForm: React.FC = () => {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const files = Array.from(e.target.files);
-    
-    // Instead of doing actual upload here, let's keep it simple for the moment or implement the POST if requested.
-    // The prompt specified we need a POST /api/admin/upload endpoint.
+    // Reset so picking the same file again (e.g. after a failed upload) fires onChange.
+    e.target.value = '';
+
     const uploadToast = toast.loading('Uploading image(s)...');
     try {
       const headers = await getAuthHeaders();
@@ -264,11 +344,12 @@ const ProductForm: React.FC = () => {
           headers,
           body: payload
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (data.success) {
           newImagePaths.push(data.path);
         } else {
-          toast.error(`Upload failed for ${file.name}`);
+          // The server says why (wrong format, over 5 MB…) — show it.
+          toast.error(`${file.name}: ${data.message || 'upload failed'}`);
         }
       }
       
@@ -291,7 +372,8 @@ const ProductForm: React.FC = () => {
     if (formData.images.length === 0) errs.push('At least one image is required');
     if (!formData.description.trim()) errs.push('Description is required');
     if (!formData.category) errs.push('Category is required');
-    if (formData.price < 0) errs.push('Price must be 0 or more');
+    // A ₹0 product can't be paid for — Razorpay rejects a zero amount at checkout.
+    if (!(Number(formData.price) > 0)) errs.push('Price must be greater than 0');
     return errs;
   };
 
@@ -328,11 +410,13 @@ const ProductForm: React.FC = () => {
         .map((f: any) => ({ question: (f.question || '').trim(), answer: (f.answer || '').trim() }))
         .filter((f: any) => f.question && f.answer);
     }
-    if (!payload.supplier) {
-      delete payload.supplier;
-    }
     if (!payload.slug) {
       delete payload.slug;
+    }
+
+    // Unchanged stock isn't sent — see loadedStockRef.
+    if (isEditMode && loadedStockRef.current !== null && payload.stock === loadedStockRef.current) {
+      delete payload.stock;
     }
 
     // Strip read-only, immutable, and computed fields
@@ -389,55 +473,8 @@ const ProductForm: React.FC = () => {
     h2Count: buildProductH2s(formData as any).length,
   };
 
-  /** Text field with a live character counter that turns amber past the limit. */
-  const CountedField = ({ label, field, limit, hint, placeholder, multiline = false }: any) => {
-    const value = ((formData as any)[field] ?? '') as string;
-    const over = value.length > limit;
-    const shared = {
-      className: `w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 transition-all ${
-        over ? 'ring-2 ring-amber-400' : 'ring-dark-red/20'
-      }`,
-      value,
-      placeholder,
-      onChange: (e: any) => setFormData(prev => ({ ...prev, [field]: e.target.value })),
-    };
-    return (
-      <div className="mb-4">
-        <div className="flex items-baseline justify-between mb-2">
-          <label className="block text-sm font-bold text-gray-700">{label}</label>
-          <span className={`text-xs tabular-nums ${over ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
-            {value.length}/{limit}
-          </span>
-        </div>
-        {multiline
-          ? <textarea {...shared} className={`${shared.className} min-h-[80px]`} />
-          : <input type="text" {...shared} />}
-        {hint && <p className="text-xs text-gray-500 mt-1.5">{hint}</p>}
-        {over && (
-          <p className="text-xs text-amber-600 mt-1">
-            Over {limit} characters — Google will truncate this.
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  const InputField = ({ label, field, type = "text", required = false, readOnly = false, min }: any) => (
-    <div className="mb-4">
-      <label className="block text-sm font-bold text-gray-700 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        type={type}
-        min={min}
-        className={`w-full p-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-dark-red/20 transition-all ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
-        value={(formData as any)[field]}
-        readOnly={readOnly}
-        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
-        onBlur={field === 'name' ? handleNameBlur : undefined}
-      />
-    </div>
-  );
+  // Handed to the module-level field components below.
+  const form: FormBinding = { data: formData, set: setFormData, onNameBlur: handleNameBlur };
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
@@ -474,10 +511,10 @@ const ProductForm: React.FC = () => {
         <section className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">1. Identity</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField label="Product ID (PID)" field="pid" required readOnly={isEditMode} />
-            <InputField label="Name" field="name" required />
-            <InputField label="URL Slug" field="slug" />
-            <InputField label="Brand" field="brand" />
+            <InputField form={form} label="Product ID (PID)" field="pid" required readOnly={isEditMode} />
+            <InputField form={form} label="Name" field="name" required />
+            <InputField form={form} label="URL Slug" field="slug" />
+            <InputField form={form} label="Brand" field="brand" />
             <div className="mb-4">
               <label className="block text-sm font-bold text-gray-700 mb-2">Category *</label>
               <Select
@@ -494,9 +531,9 @@ const ProductForm: React.FC = () => {
                 ]}
               />
             </div>
-            <InputField label="Sub Category" field="sub_category" />
-            <InputField label="Product Type" field="product_type" />
-            <InputField label="Item Form" field="item_form" />
+            <InputField form={form} label="Sub Category" field="sub_category" />
+            <InputField form={form} label="Product Type" field="product_type" />
+            <InputField form={form} label="Item Form" field="item_form" />
             <div className="mb-4 md:col-span-2">
               <label className="block text-sm font-bold text-gray-700 mb-2">Google Product Category</label>
               <Select
@@ -523,7 +560,8 @@ const ProductForm: React.FC = () => {
                 <span className="text-dark-red font-bold block mb-1">Click to Upload</span>
                 <span className="text-sm text-gray-500">JPG, PNG, WEBP</span>
               </div>
-              <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+              {/* Only what the upload endpoint accepts — image/* let HEIC/GIF through to fail server-side. */}
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleImageUpload} />
             </label>
           </div>
           {formData.images.length > 0 && (
@@ -623,7 +661,7 @@ const ProductForm: React.FC = () => {
             </p>
 
             <div className="pl-4 border-l-2 border-dark-red/20 space-y-4">
-              <CountedField
+              <CountedField form={form}
                 label="Meta Title"
                 field="seo_title"
                 limit={60}
@@ -631,7 +669,7 @@ const ProductForm: React.FC = () => {
                 hint="Shown as the clickable headline in Google. Google cuts it off past ~60 characters."
               />
 
-              <CountedField
+              <CountedField form={form}
                 label="Meta Description"
                 field="seo_description"
                 limit={155}
@@ -640,7 +678,7 @@ const ProductForm: React.FC = () => {
                 hint="The grey summary under the headline. Not a ranking factor, but it decides whether people click."
               />
 
-              <CountedField
+              <CountedField form={form}
                 label="H1 — main page heading"
                 field="seo_h1"
                 limit={70}
@@ -662,7 +700,7 @@ const ProductForm: React.FC = () => {
                 </p>
               </div>
 
-              <CountedField
+              <CountedField form={form}
                 label="Main Image Alt Text"
                 field="seo_image_alt"
                 limit={125}
@@ -778,7 +816,7 @@ const ProductForm: React.FC = () => {
               </div>
             </div>
           </div>
-          <InputField label="Texture" field="texture" />
+          <InputField form={form} label="Texture" field="texture" />
           <ArrayField label="Benefits" value={formData.benefits} onChange={v => setFormData(prev => ({ ...prev, benefits: v }))} />
           <ArrayField label="Concerns Targeted" value={formData.concerns_targeted} onChange={v => setFormData(prev => ({ ...prev, concerns_targeted: v }))} />
           <ArrayField label="Tips" value={formData.tips} onChange={v => setFormData(prev => ({ ...prev, tips: v }))} />
@@ -825,13 +863,13 @@ const ProductForm: React.FC = () => {
         <section className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">7. Pricing & Stock</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <InputField label="Price *" field="price" type="number" min="0" required />
-            <InputField label="Price (INR)" field="price_inr" type="number" min="0" />
+            <InputField form={form} label="Price" field="price" type="number" min="0" required />
+            <InputField form={form} label="Price (INR)" field="price_inr" type="number" min="0" />
             <div>
-              <InputField label="Stock" field="stock" type="number" min="0" />
+              <InputField form={form} label="Stock" field="stock" type="number" min="0" />
 
             </div>
-            <InputField label="Low Stock Threshold" field="lowStockThreshold" type="number" min="0" />
+            <InputField form={form} label="Low Stock Threshold" field="lowStockThreshold" type="number" min="0" />
             <div className="mb-4">
               <label className="block text-sm font-bold text-gray-700 mb-2">Availability</label>
               <Select
@@ -855,8 +893,8 @@ const ProductForm: React.FC = () => {
         <section className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">8. Physical Details</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField label="Weight (ml)" field="product_weight_ml" type="number" min="0" />
-            <InputField label="Weight (g)" field="product_weight_g" type="number" min="0" />
+            <InputField form={form} label="Weight (ml)" field="product_weight_ml" type="number" min="0" />
+            <InputField form={form} label="Weight (g)" field="product_weight_g" type="number" min="0" />
             <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer">
               <input 
                 type="checkbox" 
@@ -882,7 +920,6 @@ const ProductForm: React.FC = () => {
               />
               <span className="font-bold text-sm text-gray-700">Visible to Customers?</span>
             </label>
-            <InputField label="Supplier (ID)" field="supplier" />
           </div>
           
           {isEditMode && (

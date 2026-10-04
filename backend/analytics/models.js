@@ -15,7 +15,8 @@ const dailySalesSchema = new mongoose.Schema({
 // 2. Product Velocity View
 // Granularity: One document per product per day
 const productVelocitySchema = new mongoose.Schema({
-  product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true, index: true },
+  // No single index: the unique { product_id, date_string } below covers it.
+  product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
   date_string: { type: String, required: true, index: true }, // Format: YYYY-MM-DD
   views: { type: Number, default: 0 }, // If tracked in audit logs
   carts: { type: Number, default: 0 },
@@ -29,7 +30,7 @@ productVelocitySchema.index({ product_id: 1, date_string: 1 }, { unique: true })
 // 3. Customer Cohort View
 const customerCohortViewSchema = new mongoose.Schema(
   {
-    cohort_month: { type: String, required: true, index: true }, // Format: YYYY-MM
+    cohort_month: { type: String, required: true }, // Format: YYYY-MM (covered by the unique compound index)
     month_index: { type: Number, required: true },               // 0 = acquisition month
     total_users_in_cohort: { type: Number, default: 0 },
     active_users: { type: Number, default: 0 },

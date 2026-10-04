@@ -30,7 +30,18 @@ const orderItemSchema = z.object({
 /* =========================================
    Shipping Details Schema
 ========================================= */
-const shippingDetailsSchema = z.object({
+const isIndiaCountry = (c) => ["india", "in", "bharat", "ind"].includes(String(c || "India").toLowerCase().trim());
+
+// State is required for India only. The shipping form (rightly) leaves it optional for
+// countries without states/provinces, but this schema required it everywhere, so those
+// customers passed the shipping step and were then rejected at payment.
+const requireIndianState = (val, ctx) => {
+  if (isIndiaCountry(val.country) && String(val.state || "").trim().length < 2) {
+    ctx.addIssue({ code: "custom", path: ["state"], message: "State is required" });
+  }
+};
+
+const shippingDetailsBase = z.object({
   name: z
     .string({ required_error: "Name is required" })
     .min(2, "Name must be at least 2 characters"),
@@ -39,17 +50,17 @@ const shippingDetailsSchema = z.object({
     .string({ required_error: "Phone number is required" })
     .regex(/^\+?[0-9\s\-()\u2010-\u2015]{7,20}$/, "Invalid phone number"),
 
+  // min 3 matches the shipping form; 5 rejected short-but-valid addresses ("12A")
+  // that the form had already accepted.
   address: z
     .string({ required_error: "Address is required" })
-    .min(5, "Address is too short"),
+    .min(3, "Address is too short"),
 
   city: z
     .string({ required_error: "City is required" })
     .min(2, "City is required"),
 
-  state: z
-    .string({ required_error: "State is required" })
-    .min(2, "State is required"),
+  state: z.string().optional().default(""),
 
   pincode: z
     .string({ required_error: "Pincode is required" })
@@ -62,6 +73,34 @@ const shippingDetailsSchema = z.object({
 
   country: z.string().optional(),
 });
+
+// Same rules the shipping form applies for India. Without them a malformed PIN or
+// short phone reached pushOrderToShiprocket, which silently substitutes 110001 /
+// 9999999999 — shipping the parcel to Delhi with an unreachable contact number.
+const requireIndianShipping = (val, ctx) => {
+  requireIndianState(val, ctx);
+  if (!isIndiaCountry(val.country)) return;
+  if (!/^[1-9][0-9]{5}$/.test(String(val.pincode || "").trim())) {
+    ctx.addIssue({ code: "custom", path: ["pincode"], message: "Enter a valid 6-digit PIN code" });
+  }
+  if (String(val.phone || "").replace(/\D/g, "").length < 10) {
+    ctx.addIssue({ code: "custom", path: ["phone"], message: "Enter a valid 10-digit phone number" });
+  }
+};
+
+const shippingDetailsSchema = shippingDetailsBase.superRefine(requireIndianShipping);
+
+
+/* =========================================
+   Billing Details Schema
+   The checkout billing form collects name/address/city/state/pincode/country
+   only. Reusing the shipping schema (which requires phone and email) rejected
+   every order placed with a separate billing address.
+========================================= */
+const billingDetailsSchema = shippingDetailsBase.extend({
+  phone: shippingDetailsBase.shape.phone.optional(),
+  email: shippingDetailsBase.shape.email.optional(),
+}).superRefine(requireIndianState);
 
 
 /* =========================================
@@ -89,7 +128,7 @@ export const createOrderSchema = z.object({
 
     shippingDetails: shippingDetailsSchema,
     
-    billingDetails: shippingDetailsSchema.optional().nullable(),
+    billingDetails: billingDetailsSchema.optional().nullable(),
 
     // UTM / marketing attribution — optional, never fail on missing
     marketing: marketingSchema,

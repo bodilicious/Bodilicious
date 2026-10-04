@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, m } from 'framer-motion';
 import Logo from './Logo';
 import { useApp } from '../context/AppContext';
+import { productImage } from '../utils/productImage';
 
 
 type ShopFilter = 'all' | 'skin' | 'hair' | 'body' | 'lip' | 'makeup';
@@ -437,7 +438,7 @@ export default function Navbar() {
                   <img
                     loading="lazy"
                     decoding="async"
-                    src={p.images?.[0] || 'https://placehold.co/100x100?text=Product'}
+                    src={productImage(p.images?.[0], 'thumb') || '/logo.webp'}
                     alt={p.name || 'Product'}
                     className="w-12 h-12 object-contain p-0.5 mix-blend-multiply rounded"
                   />

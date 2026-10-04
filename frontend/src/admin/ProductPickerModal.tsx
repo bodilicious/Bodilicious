@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Search } from 'lucide-react';
 
@@ -14,6 +14,15 @@ export default function ProductPickerModal({ isOpen, onClose, selectedPids, onSa
   const { products } = useApp();
   const [search, setSearch] = useState('');
   const [localSelection, setLocalSelection] = useState<string[]>(selectedPids || []);
+
+  // The modal stays mounted while closed, so without this it reopened with whatever was
+  // toggled last time — including picks discarded with ✕, which Save then committed.
+  useEffect(() => {
+    if (isOpen) {
+      setLocalSelection(selectedPids || []);
+      setSearch('');
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
 

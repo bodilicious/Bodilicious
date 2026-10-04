@@ -10,9 +10,14 @@ code before (it documents an invoice format and a cron cadence that no longer ma
 
 ## Currency invariants
 
-**Every monetary field on an Order is denominated in `order.currency`.** That includes
-`totalAmount`, `originalAmount`, `shippingCost`, `discountAmount`, `refundAmount`, and
-`items[].priceAtPurchase`. Only *catalogue* prices (`Product.price`) are reliably INR.
+**Order totals are denominated in `order.currency`.** That includes `totalAmount`,
+`originalAmount`, `shippingCost`, `discountAmount` and `refundAmount`.
+
+**Exception: `items[].priceAtPurchase` is always INR.** Every writer (`createOrder`,
+`initRazorpayOrder`, `createDraftOrder`) stores `product.price` unconverted. To show a
+line item in the order's currency, multiply by `order.exchangeRate` when
+`order.currency !== "INR"` — the order pages, emails and Shiprocket push do exactly
+that. Formatting it directly in `order.currency` prints ₹1,500 as "$1,500".
 
 Consequences worth holding onto:
 

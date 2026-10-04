@@ -2,6 +2,42 @@ import admin from "../config/firebaseAdmin.js";
 import UserProfile from "../profile/models.js";
 import { logAction } from "../admin/controller.js";
 
+/*
+ * Short-lived cache of the synced profile per Firebase uid. Every authenticated
+ * request used to run a findOneAndUpdate upsert on UserProfile — a database
+ * round-trip on each cart sync, profile load and order call. The token is still
+ * verified on every request (local crypto); only the profile sync is skipped while
+ * a fresh entry exists and the token's email/verified state still matches it.
+ * Controllers read only identity fields (_id, firebaseUID, email) and role from
+ * req.user, and adminOnly re-reads the role from the database itself. Blocking a
+ * user or changing a role clears the cache immediately (admin/controller.js).
+ */
+const AUTH_CACHE_TTL_MS = 60_000;
+const AUTH_CACHE_MAX = 5_000;
+const authCache = new Map(); // uid -> { user, email, emailVerified, expires }
+
+export const clearAuthCache = () => authCache.clear();
+
+const getCachedUser = (decoded) => {
+  const entry = authCache.get(decoded.uid);
+  if (!entry) return null;
+  if (entry.expires < Date.now() || entry.email !== (decoded.email || "") || entry.emailVerified !== !!decoded.email_verified) {
+    authCache.delete(decoded.uid);
+    return null;
+  }
+  return entry.user;
+};
+
+const cacheUser = (decoded, user) => {
+  if (authCache.size >= AUTH_CACHE_MAX) authCache.clear();
+  authCache.set(decoded.uid, {
+    user,
+    email: decoded.email || "",
+    emailVerified: !!decoded.email_verified,
+    expires: Date.now() + AUTH_CACHE_TTL_MS,
+  });
+};
+
 export const protect = async (req, res, next) => {
   try {
     let header = req.headers.authorization;
@@ -32,6 +68,19 @@ export const protect = async (req, res, next) => {
       });
     }
 
+    const cached = getCachedUser(decoded);
+    if (cached) {
+      if (cached.isBlocked) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended. Please contact support.",
+        });
+      }
+      req.user = cached;
+      req.userVerified = cached.emailVerified;
+      return next();
+    }
+
     try {
       const result = await UserProfile.findOneAndUpdate(
         { firebaseUID: decoded.uid },
@@ -54,6 +103,7 @@ export const protect = async (req, res, next) => {
       );
 
       const user = result.value;
+      cacheUser(decoded, user);
 
       // Blocked users must not be able to authenticate, even with a valid token
       if (user.isBlocked) {
@@ -126,6 +176,12 @@ export const tryProtect = async (req, res, next) => {
       return next();
     }
 
+    const cached = getCachedUser(decoded);
+    if (cached) {
+      if (!cached.isBlocked) req.user = cached;
+      return next();
+    }
+
     try {
       const result = await UserProfile.findOneAndUpdate(
         { firebaseUID: decoded.uid },
@@ -148,6 +204,7 @@ export const tryProtect = async (req, res, next) => {
       );
 
       const user = result.value;
+      cacheUser(decoded, user);
 
       // Even in tryProtect, blocked users should not receive req.user
       if (user.isBlocked) return next();

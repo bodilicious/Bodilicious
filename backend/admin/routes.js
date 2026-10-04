@@ -6,6 +6,7 @@ import { adminLimiter, enforcePagination } from "../middleware/admin.js";
 import * as adminCtrl from "./controller.js";
 import * as analyticsCtrl from "./analyticsController.js";
 import * as segmentCtrl from "./segmentController.js";
+import * as reviewCtrl from "./reviewController.js";
 import { generatePaymentLink } from "../payment/controller.js";
 import multer from "multer";
 import path from "path";
@@ -92,6 +93,7 @@ router.patch("/products/bulk-status", adminCtrl.bulkUpdateProductStatus);
 router.get("/products/low-stock", adminCtrl.getLowStockProducts);
 router.get("/products/:id/stock-history", adminCtrl.getProductStockHistory);
 router.get("/products", enforcePagination, adminCtrl.getAllProductsAdmin);
+router.get("/products/:id", adminCtrl.getProductAdmin);
 router.post("/products", adminCtrl.createProductAdmin);
 router.put("/products/:id", adminCtrl.updateProductAdmin);
 router.patch("/products/:id/status", adminCtrl.toggleProductStatus);
@@ -123,6 +125,10 @@ router.get("/segments/:segment/export", segmentCtrl.exportSegmentCSV);
 router.get("/customers/:id/summary",  segmentCtrl.getCustomerSummary);
 router.get("/customers/:id/orders",   segmentCtrl.getCustomerOrders);
 router.get("/customers/:id/reviews",  segmentCtrl.getCustomerReviews);
+
+// Review moderation (StoreSettings.reviewModerationEnabled)
+router.get("/reviews", reviewCtrl.listReviews);
+router.patch("/reviews/:productId/:reviewId", reviewCtrl.moderateReview);
 router.get("/customers/:id/tickets",  segmentCtrl.getCustomerTickets);
 router.get("/customers/:id/cart",     segmentCtrl.getCustomerCart);
 router.get("/customers/:id/cart-history", segmentCtrl.getCustomerCartHistory);

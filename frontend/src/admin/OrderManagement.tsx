@@ -33,7 +33,7 @@ const OrderManagement: React.FC = () => {
   const [pages, setPages] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ orderStatus: '', paymentStatus: '', range: '30' });
+  const [filters, setFilters] = useState({ orderStatus: '', paymentStatus: '' });
 
   // modal/drawer state
   const [timelineOrder, setTimelineOrder] = useState<any | null>(null);
@@ -59,8 +59,7 @@ const OrderManagement: React.FC = () => {
         limit: '10',
         search,
         orderStatus: filters.orderStatus,
-        paymentStatus: filters.paymentStatus,
-        range: filters.range
+        paymentStatus: filters.paymentStatus
       });
       const res = await fetch(`${API_URL}/api/v1/admin/orders?${query}`, { headers });
       const data = await res.json();
@@ -102,18 +101,28 @@ const OrderManagement: React.FC = () => {
   const handleExport = async () => {
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`${API_URL}/api/v1/admin/orders/export?range=${filters.range}`, { headers });
+      // Export what's on screen: the same status filters the list uses.
+      const params = new URLSearchParams();
+      if (filters.orderStatus) params.set('orderStatus', filters.orderStatus);
+      if (filters.paymentStatus) params.set('paymentStatus', filters.paymentStatus);
+      const res = await fetch(`${API_URL}/api/v1/admin/orders/export?${params}`, { headers });
+      // Without this check a 401/500 JSON error body was saved as the "CSV".
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Export failed (${res.status})`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `orders_${filters.range}d.csv`;
+      a.download = `orders_${filters.orderStatus || 'all'}_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast.success('Export started');
-    } catch {
-      toast.error('Export failed');
+      window.URL.revokeObjectURL(url);
+      toast.success('Export downloaded');
+    } catch (e: any) {
+      toast.error(e.message || 'Export failed');
     }
   };
 
@@ -125,7 +134,10 @@ const OrderManagement: React.FC = () => {
 
   const handleBulkStatus = async () => {
     if (!selectedIds.length) return;
-    if (!window.confirm(`Update ${selectedIds.length} selected order(s) to "${bulkStatus}"?`)) return;
+    const cancelNote = bulkStatus === 'cancelled'
+      ? '\n\nPaid orders will be refunded through Razorpay, stock will be restored, and live shipments cancelled in Shiprocket.'
+      : '';
+    if (!window.confirm(`Update ${selectedIds.length} selected order(s) to "${bulkStatus}"?${cancelNote}`)) return;
     setBulkLoading(true);
     try {
       const headers = await getAuthHeaders();
@@ -138,8 +150,11 @@ const OrderManagement: React.FC = () => {
       if (!res.ok) throw new Error(data.message || 'Failed');
       toast.success(`Updated ${data.updated} orders. Failed: ${data.failed?.length || 0}`);
       if (data.failed?.length) {
-        data.failed.forEach((f: any) => toast.error(`Order ${f.id.slice(-6)}: ${f.reason}`, { duration: 5000 }));
+        data.failed.forEach((f: any) => toast.error(`Order ${String(f.id).slice(-6)}: ${f.reason}`, { duration: 5000 }));
       }
+      // Side effects that need a human (a refund Razorpay rejected, a shipment still
+      // live in Shiprocket) — held on screen long enough to act on.
+      (data.warnings || []).forEach((w: string) => toast.error(w, { duration: 15000 }));
       fetchOrders();
     } catch (e: any) {
       toast.error(e.message || 'Bulk update failed');
@@ -180,7 +195,11 @@ const OrderManagement: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Sync failed');
       setOrders(prev => prev.map(o => o._id === order._id ? { ...o, ...data.data } : o));
-      toast.success(data.message === 'Already up to date' ? 'Already up to date' : 'Order synced with Shiprocket ✓');
+      if (data.data?.needsManualReview && data.message && data.message !== 'Already up to date') {
+        toast.error(data.message, { duration: 8000 });
+      } else {
+        toast.success(data.message === 'Already up to date' ? 'Already up to date' : 'Order synced with Shiprocket ✓');
+      }
     } catch (e: any) {
       toast.error(e.message || 'Failed to sync with Shiprocket');
     } finally {
@@ -223,6 +242,7 @@ const OrderManagement: React.FC = () => {
             onChange={(val) => setFilters(prev => ({ ...prev, orderStatus: val as string }))}
             options={[
               { value: '', label: 'Status: All' },
+              { value: 'pending', label: 'Pending' },
               { value: 'processing', label: 'Processing' },
               { value: 'shipped', label: 'Shipped' },
               { value: 'delivered', label: 'Delivered' },
@@ -323,7 +343,9 @@ const OrderManagement: React.FC = () => {
               </tr>
             ) : orders.map((order) => {
               const rowLoading = srLoading[order._id];
-              const canPush = !order.awb && !order.shiprocketOrderId && ['pending', 'processing'].includes(order.orderStatus);
+              // Unpaid online orders can't ship (the backend rejects them too).
+              const isPayable = order.paymentMethod === 'cod' || order.paymentStatus === 'paid';
+              const canPush = !order.awb && !order.shiprocketOrderId && isPayable && ['pending', 'processing'].includes(order.orderStatus);
               const canSync = !!order.shiprocketOrderId;
 
               return (
@@ -361,6 +383,16 @@ const OrderManagement: React.FC = () => {
                   <td className="px-4 py-4">
                     <div className="flex flex-col items-start gap-1.5">
                       {getStatusBadge(order.orderStatus)}
+                      {/* Set by the payment flow, Shiprocket sync and returns when something
+                          needs a human — previously never shown anywhere in the panel. */}
+                      {order.needsManualReview && (
+                        <span
+                          title={order.reviewReason || 'Needs manual review'}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-700 border-red-200 cursor-help"
+                        >
+                          Needs review
+                        </span>
+                      )}
                       {order.refundStatus && (
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${order.refundStatus === 'processed' ? 'bg-purple-50 text-purple-700 border-purple-200' : order.refundStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
                           Refund: {order.refundStatus}

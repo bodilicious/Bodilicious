@@ -141,22 +141,30 @@ export const rejectReturn = async (req, res) => {
 
 /**
  * PATCH /api/v1/admin/returns/:id/received
- * Mark physical item as received. Triggers optional restock.
+ * Mark physical item as received. Triggers optional restock and the refund.
  */
 export const markReceived = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate("items.product", "name pid stock");
-
-    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
-    if (order.returnStatus !== "approved") {
+    // Atomic claim. With a read-then-save, two concurrent requests (a double-click) both
+    // saw physicalReceived:false and both called Razorpay; the second refund fails (the
+    // payment is already fully refunded) and its save overwrote the first's
+    // refundStatus with "failed" — a refunded customer shown as an unpaid refund.
+    const claimed = await Order.findOneAndUpdate(
+      { _id: req.params.id, returnStatus: "approved", physicalReceived: { $ne: true } },
+      { $set: { physicalReceived: true } },
+      { new: true }
+    );
+    if (!claimed) {
+      const existing = await Order.findById(req.params.id).select("returnStatus physicalReceived").lean();
+      if (!existing) return res.status(404).json({ success: false, message: "Order not found" });
+      if (existing.physicalReceived) {
+        return res.status(400).json({ success: false, message: "Already marked as received" });
+      }
       return res.status(400).json({ success: false, message: "Only approved returns can be marked as received" });
     }
-    if (order.physicalReceived) {
-      return res.status(400).json({ success: false, message: "Already marked as received" });
-    }
 
-    order.physicalReceived = true;
+    const order = await Order.findById(claimed._id).populate("items.product", "name pid stock");
+
     order.returnStatus = "completed";
     order.orderStatus = "returned"; // Update order status to returned
 
@@ -175,60 +183,83 @@ export const markReceived = async (req, res) => {
         }
     }
 
-    // Optional restock
+    // Optional restock — $inc, not "stock read at page load + qty": an absolute write
+    // discarded every sale made in between. Claimed via isStockRestored so it can never
+    // run twice for one order.
     const restockLog = [];
-    if (AUTO_RESTOCK) {
-      for (const item of order.items) {
-        if (item.product?._id) {
-          const newStock = (item.product.stock || 0) + (item.quantity || 1);
-          await Product.findByIdAndUpdate(item.product._id, { stock: newStock });
-          restockLog.push({ pid: item.product.pid, addedQty: item.quantity, newStock });
+    if (AUTO_RESTOCK && !order.isStockRestored) {
+      const restockClaim = await Order.findOneAndUpdate(
+        { _id: order._id, isStockRestored: { $ne: true } },
+        { $set: { isStockRestored: true } }
+      );
+      if (restockClaim) {
+        order.isStockRestored = true;
+        for (const item of order.items) {
+          if (item.product?._id) {
+            const qty = item.quantity || 1;
+            const updated = await Product.findByIdAndUpdate(
+              item.product._id,
+              { $inc: { stock: qty } },
+              { new: true }
+            ).select("stock");
+            const newStock = updated?.stock ?? null;
+            restockLog.push({ pid: item.product.pid, addedQty: qty, newStock });
 
-          await logAuditEvent({
-            event_type: "STOCK_RESTOCK_ON_RETURN",
-            user_id: req.user._id,
-            severity: "INFO",
-            source_system: "backend-api",
-            correlation_id: item.product._id.toString(),
-            network: { ip_address: req.ip },
-            metadata: {
-              targetType: "product",
-              targetId: item.product._id.toString(),
-              before: { stock: item.product.stock },
-              after: { stock: newStock },
-              reason: "return_received",
-              source: "admin"
-            }
-          });
+            await logAuditEvent({
+              event_type: "STOCK_RESTOCK_ON_RETURN",
+              user_id: req.user._id,
+              severity: "INFO",
+              source_system: "backend-api",
+              correlation_id: item.product._id.toString(),
+              network: { ip_address: req.ip },
+              metadata: {
+                targetType: "product",
+                targetId: item.product._id.toString(),
+                before: { stock: newStock !== null ? newStock - qty : null },
+                after: { stock: newStock },
+                reason: "return_received",
+                source: "admin"
+              }
+            });
+          }
         }
       }
     }
 
     // Process automated refund if applicable
     let refundLog = null;
-    if (order.returnRefundMethod === "original_payment" && order.razorpayPaymentId && !["processed", "pending"].includes(order.refundStatus)) {
-      try {
-        const razorpayInstance = new Razorpay({
-          key_id: process.env.RAZORPAY_KEY_ID,
-          key_secret: process.env.RAZORPAY_KEY_SECRET,
-        });
+    if (order.returnRefundMethod === "original_payment" && !["processed", "pending"].includes(order.refundStatus)) {
+      if (order.razorpayPaymentId) {
+        try {
+          const razorpayInstance = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+          });
 
-        const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
-          amount: toRazorpayMinorUnits(order.totalAmount, order.currency || "INR"),
-          speed: "normal",
-          notes: { reason: "Return marked as received" },
-        });
+          const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+            amount: toRazorpayMinorUnits(order.totalAmount, order.currency || "INR"),
+            speed: "normal",
+            notes: { reason: "Return marked as received" },
+          });
 
-        order.refundId = refund.id;
-        order.refundStatus = "pending";
-        order.refundAmount = order.totalAmount;
-        order.paymentStatus = "refunded";
-        refundLog = { status: "success", id: refund.id };
-      } catch (refundErr) {
-        console.error("Razorpay refund failed in markReceived:", refundErr.message);
-        order.refundStatus = "failed";
-        order.refundAmount = order.totalAmount;
-        refundLog = { status: "failed", error: refundErr.message };
+          order.refundId = refund.id;
+          order.refundStatus = "pending";
+          order.refundAmount = order.totalAmount;
+          order.paymentStatus = "refunded";
+          refundLog = { status: "success", id: refund.id };
+        } catch (refundErr) {
+          const msg = refundErr?.error?.description || refundErr.message;
+          console.error("Razorpay refund failed in markReceived:", msg);
+          order.refundStatus = "failed";
+          order.refundAmount = order.totalAmount;
+          refundLog = { status: "failed", error: msg };
+        }
+      } else {
+        // COD (no Razorpay payment): nothing can be refunded automatically. This used to
+        // complete silently, leaving no trace that the customer is still owed money.
+        order.needsManualReview = true;
+        order.reviewReason = "Return completed with refund to original payment, but there is no online payment to refund (COD) — refund the customer manually.";
+        refundLog = { status: "manual_required" };
       }
     }
 
@@ -239,7 +270,7 @@ export const markReceived = async (req, res) => {
       meta: { restockLog, source: "admin" },
     });
 
-    res.json({ success: true, data: order, restockLog });
+    res.json({ success: true, data: order, restockLog, refund: refundLog });
   } catch (err) {
     console.error("MarkReceived Error:", err);
     res.status(500).json({ success: false, message: err.message });

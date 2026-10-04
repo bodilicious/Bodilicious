@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '../utils/currencies';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -44,10 +45,19 @@ const AbandonedCheckouts: React.FC = () => {
 
   const getTimeAgo = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    if (days > 0) return `${days} days ago`;
-    return `${hours} hours ago`;
+    if (days > 0) return `${days} day${days === 1 ? '' : 's'} ago`;
+    if (hours > 0) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    return `${minutes} min ago`; // checkouts show up here from 30 minutes — was "0 hours ago"
+  };
+
+  const recoveryMailto = (email: string, name?: string) => {
+    // Encoded — a name with "&" or "#" used to break the link.
+    const subject = encodeURIComponent('Did you forget something at Bodilicious?');
+    const body = encodeURIComponent(`Hi ${name || 'there'},\n\nWe noticed you left some items in your cart...`);
+    return `mailto:${email}?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -109,7 +119,7 @@ const AbandonedCheckouts: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-dark-red">
-                      ₹{(order.totalAmount ?? 0).toLocaleString()}
+                      {formatCurrency(order.totalAmount ?? 0, order.currency)}
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200">
@@ -125,7 +135,7 @@ const AbandonedCheckouts: React.FC = () => {
                           </a>
                         )}
                         {(order.shippingDetails?.email || order.user?.email) && (
-                          <a href={`mailto:${order.shippingDetails?.email || order.user?.email}?subject=Did you forget something at Bodilicious?&body=Hi ${order.shippingDetails?.name},%0D%0A%0D%0AWe noticed you left some items in your cart...`} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 transition-all" title="Email Customer">
+                          <a href={recoveryMailto(order.shippingDetails?.email || order.user?.email, order.shippingDetails?.name)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 transition-all" title="Email Customer">
                             <Mail size={16} />
                           </a>
                         )}

@@ -3,15 +3,21 @@ import Footer from '../components/Footer';
 import { Truck, RotateCcw, Package, Globe, Clock, CreditCard, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSEO } from '../hooks/useSEO';
+import { useApp } from '../context/AppContext';
 
 export default function ShippingRefundPage() {
     useSEO({
         title: 'Shipping & Returns Policy — Bodilicious',
         description:
-            'Free shipping over ₹1500. Bodilicious delivery timelines, international shipping, and 7-day returns.',
+            // No figures here: this is prerendered before store settings load, and the
+            // hardcoded "₹1500 / 7-day" could contradict the live policy.
+            'Bodilicious shipping and returns: free shipping on qualifying orders, delivery timelines, international shipping and easy returns.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
         canonical: '/shipping-refund',
     });
+
+    const { storeSettings } = useApp();
+    const returnWindowDays = storeSettings.returnWindowDays ?? 7;
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -113,7 +119,7 @@ export default function ShippingRefundPage() {
                         <div className="bg-white p-6 border border-silk shadow-sm rounded-sm hover:border-ruby-red/30 transition-colors">
                             <h3 className="font-serif text-lg text-dark-red mb-3">Returns</h3>
                             <p className="text-sm text-gray-600 leading-relaxed font-light">
-                                Our goal is for you to be completely satisfied. We offer a 7-day return policy for products purchased directly from our website, provided they are in original, unused condition and accompanied by the original receipt.
+                                Our goal is for you to be completely satisfied. We offer a {returnWindowDays}-day return policy (counted from delivery) for products purchased directly from our website, provided they are in original, unused condition and accompanied by the original receipt.
                             </p>
                         </div>
 

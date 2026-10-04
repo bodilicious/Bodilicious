@@ -22,8 +22,12 @@ export function cloudinaryUrl(
   const prefix = match[1];
   const rest = url.slice(prefix.length);
 
-  // Don't double-inject if transformations already present
-  if (/^[a-z_,0-9]+\//.test(rest)) return url;
+  // Don't double-inject if transformations are already present. Match real
+  // transformation segments ("f_auto,q_auto,w_600/", "c_fill,h_200/") only: the old
+  // /^[a-z_,0-9]+\// also matched the version segment ("v1712345678/") that almost
+  // every Cloudinary URL starts with, so it returned those URLs untouched and the
+  // storefront downloaded full-size originals everywhere.
+  if (/^[a-z]{1,3}_[^/,]+(,[a-z]{1,3}_[^/,]+)*\//.test(rest)) return url;
 
   // Build transformation string
   const transforms: string[] = ['f_auto', `q_${options.q ?? 'auto'}`];

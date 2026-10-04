@@ -23,7 +23,9 @@ const DraftOrders: React.FC = () => {
   // Selection States
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [cartItems, setCartItems] = useState<{ product: any, quantity: number, variant?: string | null }[]>([]);
-  const [manualDiscount, setManualDiscount] = useState(0);
+  // Kept as the typed text so the box can be cleared; parsed where it's used.
+  const [manualDiscountText, setManualDiscountText] = useState('');
+  const manualDiscount = Math.max(0, Number(manualDiscountText) || 0);
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('razorpay');
   const [alreadyPaid, setAlreadyPaid] = useState(false);
@@ -52,7 +54,7 @@ const DraftOrders: React.FC = () => {
     const timer = setTimeout(async () => {
       try {
         const headers = await getAuthHeaders();
-        const res = await fetch(`${API_URL}/api/v1/admin/users?search=${userSearch}&limit=5`, { headers });
+        const res = await fetch(`${API_URL}/api/v1/admin/users?search=${encodeURIComponent(userSearch)}&limit=5`, { headers });
         const data = await res.json();
         if (data.success) setUsers(data.data);
       } catch { /* ignore */ }
@@ -69,7 +71,7 @@ const DraftOrders: React.FC = () => {
     const timer = setTimeout(async () => {
       try {
         const headers = await getAuthHeaders();
-        const res = await fetch(`${API_URL}/api/v1/admin/products?search=${productSearch}&limit=5`, { headers });
+        const res = await fetch(`${API_URL}/api/v1/admin/products?search=${encodeURIComponent(productSearch)}&limit=5`, { headers });
         const data = await res.json();
         if (data.success) setProducts(data.data);
       } catch { /* ignore */ }
@@ -79,15 +81,18 @@ const DraftOrders: React.FC = () => {
 
   const selectUser = (u: any) => {
     setSelectedUser(u);
+    // Saved addresses store the street as addressLine (+ optional houseNumber/area);
+    // reading `.street` meant a known customer's address never prefilled.
+    const addr = u.addresses?.find((a: any) => a.isDefault) || u.addresses?.[0];
     setShippingDetails({
-      name: u.name || '',
+      name: u.name || addr?.name || '',
       email: u.email || '',
-      phone: u.phone || '',
-      address: u.addresses?.[0]?.street || '',
-      city: u.addresses?.[0]?.city || '',
-      state: u.addresses?.[0]?.state || '',
-      pincode: u.addresses?.[0]?.pincode || '',
-      country: 'India'
+      phone: u.phone || addr?.phone || '',
+      address: addr ? [addr.houseNumber, addr.addressLine, addr.area].filter(Boolean).join(', ') : '',
+      city: addr?.city || '',
+      state: addr?.state || '',
+      pincode: addr?.pincode || '',
+      country: addr?.country || 'India'
     });
     setStep(2);
   };
@@ -121,13 +126,33 @@ const DraftOrders: React.FC = () => {
     setCartItems(cartItems.map(item => item.product._id === id ? { ...item, quantity: qty } : item));
   };
 
+  // What's typed in each quantity box. Writing straight to the number made the box
+  // impossible to clear: backspace snapped it back to 1, so retyping "5" gave "15".
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  const handleQtyInput = (item: { product: any; quantity: number }, raw: string) => {
+    setQtyDrafts(d => ({ ...d, [item.product._id]: raw }));
+    const n = Number(raw);
+    if (raw !== '' && Number.isInteger(n) && n >= 1) {
+      updateQuantity(item.product._id, item.product.stock > 0 ? Math.min(n, item.product.stock) : n);
+    }
+  };
+  const settleQty = (id: string) => setQtyDrafts(d => {
+    const next = { ...d };
+    delete next[id]; // show the committed quantity again (an empty box falls back to it)
+    return next;
+  });
+
   const removeItem = (id: string) => {
     setCartItems(cartItems.filter(item => item.product._id !== id));
   };
 
   const calculateTotal = () => {
     const subtotal = cartItems.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-    const shipping = subtotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost;
+    // Same rule as createDraftOrder on the server (domestic vs international rate card).
+    const isIndia = ['india', 'in', 'bharat', 'ind'].includes((shippingDetails.country || 'India').toLowerCase().trim());
+    const shipping = isIndia
+      ? (subtotal >= storeSettings.shippingThreshold ? 0 : storeSettings.shippingCost)
+      : (subtotal >= storeSettings.internationalShippingThreshold ? 0 : storeSettings.internationalShippingCost);
     const total = Math.max(0, subtotal + shipping - manualDiscount);
     return { subtotal, shipping, total };
   };
@@ -202,7 +227,8 @@ const DraftOrders: React.FC = () => {
     setStep(1);
     setSelectedUser(null);
     setCartItems([]);
-    setManualDiscount(0);
+    setManualDiscountText('');
+    setQtyDrafts({});
     setNotes('');
     setPaymentMethod('razorpay');
     setAlreadyPaid(false);
@@ -350,8 +376,9 @@ const DraftOrders: React.FC = () => {
                           <input 
                             type="number" min="1" max={item.product.stock}
                             className="w-16 p-1 border border-silk-light rounded text-center outline-none"
-                            value={item.quantity}
-                            onChange={e => updateQuantity(item.product._id, parseInt(e.target.value) || 1)}
+                            value={qtyDrafts[item.product._id] ?? String(item.quantity)}
+                            onChange={e => handleQtyInput(item, e.target.value)}
+                            onBlur={() => settleQty(item.product._id)}
                           />
                         </td>
                         <td className="p-3 text-right">
@@ -417,10 +444,12 @@ const DraftOrders: React.FC = () => {
                       <Select
                         value={paymentMethod}
                         onChange={val => setPaymentMethod(val as string)}
+                        // Values must be Order.paymentMethod enum values. "cash_on_delivery" and
+                        // "bank_transfer" weren't, so those drafts always failed to save. A bank
+                        // transfer/UPI order is recorded with "Mark as Already Paid".
                         options={[
                           { value: 'razorpay', label: 'Razorpay (Send Link)' },
-                          { value: 'cash_on_delivery', label: 'Cash on Delivery (COD)' },
-                          { value: 'bank_transfer', label: 'Bank Transfer / UPI' }
+                          { value: 'cod', label: 'Cash on Delivery (COD)' }
                         ]}
                       />
                     )}
@@ -449,8 +478,9 @@ const DraftOrders: React.FC = () => {
                       type="number" 
                       min="0"
                       className="w-24 p-1.5 border border-silk-light rounded text-right outline-none bg-white"
-                      value={manualDiscount}
-                      onChange={e => setManualDiscount(Number(e.target.value))}
+                      value={manualDiscountText}
+                      placeholder="0"
+                      onChange={e => setManualDiscountText(e.target.value)}
                     />
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-bold text-lg text-dark-red">

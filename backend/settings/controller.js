@@ -3,7 +3,20 @@ import HomepageContent from "./homepageModel.js";
 import { COUNTRIES } from "../utils/countries.js";
 import { CHECKOUT_CURRENCIES } from "../utils/currencies.js";
 import { logAction } from "../admin/controller.js";
-import { clearSettingsCache } from "./cache.js";
+import { clearSettingsCache, getSettings as getCachedSettings } from "./cache.js";
+
+// Rate-limits the stale-exchange-rate warning to once an hour (it ran on every request).
+let lastRateWarningAt = 0;
+
+/**
+ * Every launch-popup field the schema defines, read from the schema itself. A
+ * hand-maintained list here (the original 7 fields) silently dropped every field added
+ * to the popup afterwards: the save returned 200 and the setting reverted on reload.
+ * Values still go through Mongoose casting and enum validation on save.
+ */
+const LAUNCH_MODAL_FIELDS = Object.keys(StoreSettings.schema.paths)
+  .filter(p => p.startsWith("launchModal."))
+  .map(p => p.slice("launchModal.".length));
 
 /**
  * GET /api/v1/settings
@@ -11,10 +24,14 @@ import { clearSettingsCache } from "./cache.js";
  */
 export const getSettings = async (req, res) => {
   try {
-    let settings = await StoreSettings.findOne();
-    if (!settings) {
-      // Create defaults if not exists
-      settings = await StoreSettings.create({});
+    // Every storefront page load calls this. It read StoreSettings from MongoDB each
+    // time; the shared 60s settings cache (cleared on every admin save) serves it.
+    let settings = await getCachedSettings();
+    if (!settings?._id) {
+      // No settings document yet — create the defaults once.
+      await StoreSettings.create({});
+      clearSettingsCache();
+      settings = await getCachedSettings();
     }
 
     // Determine country code from Cloudflare header, fallback to 'IN'
@@ -24,13 +41,17 @@ export const getSettings = async (req, res) => {
         : 'IN';
 
     // Check for stale exchange rate (> 48 hours)
-    if (settings.exchangeRatesLastUpdated) {
+    if (Date.now() - lastRateWarningAt > 60 * 60 * 1000) {
+      if (settings.exchangeRatesLastUpdated) {
         const msSinceUpdate = Date.now() - new Date(settings.exchangeRatesLastUpdated).getTime();
         if (msSinceUpdate > 48 * 60 * 60 * 1000) {
-            console.warn(`[WARNING] Exchange Rates are stale! Last updated: ${settings.exchangeRatesLastUpdated}`);
+          console.warn(`[WARNING] Exchange Rates are stale! Last updated: ${settings.exchangeRatesLastUpdated}`);
+          lastRateWarningAt = Date.now();
         }
-    } else {
+      } else {
         console.warn("[WARNING] Exchange Rates have never been updated.");
+        lastRateWarningAt = Date.now();
+      }
     }
 
     // ── Checkout-currency rates for the storefront ────────────────────────────
@@ -68,7 +89,8 @@ export const getSettings = async (req, res) => {
         shippingCost: settings.shippingCost,
         announcementBar: settings.announcementBar,
         launchModal: settings.launchModal,
-        maintenanceMode: req.query.bypass === settings.maintenanceBypassSecret ? false : settings.maintenanceMode,
+        // An empty secret must not make "?bypass=" a valid bypass for everyone.
+        maintenanceMode: settings.maintenanceBypassSecret && req.query.bypass === settings.maintenanceBypassSecret ? false : settings.maintenanceMode,
         maintenanceMessage: settings.maintenanceMessage,
         bestSellerPids: settings.bestSellerPids || [],
         internationalShippingEnabled: settings.internationalShippingEnabled,
@@ -95,6 +117,13 @@ export const getSettings = async (req, res) => {
         // COD availability — the checkout page needs both to decide whether to offer it.
         codEnabled: settings.codEnabled ?? true,
         codInternationalEnabled: settings.codInternationalEnabled ?? false,
+        // Both are set in the admin panel; the checkout shows the fee and the minimum
+        // (createOrder enforces them). They were saved but never sent or applied.
+        codExtraCharge: settings.codExtraCharge ?? 0,
+        minOrderValueForCOD: settings.minOrderValueForCOD ?? 0,
+        // The order page hardcoded 7 days, so a changed window showed the Return
+        // button on orders the server then refused (or hid it on eligible ones).
+        returnWindowDays: settings.returnWindowDays ?? 7,
       },
     });
   } catch (err) {
@@ -192,15 +221,11 @@ export const updateSettings = async (req, res) => {
       if (req.body.announcementBar.link !== undefined) settings.announcementBar.link = req.body.announcementBar.link;
     }
 
-    if (req.body.launchModal) {
+    if (req.body.launchModal && typeof req.body.launchModal === "object") {
       const lm = req.body.launchModal;
-      if (lm.isActive    !== undefined) settings.launchModal.isActive    = lm.isActive;
-      if (lm.badge       !== undefined) settings.launchModal.badge       = lm.badge;
-      if (lm.title       !== undefined) settings.launchModal.title       = lm.title;
-      if (lm.description !== undefined) settings.launchModal.description = lm.description;
-      if (lm.ctaLabel    !== undefined) settings.launchModal.ctaLabel    = lm.ctaLabel;
-      if (lm.ctaLink     !== undefined) settings.launchModal.ctaLink     = lm.ctaLink;
-      if (lm.image       !== undefined) settings.launchModal.image       = lm.image;
+      for (const key of LAUNCH_MODAL_FIELDS) {
+        if (lm[key] !== undefined) settings.launchModal[key] = lm[key];
+      }
     }
 
     if (req.body.socialLinks) {
@@ -282,10 +307,13 @@ const sanitizeContent = (data, keyName = '') => {
 
 export const getHomepageContent = async (req, res) => {
   try {
-    const content = await HomepageContent.findOne();
+    // Published layout only — the document also carries the full draft, which the
+    // storefront never uses (it doubled the bytes read for every homepage visit).
+    const content = await HomepageContent.findOne().select("published").lean();
     if (!content) {
       return res.json({ success: true, data: null });
     }
+    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
     res.json({ success: true, data: content.published });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

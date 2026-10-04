@@ -27,7 +27,8 @@ const AnalyticsDashboard: React.FC = () => {
         fetch(`${API_URL}/api/v1/admin/analytics/products?${qp}`, { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/inventory`, { headers }),
         fetch(`${API_URL}/api/v1/admin/analytics/customers?${qp}`, { headers }),
-        fetch(`${API_URL}/api/v1/admin/analytics/behavioral`, { headers }),
+        // Same 30-day window as the rest — without it the failure/error cards were all-time.
+        fetch(`${API_URL}/api/v1/admin/analytics/behavioral?${qp}`, { headers }),
       ]);
 
       const [sData, pData, iData, cData, bData] = await Promise.all([
@@ -76,7 +77,9 @@ const AnalyticsDashboard: React.FC = () => {
   const stockAlerts = data?.inventory?.stockoutImpact || [];
   const totalBackendErrors = (data?.behavioral?.backendErrors || []).reduce((s: number, e: any) => s + e.count, 0);
   const checkoutFailures = data?.behavioral?.checkoutFailureTotal || 0;
-  const totalCustomers = (data?.customers?.segmentStats || []).reduce((s: number, x: any) => s + x.customerCount, 0);
+  // Real count from the API — summing segment counts double-counted customers in
+  // several segments and skipped unsegmented ones.
+  const totalCustomers = data?.customers?.totalCustomers ?? 0;
   const loyalCount = (data?.customers?.segmentStats || []).find((s: any) => s.segment === 'loyal')?.customerCount || 0;
 
   if (loading) {
@@ -177,7 +180,7 @@ const AnalyticsDashboard: React.FC = () => {
             { label: 'Customers & Segments', sub: 'New vs returning, CLV, retention funnel', icon: <Users size={18} />, section: 'customers', color: '#7C3AED', bg: '#F5F3FF' },
             { label: 'Operations', sub: 'Fulfillment time, SLA performance', icon: <Clock size={18} />, section: 'operations', color: '#9A3412', bg: '#FFF7ED' },
             { label: 'Insights & Behavioral', sub: 'Peak times heatmap, error rates', icon: <Activity size={18} />, section: 'behavioral', color: '#D97706', bg: '#FFFBEB' },
-            { label: 'Deep Intelligence', sub: 'Product funnel, cohorts, at-risk customers', icon: <BarChart2 size={18} />, section: 'overview', color: '#BE185D', bg: '#FDF2F8' },
+            { label: 'Deep Intelligence', sub: 'Product funnel, cohorts, at-risk customers', icon: <BarChart2 size={18} />, section: 'intelligence', color: '#BE185D', bg: '#FDF2F8' },
           ].map(item => (
             <Link
               key={item.label}

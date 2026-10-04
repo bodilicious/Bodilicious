@@ -6,6 +6,8 @@ import {
   renderBlogHtml,
   rewriteBlogIndex,
   rewriteStaticMeta,
+  rewriteHeadMeta,
+  buildShopMeta,
   STATIC_PAGE_SEO,
   SITEMAP_CATEGORIES,
   SITEMAP_CONCERNS,
@@ -90,6 +92,19 @@ function getStaticCacheControl(pathname) {
 }
 
 /**
+ * How long Cloudflare's edge may keep a static file fetched from the Render origin
+ * (seconds), or null for anything that must always come from the origin.
+ * Content-hashed Vite output can be kept for a year. Other public files keep a
+ * fixed name even when replaced, so they get a week at the edge — purge the
+ * Cloudflare cache after swapping one in place.
+ */
+function getEdgeCacheTtl(pathname) {
+  if (/^\/assets\/[^/]+\.(js|css)$/.test(pathname)) return 31536000;
+  if (/\.(webp|png|jpe?g|avif|gif|svg|ico|woff2?|txt)$/i.test(pathname)) return 604800;
+  return null;
+}
+
+/**
  * Clones `response` and layers security + cache headers onto it without
  * touching status/body. Applied once, right before the worker's fetch
  * handler returns, so every code path (bot-rendered HTML, proxied origin
@@ -148,14 +163,31 @@ async function route(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // Helper to bypass Cloudflare Orange-to-Orange conflict by fetching the raw Render URL
-    const fetchFromOrigin = () => {
+    // Helper to bypass Cloudflare Orange-to-Orange conflict by fetching the raw Render URL.
+    // `originPath` fetches a different file than the one requested (see fetchPrerendered).
+    const fetchFromOrigin = (originPath) => {
       const originUrl = new URL(request.url);
       originUrl.hostname = 'bodilicious-front.onrender.com';
+      if (originPath) {
+        originUrl.pathname = originPath;
+        originUrl.search = '';
+      }
       // Create a new request to avoid mutating the original
       const modifiedRequest = new Request(originUrl, request);
       // Ensure we don't pass Cloudflare headers that might confuse Render's Cloudflare
       modifiedRequest.headers.delete('cf-connecting-ip');
+      // Edge-cache static files so repeat requests are served from Cloudflare (free,
+      // unmetered) instead of Render's metered static-site bandwidth. Worker
+      // subrequests aren't edge-cached by default, so every JS chunk and product
+      // image was re-fetched from Render. HTML is never cached here (a deploy must
+      // show up immediately); the query string is part of the cache key, so the
+      // ?v= cache-busters on product images still force a refresh.
+      const edgeTtl = getEdgeCacheTtl(originUrl.pathname);
+      if (edgeTtl && request.method === 'GET') {
+        return fetch(modifiedRequest, {
+          cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': edgeTtl, '404': 60, '500-599': 0 } },
+        });
+      }
       return fetch(modifiedRequest);
     };
 
@@ -222,11 +254,28 @@ async function route(request, env, ctx) {
 
     // 1. Check if SEO rendering is enabled (kill-switch)
     if (env.SEO_BOT_RENDER_ENABLED !== 'true') {
-      return fetchFromOrigin(); 
+      return fetchFromOrigin();
+    }
+
+    const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
+
+    // 1b. Static content pages — for EVERY client, not just bots. The build
+    // prerenders each of these to dist/<path>/index.html, but the origin
+    // answers /<path> with its SPA fallback, dist/index.html — which the
+    // prerender has overwritten with the baked HOMEPAGE. So /about, /terms,
+    // /faqs etc. went out with the homepage's title, description, canonical
+    // and body to browsers and to every crawler not on the isBot() allowlist,
+    // and allowlisted bots got a corrected <head> (3d below) over that same
+    // homepage body. Requesting the baked file directly doesn't depend on the
+    // Render rewrite rules that were meant to do this and never took effect.
+    if (STATIC_PAGE_SEO[pathname]) {
+      const prerendered = await fetchPrerendered(pathname, fetchFromOrigin, frontendUrl);
+      if (prerendered) return prerendered;
     }
 
     // 2. Only intercept for bots — humans always get the real SPA.
     if (!isBot(request)) {
+      if (pathname === '/shop') return serveShop(url, fetchFromOrigin, frontendUrl);
       return fetchFromOrigin();
     }
 
@@ -256,7 +305,8 @@ async function route(request, env, ctx) {
       }
     }
 
-    // 3c. Blog index — correct metadata plus an ItemList of every post.
+    // 3c. Blog index — correct metadata plus an ItemList of every post. Only
+    // reached when 1b had no usable prerendered /blogs page.
     if (pathname === '/blogs' && !url.search) {
       return handleBlogIndex(request, env, fetchFromOrigin);
     }
@@ -277,38 +327,90 @@ async function route(request, env, ctx) {
     // returning a synthesised page: the real copy lives in React components,
     // and replacing the body would both serve crawlers less than users see and
     // stop Google rendering the JS that contains the actual content.
+    //
+    // Only reached when 1b had no usable prerendered page, so the origin
+    // response here is the homepage shell.
     if (STATIC_PAGE_SEO[pathname]) {
       const originResponse = await fetchFromOrigin();
       const contentType = originResponse.headers.get('content-type') || '';
       if (!contentType.includes('text/html')) return originResponse;
-      return rewriteStaticMeta(
-        originResponse,
-        pathname,
-        env.FRONTEND_URL || 'https://bodilicious.in'
-      );
+      return rewriteStaticMeta(originResponse, pathname, frontendUrl);
     }
 
     // 4. Handle Shop / category filter pages — these were previously served as
     // plain index.html to bots, causing Google to read the hardcoded homepage
     // canonical and ignore the facet page entirely.
     if (pathname === '/shop' || pathname === '/shop/') {
-      const category = url.searchParams.get('category');
-      const type = url.searchParams.get('type');
-      const concern = url.searchParams.get('concern');
-      // Only intercept single-facet URLs (what the sitemap targets).
-      // Multi-param or no-param requests fall through to origin.
-      const facetCount = [category, type, concern].filter(Boolean).length;
-      const hasOtherParams = url.searchParams.has('search') || url.searchParams.has('sort')
-        || url.searchParams.has('ingredient') || url.searchParams.has('priceMin')
-        || url.searchParams.has('priceMax') || url.searchParams.has('sub_category')
-        || (url.searchParams.get('page') && url.searchParams.get('page') !== '1');
-      if (facetCount <= 1 && !hasOtherParams) {
+      // Only bot-render single-facet URLs (what the sitemap targets).
+      // Multi-param requests get the prerendered /shop page.
+      const { category, type, concern, isLanding } = getShopFacets(url);
+      if (isLanding) {
         return handleShop({ category, type, concern }, request, env, ctx, fetchFromOriginNoCache);
       }
+      return serveShop(url, fetchFromOrigin, frontendUrl);
     }
 
     // For everything else, pass through to origin.
     return fetchFromOrigin();
+}
+
+/**
+ * Fetch the prerendered dist/<pathname>/index.html from origin, or null when
+ * there isn't a usable one. A page only counts if its canonical points at its
+ * own URL: prerender.js saves whatever it has when a page times out, which can
+ * be the shell still carrying the homepage canonical — serving that would
+ * reintroduce the exact duplicate-of-the-homepage bug this exists to fix.
+ */
+async function fetchPrerendered(pathname, fetchFromOrigin, frontendUrl) {
+  let res;
+  try {
+    res = await fetchFromOrigin(`${pathname}/index.html`);
+  } catch {
+    return null;
+  }
+  // The client's If-None-Match matched this file's ETag, so the copy it
+  // already holds is this page.
+  if (res.status === 304) return res;
+  if (!res.ok || !(res.headers.get('content-type') || '').includes('text/html')) return null;
+
+  const html = await res.text();
+  const canonicalTag = html.match(/<link\b[^>]*\brel="canonical"[^>]*>/i)?.[0] || '';
+  const canonical = (canonicalTag.match(/\bhref="([^"]*)"/) || [])[1];
+  if (canonical !== `${frontendUrl}${pathname}`) return null;
+
+  const headers = new Headers(res.headers);
+  headers.delete('content-length');
+  return new Response(html, { status: res.status, statusText: res.statusText, headers });
+}
+
+function getShopFacets(url) {
+  const category = url.searchParams.get('category');
+  const type = url.searchParams.get('type');
+  const concern = url.searchParams.get('concern');
+  const facetCount = [category, type, concern].filter(Boolean).length;
+  const hasOtherParams = url.searchParams.has('search') || url.searchParams.has('sort')
+    || url.searchParams.has('ingredient') || url.searchParams.has('priceMin')
+    || url.searchParams.has('priceMax') || url.searchParams.has('sub_category')
+    || (url.searchParams.get('page') && url.searchParams.get('page') !== '1');
+  return { category, type, concern, isLanding: facetCount <= 1 && !hasOtherParams };
+}
+
+/**
+ * /shop for every client handleShop doesn't cover: humans, and bots on
+ * multi-filter URLs. Serves the prerendered /shop page; on a single-facet
+ * landing URL (/shop?category=hair) the head is rewritten to that facet's own
+ * title, description and canonical — the same values handleShop gives bots.
+ */
+async function serveShop(url, fetchFromOrigin, frontendUrl) {
+  const prerendered = await fetchPrerendered('/shop', fetchFromOrigin, frontendUrl);
+  if (!prerendered) return fetchFromOrigin();
+
+  const { category, type, concern, isLanding } = getShopFacets(url);
+  if (!isLanding || !(category || type || concern) || prerendered.status !== 200) {
+    return prerendered;
+  }
+  const { pageTitle, description, canonicalUrl } = buildShopMeta({ category, type, concern }, frontendUrl);
+  return rewriteHeadMeta(prerendered, { title: pageTitle, description, url: canonicalUrl });
 }
 
 /**

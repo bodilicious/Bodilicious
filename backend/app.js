@@ -4,14 +4,31 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize";
 import compression from "compression";
+import zlib from "zlib";
 import { razorpayWebhook } from "./payment/controller.js";
 import { trackActiveSession } from "./analytics/live.js";
 import routes from "./index.js";
 
 const app = express();
-// Level 9 = maximum compression. Threshold 512 B catches more small API responses.
-// This directly reduces Render outbound bandwidth on every API reply.
-app.use(compression({ level: 9, threshold: 512 }));
+
+// Health check for UptimeRobot (keeps the free Render instance awake). Registered
+// first so pings skip every middleware below — previously each ping ran helmet,
+// CORS, body parsing and the live-visitor tracker, and showed up as an "active
+// visitor" on the admin live dashboard. Body-less 200; no-store so no edge caches it.
+app.get("/health", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.status(200).end();
+});
+
+// Brotli when the client supports it (all modern browsers), gzip otherwise.
+// Brotli q4 compresses JSON smaller than gzip at a fraction of the CPU of the old
+// gzip level 9 — which matters on a 0.1-CPU free instance. Brotli's own default
+// (q11) would be far slower still, hence the explicit quality.
+app.use(compression({
+  threshold: 1024,
+  level: 6,
+  brotli: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } },
+}));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -133,16 +150,6 @@ app.use("/api/v1/payment/verify", sensitiveLimiter);
 
 // Everything else under /api/v1 (includes remaining /payment/* like /webhook)
 app.use("/api/v1", globalLimiter, routes);
-
-// Health check endpoint for UptimeRobot — keep body minimal to save bandwidth.
-// UptimeRobot only checks the HTTP 200 status, not the body content.
-// Rate-limited to prevent /health being used as a free flood vector.
-// Cache-Control: no-store ensures Cloudflare always proxies to the real origin
-// so UptimeRobot gets a genuine response, not a cached one from the edge.
-app.get("/health", globalLimiter, (req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.status(200).end();
-});
 
 // Global Error Handler to prevent Express from sending HTML 500 pages
 app.use((err, req, res, next) => {

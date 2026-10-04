@@ -74,13 +74,62 @@ const storeSettingsSchema = new mongoose.Schema(
       link: { type: String, default: "" },
     },
     launchModal: {
-      isActive:    { type: Boolean, default: false },
-      badge:       { type: String, default: "Just Launched" },
-      title:       { type: String, default: "New Collection" },
-      description: { type: String, default: "Discover our latest additions, crafted with rare botanical extracts." },
-      ctaLabel:    { type: String, default: "Explore Collection" },
-      ctaLink:     { type: String, default: "/shop" },
-      image:       { type: String, default: "" },
+      // ── Core ──────────────────────────────────────────────────────────────
+      isActive:         { type: Boolean, default: false },
+      badge:            { type: String,  default: 'Just Launched' },
+      title:            { type: String,  default: 'New Collection' },
+      description:      { type: String,  default: 'Discover our latest additions, crafted with rare botanical extracts.' },
+      ctaLabel:         { type: String,  default: 'Explore Collection' },
+      ctaLink:          { type: String,  default: '/shop' },
+      image:            { type: String,  default: '' },
+      // Delay before popup fires (seconds). Replaces the hard-coded 2.5 s.
+      showDelaySeconds: { type: Number,  default: 2.5 },
+      // Fire popup when cursor moves toward browser chrome (desktop exit-intent)
+      exitIntentTrigger: { type: Boolean, default: false },
+
+      // ── Colours & Theme ───────────────────────────────────────────────────
+      // CSS gradient string for the header panel, e.g. "135deg, #3B1E0A 0%, #7C3527 100%"
+      headerBg:          { type: String,  default: '' },
+      headerBgAnimated:  { type: Boolean, default: true },
+      orb1Color:         { type: String,  default: '#F97316' },
+      orb2Color:         { type: String,  default: '#EC4899' },
+      orb3Color:         { type: String,  default: '#FBBF24' },
+      badgeBg:           { type: String,  default: 'rgba(255,255,255,0.15)' },
+      badgeTextColor:    { type: String,  default: '#FDE68A' },
+      titleColor:        { type: String,  default: '#ffffff' },
+      descriptionColor:  { type: String,  default: 'rgba(255,255,255,0.75)' },
+      // CSS gradient string for CTA button, e.g. "135deg, #FBBF24, #F97316"
+      ctaGradient:       { type: String,  default: '135deg, #FBBF24, #F97316' },
+      ctaTextColor:      { type: String,  default: '#2C1208' },
+      ctaGlow:           { type: Boolean, default: false },
+      contentBg:         { type: String,  default: '#ffffff' },
+
+      // ── Floating Emojis ───────────────────────────────────────────────────
+      floatingEmojisEnabled: { type: Boolean,   default: false },
+      floatingEmojis:        { type: [String],  default: [] },
+      // Give each emoji its own randomised velocity/rotation so they don't look mechanically identical
+      emojiTrailPhysics: { type: Boolean, default: true },
+
+      // ── Urgency Strip & Countdown ─────────────────────────────────────────
+      urgencyEnabled:        { type: Boolean, default: false },
+      urgencyText:           { type: String,  default: '⏰ Limited time offer' },
+      countdownEnabled:      { type: Boolean, default: false },
+      countdownTargetDate:   { type: String,  default: '' }, // ISO-8601, stored as UTC
+      countdownExpiredText:  { type: String,  default: 'Offer ended' },
+
+      // ── Entrance & Motion ─────────────────────────────────────────────────
+      entranceStyle:   { type: String,  default: 'spring', enum: ['spring', 'zoomFade', 'slideUp', 'flip3D'] },
+      parallaxOnMouse: { type: Boolean, default: false },
+      staggerContent:  { type: Boolean, default: true },
+      // Global performance dial: low = no blur/parallax/particles; high = everything
+      effectsIntensity: { type: String, default: 'medium', enum: ['low', 'medium', 'high'] },
+
+      // ── Interaction Effects ───────────────────────────────────────────────
+      ctaShimmer:           { type: Boolean, default: true },
+      ctaParticleBurst:     { type: Boolean, default: true },
+      closeButtonSpin:      { type: Boolean, default: true },
+      backdropBlurAnimated: { type: Boolean, default: true },
+      imageRevealStyle:     { type: String,  default: 'fadeScale', enum: ['none', 'clipWipe', 'fadeScale'] },
     },
     socialLinks: {
       instagram: { type: String, default: "" },

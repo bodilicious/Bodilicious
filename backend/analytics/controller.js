@@ -4,6 +4,8 @@ import Order from "../tracker/models.js";
 import UserProfile from "../profile/models.js";
 import AuditLogV2 from "../audit/models.js";
 import { logAuditEvent } from "../audit/logger.js";
+import mongoose from "mongoose";
+import UserInteractionLog from "./interactionModel.js";
 
 /**
  * Returns top level KPIs and charts
@@ -265,7 +267,7 @@ export const trackEvent = async (req, res) => {
     if (!event || !allowedEvents.includes(event)) {
       return res.status(400).json({ success: false, message: "Invalid event type" });
     }
-    if (!productId) {
+    if (!productId || typeof productId !== "string" || productId.length > 64) {
       return res.status(400).json({ success: false, message: "productId is required" });
     }
 
@@ -288,9 +290,32 @@ export const trackEvent = async (req, res) => {
       metadata: {
         targetType: "product",
         targetId: productId,
-        productName: productName || null,
+        productName: typeof productName === "string" ? productName.slice(0, 200) : null,
       },
     });
+
+    // Per-customer view history (CRM "recently viewed", segments). This used to live
+    // in getProductByPid behind req.user — but that route has no auth middleware, so
+    // it never ran. The product page now reports views here, with the user's token.
+    if (event === "product_viewed" && req.user?._id && mongoose.isValidObjectId(productId)) {
+      const pidObj = new mongoose.Types.ObjectId(productId);
+      UserInteractionLog.create({ userId: req.user._id, productId: pidObj, eventType: "view" })
+        .catch(err => console.error("Failed to log view interaction:", err.message));
+      UserProfile.bulkWrite([
+        {
+          updateOne: {
+            filter: { _id: req.user._id, "productViewCounts.productId": pidObj },
+            update: { $inc: { "productViewCounts.$.count": 1 }, $set: { "productViewCounts.$.lastViewedAt": new Date() } },
+          },
+        },
+        {
+          updateOne: {
+            filter: { _id: req.user._id, "productViewCounts.productId": { $ne: pidObj } },
+            update: { $push: { productViewCounts: { $each: [{ productId: pidObj, count: 1, lastViewedAt: new Date() }], $slice: -100 } } },
+          },
+        },
+      ]).catch(err => console.error("Failed to update productViewCounts:", err.message));
+    }
 
     return res.json({ success: true });
   } catch (error) {

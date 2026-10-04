@@ -17,6 +17,7 @@ import {
 } from 'recharts';
 import toast from 'react-hot-toast';
 import { mapAuditEvent } from './utils/auditEventMapper';
+import { formatCurrency } from '../utils/currencies';
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/v1`;
 
@@ -57,6 +58,9 @@ type TabKey = 'overview' | 'orders' | 'payment' | 'reviews' | 'support' | 'cart'
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtINR = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+// A single order's amount, in that order's own currency and to the paisa/cent.
+// fmtINR stays for INR aggregates and catalogue prices.
+const fmtOrderAmount = (n: number, currency?: string) => formatCurrency(n || 0, currency);
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 
@@ -581,7 +585,7 @@ function OrdersTab({ userId }: { userId: string }) {
                 </div>
                 <div>
                   <p className="text-xs font-mono text-gray-400">#{order._id.slice(-8).toUpperCase()}</p>
-                  <p className="text-sm font-semibold text-gray-800">{fmtINR(order.totalAmount || 0)}</p>
+                  <p className="text-sm font-semibold text-gray-800">{fmtOrderAmount(order.totalAmount, order.currency)}</p>
                   <p className="text-[10px] text-gray-400">{fmtDate(order.createdAt)} · {(order.items || []).length} item{order.items?.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
@@ -609,7 +613,8 @@ function OrdersTab({ userId }: { userId: string }) {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-800 truncate">{item.product?.name || 'Product'}</p>
-                      <p className="text-[10px] text-gray-400">Qty: {item.quantity} · {fmtINR(item.price || 0)}</p>
+                      {/* Order items carry priceAtPurchase (in the order's currency) — `item.price` doesn't exist, so every line showed ₹0. */}
+                      <p className="text-[10px] text-gray-400">Qty: {item.quantity} · {fmtOrderAmount(item.priceAtPurchase, order.currency)}</p>
                     </div>
                   </div>
                 ))}
@@ -1180,7 +1185,7 @@ function PaymentHistoryTab({ userId }: { userId: string }) {
                   <p className="text-[10px] text-gray-400 mt-0.5">{fmtDate(o.createdAt)} · {o.paymentMethod || 'Unknown method'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-[#3D0A05]">{fmtINR(o.totalAmount || 0)}</p>
+                  <p className="text-sm font-bold text-[#3D0A05]">{fmtOrderAmount(o.totalAmount, o.currency)}</p>
                   <span className={`inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                     o.paymentStatus === 'paid' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
                   }`}>

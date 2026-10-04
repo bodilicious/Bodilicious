@@ -3,11 +3,12 @@ const router = Router();
 
 import { protect, adminOnly, primaryAdminOnly } from "../middleware/auth.js";
 import { adminLimiter } from "../middleware/admin.js";
+import { cacheResponse } from "../utils/responseCache.js";
 import { getSettings, getAdminSettings, updateSettings, getHomepageContent, getHomepageDraft, updateHomepageDraft, publishHomepageContent, revertHomepageDraft } from "./controller.js";
 
 // Public route to get non-sensitive store settings
 router.get("/public", getSettings);
-router.get("/homepage", getHomepageContent);
+router.get("/homepage", cacheResponse(5 * 60_000), getHomepageContent);
 
 // Admin routes
 router.use(protect);

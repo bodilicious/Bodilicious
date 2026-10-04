@@ -34,7 +34,15 @@ const shippingDetailsSchema = new mongoose.Schema(
     phone: { type: String, required: true },
     address: { type: String, required: true },
     city: { type: String, required: true },
-    state: { type: String, required: true },
+    // Required for Indian addresses only — see tracker/schema.js (many countries have
+    // no states, and the checkout form allows leaving it blank for them).
+    state: {
+      type: String,
+      default: "",
+      required: function () {
+        return ["india", "in", "bharat", "ind"].includes(String(this.country || "India").toLowerCase().trim());
+      },
+    },
     pincode: { type: String, required: true },
     country: { type: String, default: "India" },
     email: {
@@ -51,17 +59,27 @@ const shippingDetailsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* =========================================
+   Billing Snapshot Schema
+   Same shape as shipping, minus the required phone: the checkout billing form
+   doesn't collect a phone number, so reusing shippingDetailsSchema rejected
+   every order placed with a separate billing address.
+========================================= */
+const billingDetailsSchema = shippingDetailsSchema.clone();
+billingDetailsSchema.path("phone").required(false);
+billingDetailsSchema.path("phone").default("");
+
 
 /* =========================================
    Main Order Schema
 ========================================= */
 const orderSchema = new mongoose.Schema(
   {
+    // No single index — { user, createdAt } below serves every per-user query.
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "UserProfile",
       required: true,
-      index: true,
     },
 
     items: [orderItemSchema],
@@ -90,7 +108,6 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ["storefront", "admin_draft"],
       default: "storefront",
-      index: true,
     },
 
     paymentMethod: {
@@ -158,6 +175,12 @@ const orderSchema = new mongoose.Schema(
     },
 
     shippingCost: {
+      type: Number,
+      default: 0,
+    },
+
+    // StoreSettings.codExtraCharge applied to a COD order (already inside totalAmount).
+    codCharge: {
       type: Number,
       default: 0,
     },
@@ -293,7 +316,6 @@ const orderSchema = new mongoose.Schema(
     shippedAt: {
       type: Date,
       default: null,
-      index: true,
     },
 
     /* =========================================
@@ -306,7 +328,7 @@ const orderSchema = new mongoose.Schema(
     },
 
     billingDetails: {
-      type: shippingDetailsSchema,
+      type: billingDetailsSchema,
       required: false,
       default: null,
     },
@@ -315,10 +337,10 @@ const orderSchema = new mongoose.Schema(
        Soft Delete
     ========================================= */
 
+    // Not indexed: nearly every order is false, so the index never narrows a query.
     isDeleted: {
       type: Boolean,
       default: false,
-      index: true,
     },
 
     /* =========================================
@@ -487,5 +509,29 @@ orderSchema.pre(/^find/, function () {
 
 const Order =
   mongoose.models.Order || mongoose.model("Order", orderSchema);
+
+/**
+ * Orders a customer should see as "their orders": excludes abandoned checkouts,
+ * unpaid/failed Razorpay attempts, and paid orders still being finalised. Shared by
+ * every customer-facing order list — the profile endpoint had no filter, so each
+ * abandoned online checkout showed up on the tracking page as a pending order.
+ */
+/**
+ * Product fields embedded when an order's items are populated. Every consumer —
+ * order pages, confirmation emails, Shiprocket push (name/sku/hsn/weights) and the
+ * returns flow — reads only these. A bare .populate("items.product") pulled whole
+ * product documents (descriptions, ingredients, FAQs, every review) into each order
+ * response, tens of KB per line item.
+ */
+export const ORDER_ITEM_PRODUCT_FIELDS = "pid name price images category slug hsn_code product_weight_g product_weight_ml";
+
+export const customerVisibleOrderFilter = (userId) => ({
+  user: userId,
+  orderStatus: { $ne: "abandoned" },
+  $nor: [
+    { paymentMethod: "razorpay", paymentStatus: { $in: ["pending", "failed"] } },
+    { paymentMethod: "razorpay", paymentStatus: "paid", invoiceGenerated: { $ne: true } },
+  ],
+});
 
 export default Order;

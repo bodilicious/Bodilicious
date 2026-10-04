@@ -448,6 +448,15 @@ export const pushOrderToShiprocket = async (order, opts = {}) => {
     });
     const totalWeight = Math.max(0.5, totalWeightGrams / 1000);
 
+    // Shiprocket works in INR and the item prices above are INR, but totalAmount is in
+    // the order's checkout currency — a $40 order was declared as ₹40. Convert back
+    // with the rate locked in at quote time (amount / exchangeRate = INR).
+    const orderCurrency = (order.currency || "INR").toUpperCase();
+    const itemsSubtotalInr = shiprocketItems.reduce((sum, i) => sum + i.selling_price * i.units, 0);
+    const subTotalInr = orderCurrency === "INR"
+      ? order.totalAmount
+      : (order.exchangeRate > 0 ? Math.round(order.totalAmount / order.exchangeRate) : itemsSubtotalInr);
+
     const payload = {
       order_id: order._id.toString(),
       order_date: new Date().toISOString().split("T")[0],
@@ -488,7 +497,7 @@ export const pushOrderToShiprocket = async (order, opts = {}) => {
       // collected. If a courier cannot support COD on the lane, we want Shiprocket to
       // reject it loudly rather than us quietly mislabelling it.
       payment_method: order.paymentMethod === "cod" ? "COD" : "Prepaid",
-      sub_total: order.totalAmount,
+      sub_total: subTotalInr,
       length: 10,
       breadth: 10,
       height: 10,

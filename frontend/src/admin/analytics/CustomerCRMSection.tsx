@@ -7,6 +7,8 @@ import { Users, TrendingUp, Zap, Clock, CalendarDays, AlertCircle } from 'lucide
 
 interface CustomerCRMSectionProps {
   segmentStats: any[];
+  /** Real customer count from the API (segments overlap, so their counts can't be summed). */
+  totalCustomers?: number;
   funnelData: any[];
   trendData?: any[]; // New vs Returning buyer trend
   support?: {
@@ -54,11 +56,13 @@ const StatBadge: React.FC<{ label: string; value: string | number; sub?: string;
 
 const CustomerCRMSection: React.FC<CustomerCRMSectionProps> = ({
   segmentStats,
+  totalCustomers: totalCustomersProp,
   funnelData,
   trendData = [],
   support
 }) => {
-  const totalCustomers = segmentStats.reduce((s, x) => s + x.customerCount, 0);
+  // A customer can be in several segments, so summing segment counts double-counts.
+  const totalCustomers = totalCustomersProp ?? segmentStats.reduce((s, x) => s + x.customerCount, 0);
   const totalRevenue = segmentStats.reduce((s, x) => s + x.revenue, 0);
   const loyalCount = segmentStats.find(s => s.segment === 'loyal')?.customerCount || 0;
   const loyalPct = totalCustomers > 0 ? ((loyalCount / totalCustomers) * 100).toFixed(0) : 0;

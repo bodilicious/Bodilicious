@@ -3,7 +3,9 @@ import rateLimit from "express-rate-limit";
 import { GoogleGenAI } from "@google/genai";
 import { getProducts } from "./products.js";
 import { matchIntent } from "./intents.js";
+import mongoose from "mongoose";
 import RitualResponse from "../admin/ritualModels.js";
+import { getSettings } from "../settings/cache.js";
 
 /* ===================================================
    RATE LIMITING
@@ -81,24 +83,42 @@ function getFuseInstance(items) {
 
 /* ===================================================
    FAQ ANSWERS
+   Built from the live store settings. These were hardcoded and had drifted from
+   the real policy — e.g. "COD is available for orders under ₹2000", a limit that
+   exists nowhere, and a fixed 7-day return window the admin can change.
  =================================================== */
-const FAQ_ANSWERS = {
-  shipping:
-    "We offer free shipping on most orders. Delivery usually takes 3–5 business days.",
-  delivery:
-    "Delivery usually takes 3–5 business days depending on your location.",
-  return:
-    "We accept returns within 7 days of delivery for unused products in original packaging.",
-  refund:
-    "Refunds are processed within 5–7 business days after receiving the returned item.",
-  cod:
-    "Cash on Delivery (COD) is available for orders under ₹2000 in most pin codes.",
-  cancellation:
-    "Orders can be cancelled before dispatch from our warehouse.",
-  contact:
-    "You can reach support at bodiliciousnaturalproducts@gmail.com or via WhatsApp at +91 9894451947",
-  support:
-    "You can reach support at bodiliciousnaturalproducts@gmail.com or via WhatsApp at +91 9894451947"
+const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+
+const buildFaqAnswers = (s = {}) => {
+  const threshold = Number(s.shippingThreshold) || 0;
+  const shipping = threshold > 0
+    ? `Shipping is free on orders above ${inr(threshold)} within India (otherwise ${inr(s.shippingCost)}). Delivery usually takes 3–5 business days.`
+    : "Delivery within India usually takes 3–5 business days.";
+  const returnDays = s.returnWindowDays ?? 7;
+
+  let cod;
+  if (s.codEnabled === false) {
+    cod = "Cash on Delivery is currently unavailable — please use online payment (cards, UPI or net banking).";
+  } else {
+    const min = Number(s.minOrderValueForCOD) || 0;
+    const fee = Number(s.codExtraCharge) || 0;
+    cod = "Cash on Delivery is available within India"
+      + (min > 0 ? ` on orders of ${inr(min)} or more` : "")
+      + (fee > 0 ? `, with a ${inr(fee)} COD fee` : "")
+      + ".";
+  }
+
+  const contact = `You can reach support at ${s.supportEmail || "bodiliciousnaturalproducts@gmail.com"} or via WhatsApp at +91 9894451947`;
+  return {
+    shipping,
+    delivery: "Delivery usually takes 3–5 business days within India, and 7–21 business days internationally.",
+    return: `We accept returns within ${returnDays} days of delivery for unused products in original packaging.`,
+    refund: "Refunds are processed within 5–7 business days after we receive the returned item.",
+    cod,
+    cancellation: "Orders can be cancelled from your account until they are dispatched from our warehouse.",
+    contact,
+    support: contact,
+  };
 };
 
 /* ===================================================
@@ -179,8 +199,8 @@ function extractContext(messages) {
   return context;
 }
 
-function matchFAQ(message) {
-  for (const [key, answer] of Object.entries(FAQ_ANSWERS)) {
+function matchFAQ(message, answers) {
+  for (const [key, answer] of Object.entries(answers)) {
     const regex = new RegExp(`\\b${key}\\b`, "i");
     if (regex.test(message)) return answer;
   }
@@ -225,14 +245,23 @@ ${suitableText}\n\n`;
  =================================================== */
 export const handleChat = async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { message } = req.body;
 
-    if (!message || typeof message !== "string") {
+    if (!message || typeof message !== "string" || !message.trim()) {
       return res.status(400).json({
         success: false,
         message: "Message is required."
       });
     }
+    if (message.length > 1000) {
+      return res.status(400).json({ success: false, message: "Message is too long (max 1000 characters)." });
+    }
+    // history was spread/lowercased unchecked — a non-array or non-string entry
+    // threw inside extractContext and the chat answered with a 500.
+    const history = (Array.isArray(req.body.history) ? req.body.history : [])
+      .filter(h => typeof h === "string")
+      .slice(-20)
+      .map(h => h.slice(0, 1000));
 
     // Load live products
     const liveProducts = await getLiveProducts();
@@ -241,7 +270,7 @@ export const handleChat = async (req, res) => {
     const lower = message.toLowerCase();
 
     /* ---------- STEP 1: FAQ ---------- */
-    const faqReply = matchFAQ(lower);
+    const faqReply = matchFAQ(lower, buildFaqAnswers(await getSettings().catch(() => ({}))));
     if (faqReply) {
       return res.json({
         success: true,
@@ -333,7 +362,10 @@ export const handleChat = async (req, res) => {
     /* ---------- STEP 4: AI FALLBACK (GEMINI) ---------- */
     if (ai) {
       try {
-        const { profileContext, structuredHistory = [] } = req.body;
+        const { profileContext } = req.body;
+        const structuredHistory = (Array.isArray(req.body.structuredHistory) ? req.body.structuredHistory : [])
+          .filter(h => h && typeof h.text === "string" && h.text.trim())
+          .map(h => ({ role: h.role, text: h.text.slice(0, 1000) }));
         
         // Prepare context for the AI - USE FUZZY SEARCH to find candidates
         const candidates = fuse.search(message).map(r => r.item).slice(0, 12);
@@ -358,8 +390,10 @@ export const handleChat = async (req, res) => {
           }
         ];
 
+        // gemini-1.5-flash has been retired, so every AI fallback errored and fell
+        // through to the generic reply. Overridable without a deploy via GEMINI_MODEL.
         const response = await ai.models.generateContent({
-          model: "gemini-1.5-flash",
+          model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
           contents: contents,
           config: {
             maxOutputTokens: 500,
@@ -367,7 +401,8 @@ export const handleChat = async (req, res) => {
           }
         });
 
-        const responseText = response.candidates[0].content.parts[0].text;
+        const responseText = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (!responseText) throw new Error("Empty response from Gemini");
 
         // Extract product IDs if mentioned (look for ID: BD-...)
         const mentionedIds = [];
@@ -422,20 +457,26 @@ export const logRitualEvent = async (req, res) => {
       concerns,
       goal,
       routineTime,
-      user: req.user?._id || null,
     };
+    // Never overwrite a known user with null from a later anonymous event.
+    if (req.user?._id) updateData.user = req.user._id;
+    // A malformed id threw a CastError (500); just don't link it.
+    if (orderId && mongoose.isValidObjectId(orderId)) updateData.order = orderId;
+    for (const k of Object.keys(updateData)) if (updateData[k] === undefined) delete updateData[k];
 
-    if (orderId) updateData.order = orderId;
-
-    // Upsert the ritual response for the session
+    // Upsert the ritual response for the session. runValidators: update queries skip
+    // schema validation by default, so an invalid status enum was persisted.
     const ritual = await RitualResponse.findOneAndUpdate(
-      { sessionId },
+      { sessionId: String(sessionId).slice(0, 100) },
       { $set: updateData },
-      { upsert: true, new: true }
+      { upsert: true, new: true, runValidators: true }
     );
 
     res.json({ success: true, data: ritual });
   } catch (err) {
+    if (err?.name === "ValidationError" || err?.name === "CastError") {
+      return res.status(400).json({ success: false, message: err.message });
+    }
     console.error("LogRitualEvent Error:", err);
     res.status(500).json({ success: false, message: "Error logging ritual event" });
   }

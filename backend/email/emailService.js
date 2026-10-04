@@ -25,8 +25,8 @@ const FROM_ALERTS   = process.env.EMAIL_FROM_ALERTS  || "Bodilicious Alerts <ale
 /**
  * Formats a monetary amount in the order's own currency.
  *
- * Order amounts (totalAmount, priceAtPurchase, refundAmount…) are denominated in
- * the CHECKOUT currency, not INR. These templates used to hardcode "₹" with
+ * Order totals (totalAmount, refundAmount…) are denominated in the CHECKOUT
+ * currency, not INR — but line-item priceAtPurchase is stored in INR (see lineTotal). These templates used to hardcode "₹" with
  * en-IN grouping, so a customer charged $49.99 received a receipt reading
  * "₹49.99". Always pass the order's currency.
  */
@@ -43,6 +43,30 @@ const formatMoney = (amount, currency = "INR") => {
     // Unknown/invalid ISO code — never throw inside an email template
     return `${code} ${value.toLocaleString("en-US")}`;
   }
+};
+
+/**
+ * Escapes text for HTML. Names, addresses, return reasons and ticket messages are
+ * typed by customers; interpolated raw, anyone could inject markup or phishing
+ * links into mail sent from our domain (including the admin alerts).
+ */
+const esc = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
+/**
+ * Line total in the order's currency. priceAtPurchase is stored in INR while the
+ * order is charged in order.currency, so a ₹1,500 item on a USD order was printed
+ * as "$1,500". Converted with the rate locked in at checkout (INR * rate).
+ */
+const lineTotal = (item, order) => {
+  const inr = (item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0);
+  const currency = (order?.currency || "INR").toUpperCase();
+  const rate = currency !== "INR" && order?.exchangeRate > 0 ? order.exchangeRate : 1;
+  return inr * rate;
 };
 
 // Helper to get primary admin email
@@ -93,7 +117,7 @@ const buildEmailLayout = (content, data = {}) => {
     <!-- Body -->
     <div style="padding: 32px 28px; color: #333333; font-size: 15px; line-height: 1.7;">
       <p style="font-size: 16px; margin: 0 0 18px;">
-        Hello${customerName ? ` ${customerName}` : ""},
+        Hello${customerName ? ` ${esc(customerName)}` : ""},
       </p>
 
       ${content}
@@ -123,11 +147,11 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
         (item) => `
           <tr>
             <td style="padding:12px 10px; border-bottom:1px solid #eeeeee; vertical-align:top;">
-              <strong>${item?.product?.name || item?.name || "Product"}</strong><br>
+              <strong>${esc(item?.product?.name || item?.name || "Product")}</strong><br>
               <span style="color:#777777; font-size:13px;">Qty: ${item?.quantity || 0}</span>
             </td>
             <td style="padding:12px 10px; border-bottom:1px solid #eeeeee; text-align:right; vertical-align:top;">
-              ${formatMoney((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0), order?.currency)}
+              ${formatMoney(lineTotal(item, order), order?.currency)}
             </td>
           </tr>
         `
@@ -195,7 +219,7 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
         </tbody>
         <tfoot>
           <tr>
-            <td style="padding:12px 10px; text-align:right; font-weight:bold;">Total Paid</td>
+            <td style="padding:12px 10px; text-align:right; font-weight:bold;">${order?.paymentMethod === "cod" && order?.paymentStatus !== "paid" ? "Total (pay on delivery)" : "Total Paid"}</td>
             <td style="padding:12px 10px; text-align:right; color:#8B0000; font-weight:bold; font-size:18px;">
               ${formatMoney(totalAmount, order?.currency)}
             </td>
@@ -206,12 +230,10 @@ export const sendOrderConfirmationEmail = async (order, userEmail, userName) => 
       <h3 style="margin:0 0 12px; color:#222222; font-size:18px;">Delivery Address</h3>
       <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin-bottom:24px;">
         <p style="margin:0; line-height:1.7;">
-          ${shippingName}<br>
-          ${order?.shippingDetails?.address || ""}<br>
-          ${order?.shippingDetails?.city || ""}, ${order?.shippingDetails?.state || ""} - ${
-      order?.shippingDetails?.pincode || ""
-    }<br>
-          Phone: ${order?.shippingDetails?.phone || ""}
+          ${esc(shippingName)}<br>
+          ${esc(order?.shippingDetails?.address)}<br>
+          ${esc(order?.shippingDetails?.city)}, ${esc(order?.shippingDetails?.state)} - ${esc(order?.shippingDetails?.pincode)}<br>
+          Phone: ${esc(order?.shippingDetails?.phone)}
         </p>
       </div>
 
@@ -295,6 +317,12 @@ export const sendOrderConfirmationAfterInvoice = async (order, accountEmail = ""
    ORDER SHIPPED EMAIL
 ───────────────────────────────────────────── */
 export const sendOrderShippedEmail = async (order, trackingUrl, userEmail, userName = "") => {
+  // Respect the store's master email switch like every other customer email, and
+  // skip cleanly when the order has no email instead of a Resend "missing to" error.
+  const settings = await getSettings();
+  if (!settings.emailAllEnabled) return;
+  if (!userEmail) return;
+
   const fullOrderId = order?._id ? order._id.toString() : "";
   const displayOrderId = fullOrderId ? fullOrderId.slice(-8).toUpperCase() : "ORDER";
   const awb = order?.awb || "Pending";
@@ -356,8 +384,8 @@ export const sendAdminNewOrderAlert = async (order) => {
         (item) => `
           <tr>
             <td style="padding:10px 0; border-bottom:1px solid #eeeeee;">
-              <strong>${item?.product?.name || item?.name || "Product"}</strong><br>
-              <span style="color:#777777; font-size:12px;">Qty: ${item?.quantity || 0} | ${formatMoney((item?.priceAtPurchase || item?.price || 0) * (item?.quantity || 0), order?.currency)}</span>
+              <strong>${esc(item?.product?.name || item?.name || "Product")}</strong><br>
+              <span style="color:#777777; font-size:12px;">Qty: ${item?.quantity || 0} | ${formatMoney(lineTotal(item, order), order?.currency)}</span>
             </td>
           </tr>
         `
@@ -370,7 +398,7 @@ export const sendAdminNewOrderAlert = async (order) => {
       </h2>
 
       <p style="margin:0 0 14px;">
-        A new order has been placed on the website by <strong>${shippingName}</strong>.
+        A new order has been placed on the website by <strong>${esc(shippingName)}</strong>.
       </p>
 
       <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
@@ -533,6 +561,41 @@ export const sendPasswordResetEmail = async (userEmail, resetLink, userName = ""
 };
 
 /* ─────────────────────────────────────────────
+   REVIEW REWARD EMAIL
+   The coupon promised on the product page ("Review & Save") for a review that
+   was approved by a moderator.
+───────────────────────────────────────────── */
+export const sendReviewRewardEmail = async (userEmail, userName, code, percent, productName) => {
+  const settings = await getSettings();
+  if (!settings.emailAllEnabled || !userEmail) return;
+
+  const frontendUrl = process.env.FRONTEND_URL || "https://www.bodilicious.in";
+  const content = `
+    <h2 style="color:#8B0000; margin:0 0 14px; font-size:24px; line-height:1.3;">Thank you for your review ⭐</h2>
+    <p style="margin:0 0 14px;">
+      Your review of <strong>${esc(productName)}</strong> is now live. As a thank-you, here is
+      <strong>${Number(percent) || 0}% off</strong> your next order.
+    </p>
+    <div style="background:#fafafa; padding:18px; border:1px dashed #8B0000; border-radius:8px; margin:22px 0; text-align:center;">
+      <p style="margin:0 0 6px; font-size:12px; color:#777777; text-transform:uppercase; letter-spacing:0.08em;">Your code</p>
+      <p style="margin:0; font-size:24px; font-weight:bold; color:#8B0000; letter-spacing:0.12em;">${esc(code)}</p>
+      <p style="margin:8px 0 0; font-size:12px; color:#777777;">Single use · valid for 60 days</p>
+    </div>
+    <div style="text-align:center; margin:28px 0 0;">
+      <a href="${frontendUrl}/shop" style="background:#8B0000; color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:6px; font-size:15px; font-weight:bold; display:inline-block;">Shop Now</a>
+    </div>
+  `;
+
+  return await sendEmail({
+    from: FROM_DEFAULT,
+    to: userEmail,
+    subject: `Your ${Number(percent) || 0}% thank-you code | Bodilicious`,
+    html: buildEmailLayout(content, { customerName: userName }),
+    label: "Review reward email",
+  });
+};
+
+/* ─────────────────────────────────────────────
    RETURN APPROVED EMAIL
 ───────────────────────────────────────────── */
 export const sendReturnApprovedEmail = async (order, userEmail, userName) => {
@@ -559,7 +622,7 @@ export const sendReturnApprovedEmail = async (order, userEmail, userName) => {
       <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
         <p style="margin:0 0 8px;"><strong>Order ID:</strong> #${orderId}</p>
         <p style="margin:0 0 8px;"><strong>Refund Method:</strong> ${refundMethodLabel}</p>
-        <p style="margin:0;"><strong>Return Reason:</strong> ${order?.returnReason || "N/A"}</p>
+        <p style="margin:0;"><strong>Return Reason:</strong> ${esc(order?.returnReason || "N/A")}</p>
       </div>
 
       <p style="margin:0 0 14px;">
@@ -618,8 +681,8 @@ export const sendReturnRejectedEmail = async (order, userEmail, userName, reject
 
       <div style="background:#fff5f5; padding:16px 18px; border:1px solid #fecaca; border-radius:8px; margin:22px 0;">
         <p style="margin:0 0 8px;"><strong>Order ID:</strong> #${orderId}</p>
-        <p style="margin:0 0 8px;"><strong>Return Reason Provided:</strong> ${order?.returnReason || "N/A"}</p>
-        <p style="margin:0;"><strong>Reason for Rejection:</strong> ${rejectionReason || "Does not meet return policy criteria"}</p>
+        <p style="margin:0 0 8px;"><strong>Return Reason Provided:</strong> ${esc(order?.returnReason || "N/A")}</p>
+        <p style="margin:0;"><strong>Reason for Rejection:</strong> ${esc(rejectionReason || "Does not meet return policy criteria")}</p>
       </div>
 
       <p style="margin:0 0 14px;">
@@ -678,7 +741,7 @@ export const sendTicketAcknowledgementEmail = async (ticket, userEmail, userName
       <div style="background:#fafafa; padding:16px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
         <p style="margin:0 0 8px;"><strong>Ticket ID:</strong> ${ticketId}</p>
         <p style="margin:0 0 8px;"><strong>Issue Type:</strong> ${typeLabel}</p>
-        <p style="margin:0;"><strong>Your Message:</strong><br/><span style="color:#555555;">${ticket?.description || ""}</span></p>
+        <p style="margin:0;"><strong>Your Message:</strong><br/><span style="color:#555555;">${esc(ticket?.description)}</span></p>
       </div>
 
       <p style="margin:0 0 14px;">
@@ -740,7 +803,7 @@ export const sendTicketReplyEmail = async (ticket, replyText, userEmail, userNam
 
       <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
         <p style="margin:0 0 8px; font-size:12px; color:#999999; text-transform:uppercase; letter-spacing:0.05em; font-weight:bold;">Bodilicious Support</p>
-        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${replyText}</p>
+        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${esc(replyText)}</p>
       </div>
 
       <div style="background:#fafafa; padding:14px 18px; border:1px solid #eeeeee; border-radius:8px; margin:22px 0;">
@@ -806,7 +869,7 @@ export const sendTicketResolvedEmail = async (ticket, userEmail, userName, resol
       messageHtml = `
       <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
         <p style="margin:0 0 8px; font-size:12px; color:#999999; text-transform:uppercase; letter-spacing:0.05em; font-weight:bold;">Final Resolution Note</p>
-        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${resolutionMessage}</p>
+        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${esc(resolutionMessage)}</p>
       </div>`;
     }
 
@@ -870,7 +933,7 @@ export const sendTicketCancelledEmail = async (ticket, userEmail, userName, canc
       reasonHtml = `
       <div style="background:#fff8f8; border-left:4px solid #8B0000; padding:16px 20px; border-radius:0 8px 8px 0; margin:22px 0;">
         <p style="margin:0 0 8px; font-size:12px; color:#999999; text-transform:uppercase; letter-spacing:0.05em; font-weight:bold;">Reason for Cancellation</p>
-        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${cancelReason}</p>
+        <p style="margin:0; font-size:15px; color:#333333; line-height:1.7; white-space:pre-wrap;">${esc(cancelReason)}</p>
       </div>`;
     }
 

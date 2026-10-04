@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   Save, Loader2, Store, Truck, Bell, CreditCard,
   RotateCcw, Star, Shield, AlertTriangle, Settings2, CheckCircle2,
-  Sparkles, ArrowRight, X, Eye,
+  Sparkles, ArrowRight, X, ChevronDown,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -145,6 +145,474 @@ function SettingsSidebar({ tabs, activeSection, onSelect }: any) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   ModalBannerAdmin — full WYSIWYG control panel for the LaunchModal popup
+───────────────────────────────────────────────────────────────────────────── */
+
+const HEADER_PRESETS = [
+  { label: 'Warm Dark',  value: '135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #8B4513 75%, #4A1E0A 100%', swatch: '#5C2D1E' },
+  { label: 'Rose',       value: '135deg, #881337 0%, #9F1239 40%, #BE123C 100%',                              swatch: '#9F1239' },
+  { label: 'Midnight',   value: '135deg, #0F172A 0%, #1E293B 50%, #312E81 100%',                              swatch: '#1E293B' },
+  { label: 'Forest',     value: '135deg, #14532D 0%, #166534 50%, #15803D 100%',                              swatch: '#166534' },
+  { label: 'Amber Gold', value: '135deg, #78350F 0%, #92400E 40%, #B45309 100%',                              swatch: '#92400E' },
+];
+const CTA_PRESETS = [
+  { label: 'Amber→Orange', value: '135deg, #FBBF24, #F97316', swatch: '#FBBF24' },
+  { label: 'Red→Crimson',  value: '135deg, #9A3412, #7C2D12', swatch: '#9A3412' },
+  { label: 'Pink→Rose',    value: '135deg, #EC4899, #BE185D', swatch: '#EC4899' },
+  { label: 'Teal→Green',   value: '135deg, #14B8A6, #059669', swatch: '#14B8A6' },
+  { label: 'Purple',       value: '135deg, #7C3AED, #6D28D9', swatch: '#7C3AED' },
+];
+
+/* Accordion row */
+function Accordion({ title, icon, children, defaultOpen = false }: {
+  title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 bg-white hover:bg-slate-50/80 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-base leading-none">{icon}</span>
+          <span className="text-sm font-semibold text-slate-800">{title}</span>
+        </div>
+        <ChevronDown
+          size={15}
+          className={`text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-2 bg-slate-50/40 space-y-0 border-t border-slate-100">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Colour field: colour picker + hex text input side by side */
+function ColorField({ label, value, onChange, description }: {
+  label: string; value: string; onChange: (v: string) => void; description?: string;
+}) {
+  return (
+    <Field label={label} description={description}>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={/^#[0-9A-Fa-f]{6}$/.test(value ?? '') ? value : '#000000'}
+          onChange={e => onChange(e.target.value)}
+          className="w-9 h-9 p-0.5 rounded-lg border border-slate-300 cursor-pointer flex-shrink-0 bg-white"
+          title="Pick a colour"
+        />
+        <Input
+          value={value ?? ''}
+          onChange={onChange}
+          placeholder="#000000 or rgba(…)"
+        />
+      </div>
+    </Field>
+  );
+}
+
+/* Gradient field: text input + preset swatches */
+function GradientField({ label, value, onChange, presets, description }: {
+  label: string; value: string; onChange: (v: string) => void;
+  presets: { label: string; value: string; swatch: string }[];
+  description?: string;
+}) {
+  return (
+    <Field label={label} description={description}>
+      <Input value={value ?? ''} onChange={onChange} placeholder="135deg, #3B1E0A 0%, #7C3527 100%" />
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {presets.map(p => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => onChange(p.value)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-sans font-bold border transition-all ${
+              value === p.value
+                ? 'border-dark-red bg-red-50 text-dark-red'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
+            }`}
+          >
+            <span
+              className="w-3 h-3 rounded-sm flex-shrink-0 border border-white/60"
+              style={{ background: p.swatch }}
+            />
+            {p.label}
+          </button>
+        ))}
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="px-2 py-1 rounded-lg text-[10px] font-sans text-slate-400 border border-slate-200 hover:text-red-500 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {value && (
+        <div
+          className="mt-2 h-5 w-full rounded-md border border-slate-200"
+          style={{ background: `linear-gradient(${value})` }}
+        />
+      )}
+    </Field>
+  );
+}
+
+/* Live Preview — renders the modal visually with all custom styles applied */
+function ModalPreview({ m: modal }: { m: any }) {
+  const headerGrad = modal.headerBg
+    ? `linear-gradient(${modal.headerBg})`
+    : 'linear-gradient(135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #4A1E0A 100%)';
+  const orb1    = modal.orb1Color    || '#F97316';
+  const orb2    = modal.orb2Color    || '#EC4899';
+  const badgeBg  = modal.badgeBg     || 'rgba(255,255,255,0.15)';
+  const badgeTxt = modal.badgeTextColor || '#FDE68A';
+  const titleClr = modal.titleColor  || '#ffffff';
+  const descClr  = modal.descriptionColor || 'rgba(255,255,255,0.75)';
+  const contentBg = modal.contentBg  || '#ffffff';
+  const ctaGrad  = modal.ctaGradient
+    ? `linear-gradient(${modal.ctaGradient})`
+    : 'linear-gradient(135deg, #FBBF24, #F97316)';
+  const ctaTxt   = modal.ctaTextColor || '#2C1208';
+  const emojis   = (modal.floatingEmojisEnabled && modal.floatingEmojis?.length)
+    ? modal.floatingEmojis.filter(Boolean)
+    : [];
+
+  return (
+    <div className="relative w-full max-w-xs mx-auto rounded-3xl shadow-2xl overflow-hidden border border-white/20" style={{ background: contentBg }}>
+      {/* Close button */}
+      <div className="absolute top-2.5 right-2.5 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-white/20 text-white shadow-sm">
+        <X size={12} />
+      </div>
+      {/* Header */}
+      <div className="relative h-36 w-full flex items-center justify-center overflow-hidden" style={{ background: headerGrad }}>
+        <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl pointer-events-none" style={{ background: `radial-gradient(circle, ${orb1}60 0%, transparent 70%)` }} />
+        <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full blur-2xl pointer-events-none" style={{ background: `radial-gradient(circle, ${orb2}50 0%, transparent 70%)` }} />
+        {/* Floating emojis (static in preview) */}
+        {emojis.slice(0, 3).map((e: string, i: number) => (
+          <span key={i} className="absolute text-lg pointer-events-none select-none opacity-80"
+            style={[{top:'10%',left:'8%'},{top:'12%',right:'10%'},{bottom:'18%',left:'10%'}][i] as any}
+          >{e}</span>
+        ))}
+        <div className="relative z-10 text-center px-4">
+          {modal.image ? (
+            <img
+              src={modal.image}
+              alt="preview"
+              className="h-24 w-auto object-contain mx-auto drop-shadow-xl"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-10 h-14 mx-auto bg-white/15 rounded-lg border border-white/30 flex items-center justify-center">
+              <Sparkles className="text-white opacity-60" size={16} />
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Urgency strip */}
+      {(modal.urgencyEnabled || modal.countdownEnabled) && (
+        <div className="px-4 py-2 text-[10px] font-semibold text-center" style={{ background: 'rgba(251,191,36,0.15)', color: '#92400E' }}>
+          {modal.urgencyEnabled ? modal.urgencyText || '⏰ Limited time offer' : '⏰ 24:00:00'}
+        </div>
+      )}
+      {/* Content */}
+      <div className="px-5 py-4 text-center" style={{ background: contentBg }}>
+        <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-widest uppercase mb-2.5" style={{ background: badgeBg, color: badgeTxt }}>
+          <Sparkles size={8} />
+          {modal.badge || 'Just Launched'}
+        </div>
+        <h3 className="text-base font-serif leading-tight mb-1.5" style={{ color: titleClr }}>
+          {modal.title || 'New Collection'}
+        </h3>
+        <p className="text-[10px] leading-relaxed mb-4 line-clamp-2" style={{ color: descClr }}>
+          {modal.description || 'Discover our latest additions, crafted with rare botanical extracts.'}
+        </p>
+        <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold px-4 py-2 rounded-xl shadow-sm" style={{ background: ctaGrad, color: ctaTxt }}>
+          {modal.ctaLabel || 'Explore Collection'}
+          <ArrowRight size={11} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A stored UTC ISO string → the local "YYYY-MM-DDTHH:mm" a datetime-local input shows.
+ * Slicing the ISO string displayed the UTC clock time as if it were local, so in IST
+ * the countdown target read 5½ hours earlier than what was picked.
+ */
+function toLocalDateTimeInput(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Number fields left blank. The number <Input> stores '' when cleared (so typing
+ * stays possible); saved like that, Mongoose stores null — a blank free-shipping
+ * threshold made `subtotal >= null` true, i.e. free shipping on every order.
+ */
+function findBlankNumbers(original: any, current: any, prefix = ''): string[] {
+  if (!original || typeof original !== 'object' || !current || typeof current !== 'object') return [];
+  return Object.keys(original).flatMap(key => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const before = original[key];
+    const after = current[key];
+    if (typeof before === 'number' && (after === '' || after === null)) return [path];
+    if (before && typeof before === 'object' && !Array.isArray(before)) return findBlankNumbers(before, after, path);
+    return [];
+  });
+}
+
+/* The main admin panel component */
+function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value: any) => void }) {
+  const m = s.launchModal ?? {};
+  const lm = (k: string, v: any) => update(`launchModal.${k}`, v);
+  const emojis: string[] = Array.isArray(m.floatingEmojis) ? [...m.floatingEmojis] : [];
+  while (emojis.length < 5) emojis.push('');
+  // Slots keep their position while editing. Filtering out empty slots on every
+  // keystroke re-packed the array, so a character typed into a slot after an empty one
+  // jumped into the earlier slot and the box being typed in went blank. Empty slots are
+  // dropped on save (handleSave) and ignored by the popup (LaunchModal filters them).
+  const setEmoji = (i: number, v: string) => {
+    const next = [...emojis];
+    next[i] = v;
+    lm('floatingEmojis', next);
+  };
+
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-bold text-slate-800">Launch Modal / Popup Banner</h4>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+          {m.isActive ? '● Active' : '○ Disabled'}
+        </span>
+      </div>
+      <p className="text-xs text-slate-500 pb-1">Configure every detail of the popup shown to first-time visitors. Changes are saved with the rest of your settings.</p>
+
+      {/* ── Section 1: Content & General ── */}
+      <Accordion title="Content & General" icon="📝" defaultOpen>
+        <Toggle
+          checked={!!m.isActive}
+          onChange={v => lm('isActive', v)}
+          label="Enable Popup"
+          description="Shows the modal to visitors after the configured delay"
+        />
+        <Field label="Badge Text"><Input value={m.badge ?? ''} onChange={(v: string) => lm('badge', v)} placeholder="Just Launched" /></Field>
+        <Field label="Headline / Title"><Input value={m.title ?? ''} onChange={(v: string) => lm('title', v)} placeholder="New Collection" /></Field>
+        <Field label="Body Copy">
+          <textarea
+            value={m.description ?? ''}
+            onChange={e => lm('description', e.target.value)}
+            rows={3}
+            placeholder="Describe your offer or announcement…"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white resize-none transition-shadow"
+          />
+        </Field>
+        <Field label="CTA Button Label"><Input value={m.ctaLabel ?? ''} onChange={(v: string) => lm('ctaLabel', v)} placeholder="Explore Collection" /></Field>
+        <Field label="CTA Button Link"><Input value={m.ctaLink ?? ''} onChange={(v: string) => lm('ctaLink', v)} placeholder="/shop" /></Field>
+        <Field label="Image URL" description="Paste any image URL — leave blank to use the sparkle graphic">
+          <Input value={m.image ?? ''} onChange={(v: string) => lm('image', v)} placeholder="https://…" />
+          {m.image && (
+            <img
+              src={m.image}
+              alt="Preview"
+              className="mt-2 h-16 object-contain rounded-lg border border-slate-200 bg-slate-50"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
+        </Field>
+        <Field label="Popup Delay (seconds)" description="How long after page load before the popup appears">
+          <Input value={m.showDelaySeconds ?? 2.5} onChange={(v: number) => lm('showDelaySeconds', v)} type="number" />
+        </Field>
+        <Toggle
+          checked={!!m.exitIntentTrigger}
+          onChange={v => lm('exitIntentTrigger', v)}
+          label="Exit-Intent Trigger"
+          description="Also show the popup when the user moves their mouse toward the browser close button (desktop only)"
+        />
+      </Accordion>
+
+      {/* ── Section 2: Colours & Theme ── */}
+      <Accordion title="Colours & Theme" icon="🎨">
+        <GradientField
+          label="Header Background"
+          value={m.headerBg ?? ''}
+          onChange={v => lm('headerBg', v)}
+          presets={HEADER_PRESETS}
+          description="CSS gradient string for the top image panel. e.g. 135deg, #3B1E0A 0%, #7C3527 100%"
+        />
+        <Toggle checked={!!m.headerBgAnimated} onChange={v => lm('headerBgAnimated', v)} label="Animate Header" description="Slowly pulses the gradient for a living background effect" />
+        <div className="grid grid-cols-3 gap-3 mt-1">
+          <ColorField label="Orb 1 Colour" value={m.orb1Color ?? '#F97316'} onChange={v => lm('orb1Color', v)} />
+          <ColorField label="Orb 2 Colour" value={m.orb2Color ?? '#EC4899'} onChange={v => lm('orb2Color', v)} />
+          <ColorField label="Orb 3 Colour" description="High intensity only" value={m.orb3Color ?? '#FBBF24'} onChange={v => lm('orb3Color', v)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-1">
+          <ColorField label="Badge Background" value={m.badgeBg ?? ''} onChange={v => lm('badgeBg', v)} />
+          <ColorField label="Badge Text" value={m.badgeTextColor ?? ''} onChange={v => lm('badgeTextColor', v)} />
+          <ColorField label="Title Colour" value={m.titleColor ?? '#ffffff'} onChange={v => lm('titleColor', v)} />
+          <ColorField label="Description Colour" value={m.descriptionColor ?? ''} onChange={v => lm('descriptionColor', v)} />
+          <ColorField label="Content Panel BG" value={m.contentBg ?? '#ffffff'} onChange={v => lm('contentBg', v)} />
+          <ColorField label="CTA Text Colour" value={m.ctaTextColor ?? '#2C1208'} onChange={v => lm('ctaTextColor', v)} />
+        </div>
+        <GradientField
+          label="CTA Button Gradient"
+          value={m.ctaGradient ?? ''}
+          onChange={v => lm('ctaGradient', v)}
+          presets={CTA_PRESETS}
+          description="Gradient for the CTA button. e.g. 135deg, #FBBF24, #F97316"
+        />
+        <Toggle checked={!!m.ctaGlow} onChange={v => lm('ctaGlow', v)} label="CTA Glow Ring" description="Pulsing golden glow ring behind the CTA button" />
+      </Accordion>
+
+      {/* ── Section 3: Special Effects ── */}
+      <Accordion title="Special Effects" icon="✨">
+        <Toggle
+          checked={!!m.floatingEmojisEnabled}
+          onChange={v => lm('floatingEmojisEnabled', v)}
+          label="Floating Emojis"
+          description="Emojis drift around the header area for a festive feel"
+        />
+        {m.floatingEmojisEnabled && (
+          <Field label="Emojis (up to 5)" description="Type or paste any emoji into each slot">
+            <div className="grid grid-cols-5 gap-2">
+              {emojis.map((e, i) => (
+                <input
+                  key={i}
+                  type="text"
+                  value={e}
+                  onChange={ev => setEmoji(i, ev.target.value)}
+                  // maxLength counts UTF-16 units: 4 cut multi-part emoji (👩‍🔬, skin
+                  // tones) in half. 16 fits any single emoji.
+                  maxLength={16}
+                  placeholder={['🌸','🍃','✨','🌹','🎀'][i]}
+                  className="w-full text-center text-xl px-1 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white"
+                />
+              ))}
+            </div>
+          </Field>
+        )}
+        {m.floatingEmojisEnabled && (
+          <Toggle checked={!!m.emojiTrailPhysics} onChange={v => lm('emojiTrailPhysics', v)} label="Emoji Trail Physics" description="Each emoji gets unique speed and rotation so they never look identical" />
+        )}
+        <Toggle checked={!!m.ctaShimmer} onChange={v => lm('ctaShimmer', v)} label="CTA Shimmer Sweep" description="A light shine glides across the CTA button periodically" />
+        <Toggle checked={!!m.ctaParticleBurst} onChange={v => lm('ctaParticleBurst', v)} label="CTA Particle Burst" description="A burst of emoji particles fires from the button on click" />
+        <Toggle checked={!!m.closeButtonSpin} onChange={v => lm('closeButtonSpin', v)} label="Close Button Spin" description="The × icon rotates 90° on hover" />
+        <Toggle checked={!!m.backdropBlurAnimated} onChange={v => lm('backdropBlurAnimated', v)} label="Animated Backdrop" description="Backdrop eases in smoothly instead of snapping" />
+        <Field label="Image Reveal Style" description="How the image animates into view when the modal opens">
+          <select
+            value={m.imageRevealStyle ?? 'fadeScale'}
+            onChange={e => lm('imageRevealStyle', e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white"
+          >
+            <option value="none">None — instant appear</option>
+            <option value="fadeScale">Fade + Scale (default)</option>
+            <option value="clipWipe">Clip Wipe (left→right reveal)</option>
+          </select>
+        </Field>
+      </Accordion>
+
+      {/* ── Section 4: Motion & Entrance ── */}
+      <Accordion title="Motion & Entrance" icon="🎬">
+        <Field label="Entrance Style" description="How the modal animates into view">
+          <div className="grid grid-cols-2 gap-2">
+            {(['spring','zoomFade','slideUp','flip3D'] as const).map(style => (
+              <button
+                key={style}
+                type="button"
+                onClick={() => lm('entranceStyle', style)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all text-left ${
+                  m.entranceStyle === style
+                    ? 'bg-red-50 border-dark-red text-dark-red'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                }`}
+              >
+                {style === 'spring'   && '🌀 Spring (default)'}
+                {style === 'zoomFade' && '🔍 Zoom Fade'}
+                {style === 'slideUp'  && '⬆️ Slide Up'}
+                {style === 'flip3D'   && '🔄 3D Flip'}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Toggle checked={!!m.parallaxOnMouse} onChange={v => lm('parallaxOnMouse', v)} label="Mouse Parallax Depth" description="Orbs and image shift with cursor position — 3D depth feel (desktop)" />
+        <Toggle checked={!!m.staggerContent} onChange={v => lm('staggerContent', v)} label="Stagger Content" description="Badge → title → description → CTA fade up in sequence" />
+        <Field label="Effects Intensity" description="Reduces heavy effects on low-end devices">
+          <div className="flex gap-2">
+            {(['low','medium','high'] as const).map(level => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => lm('effectsIntensity', level)}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold border capitalize transition-all ${
+                  m.effectsIntensity === level
+                    ? 'bg-red-50 border-dark-red text-dark-red'
+                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                }`}
+              >
+                {level === 'low' ? '🔋 Low' : level === 'medium' ? '⚡ Medium' : '🚀 High'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-snug">
+            Low: no blur, particles, or parallax &nbsp;•&nbsp; Medium: orbs + emojis &nbsp;•&nbsp; High: all effects
+          </p>
+        </Field>
+      </Accordion>
+
+      {/* ── Section 5: Urgency & Countdown ── */}
+      <Accordion title="Urgency Strip & Countdown" icon="⏰">
+        <Toggle checked={!!m.urgencyEnabled} onChange={v => lm('urgencyEnabled', v)} label="Show Urgency Strip" description="Amber strip between the header and content area" />
+        {m.urgencyEnabled && (
+          <Field label="Urgency Message">
+            <Input value={m.urgencyText ?? ''} onChange={(v: string) => lm('urgencyText', v)} placeholder="⏰ Limited time offer" />
+          </Field>
+        )}
+        <Toggle checked={!!m.countdownEnabled} onChange={v => lm('countdownEnabled', v)} label="Live Countdown Timer" description="Replaces the urgency text with a real ticking HH:MM:SS countdown" />
+        {m.countdownEnabled && (
+          <>
+            <Field label="Countdown Target Date & Time" description="Stored in UTC — visitors see the countdown in their local time">
+              <input
+                type="datetime-local"
+                value={toLocalDateTimeInput(m.countdownTargetDate)}
+                onChange={e => lm('countdownTargetDate', e.target.value ? new Date(e.target.value).toISOString() : '')}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white"
+              />
+            </Field>
+            <Field label="Expired Text" description="Shown once the countdown reaches zero">
+              <Input value={m.countdownExpiredText ?? ''} onChange={(v: string) => lm('countdownExpiredText', v)} placeholder="Offer ended" />
+            </Field>
+          </>
+        )}
+      </Accordion>
+
+      {/* ── Section 6: Live Preview ── */}
+      <Accordion title="Live Preview" icon="👁️" defaultOpen={false}>
+        <div className="pt-2">
+          <p className="text-xs text-slate-500 mb-4 text-center">Real-time WYSIWYG preview — updates as you change any setting above.</p>
+          <ModalPreview m={m} />
+          {!m.isActive && (
+            <p className="text-center text-xs text-amber-600 mt-3 flex items-center justify-center gap-1">
+              <AlertTriangle size={11} /> Popup is disabled — enable it in the Content section above.
+            </p>
+          )}
+        </div>
+      </Accordion>
+    </div>
+  );
+}
+
 /* --- Main Page Component --- */
 
 export default function StoreSettings() {
@@ -211,13 +679,27 @@ export default function StoreSettings() {
       toast.error('Only the primary admin can save settings.');
       return;
     }
+    const blanks = findBlankNumbers(originalState, formState);
+    if (blanks.length > 0) {
+      toast.error(`Fill in a number (0 is fine) for: ${blanks.join(', ')}`);
+      return;
+    }
+    const payload = {
+      ...formState,
+      ...(formState.launchModal && {
+        launchModal: {
+          ...formState.launchModal,
+          floatingEmojis: (formState.launchModal.floatingEmojis || []).filter(Boolean),
+        },
+      }),
+    };
     setSaveStatus('saving');
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/api/v1/settings/`, {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(formState),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -320,94 +802,10 @@ export default function StoreSettings() {
                 <Field label="Announcement Text"><Input value={s.announcementBar?.text} onChange={(v: string) => update('announcementBar.text', v)} placeholder="Free shipping on orders over ₹999!" /></Field>
                 <Field label="Announcement Link" description="Optional — clicking the bar navigates here"><Input value={s.announcementBar?.link} onChange={(v: string) => update('announcementBar.link', v)} placeholder="/shop" /></Field>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-800 mb-2">Launch Modal / Popup Banner</h4>
-                <p className="text-xs text-slate-500 mb-4">Customize the popup banner shown to visitors when they first land on your site.</p>
-                <Toggle checked={!!s.launchModal?.isActive} onChange={v => update('launchModal.isActive', v)} label="Show Launch Modal" description="Pop-up shown after 2.5 seconds on first visit" />
-                <Field label="Badge Text"><Input value={s.launchModal?.badge} onChange={(v: string) => update('launchModal.badge', v)} placeholder="Just Launched" /></Field>
-                <Field label="Title"><Input value={s.launchModal?.title} onChange={(v: string) => update('launchModal.title', v)} /></Field>
-                <Field label="Description">
-                  <textarea
-                    value={s.launchModal?.description ?? ''}
-                    onChange={e => update('launchModal.description', e.target.value)}
-                    rows={3}
-                    placeholder="Describe your offer or announcement…"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white resize-none transition-shadow"
-                  />
-                </Field>
-                <Field label="CTA Button Label"><Input value={s.launchModal?.ctaLabel} onChange={(v: string) => update('launchModal.ctaLabel', v)} placeholder="Explore Collection" /></Field>
-                <Field label="CTA Button Link"><Input value={s.launchModal?.ctaLink} onChange={(v: string) => update('launchModal.ctaLink', v)} placeholder="/shop" /></Field>
-                <Field label="Image URL" description="Optional — paste a product or banner image URL. Leave blank for the default sparkle graphic.">
-                  <Input value={s.launchModal?.image} onChange={(v: string) => update('launchModal.image', v)} placeholder="https://…" />
-                  {s.launchModal?.image && (
-                    <img
-                      src={s.launchModal.image}
-                      alt="Modal preview"
-                      className="mt-2 h-20 object-contain rounded-lg border border-slate-200 bg-slate-50"
-                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  )}
-                </Field>
-
-                {/* ── Live Preview ── */}
-                <div className="mt-6 pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Eye size={14} className="text-dark-red" />
-                    <p className="text-xs font-bold text-slate-700 uppercase tracking-widest">Live Preview</p>
-                  </div>
-                  <p className="text-xs text-slate-500 mb-4">This is exactly how the popup will appear to your visitors.</p>
-                  <div className="relative w-full max-w-sm mx-auto overflow-hidden bg-white/95 rounded-3xl shadow-2xl border border-slate-200">
-                    {/* Close button mock */}
-                    <div className="absolute top-3 right-3 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-white/80 text-slate-400 shadow-sm">
-                      <X size={13} />
-                    </div>
-                    {/* Image / graphic area */}
-                    <div className="h-40 w-full relative bg-gradient-to-br from-rose-100 via-rose-50 to-white flex items-center justify-center overflow-hidden">
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/60 via-transparent to-transparent opacity-80" />
-                      <div className="absolute -right-10 -top-10 w-40 h-40 bg-ruby-red/10 rounded-full blur-3xl pointer-events-none" />
-                      <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-rose-200/20 rounded-full blur-3xl pointer-events-none" />
-                      <div className="relative z-10 text-center w-full px-4">
-                        {s.launchModal?.image ? (
-                          <img
-                            src={s.launchModal.image}
-                            alt="modal"
-                            className="h-28 object-contain mx-auto drop-shadow-xl"
-                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <div className="relative inline-block">
-                            <div className="w-14 h-20 mx-auto bg-gradient-to-b from-rose-200 to-rose-300 rounded-lg shadow-md border border-white/80 flex items-center justify-center">
-                              <Sparkles className="text-ruby-red opacity-60" size={18} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Content */}
-                    <div className="p-6 text-center bg-white">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-[10px] font-sans font-bold tracking-widest uppercase text-ruby-red mb-3">
-                        <Sparkles size={10} />
-                        {s.launchModal?.badge || 'Just Launched'}
-                      </div>
-                      <h3 className="text-xl font-serif text-dark-red mb-2 leading-tight">
-                        {s.launchModal?.title || 'New Collection'}
-                      </h3>
-                      <p className="text-xs font-sans text-slate-400 leading-relaxed mb-5 line-clamp-3">
-                        {s.launchModal?.description || 'Discover our latest additions, crafted with rare botanical extracts.'}
-                      </p>
-                      <div className="flex w-full items-center justify-center gap-2 bg-gradient-to-r from-dark-red to-ruby-red text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-md">
-                        {s.launchModal?.ctaLabel || 'Explore Collection'}
-                        <ArrowRight size={13} />
-                      </div>
-                    </div>
-                  </div>
-                  {!s.launchModal?.isActive && (
-                    <p className="text-center text-xs text-amber-600 mt-3 flex items-center justify-center gap-1">
-                      <AlertTriangle size={11} /> Modal is currently disabled — toggle "Show Launch Modal" to activate it.
-                    </p>
-                  )}
-                </div>
-              </div>
+              {/* ════════════════════════════════════════════════════════════
+                  Launch Modal / Popup Banner — full WYSIWYG admin
+              ════════════════════════════════════════════════════════════ */}
+              <ModalBannerAdmin s={s as any} update={update} />
             </SettingsCard>
 
             <SettingsCard id="shipping" title="Shipping & Delivery" description="Manage shipping thresholds, costs, and international settings.">

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/generate-sitemap.js",
+    "prebuild": "node scripts/generate-sitemap.js && node scripts/generate-image-variants.mjs",
     "build": "vite build && node scripts/prerender.js",
     "prerender": "node scripts/prerender.js",
     "ping-indexnow": "PRERENDER=true node scripts/ping-indexnow.js",

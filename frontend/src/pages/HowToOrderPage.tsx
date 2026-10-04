@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import { useSEO } from '../hooks/useSEO';
+import { productImage } from '../utils/productImage';
 
 interface Step {
   number: string;
@@ -68,7 +69,9 @@ const steps: Step[] = [
     title: 'Shipping Details',
     subtitle: 'Safe, secure, and tracked transit',
     description:
-      'Provide your full delivery address and current contact details. We ship securely to thousands of locations across India, with free standard shipping available for orders over ₹1,500. Every parcel is safely packed to preserve your items.',
+      // {FREE_SHIPPING} / {COD} are filled from live store settings at render time —
+      // the hardcoded "over ₹1,500" and "COD for all orders" contradicted the checkout.
+      'Provide your full delivery address and current contact details. We ship securely to thousands of locations across India{FREE_SHIPPING}. Every parcel is safely packed to preserve your items.',
     cta: null,
     highlight: 'Dispatched from our warehouse within 24–48 hours.',
   },
@@ -78,7 +81,7 @@ const steps: Step[] = [
     title: 'Secure Payment',
     subtitle: 'Fully encrypted transaction gateway',
     description:
-      'Complete your checkout securely via Razorpay. We support UPI, all major credit/debit cards, Net Banking, and popular mobile wallets. Cash on Delivery (COD) is also available for all orders within India. Your credentials are fully protected.',
+      'Complete your checkout securely via Razorpay. We support UPI, all major credit/debit cards, Net Banking, and popular mobile wallets.{COD} Your credentials are fully protected.',
     cta: null,
     highlight: 'Look for the lock icon in the address bar. SSL Secured.',
   },
@@ -117,6 +120,23 @@ export default function HowToOrderPage() {
 
   const appContext = useContext(AppContext);
   const { formatPrice } = useCurrency();
+
+  // Policy figures from store settings (thresholds/fees are INR, so formatPrice).
+  const fillPolicy = (text: string) => {
+    const s = appContext?.storeSettings;
+    const threshold = Number(s?.shippingThreshold) || 0;
+    const freeShipping = threshold > 0 ? `, with free standard shipping on orders over ${formatPrice(threshold)}` : '';
+    let cod = '';
+    if (s && s.codEnabled !== false) {
+      const min = Number(s.minOrderValueForCOD) || 0;
+      const fee = Number(s.codExtraCharge) || 0;
+      cod = ' Cash on Delivery (COD) is also available within India'
+        + (min > 0 ? ` on orders of ${formatPrice(min)} or more` : '')
+        + (fee > 0 ? ` (a ${formatPrice(fee)} COD fee applies)` : '')
+        + '.';
+    }
+    return text.replace('{FREE_SHIPPING}', freeShipping).replace('{COD}', cod);
+  };
   
   const displayProduct = appContext?.products && appContext.products.length > 0 
     ? appContext.products[0] 
@@ -206,7 +226,7 @@ export default function HowToOrderPage() {
               <div className="p-4 space-y-3">
                 <div className="flex gap-3">
                   {displayProduct.images && displayProduct.images.length > 0 ? (
-                    <img src={displayProduct.images[0]} alt={displayProduct.name} className="w-12 h-12 bg-rose-100 rounded-lg flex-shrink-0 object-cover" />
+                    <img src={productImage(displayProduct.images[0], 'thumb')} alt={displayProduct.name} className="w-12 h-12 bg-rose-100 rounded-lg flex-shrink-0 object-cover" />
                   ) : (
                     <div className="w-12 h-12 bg-rose-100 rounded-lg flex-shrink-0 flex items-center justify-center font-serif text-ruby-red text-sm font-semibold">B</div>
                   )}
@@ -463,7 +483,7 @@ export default function HowToOrderPage() {
                   </div>
 
                   <p className="text-sm text-gray-600 leading-relaxed font-light">
-                    {steps[activeStep].description}
+                    {fillPolicy(steps[activeStep].description)}
                   </p>
 
                   <div className="inline-flex items-start gap-2 text-xs font-sans text-amber-800 bg-amber-50 border border-amber-200/60 p-3 rounded-xl">

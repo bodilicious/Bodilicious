@@ -560,28 +560,54 @@ export function renderBlogHtml(post, frontendUrl) {
  * (STATIC_PAGE_SEO[pathname].body, copied verbatim from the component) are
  * injected into #root to fix that, without going as far as a full stub page.
  */
+/**
+ * Register handlers that point a page's title, description, canonical,
+ * hreflang, OG and Twitter tags at `url`. The tags must already exist — every
+ * page the origin serves carries the full set from index.html.
+ */
+function withHeadMeta(rewriter, { title, description, url }) {
+  const setAttr = (name, value) => ({
+    element(el) { el.setAttribute(name, value); },
+  });
+
+  return rewriter
+    .on('title', {
+      element(el) { el.setInnerContent(title); },
+    })
+    .on('meta[name="description"]', setAttr('content', description))
+    .on('link[rel="canonical"]', setAttr('href', url))
+    .on('link[rel="alternate"][hreflang="en-IN"]', setAttr('href', url))
+    .on('link[rel="alternate"][hreflang="x-default"]', setAttr('href', url))
+    .on('meta[property="og:title"]', setAttr('content', title))
+    .on('meta[property="og:description"]', setAttr('content', description))
+    .on('meta[property="og:url"]', setAttr('content', url))
+    .on('meta[name="twitter:title"]', setAttr('content', title))
+    .on('meta[name="twitter:description"]', setAttr('content', description))
+    .on('meta[name="twitter:url"]', setAttr('content', url));
+}
+
+/**
+ * Rewrite only the head metadata of a page, leaving the body untouched. Used
+ * for /shop facet URLs served from the prerendered /shop page: the baked
+ * page-level JSON-LD describes the unfiltered catalogue, so it is dropped
+ * rather than left contradicting the facet title (useSEO re-injects the
+ * right one once the app mounts).
+ */
+export function rewriteHeadMeta(response, meta) {
+  return withHeadMeta(new HTMLRewriter(), meta)
+    .on('script[data-bodilicious-ld]', {
+      element(el) { el.remove(); },
+    })
+    .transform(response);
+}
+
 export function rewriteStaticMeta(response, pathname, frontendUrl) {
   const meta = STATIC_PAGE_SEO[pathname];
   if (!meta) return response;
 
   const url = `${frontendUrl}${pathname}`;
-  const setAttr = (name, value) => ({
-    element(el) { el.setAttribute(name, value); },
-  });
 
-  return new HTMLRewriter()
-    .on('title', {
-      element(el) { el.setInnerContent(meta.title); },
-    })
-    .on('meta[name="description"]', setAttr('content', meta.description))
-    .on('link[rel="canonical"]', setAttr('href', url))
-    .on('link[rel="alternate"][hreflang="en-IN"]', setAttr('href', url))
-    .on('link[rel="alternate"][hreflang="x-default"]', setAttr('href', url))
-    .on('meta[property="og:title"]', setAttr('content', meta.title))
-    .on('meta[property="og:description"]', setAttr('content', meta.description))
-    .on('meta[property="og:url"]', setAttr('content', url))
-    .on('meta[name="twitter:title"]', setAttr('content', meta.title))
-    .on('meta[name="twitter:description"]', setAttr('content', meta.description))
+  return withHeadMeta(new HTMLRewriter(), { title: meta.title, description: meta.description, url })
     // This stream-through only ever reaches bots (worker.js gates it behind
     // isBot() before it runs), so it's safe to drop static content into
     // #root — real browsers never get this response, and Googlebot's later
@@ -843,11 +869,11 @@ export function renderHomeHtml(products, frontendUrl) {
 }
 
 /**
- * Render a bot-readable HTML page for /shop?category=X, /shop?type=X, /shop?concern=X.
- * Sets a correct self-canonical so Google indexes the facet page, not the homepage.
+ * Title, description and self-canonical for a single-facet /shop URL. Shared
+ * by the bot renderer and the head rewrite humans get (worker.js serveShop), so
+ * every client sees the same metadata for /shop?category=hair.
  */
-export function renderShopHtml({ category, type, concern }, products, frontendUrl) {
-  // Determine canonical facet
+export function buildShopMeta({ category, type, concern }, frontendUrl) {
   const facetParam = category ? `category=${encodeURIComponent(category)}`
     : type ? `type=${encodeURIComponent(type)}`
     : concern ? `concern=${encodeURIComponent(concern)}`
@@ -856,13 +882,22 @@ export function renderShopHtml({ category, type, concern }, products, frontendUr
     ? `${frontendUrl}/shop?${facetParam}`
     : `${frontendUrl}/shop`;
 
-  // Title & description
   const label = category ? titleCase(category) : type ? titleCase(type) : concern ? titleCase(concern) : null;
   const pageTitle = label
     ? (concern ? `Best Products for ${label}` : `${label} Products`) + ' — Bodilicious'
     : 'Shop Skincare & Haircare — Bodilicious';
-  const introKey = concern || category || type || 'default';
   const description = `Shop Bodilicious ${label || 'skincare & haircare'} products. Dermatologically tested, science-backed formulas made for Indian skin. Free shipping on orders over ₹1500.`;
+
+  return { label, pageTitle, description, canonicalUrl };
+}
+
+/**
+ * Render a bot-readable HTML page for /shop?category=X, /shop?type=X, /shop?concern=X.
+ * Sets a correct self-canonical so Google indexes the facet page, not the homepage.
+ */
+export function renderShopHtml({ category, type, concern }, products, frontendUrl) {
+  const { label, pageTitle, description, canonicalUrl } = buildShopMeta({ category, type, concern }, frontendUrl);
+  const introKey = concern || category || type || 'default';
   const intro = CATEGORY_INTRO[introKey] || CATEGORY_INTRO['default'];
 
   // Breadcrumb JSON-LD

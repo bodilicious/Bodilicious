@@ -6,6 +6,8 @@ import { logAuditEvent } from "../audit/logger.js";
 import { buildTopicPatterns } from "../utils/topicMatch.js";
 import { pingIndexNow } from "../utils/indexNow.js";
 import { triggerFrontendDeploy } from "../utils/deployHook.js";
+import { getSettings } from "../settings/cache.js";
+import { isPublishedReview, recalculateRatings, issueReviewReward } from "./reviewModeration.js";
 
 /**
  * CREATE PRODUCT
@@ -51,6 +53,7 @@ export const getAllProducts = async (req, res) => {
       ingredient,
       priceMax,
       inStock,
+      priceMin,
       excludePid,
       slim,           // slim=true → strip heavy fields (reviews, description, ingredients)
       sort = "best_selling",
@@ -121,8 +124,15 @@ export const getAllProducts = async (req, res) => {
       query.stock = 0;
     }
 
-    if (priceMax) {
-      query.price = { ...(query.price || {}), $lte: Number(priceMax) };
+    // The shop sends both bounds; priceMin was ignored, so its filter did nothing.
+    // Non-numeric input is skipped rather than becoming a NaN bound that matches nothing.
+    const maxPrice = Number(priceMax);
+    if (priceMax !== undefined && priceMax !== "" && Number.isFinite(maxPrice)) {
+      query.price = { ...(query.price || {}), $lte: maxPrice };
+    }
+    const minPrice = Number(priceMin);
+    if (priceMin !== undefined && priceMin !== "" && Number.isFinite(minPrice) && minPrice > 0) {
+      query.price = { ...(query.price || {}), $gte: minPrice };
     }
 
     if (excludePid) {
@@ -133,11 +143,15 @@ export const getAllProducts = async (req, res) => {
       query.$and = andConditions;
     }
 
+    // Price/newest sort by what their labels say — they were grouped by sub_category
+    // first, so "Price: Low → High" wasn't in price order across the shop (the page
+    // doesn't group by sub-category). Every sort ends in _id: without a unique
+    // tiebreaker, skip/limit pagination can show a product on two pages, or on none.
     const sortMap = {
-      best_selling: { sub_category: 1, ratingCount: -1, rating: -1 },
-      price_asc: { sub_category: 1, price: 1 },
-      price_desc: { sub_category: 1, price: -1 },
-      newest: { sub_category: 1, createdAt: -1 },
+      best_selling: { sub_category: 1, ratingCount: -1, rating: -1, _id: 1 },
+      price_asc: { price: 1, _id: 1 },
+      price_desc: { price: -1, _id: 1 },
+      newest: { createdAt: -1, _id: 1 },
     };
 
     const sortObj = sortMap[sort] || sortMap.best_selling;
@@ -152,14 +166,14 @@ export const getAllProducts = async (req, res) => {
 
     const skip = (numPage - 1) * numLimit;
 
-    // Add Vercel-CDN-Cache-Control for edge caching
-    // 5 min s-maxage (was 60s) — product lists change infrequently
-    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    // Browsers reuse the list for a minute and revalidate in the background after
+    // that. (This was a Vercel-only header, which does nothing on Render.)
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
 
     // Use space-separated strings for projection to guarantee Mongoose strictly excludes other fields.
     // Using $slice in the projection object causes MongoDB to return the entire document (including heavy descriptions and reviews).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive variants'
+      ? 'pid name price images rating ratingCount stock category brand isActive variants createdAt'
       // sub_category / product_type / google_product_category / seo_title /
       // seo_description are here for the Merchant Center feed, which reads
       // this endpoint (worker.js handleProductFeed) and has no other source
@@ -189,7 +203,7 @@ export const getAllProducts = async (req, res) => {
       let modifiedProduct = { ...product };
 
       if (!isSlim && modifiedProduct.reviews && modifiedProduct.reviews.length > 0) {
-        modifiedProduct.reviews = modifiedProduct.reviews.reverse().map(r => ({
+        modifiedProduct.reviews = modifiedProduct.reviews.filter(isPublishedReview).reverse().map(r => ({
           rating: r.rating,
           comment: r.comment,
           isVerified: !!r.isVerified,
@@ -239,8 +253,7 @@ export const getAllProducts = async (req, res) => {
  */
 export const getProductFilters = async (req, res) => {
   try {
-    // Add Vercel-CDN-Cache-Control for edge caching
-    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
 
     const baseQuery = { isActive: true };
     const filterQuery = { isActive: true };
@@ -298,8 +311,8 @@ export const getProductFilters = async (req, res) => {
  */
 export const getProductByPid = async (req, res) => {
   try {
-    // Add Vercel-CDN-Cache-Control for edge caching
-    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    // Short: the page shows live stock.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
 
     const isSlim = req.query.slim === 'true';
 
@@ -362,54 +375,12 @@ export const getProductByPid = async (req, res) => {
       }
     }
 
-    // 🚀 NEW: Update UserProfile productViewCounts if user is logged in (skip for slim requests)
-    if (!isSlim && req.user && req.user._id) {
-      import("../analytics/interactionModel.js").then(({ default: UserInteractionLog }) => {
-         UserInteractionLog.create({
-            userId: req.user._id,
-            productId: product._id,
-            eventType: "view"
-         }).catch(err => console.error("Failed to log view interaction:", err));
-      }).catch(err => console.error("Failed to import UserInteractionLog:", err));
-
-      // Dynamic import to avoid circular dependency if any, or just require it
-      import("../profile/models.js").then(({ default: UserProfile }) => {
-        const pidObj = product._id;
-        const bulkOps = [
-          {
-            updateOne: {
-              filter: { _id: req.user._id, "productViewCounts.productId": pidObj },
-              update: {
-                $inc: { "productViewCounts.$.count": 1 },
-                $set: { "productViewCounts.$.lastViewedAt": new Date() }
-              }
-            }
-          },
-          {
-            updateOne: {
-              filter: { _id: req.user._id, "productViewCounts.productId": { $ne: pidObj } },
-              update: {
-                $push: {
-                  productViewCounts: {
-                    $each: [{
-                      productId: pidObj,
-                      count: 1,
-                      lastViewedAt: new Date()
-                    }],
-                    $slice: -100
-                  }
-                }
-              }
-            }
-          }
-        ];
-        UserProfile.bulkWrite(bulkOps).catch(err => console.error("Failed to update productViewCounts:", err));
-      }).catch(err => console.error("Failed to import UserProfile:", err));
-    }
+    // Per-user view tracking lives in analytics/controller.js → trackEvent (this route
+    // carries no auth, so a req.user-gated block here could never run).
 
     // Map populated user object to just the name string for the frontend
     if (!isSlim && product.reviews && product.reviews.length > 0) {
-      product.reviews = product.reviews.map(r => ({
+      product.reviews = product.reviews.filter(isPublishedReview).map(r => ({
         rating: r.rating,
         comment: r.comment,
         isVerified: !!r.isVerified,
@@ -543,20 +514,43 @@ export const addReview = async (req, res) => {
       "items.product": product._id
     });
 
-    const review = {
+    // The "Review moderation" setting existed (and the page told customers their
+    // review was "pending approval") but reviews were always published instantly.
+    const settings = await getSettings();
+    const status = settings?.reviewModerationEnabled ? "pending" : "approved";
+
+    product.reviews.push({
       user: req.user._id,
       rating: Number(rating),
       comment: comment || "",
-      isVerified: !!deliveredOrder
-    };
+      isVerified: !!deliveredOrder,
+      status,
+    });
+    const review = product.reviews[product.reviews.length - 1];
+    recalculateRatings(product);
 
-    product.reviews.push(review);
-    product.ratingCount = product.reviews.length;
-    product.rating = product.reviews.reduce((acc, item) => item.rating + acc, 0) / product.reviews.length;
+    // Published straight away → the promised reward can be issued now; a pending
+    // review gets it when an admin approves it (admin/reviewController.js).
+    let reward = null;
+    if (status === "approved") {
+      reward = await issueReviewReward({ product, review, settings }).catch(err => {
+        console.error("[Reviews] Reward coupon failed:", err.message);
+        return null;
+      });
+    }
 
     await product.save();
 
-    res.status(201).json({ success: true, message: "Review added" });
+    res.status(201).json({
+      success: true,
+      message: status === "pending" ? "Review submitted and awaiting approval" : "Review added",
+      data: {
+        status,
+        isVerified: review.isVerified,
+        rewardCode: reward?.code || null,
+        rewardPercent: reward?.percent || null,
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -568,9 +562,6 @@ export const addReview = async (req, res) => {
  */
 export const getTopReviews = async (req, res) => {
   try {
-    // Add Vercel-CDN-Cache-Control for edge caching
-    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-    // Also set standard Cache-Control so the browser can cache it
     res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
 
     // Aggregate to get the top 3 reviews efficiently without loading everything into memory.
@@ -579,7 +570,7 @@ export const getTopReviews = async (req, res) => {
     const topReviews = await Product.aggregate([
       { $match: { isActive: true, "reviews.0": { $exists: true } } },
       { $unwind: "$reviews" },
-      { $match: { "reviews.rating": { $gte: 4 } } },
+      { $match: { "reviews.rating": { $gte: 4 }, "reviews.status": { $nin: ["pending", "rejected"] } } },
       { $sort: { "reviews.rating": -1, "reviews.createdAt": -1 } },
       // Group by product to get 1 review per product
       { 

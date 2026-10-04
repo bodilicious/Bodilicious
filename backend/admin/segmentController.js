@@ -5,6 +5,21 @@ import Product from "../products/models.js";
 import Order from "../tracker/models.js";
 import { exportToCSV } from "../utils/exportCSV.js";
 import { logAction } from "./controller.js";
+import { parseRangeStart, parseRangeEnd } from "../utils/dateRange.js";
+
+/**
+ * { $gte, $lte } for the customer tabs' date filters, or null when neither is set.
+ * The old inline versions ignored a filter unless BOTH dates were given, and used a
+ * bare end date as midnight — so start = end = today returned nothing at all.
+ */
+const rangeFilter = (startDate, endDate) => {
+  const start = parseRangeStart(startDate);
+  const end = parseRangeEnd(endDate);
+  const filter = {};
+  if (start && !isNaN(start.getTime())) filter.$gte = start;
+  if (end && !isNaN(end.getTime())) filter.$lte = end;
+  return Object.keys(filter).length ? filter : null;
+};
 
 const HIGH_VALUE_THRESHOLD = parseInt(process.env.HIGH_VALUE_THRESHOLD) || 5000;
 const LOYAL_ORDER_COUNT = 3;
@@ -514,6 +529,7 @@ export const getCustomerReviews = async (req, res) => {
           rating: r.rating,
           comment: r.comment,
           isVerified: r.isVerified,
+          status: r.status || "approved",
           createdAt: r.createdAt,
         });
       }
@@ -642,12 +658,8 @@ export const getCustomerCartHistory = async (req, res) => {
       user_id: id,
       event_type: { $in: ["CART_ITEM_ADDED", "CART_ITEM_REMOVED"] }
     };
-    if (req.query.startDate && req.query.endDate) {
-      query.timestamp_utc = { 
-        $gte: new Date(req.query.startDate), 
-        $lte: new Date(req.query.endDate) 
-      };
-    }
+    const cartRange = rangeFilter(req.query.startDate, req.query.endDate);
+    if (cartRange) query.timestamp_utc = cartRange;
 
     const [rawLogs, total] = await Promise.all([
       AuditLogV2.find(query)
@@ -698,7 +710,7 @@ export const getCustomerPaymentHistory = async (req, res) => {
     // Fetch from Orders
     const orders = await Order.find({ user: id })
       .sort({ createdAt: -1 })
-      .select('orderId totalAmount paymentStatus paymentMethod createdAt orderStatus')
+      .select('orderId totalAmount currency paymentStatus paymentMethod createdAt orderStatus')
       .lean();
       
     // Fetch PAYMENT_FAILED from AuditLogV2
@@ -736,12 +748,8 @@ export const getCustomerActivity = async (req, res) => {
 
     const { startDate, endDate } = req.query;
     const query = { user_id: objectId };
-    if (startDate && endDate) {
-      query.start_time = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
-    }
+    const sessionRange = rangeFilter(startDate, endDate);
+    if (sessionRange) query.start_time = sessionRange;
 
     const total = await UserSession.countDocuments(query);
     const rawSessions = await UserSession.find(query)
@@ -788,12 +796,8 @@ export const getCustomerAuditLogs = async (req, res) => {
     if (eventType) {
       query.event_type = eventType;
     }
-    if (startDate && endDate) {
-      query.timestamp_utc = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
-    }
+    const auditRange = rangeFilter(startDate, endDate);
+    if (auditRange) query.timestamp_utc = auditRange;
 
     const [rawLogs, total] = await Promise.all([
       AuditLogV2.find(query)

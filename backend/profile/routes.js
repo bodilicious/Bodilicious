@@ -48,6 +48,8 @@ const router = express.Router();
 // PROFILE
 router.get("/", protect, getProfile);
 router.put("/", protect, validate(updateUserProfileSchema), updateProfile);
+// The storefront sends PATCH — with only PUT registered, every profile edit 404'd.
+router.patch("/", protect, validate(updateUserProfileSchema), updateProfile);
 router.delete("/", protect, async (req, res) => {
   const deleted = await UserProfile.findByIdAndDelete(req.user._id);
   if (!deleted) {

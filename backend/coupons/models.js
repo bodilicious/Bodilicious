@@ -73,6 +73,11 @@ const couponSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
     }],
+    // Personal codes (e.g. review rewards) — never listed on the public offers endpoint.
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
@@ -88,11 +93,11 @@ couponSchema.index({ applicableProducts: 1 }, { sparse: true });
 ========================================= */
 const couponUseSchema = new mongoose.Schema(
   {
+    // coupon/user: no single indexes — { coupon, user } and { user, coupon } cover both.
     coupon: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Coupon",
       required: true,
-      index: true,
     },
     order: {
       type: mongoose.Schema.Types.ObjectId,
@@ -104,7 +109,6 @@ const couponUseSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "UserProfile",
       required: true,
-      index: true,
     },
     discountApplied: {
       type: Number,

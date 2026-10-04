@@ -27,7 +27,9 @@ export default function Select({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((opt) => opt.value === value) || options.find((opt) => opt.value.toString() === value.toString());
+  // String(… ?? '') rather than .toString(): a null/undefined value (e.g. a field
+  // missing on an older document) threw here and blanked the whole page.
+  const selectedOption = options.find((opt) => opt.value === value) || options.find((opt) => String(opt.value ?? '') === String(value ?? ''));
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

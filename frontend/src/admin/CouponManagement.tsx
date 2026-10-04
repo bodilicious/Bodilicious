@@ -53,6 +53,7 @@ type FormState = {
   expiresAt: string;
   description: string;
   applicableProducts: ProductOption[];
+  isActive: boolean;
 };
 
 const blankForm = (): FormState => ({
@@ -66,6 +67,7 @@ const blankForm = (): FormState => ({
   expiresAt: '',
   description: '',
   applicableProducts: [],
+  isActive: true,
 });
 
 const couponToForm = (c: Coupon): FormState => ({
@@ -76,10 +78,17 @@ const couponToForm = (c: Coupon): FormState => ({
   perUserLimit: c.perUserLimit != null ? String(c.perUserLimit) : '',
   totalCap: c.totalCap != null ? String(c.totalCap) : '',
   allowsStacking: c.allowsStacking,
-  expiresAt: c.expiresAt ? c.expiresAt.substring(0, 10) : '',
+  // The calendar date in IST ('en-CA' formats as YYYY-MM-DD for the date input).
+  expiresAt: c.expiresAt ? new Date(c.expiresAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : '',
   description: c.description ?? '',
   applicableProducts: c.applicableProducts ?? [],
+  isActive: c.isActive,
 });
+
+// The date picker yields a calendar day. Sent bare, the server parsed "2026-10-31" as
+// midnight UTC, so a coupon "expiring Oct 31" stopped working at 5:30 AM IST that day.
+// Expire at the end of the chosen day in the store's timezone instead.
+const endOfDayIST = (date: string) => `${date}T23:59:59.999+05:30`;
 
 // ── Sparkline ────────────────────────────────────────────────────────────────
 const SparklineChart: React.FC<{ data: Array<{ _id: string; count: number }> }> = ({ data }) => {
@@ -112,9 +121,12 @@ const ProductPicker: React.FC<ProductPickerProps> = ({ selected, onChange }) => 
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Responses can arrive out of order; only the latest query may set results.
+  const latestQueryRef = useRef('');
   const selectedIds = new Set(selected.map(p => p._id));
 
   const search = useCallback(async (q: string) => {
+    latestQueryRef.current = q;
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
@@ -125,7 +137,7 @@ const ProductPicker: React.FC<ProductPickerProps> = ({ selected, onChange }) => 
       );
       const d = await r.json();
       // The products endpoint returns `products` (canonical) and `data` (compat alias).
-      if (d.success) {
+      if (d.success && latestQueryRef.current === q) {
         setResults((d.products || []).map((p: { _id: string; name: string; pid: string }) => ({
           _id: p._id, name: p.name, pid: p.pid,
         })));
@@ -223,10 +235,11 @@ interface CouponFormProps {
   onCancel: () => void;
   submitLabel: string;
   isEdit?: boolean;
+  submitting?: boolean;
 }
 
 const CouponForm: React.FC<CouponFormProps> = ({
-  formData, setFormData, onSubmit, onCancel, submitLabel, isEdit = false,
+  formData, setFormData, onSubmit, onCancel, submitLabel, isEdit = false, submitting = false,
 }) => {
   const handleTypeChange = (newType: string) => {
     const update: Partial<FormState> = { type: newType };
@@ -353,6 +366,22 @@ const CouponForm: React.FC<CouponFormProps> = ({
         </div>
       </label>
 
+      {/* Active — the only way to switch a coupon back on: deactivation goes through
+          bulk-deactivate, and nothing else in the panel could undo it. */}
+      {isEdit && (
+        <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer">
+          <input
+            type="checkbox" checked={formData.isActive}
+            onChange={e => setFormData(f => ({ ...f, isActive: e.target.checked }))}
+            className="w-4 h-4 accent-red-700"
+          />
+          <div>
+            <p className="text-sm font-medium text-gray-800">Active</p>
+            <p className="text-xs text-gray-500">Inactive coupons are rejected at checkout</p>
+          </div>
+        </label>
+      )}
+
       {/* Description */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
@@ -369,9 +398,9 @@ const CouponForm: React.FC<CouponFormProps> = ({
           className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all">
           Cancel
         </button>
-        <button type="submit"
-          className="flex-1 px-4 py-2.5 bg-dark-red text-white rounded-xl text-sm font-medium hover:bg-red-800 transition-all">
-          {submitLabel}
+        <button type="submit" disabled={submitting}
+          className="flex-1 px-4 py-2.5 bg-dark-red text-white rounded-xl text-sm font-medium hover:bg-red-800 disabled:opacity-50 transition-all">
+          {submitting ? 'Saving…' : submitLabel}
         </button>
       </div>
     </form>
@@ -407,6 +436,7 @@ const CouponManagement: React.FC = () => {
   const [deactivateConfirm, setDeactivateConfirm] = useState(false);
   const [createForm, setCreateForm] = useState<FormState>(blankForm());
   const [editForm, setEditForm] = useState<FormState>(blankForm());
+  const [submitting, setSubmitting] = useState(false);
 
   const LIMIT = 20;
 
@@ -448,6 +478,8 @@ const CouponManagement: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const body: Record<string, unknown> = {
         code: createForm.code,
@@ -459,7 +491,7 @@ const CouponManagement: React.FC = () => {
       if (createForm.minOrderValue) body.minOrderValue = parseFloat(createForm.minOrderValue);
       if (createForm.perUserLimit)  body.perUserLimit  = parseInt(createForm.perUserLimit);
       if (createForm.totalCap)      body.totalCap      = parseInt(createForm.totalCap);
-      if (createForm.expiresAt)     body.expiresAt     = createForm.expiresAt;
+      if (createForm.expiresAt)     body.expiresAt     = endOfDayIST(createForm.expiresAt);
       if (createForm.description)   body.description   = createForm.description;
 
       const headers = await getAuthHeaders();
@@ -472,25 +504,26 @@ const CouponManagement: React.FC = () => {
         fetchCoupons();
       } else toast.error(d.message);
     } catch { toast.error('Create failed'); }
+    finally { setSubmitting(false); }
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCoupon) return;
+    if (!editingCoupon || submitting) return;
+    setSubmitting(true);
     try {
       const body: Record<string, unknown> = {
         type: editForm.type,
         value: parseFloat(editForm.value) || 0,
         allowsStacking: editForm.allowsStacking,
-        // Preserve active state; deactivation goes through bulk-deactivate
-        isActive: editingCoupon.isActive,
+        isActive: editForm.isActive,
         // Always send applicableProducts so clearing to [] is honoured
         applicableProducts: editForm.applicableProducts.map(p => p._id),
         // Always send nullable fields so clearing them to empty is honoured
         minOrderValue: editForm.minOrderValue ? parseFloat(editForm.minOrderValue) : 0,
         perUserLimit:  editForm.perUserLimit  ? parseInt(editForm.perUserLimit)   : null,
         totalCap:      editForm.totalCap      ? parseInt(editForm.totalCap)       : null,
-        expiresAt:     editForm.expiresAt     || null,
+        expiresAt:     editForm.expiresAt ? endOfDayIST(editForm.expiresAt) : null,
         description:   editForm.description,
       };
 
@@ -507,6 +540,7 @@ const CouponManagement: React.FC = () => {
         fetchCoupons();
       } else toast.error(d.message);
     } catch { toast.error('Update failed'); }
+    finally { setSubmitting(false); }
   };
 
   const handleBulkDeactivate = async () => {
@@ -771,6 +805,7 @@ const CouponManagement: React.FC = () => {
             onSubmit={handleCreate}
             onCancel={() => setShowBuilder(false)}
             submitLabel="Create Coupon"
+            submitting={submitting}
           />
         </Modal>
       )}
@@ -784,6 +819,7 @@ const CouponManagement: React.FC = () => {
             onSubmit={handleUpdate}
             onCancel={() => setEditingCoupon(null)}
             submitLabel="Save Changes"
+            submitting={submitting}
             isEdit
           />
         </Modal>

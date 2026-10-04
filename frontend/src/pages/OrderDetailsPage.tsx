@@ -1,7 +1,7 @@
  
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Order } from '../types';
 import {
@@ -19,6 +19,7 @@ import { TimelineEvent } from '../types';
 import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 import { useSEO } from '../hooks/useSEO';
+import { productImage } from '../utils/productImage';
 
 export default function OrderDetailsPage() {
     useSEO({
@@ -30,8 +31,9 @@ export default function OrderDetailsPage() {
     const { orderId: urlOrderId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
-    const { orders, selectedOrderId, authLoading, isAuthenticated, navigateTo, getAuthHeaders, updateOrderAddress, cancelOrder, requestReturn } = useApp();
+    const { selectedOrderId, authLoading, isAuthenticated, navigateTo, getAuthHeaders, updateOrderAddress, cancelOrder, requestReturn, storeSettings } = useApp();
     const [order, setOrder] = useState<Order | null>(null);
+    const [isOrderLoading, setIsOrderLoading] = useState(true);
 
     // Tracking state
     const [trackingData, setTrackingData] = useState<{
@@ -140,6 +142,46 @@ export default function OrderDetailsPage() {
         }
     }, [getAuthHeaders]);
 
+    // The page used to render from the account's order list, which carries only summary
+    // fields: online orders showed as "COD", the address/contact/notes were blank, and
+    // any order older than the 20 most recent bounced back to the list. It now loads
+    // the full order.
+    const applyOrder = useCallback((o: Order) => {
+        setOrder(o);
+        setComments(o.customerComments || []);
+        setEditForm({
+            name: o.shippingDetails?.name || '',
+            phone: o.shippingDetails?.phone || '',
+            email: o.shippingDetails?.email || '',
+            address: o.shippingDetails?.address || '',
+            city: o.shippingDetails?.city || '',
+            state: o.shippingDetails?.state || '',
+            pincode: o.shippingDetails?.pincode || ''
+        });
+    }, []);
+
+    const loadOrder = useCallback(async (id: string): Promise<Order> => {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/orders/${id}`, { headers });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.data) throw new Error(data?.message || 'Order not found');
+        return data.data as Order;
+    }, [getAuthHeaders]);
+
+    // Re-read after a change so status, refund and payment fields are current — the
+    // handlers used to re-read the pre-change list, so the page kept showing the old status.
+    const refreshOrder = useCallback(async (id: string) => {
+        try {
+            const fresh = await loadOrder(id);
+            applyOrder(fresh);
+            fetchTracking(fresh);
+        } catch (err) {
+            console.error('Failed to refresh order:', err);
+        }
+    }, [loadOrder, applyOrder, fetchTracking]);
+
+    const targetOrderId = urlOrderId || selectedOrderId;
+
     useEffect(() => {
         if (authLoading) return;
 
@@ -149,40 +191,35 @@ export default function OrderDetailsPage() {
             return;
         }
 
-        const targetOrderId = urlOrderId || selectedOrderId;
-
         if (!targetOrderId) {
             navigateTo('tracking');
             return;
         }
 
-        const foundOrder = orders.find(o => o._id === targetOrderId);
-        if (foundOrder) {
-            setOrder(foundOrder);
-            setComments((foundOrder as any).customerComments || []);
-            setEditForm({
-                name: foundOrder.shippingDetails?.name || '',
-                phone: foundOrder.shippingDetails?.phone || '',
-                email: foundOrder.shippingDetails?.email || '',
-                address: foundOrder.shippingDetails?.address || '',
-                city: foundOrder.shippingDetails?.city || '',
-                state: foundOrder.shippingDetails?.state || '',
-                pincode: foundOrder.shippingDetails?.pincode || ''
-            });
-
-            fetchTracking(foundOrder);
-        } else if (orders.length > 0) {
-            // If orders are loaded but not found, redirect to tracking list
-            navigateTo('tracking');
-        }
-    }, [authLoading, isAuthenticated, urlOrderId, selectedOrderId, orders, navigateTo, location.pathname, navigate, fetchTracking]);
+        let cancelled = false;
+        setIsOrderLoading(true);
+        loadOrder(targetOrderId)
+            .then(full => {
+                if (cancelled) return;
+                applyOrder(full);
+                fetchTracking(full);
+            })
+            .catch(err => {
+                if (cancelled) return;
+                toast.error(err.message || 'Order not found');
+                navigateTo('tracking');
+            })
+            .finally(() => { if (!cancelled) setIsOrderLoading(false); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authLoading, isAuthenticated, targetOrderId]);
 
     const handleSaveAddress = async () => {
         if (!order) return;
         setIsSavingAddress(true);
         try {
             const updatedOrder = await updateOrderAddress(order._id, editForm);
-            setOrder(updatedOrder);
+            applyOrder(updatedOrder);
             setIsEditingAddress(false);
             toast.success("Address updated successfully!");
         } catch (err: any) {
@@ -199,9 +236,7 @@ export default function OrderDetailsPage() {
             await cancelOrder(order._id);
             toast.success("Order cancelled successfully.");
             setIsCancelModalOpen(false);
-            // Refresh order
-            const foundOrder = orders.find(o => o._id === order._id);
-            if (foundOrder) setOrder(foundOrder);
+            await refreshOrder(order._id);
         } catch (err: any) {
             toast.error(err.message || "Failed to cancel order");
         } finally {
@@ -217,12 +252,12 @@ export default function OrderDetailsPage() {
         }
         setIsProcessingAction(true);
         try {
-            await requestReturn(order._id, returnReason);
+            const updated = await requestReturn(order._id, returnReason);
             toast.success("Return request submitted successfully.");
             setIsReturnModalOpen(false);
             setReturnReason('');
-            const foundOrder = orders.find(o => o._id === order._id);
-            if (foundOrder) setOrder(foundOrder);
+            if (updated?._id) applyOrder(updated);
+            else await refreshOrder(order._id);
         } catch (err: any) {
             toast.error(err.message || "Failed to submit return request");
         } finally {
@@ -259,7 +294,13 @@ export default function OrderDetailsPage() {
         window.print();
     };
 
-    if (!order) return null;
+    if (!order) {
+        return isOrderLoading ? (
+            <div className="min-h-screen bg-neutral-50 flex items-center justify-center text-gray-400 font-sans text-sm">
+                <RefreshCw className="animate-spin w-5 h-5 mr-3" /> Loading your order...
+            </div>
+        ) : null;
+    }
 
     // Badge styling helpers
     const getPaymentBadge = (status: string) => {
@@ -280,11 +321,37 @@ export default function OrderDetailsPage() {
     };
 
     const rawShippingCost = order.shippingCost ?? 0;
+    const rawCodCharge = order.codCharge ?? 0;
     const rawDiscountAmount = order.discountAmount ?? 0;
     const rawTaxAmount = order.taxAmount ?? 0;
     const rawTotalAmount = order.totalAmount ?? 0;
-    const rawSubtotal = (order.originalAmount ?? rawTotalAmount) - rawShippingCost;
+    // Subtotal from the line items (converted below via itemFx). Deriving it as
+    // originalAmount − shippingCost over-stated it whenever a free-shipping coupon
+    // zeroed shippingCost, since originalAmount still includes the original charge.
+    const itemsSubtotalInr = order.items.reduce((sum, i) => sum + (i.priceAtPurchase || 0) * (i.quantity || 0), 0);
+    const shippingCountry = order.shippingDetails?.country || 'India';
+    const billing = order.billingDetails;
+    const canEditAddress = ['pending', 'processing'].includes(order.orderStatus) && !order.awb;
+    // Same rule the server enforces in requestReturn: configurable window, counted
+    // from deliveredAt (updatedAt only for legacy orders that predate the field).
+    const returnWindowDays = storeSettings.returnWindowDays ?? 7;
+    const canRequestReturn = (() => {
+        if (order.orderStatus !== 'delivered') return false;
+        if (order.returnStatus && order.returnStatus !== 'none' && order.returnStatus !== 'rejected') return false;
+        const deliveredStr = order.deliveredAt || order.updatedAt;
+        if (!deliveredStr) return true;
+        const daysSinceDelivery = (Date.now() - new Date(deliveredStr).getTime()) / (1000 * 60 * 60 * 24);
+        return daysSinceDelivery <= returnWindowDays;
+    })();
     
+    // priceAtPurchase is stored in INR; everything else on the order is in
+    // order.currency. Convert line items with the rate locked in at checkout, or a
+    // ₹1,500 item on a USD order was shown as $1,500.
+    const itemFx = (order.currency && order.currency !== 'INR' && order.exchangeRate) ? order.exchangeRate : 1;
+    const rawSubtotal = itemsSubtotalInr > 0
+      ? itemsSubtotalInr * itemFx
+      : (order.originalAmount ?? rawTotalAmount) - rawShippingCost - rawCodCharge;
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -381,13 +448,7 @@ export default function OrderDetailsPage() {
                                         Cancel Order
                                     </button>
                                 )}
-                                {(() => {
-                                    if (order.orderStatus !== 'delivered' || order.returnStatus !== 'none') return false;
-                                    const deliveryDateStr = order.updatedAt || order.estimatedDeliveryDate;
-                                    const deliveryDate = deliveryDateStr ? new Date(deliveryDateStr) : new Date(order.createdAt);
-                                    const daysSinceDelivery = (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24);
-                                    return daysSinceDelivery <= 7;
-                                })() && (
+                                {canRequestReturn && (
                                     <button onClick={() => setIsReturnModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-sans tracking-widest uppercase text-orange-600 bg-white border border-orange-200 hover:bg-orange-50 transition-colors shadow-sm w-full sm:w-auto justify-center">
                                         Return Order
                                     </button>
@@ -444,7 +505,7 @@ export default function OrderDetailsPage() {
                                                     {item.product?.images?.[0] ? (
                                                         <img 
                                                           loading="lazy"
-                                                          src={item.product.images[0]} 
+                                                          src={productImage(item.product.images[0], 'thumb')}  
                                                           alt={item.product.name} 
                                                           className="w-full h-full object-contain p-1 mix-blend-multiply" 
                                                         />
@@ -455,19 +516,25 @@ export default function OrderDetailsPage() {
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <a href="#" className="text-sm font-serif text-dark-red hover:text-ruby-red transition-colors truncate block">
-                                                        {item.product?.name || 'Unknown Product'}
-                                                    </a>
+                                                    {item.product?.pid ? (
+                                                        <Link to={`/product/${item.product.pid}`} className="text-sm font-serif text-dark-red hover:text-ruby-red transition-colors truncate block">
+                                                            {item.product.name}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-sm font-serif text-dark-red truncate block">
+                                                            {item.product?.name || 'Unknown Product'}
+                                                        </span>
+                                                    )}
                                                     {item.variant && (
                                                         <p className="font-sans text-[10px] text-dark-red/70 uppercase tracking-wider mt-0.5">Shade: {item.variant}</p>
                                                     )}
                                                     <p className="text-xs font-sans text-grey-beige mt-1 uppercase tracking-wider">{item.product?.category || 'Standard'}</p>
                                                 </div>
                                                 <div className="text-right text-sm font-sans text-gray-500">
-                                                    {formatCurrency(item.priceAtPurchase)} × {item.quantity}
+                                                    {formatCurrency(item.priceAtPurchase * itemFx)} × {item.quantity}
                                                 </div>
                                                 <div className="text-right text-sm font-sans font-semibold text-dark-red min-w-[80px]">
-                                                    {formatCurrency(item.priceAtPurchase * item.quantity)}
+                                                    {formatCurrency(item.priceAtPurchase * itemFx * item.quantity)}
                                                 </div>
                                             </div>
                                         ))}
@@ -483,7 +550,13 @@ export default function OrderDetailsPage() {
                                             <Clock size={18} className="text-yellow-600" />
                                         )}
                                         <h3 className="text-lg font-serif text-dark-red">
-                                            {order.paymentStatus === 'paid' ? 'Paid' : 'Payment pending'}
+                                            {order.paymentStatus === 'paid'
+                                                ? 'Paid'
+                                                : order.paymentStatus === 'refunded'
+                                                    ? 'Refunded'
+                                                    : order.paymentMethod === 'cod'
+                                                        ? 'Cash on Delivery — pay when it arrives'
+                                                        : 'Payment pending'}
                                         </h3>
                                     </div>
                                     <div className="p-4">
@@ -491,14 +564,22 @@ export default function OrderDetailsPage() {
                                             <span>Subtotal ({order.items.length} item{order.items.length > 1 ? 's' : ''})</span>
                                             <span className="text-gray-900">{formatCurrency(rawSubtotal)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center py-2 text-sm text-gray-600">
-                                            <span>Discount {order.isWelcomeOfferApplied && <span className="text-xs text-green-600">(Welcome Offer)</span>}</span>
-                                            <span className="text-gray-900">-{formatCurrency(rawDiscountAmount)}</span>
-                                        </div>
+                                        {rawDiscountAmount > 0 && (
+                                            <div className="flex justify-between items-center py-2 text-sm text-gray-600">
+                                                <span>Discount {order.isWelcomeOfferApplied && <span className="text-xs text-green-600">(Welcome Offer)</span>}{order.couponCode && <span className="text-xs text-green-600"> ({order.couponCode})</span>}</span>
+                                                <span className="text-gray-900">-{formatCurrency(rawDiscountAmount)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-center py-2 text-sm text-gray-600">
                                             <span>Shipping</span>
                                             <span className="text-gray-900">{rawShippingCost === 0 ? 'Free' : formatCurrency(rawShippingCost)}</span>
                                         </div>
+                                        {rawCodCharge > 0 && (
+                                            <div className="flex justify-between items-center py-2 text-sm text-gray-600">
+                                                <span>Cash on Delivery fee</span>
+                                                <span className="text-gray-900">{formatCurrency(rawCodCharge)}</span>
+                                            </div>
+                                        )}
                                         {/* Hidden when no tax applies. This row was unconditional, so
                                             every order showed "Tax (Inclusive) ₹0" — and it must stay
                                             hidden on zero-rated international orders. */}
@@ -516,7 +597,7 @@ export default function OrderDetailsPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    {order.paymentStatus === 'paid' && (
+                                    {(order.paymentStatus === 'paid' || order.paymentStatus === 'refunded') && (
                                         <div className="p-4 bg-gray-50 border-t border-gray-200">
                                             <div className="text-sm text-gray-600 flex justify-between items-center mb-1">
                                                 <span>{order.paymentMethod === 'razorpay' ? 'Online' : 'COD'} transaction</span>
@@ -524,7 +605,7 @@ export default function OrderDetailsPage() {
                                             </div>
                                             {order.refundId && (
                                                 <div className="text-sm text-gray-600 flex flex-col justify-start items-start pt-2 border-t border-gray-200 mt-2">
-                                                    <span className="font-semibold text-purple-700">Refund: {order.refundAmount ? formatCurrency(order.refundAmount) : '—'} ({order.refundStatus})</span>
+                                                    <span className="font-semibold text-purple-700">Refund: {order.refundAmount ? formatCurrency(order.refundAmount) : '—'}{order.refundStatus ? ` (${order.refundStatus})` : ''}</span>
                                                     <span className="font-mono text-[10px] text-gray-400">Refund Ref: {order.refundId}</span>
                                                 </div>
                                             )}
@@ -625,9 +706,11 @@ export default function OrderDetailsPage() {
 
                                     <div className="border-t border-gray-100 pt-3">
                                         <h4 className="text-xs uppercase tracking-widest font-sans text-grey-beige mb-3">Contact Information</h4>
-                                        <a href={`mailto:${order.shippingDetails?.email || 'customer@example.com'}`} className="text-sm font-sans text-dark-red hover:text-ruby-red flex flex-col mb-1.5 break-all w-fit">
-                                            {order.shippingDetails?.email || 'customer@example.com'}
-                                        </a>
+                                        {order.shippingDetails?.email && (
+                                            <a href={`mailto:${order.shippingDetails.email}`} className="text-sm font-sans text-dark-red hover:text-ruby-red flex flex-col mb-1.5 break-all w-fit">
+                                                {order.shippingDetails.email}
+                                            </a>
+                                        )}
                                         <a href={`tel:${order.shippingDetails?.phone}`} className="text-sm font-sans text-gray-700 hover:text-dark-red flex flex-col">
                                             {order.shippingDetails?.phone}
                                         </a>
@@ -658,7 +741,7 @@ export default function OrderDetailsPage() {
                                             <>
                                                 <div className="flex justify-between items-center mb-3">
                                                     <h4 className="text-xs uppercase tracking-widest font-sans text-grey-beige">Shipping Address</h4>
-                                                    {(order.orderStatus !== 'shipped' && order.orderStatus !== 'delivered') && (
+                                                    {canEditAddress && (
                                                         <button onClick={() => setIsEditingAddress(true)} className="text-dark-red text-xs font-sans tracking-wider hover:text-ruby-red uppercase print:hidden">Edit</button>
                                                     )}
                                                 </div>
@@ -666,7 +749,7 @@ export default function OrderDetailsPage() {
                                                     {order.shippingDetails?.name}<br />
                                                     {order.shippingDetails?.address}<br />
                                                     {order.shippingDetails?.city} - {order.shippingDetails?.pincode}<br />
-                                                    {order.shippingDetails?.state}, India
+                                                    {order.shippingDetails?.state}, {shippingCountry}
                                                 </p>
                                             </>
                                         )}
@@ -676,7 +759,16 @@ export default function OrderDetailsPage() {
                                         <div className="flex justify-between items-center mb-3">
                                             <h4 className="text-xs uppercase tracking-widest font-sans text-grey-beige">Billing Address</h4>
                                         </div>
-                                        <p className="text-sm font-sans text-gray-500 italic">Same as shipping address</p>
+                                        {billing?.address ? (
+                                            <p className="text-sm font-sans text-gray-800 leading-relaxed">
+                                                {billing.name}<br />
+                                                {billing.address}<br />
+                                                {billing.city} - {billing.pincode}<br />
+                                                {billing.state}, {billing.country || 'India'}
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm font-sans text-gray-500 italic">Same as shipping address</p>
+                                        )}
                                     </div>
                                 </div>
 

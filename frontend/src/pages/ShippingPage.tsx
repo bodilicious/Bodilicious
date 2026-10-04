@@ -14,6 +14,7 @@ import { formatCurrency } from '../utils/currencies';
 import { useCurrency } from '../hooks/useCurrency';
 import { getIsoAlpha2Code } from '../utils/countryMapper';
 import { useSEO } from '../hooks/useSEO';
+import { productImage } from '../utils/productImage';
 
 // ─── Module-level pincode cache ────────────────────────────────────────────────
 const pincodeCache: Record<string, { city: string; state: string; areas: string[] }> = {};
@@ -1219,7 +1220,7 @@ export default function ShippingPage() {
                                             <div className="w-16 h-20 bg-silk-light shrink-0 rounded-sm overflow-hidden">
                                                 <img
                                                     loading="lazy"
-                                                    src={item.product.images[0]}
+                                                    src={productImage(item.product.images[0], 'thumb')}
                                                     alt={item.product.name}
                                                     className="w-full h-full object-contain p-1 mix-blend-multiply"
                                                 />

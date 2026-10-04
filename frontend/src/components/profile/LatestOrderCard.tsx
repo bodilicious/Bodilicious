@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Package, Truck, CheckCircle2, Clock, XCircle, ChevronRight, ShoppingBag } from 'lucide-react';
 import { Order } from '../../types';
 import { formatCurrency } from '../../utils/currencies';
+import { productImage } from '../../utils/productImage';
 
 interface Props {
     order: Order | null;
@@ -70,7 +71,7 @@ export default function LatestOrderCard({ order, navigateTo, onReorder }: Props)
                             <div key={idx} className="inline-block h-16 w-16 rounded-xl border-2 border-white bg-silk-light overflow-hidden shadow-sm">
                                 <img
                                     loading="lazy"
-                                    src={item.product?.images?.[0] || 'https://via.placeholder.com/150'}
+                                    src={productImage(item.product?.images?.[0], 'thumb') || '/logo.webp'}
                                     alt={item.product?.name || 'Product'}
                                     className="h-full w-full object-cover"
                                 />

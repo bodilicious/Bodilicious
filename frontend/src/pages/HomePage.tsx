@@ -200,7 +200,7 @@ interface HomePageProps {
 }
 
 export default function HomePage({ isEditing = false, contentData: propContentData, onContentChange }: HomePageProps) {
-  const { setShopFilter, products, isLoading, error } = useApp();
+  const { setShopFilter, products, isLoading, error, user, getAuthHeaders } = useApp();
   const [publishedContent, setPublishedContent] = useState<any>(null);
 
   const navigate = useNavigate();
@@ -212,7 +212,7 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
   useSEO({
     title: 'Bodilicious — Premium Skincare & Haircare',
     description:
-      'Dermatologically tested skincare & haircare with science-backed actives. Free shipping over ₹1500. Shop now.',
+      'Dermatologically tested skincare & haircare with science-backed actives. Free shipping on qualifying orders. Shop now.',
     keywords: 'skincare products, dermatologically tested haircare, niacinamide serum for glowing skin, retinol anti-aging cream, organic shampoo for hair fall, hyaluronic acid moisturizer natural, premium skincare india, buy skincare products online india',
     canonical: '/',
   });
@@ -267,27 +267,40 @@ export default function HomePage({ isEditing = false, contentData: propContentDa
     }
   }, [location]);
 
-  // Ref guard: fetch homepage content exactly once — avoids re-fetching every time
-  // publishedContent or fetchingHomepage state changes (which re-triggered the effect).
-  const homepageFetchedRef = useRef(false);
+  // The Live Builder's "Preview" button opens /?preview=draft. For an admin that shows
+  // the unpublished draft; it used to load the published homepage like any visitor, so
+  // "Preview" never showed the changes being previewed. `user` resolves after the first
+  // render, so this can flip to true later — the fetch below follows it.
+  const isAdminUser = user?.role === 'admin' || user?.role === 'primary_admin';
+  const wantsDraft = isAdminUser && new URLSearchParams(location.search).get('preview') === 'draft';
+
+  // Ref guard: fetch each kind of content (published / draft) at most once — avoids
+  // re-fetching every time publishedContent or fetchingHomepage state changes.
+  const homepageFetchedRef = useRef<'published' | 'draft' | null>(null);
   useEffect(() => {
-    if (isEditing || propContentData || homepageFetchedRef.current) return;
-    homepageFetchedRef.current = true;
-    fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/settings/homepage`)
-      .then(res => res.json())
-      .then(data => {
+    if (isEditing || propContentData) return;
+    const mode = wantsDraft ? 'draft' : 'published';
+    if (homepageFetchedRef.current === mode) return;
+    homepageFetchedRef.current = mode;
+    const base = `${import.meta.env.VITE_API_URL || ''}/api/v1/settings/homepage`;
+    (async () => {
+      try {
+        const res = mode === 'draft'
+          ? await fetch(`${base}/draft`, { headers: await getAuthHeaders() })
+          : await fetch(base);
+        const data = await res.json();
         if (data.success && data.data) {
           setPublishedContent(data.data);
         } else {
           setPublishedContent({});
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('Failed to load homepage content', err);
-        homepageFetchedRef.current = false; // allow retry on error
+        homepageFetchedRef.current = null; // allow retry on error
         setPublishedContent({});
-      });
-  }, [isEditing, propContentData]); // stable deps — no publishedContent/fetchingHomepage loop
+      }
+    })();
+  }, [isEditing, propContentData, wantsDraft, getAuthHeaders]); // stable deps — no publishedContent/fetchingHomepage loop
 
   const contentData = propContentData || publishedContent;
 

@@ -199,7 +199,7 @@ const CATEGORY_INTRO: Record<string, string> = {
     'Bodilicious makeup is formulated with skin care principles in mind — so you\'re not undoing your serum routine with a foundation that clogs pores. Our range is non-comedogenic, long-wear, and suited to warm, humid Indian conditions where most imported formulas transfer or oxidise by midday. Ingredients like niacinamide in the foundation and SPF in the tinted products mean your colour is doing something useful for your skin, not just sitting on top of it.',
   // ── Default (no or multiple filters active) ───────────────────────────────
   default:
-    'Bodilicious is an Indian science-backed beauty brand offering dermatologically tested skincare, haircare, lip care, and makeup. Every formula is built around proven actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, BHAs, and keratin — at concentrations that work for Indian skin types and India\'s climate. Free shipping on orders over ₹1500. All products are non-comedogenic, cruelty-free, and made without harmful fillers.',
+    'Bodilicious is an Indian science-backed beauty brand offering dermatologically tested skincare, haircare, lip care, and makeup. Every formula is built around proven actives — niacinamide, retinol, vitamin C, hyaluronic acid, AHAs, BHAs, and keratin — at concentrations that work for Indian skin types and India\'s climate. Free shipping on qualifying orders. All products are non-comedogenic, cruelty-free, and made without harmful fillers.',
 };
 
 export default function ShopPage() {
@@ -228,7 +228,7 @@ export default function ShopPage() {
     if (selectedConcerns.length === 1)
       return `Shop Bodilicious products formulated for ${titleCase(selectedConcerns[0])}. Dermatologically tested, science-backed skincare and haircare made in India.`;
     if (selectedCategories.length === 1)
-      return `Explore the Bodilicious ${titleCase(selectedCategories[0])} range. Premium formulas with science-backed actives. Free shipping on orders over ₹1500.`;
+      return `Explore the Bodilicious ${titleCase(selectedCategories[0])} range. Premium formulas with science-backed actives. Free shipping on qualifying orders.`;
     return 'Browse our complete range of premium skincare, haircare, lip care and makeup. Filter by skin concern, ingredient, or skin type and find your perfect match.';
   }, [selectedCategories, selectedConcerns]);
 
@@ -329,6 +329,12 @@ export default function ShopPage() {
   // already covers the full set (and was already fetched once on mount).
   // This eliminates a redundant hit to /api/v1/products/filters on every page load.
   const [dynamicFilters, setDynamicFilters] = useState<any>(null);
+  // Filter-panel UI state lives here, not inside the panel: the panel used to be a
+  // component declared inside ShopPage, so every ShopPage render (e.g. each keystroke
+  // in the price boxes) remounted it — the input lost focus after one character and
+  // the ingredient search box was wiped.
+  const [ingredientQuery, setIngredientQuery] = useState('');
+  const [showAllIngredients, setShowAllIngredients] = useState(false);
 
   const categoriesString = selectedCategories.join(',');
   useEffect(() => {
@@ -455,10 +461,9 @@ export default function ShopPage() {
 
 
   // ─── Shared filter panel content ──────────────────────────────────────────
-  const FilterPanelContent = () => {
-    const [ingredientQuery, setIngredientQuery] = useState('');
-    const [showAllIngredients, setShowAllIngredients] = useState(false);
-    
+  // A plain render function (no hooks), called as {renderFilterPanel()} — never as
+  // <Component/>, which would give it a new identity on every render.
+  const renderFilterPanel = () => {
     const filteredIngredients = INGREDIENT_OPTIONS.filter(i => i.label.toLowerCase().includes(ingredientQuery.toLowerCase()));
     const visibleIngredients = showAllIngredients ? filteredIngredients : filteredIngredients.slice(0, 6);
     const hasMoreIngredients = filteredIngredients.length > 6;
@@ -846,7 +851,7 @@ export default function ShopPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-5 py-4">
-                  <FilterPanelContent />
+                  {renderFilterPanel()}
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100">
@@ -882,7 +887,7 @@ export default function ShopPage() {
                 )}
               </div>
 
-              <FilterPanelContent />
+              {renderFilterPanel()}
             </div>
           </div>
 

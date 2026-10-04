@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { Product, Page } from '../types';
 import toast from 'react-hot-toast';
 import { useSEO } from '../hooks/useSEO';
+import { productImage } from '../utils/productImage';
 
 import {
     FocusArea, SkinType, Concern, Goal, QuizState, RoutineTime,
@@ -219,7 +220,7 @@ function HowToUseCarousel({ recommendedRoutine, navigateTo, routineTime }: HowTo
                                 <div className="relative w-44 h-44 flex items-center justify-center mb-6">
                                     <div className="absolute inset-0 bg-white/50 rounded-full blur-xl" />
                                     <img
-                                        src={current.product.images[0]}
+                                        src={productImage(current.product.images[0], 'card')}
                                         alt={current.product.name}
                                         loading="lazy"
                                         decoding="async"
@@ -326,7 +327,7 @@ function HowToUseCarousel({ recommendedRoutine, navigateTo, routineTime }: HowTo
                             >
                                 <div className="flex items-center gap-4 p-4 pb-3 border-b border-[#EDE5DE]">
                                     <div className="w-14 h-14 rounded-xl bg-[#F5EFE9] flex items-center justify-center shrink-0 overflow-hidden">
-                                        <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-contain mix-blend-multiply p-1" />
+                                        <img src={productImage(item.product.images[0], 'thumb')} alt={item.product.name} className="w-full h-full object-contain mix-blend-multiply p-1" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#A89080] block">{item.stepLabel}</span>
@@ -409,6 +410,10 @@ export default function RitualFinderPage() {
     const [step, setStep] = useState(0);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // One id per quiz run. The endpoint requires it (it upserts by session), and it
+    // was never sent — every event was rejected and the ritual analytics stayed empty.
+    const newSessionId = () => `rf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const sessionIdRef = useRef<string>(newSessionId());
 
     const [answers, setAnswers] = useState<QuizState>({
         focusArea: '',
@@ -421,10 +426,12 @@ export default function RitualFinderPage() {
     const logRitualEvent = async (status: string, currentAnswers?: QuizState) => {
         try {
             const data = {
+                sessionId: sessionIdRef.current,
                 status,
                 skinType: currentAnswers?.skinType || answers.skinType,
                 concerns: currentAnswers?.concerns || answers.concerns,
-                goals: currentAnswers?.goal ? [currentAnswers.goal] : (answers.goal ? [answers.goal] : []),
+                // The server stores a single `goal`; `goals` was silently dropped.
+                goal: currentAnswers?.goal || answers.goal || undefined,
                 focusArea: currentAnswers?.focusArea || answers.focusArea,
                 routineTime: currentAnswers?.routineTime || answers.routineTime,
             };
@@ -838,7 +845,7 @@ export default function RitualFinderPage() {
                                     {recommendedRoutine.map((stepItem, idx) => (
                                         <motion.div key={stepItem.product.pid} custom={idx} variants={stepCardVariants} initial="hidden" animate="visible" className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 flex gap-6 border border-white shadow-sm hover:shadow-md transition-all">
                                             <div className="w-32 h-32 shrink-0 bg-neutral-50 rounded-xl overflow-hidden p-2">
-                                                <img src={stepItem.product.images[0]} alt={stepItem.product.name} className="w-full h-full object-contain mix-blend-multiply" />
+                                                <img src={productImage(stepItem.product.images[0], 'thumb')} alt={stepItem.product.name} className="w-full h-full object-contain mix-blend-multiply" />
                                             </div>
                                             <div className="flex-1 py-1">
                                                 <div className="flex items-center gap-2 mb-1">
@@ -886,7 +893,7 @@ export default function RitualFinderPage() {
                             )}
 
                              <div className="mt-12 text-center">
-                                <button onClick={() => setStep(0)} className="inline-flex items-center gap-2 text-grey-beige hover:text-dark-red font-sans text-sm tracking-widest uppercase transition-colors">
+                                <button onClick={() => { sessionIdRef.current = newSessionId(); setStep(0); }} className="inline-flex items-center gap-2 text-grey-beige hover:text-dark-red font-sans text-sm tracking-widest uppercase transition-colors">
                                     <RefreshCcw size={16} /> Reset and Retake Quiz
                                 </button>
                             </div>

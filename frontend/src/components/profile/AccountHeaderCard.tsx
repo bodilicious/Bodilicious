@@ -26,17 +26,43 @@ export default function AccountHeaderCard({ user, authStatus,  onSave }: Account
             toast.error('Image must be smaller than 2MB.');
             return;
         }
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please choose an image file.');
+            return;
+        }
         const reader = new FileReader();
         reader.onloadend = async () => {
-            const base64 = reader.result as string;
+            // Shrink to a 256px JPEG before saving: the raw photo (up to 2MB, ~2.7MB as
+            // base64) would be stored on the profile and re-sent with every profile load.
+            let base64: string;
+            try {
+                base64 = await new Promise<string>((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const scale = Math.min(1, 256 / Math.max(img.width, img.height));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.max(1, Math.round(img.width * scale));
+                        canvas.height = Math.max(1, Math.round(img.height * scale));
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) return reject(new Error('Canvas unavailable'));
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    };
+                    img.onerror = () => reject(new Error('Unreadable image'));
+                    img.src = reader.result as string;
+                });
+            } catch {
+                toast.error('Could not read that image. Please try another one.');
+                return;
+            }
             setLocalAvatar(base64);
             if (onSave) {
                 setIsUploadingAvatar(true);
                 try {
                     await onSave({ photoURL: base64 });
                     toast.success('Profile picture updated!');
-                } catch {
-                    toast.error('Failed to update picture. Please try again.');
+                } catch (err: any) {
+                    toast.error(err?.message || 'Failed to update picture. Please try again.');
                     setLocalAvatar(null);
                 } finally {
                     setIsUploadingAvatar(false);

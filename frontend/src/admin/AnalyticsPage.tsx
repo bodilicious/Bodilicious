@@ -50,7 +50,11 @@ const fmt = (val: number) =>
 const AnalyticsPage: React.FC = () => {
   const { getAuthHeaders } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialSection = (searchParams.get('section') as Section) || 'sales';
+  // Validated: an unknown ?section= (the dashboard linked "overview") rendered an empty panel.
+  const requestedSection = searchParams.get('section');
+  const initialSection: Section = NAV_SECTIONS.some(s => s.key === requestedSection)
+    ? (requestedSection as Section)
+    : 'sales';
 
   const [activeSection, setActiveSection] = useState<Section>(initialSection);
   const [intelTab, setIntelTab] = useState<IntelSubTab>('overview');
@@ -355,6 +359,7 @@ const AnalyticsPage: React.FC = () => {
               {activeSection === 'customers' && (
                 <CustomerCRMSection
                   segmentStats={customerData?.segmentStats || []}
+                  totalCustomers={customerData?.totalCustomers}
                   funnelData={customerData?.funnelData || []}
                   trendData={customerData?.trendData || []}
                   support={customerData?.support}

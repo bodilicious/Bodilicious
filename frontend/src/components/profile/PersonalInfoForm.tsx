@@ -18,8 +18,10 @@ export default function PersonalInfoForm({ user, onSave }: Props) {
         dateOfBirth: '',
     });
 
+    // Re-sync from the profile only while NOT editing — any background refresh of
+    // `user` (token refresh, profile sync) used to wipe what was being typed.
     useEffect(() => {
-        if (user) {
+        if (user && !isEditing) {
             setFormData({
                 displayName: user.displayName || '',
                 phone: user.phone || '',
@@ -27,7 +29,7 @@ export default function PersonalInfoForm({ user, onSave }: Props) {
                 dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
             });
         }
-    }, [user]);
+    }, [user, isEditing]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

@@ -112,7 +112,7 @@ blogSchema.set("autoCreate", true);
 
 const blogCommentSchema = new mongoose.Schema(
   {
-    blog: { type: mongoose.Schema.Types.ObjectId, ref: "Blog", required: true, index: true },
+    blog: { type: mongoose.Schema.Types.ObjectId, ref: "Blog", required: true }, // covered by { blog, createdAt }
     author: { type: mongoose.Schema.Types.ObjectId, ref: "UserProfile", required: true },
     content: { type: String, required: true, trim: true, maxlength: 2000 },
   },

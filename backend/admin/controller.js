@@ -1,4 +1,4 @@
-import Order from "../tracker/models.js";
+import Order, { ORDER_ITEM_PRODUCT_FIELDS } from "../tracker/models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
 import StoreSettings from "../settings/models.js";
@@ -12,6 +12,11 @@ import { Ticket } from "../support/models.js";
 import escapeStringRegexp from "escape-string-regexp";
 import path from "path";
 import _redis from "../utils/redis.js";
+import { toRazorpayMinorUnits, fromRazorpayMinorUnits } from "../utils/currencies.js";
+import { parseRangeStart, parseRangeEnd } from "../utils/dateRange.js";
+import { releaseCouponUsage } from "../coupons/controller.js";
+import { calculateInclusiveTax } from "../utils/pricing.js";
+import { clearAuthCache } from "../middleware/auth.js";
 
 // Use the shared singleton; fall back to a no-op object if Redis is unavailable.
 // All methods return Promises because every call site uses await.
@@ -30,6 +35,14 @@ const redis = _redis ?? {
 const ABANDONED_WINDOW_MS = 30 * 60 * 1000;
 
 /**
+ * Cloudinary folder the media library uploads to, lists and deletes from. One constant
+ * so the three can't disagree: delete used to check against
+ * `CLOUDINARY_FOLDER || "bodilicious"`, which no listed image ("bodilicious_products/…")
+ * could ever match, so every delete was rejected as unauthorized.
+ */
+const MEDIA_FOLDER = "bodilicious_products";
+
+/**
  * The single definition of an abandoned checkout.
  *
  * Built fresh on each call rather than held as a module constant: `createdAt` is
@@ -46,11 +59,16 @@ const ABANDONED_WINDOW_MS = 30 * 60 * 1000;
  * creation fails, the claim is reverted to pending/failed and the order is flagged —
  * which otherwise looks exactly like an abandoned checkout. Those are the opposite of
  * abandoned: the customer's money is gone and ops must see them.
+ *
+ * `orderStatus` covers both states an abandoned checkout can be in: "pending" before
+ * the draft-cleanup cron (cron/draftOrders.js) reaches it, and "abandoned" after the
+ * cron relabels it. Matching only "pending" left the Abandoned page permanently empty
+ * — every checkout was swept to "abandoned" within one cron tick of becoming eligible.
  */
 const abandonedCheckoutFilter = () => ({
   paymentMethod: { $ne: "cod" },          // COD is never "unpaid" in this sense
   source: { $ne: "admin_draft" },         // admin-created drafts aren't customer checkouts
-  orderStatus: "pending",
+  orderStatus: { $in: ["pending", "abandoned"] },
   paymentStatus: { $in: ["pending", "failed"] },
   needsManualReview: { $ne: true },       // money captured, order stuck — keep visible
   createdAt: { $lt: new Date(Date.now() - ABANDONED_WINDOW_MS) },
@@ -227,10 +245,12 @@ export const getNotificationCounts = async (req, res) => {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // To count users requiring attention, we find users with failed orders or open tickets directly
+    // To count users requiring attention, we find users with failed orders or open tickets directly.
+    // Tickets reference their owner as `userId`, not `user` — distinct("user") returned [] and
+    // silently dropped every open ticket from this badge.
     const [usersWithFailedOrders, usersWithOpenTickets] = await Promise.all([
       Order.distinct("user", { paymentStatus: "failed" }),
-      Ticket.distinct("user", { status: "open" })
+      Ticket.distinct("userId", { status: "open" })
     ]);
 
     const usersReqAttentionSet = new Set([
@@ -240,7 +260,8 @@ export const getNotificationCounts = async (req, res) => {
 
     const usersCount = usersReqAttentionSet.size;
 
-    const ordersQuery = { orderStatus: "pending" };
+    // Same exclusion as the orders list, so the badge never counts orders the list hides.
+    const ordersQuery = { orderStatus: "pending", $nor: [abandonedCheckoutFilter()] };
     if (lastViewedOrders && !isNaN(Number(lastViewedOrders))) {
       ordersQuery.createdAt = { $gt: new Date(Number(lastViewedOrders)) };
     }
@@ -346,39 +367,68 @@ export const getAllProductsAdmin = async (req, res) => {
 };
 
 /**
+ * GET /api/v1/admin/products/:id  (Mongo _id or pid)
+ *
+ * The product editor used to load through the public GET /products/:pid. That route
+ * only returns ACTIVE products, so hidden products couldn't be edited at all, and its
+ * projection omits admin-only fields (price_inr, lowStockThreshold, availability,
+ * is_active_based). The form then saved its defaults over them: every edit reset
+ * price_inr to 0 (which the chat assistant quotes to customers) and the low-stock
+ * threshold to 5.
+ */
+export const getProductAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const filter = mongoose.isObjectIdOrHexString(id) ? { _id: id } : { pid: id };
+    const product = await Product.findOne(filter).select("-reviews").lean();
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+    res.json({ success: true, data: product });
+  } catch (err) {
+    console.error("Admin GetProduct Error:", err);
+    res.status(500).json({ success: false, message: "Error fetching product" });
+  }
+};
+
+/**
+ * Product fields the admin editor may write. One list for create and update — they were
+ * two hand-copied lists, and a field missing from a list is dropped silently (200, no
+ * error, nothing saved). `google_product_category` was missing from both, so the
+ * editor's Merchant Center category dropdown never saved. `pid` is passed as a
+ * create-only extra: storefront URLs and the product feed are keyed on it.
+ */
+const PRODUCT_EDITABLE_FIELDS = [
+  "name", "price", "price_inr", "description", "images", "stock", "lowStockThreshold",
+  "category", "sub_category", "product_type", "item_form", "texture", "google_product_category",
+  "brand", "ingredients", "benefits", "concerns_targeted", "how_to_use", "tips", "warnings",
+  "usage", "skin_type_suitable", "skin_type_not_suitable", "hair_type_suitable",
+  "product_weight_g", "product_weight_ml", "availability", "is_active_based",
+  "slug", "isActive", "seo_keywords", "variants",
+  "seo_title", "seo_description", "seo_h1", "seo_h2", "seo_image_alt", "faqs",
+];
+const pickProductFields = (body, extra = []) => Object.fromEntries(
+  [...PRODUCT_EDITABLE_FIELDS, ...extra]
+    .filter((key) => body?.[key] !== undefined)
+    .map((key) => [key, body[key]])
+);
+
+/**
  * POST /api/v1/admin/products
  */
 export const createProductAdmin = async (req, res) => {
   try {
-    const {
-      name, price, price_inr, description, images, stock, lowStockThreshold,
-      category, sub_category, product_type, item_form, texture,
-      brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
-      usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
-      product_weight_g, product_weight_ml, availability, is_active_based,
-      slug, isActive, seo_keywords, variants,
-      seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
-    } = req.body;
-
-    const allowedFields = Object.fromEntries(
-      Object.entries({
-        name, price, price_inr, description, images, stock, lowStockThreshold,
-        category, sub_category, product_type, item_form, texture,
-        brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
-        usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
-        product_weight_g, product_weight_ml, availability, is_active_based,
-        slug, isActive, seo_keywords, variants,
-        // Editorial SEO overrides — a field missing from this allowlist is
-        // dropped silently: 200 response, no saved change, no error anywhere.
-        seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
-      }).filter(([, v]) => v !== undefined)
-    );
+    // pid is create-only — it was missing here, so every new product failed with
+    // "pid is required" no matter what the form sent.
+    const allowedFields = pickProductFields(req.body, ["pid"]);
 
     const product = new Product(allowedFields);
     await product.save();
     res.status(201).json({ success: true, data: product });
   } catch (err) {
     console.error("Admin CreateProduct Error:", err);
+    if (err?.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || "pid";
+      return res.status(409).json({ success: false, message: `A product with this ${field} already exists.` });
+    }
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -389,29 +439,11 @@ export const createProductAdmin = async (req, res) => {
 export const updateProductAdmin = async (req, res) => {
   try {
     // Allowlist editable fields — never let the client overwrite sensitive computed/control fields
-    const {
-      name, price, price_inr, description, images, stock, lowStockThreshold,
-      category, sub_category, product_type, item_form, texture,
-      brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
-      usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
-      product_weight_g, product_weight_ml, availability, is_active_based,
-      slug, isActive, seo_keywords, variants,
-      seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
-    } = req.body;
+    const allowedFields = pickProductFields(req.body);
 
-    const allowedFields = Object.fromEntries(
-      Object.entries({
-        name, price, price_inr, description, images, stock, lowStockThreshold,
-        category, sub_category, product_type, item_form, texture,
-        brand, ingredients, benefits, concerns_targeted, how_to_use, tips, warnings,
-        usage, skin_type_suitable, skin_type_not_suitable, hair_type_suitable,
-        product_weight_g, product_weight_ml, availability, is_active_based,
-        slug, isActive, seo_keywords, variants,
-        // Editorial SEO overrides — a field missing from this allowlist is
-        // dropped silently: 200 response, no saved change, no error anywhere.
-        seo_title, seo_description, seo_h1, seo_h2, seo_image_alt, faqs,
-      }).filter(([, v]) => v !== undefined)
-    );
+    // Needed to record stock changes below; also the 404 check.
+    const before = await Product.findById(req.params.id).select("stock").lean();
+    if (!before) return res.status(404).json({ success: false, message: "Product not found" });
 
     // CRITICAL: always use $set — passing a plain object to findByIdAndUpdate
     // without $set causes Mongoose to do a full document REPLACEMENT, wiping
@@ -422,6 +454,28 @@ export const updateProductAdmin = async (req, res) => {
       { new: true, runValidators: true }
     );
     if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+    // The stock-history drawer is built from STOCK_* audit events. Bulk import and
+    // return restocks logged one; inline and form edits didn't, so the history the
+    // drawer showed silently omitted every manual adjustment.
+    if (allowedFields.stock !== undefined && Number(before.stock) !== Number(product.stock)) {
+      await logAuditEvent({
+        event_type: "STOCK_MANUAL_EDIT",
+        user_id: req.user._id,
+        severity: "INFO",
+        source_system: "backend-api",
+        correlation_id: product._id.toString(),
+        network: { ip_address: req.ip },
+        metadata: {
+          targetType: "product",
+          targetId: product._id.toString(),
+          before: { stock: before.stock },
+          after: { stock: product.stock },
+          reason: "manual_edit"
+        }
+      }).catch(err => console.error("Stock edit audit failed:", err.message));
+    }
+
     res.json({ success: true, data: product });
   } catch (err) {
     console.error("Admin UpdateProduct Error:", err);
@@ -498,6 +552,112 @@ const shiprocketSyncCache = new Map(); // orderId (string) → last synced times
 const SR_SYNC_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes per order
 const SR_SYNC_MAX_PER_CALL = 10; // never more than 10 Shiprocket calls per admin page load
 
+/**
+ * Shiprocket `orders/show` statuses → ours. Shiprocket spells it "CANCELED" (one L);
+ * a map with only "cancelled" never matched a courier-side cancellation.
+ */
+const SHIPROCKET_STATUS_MAP = {
+  "new":              "pending",
+  "awb assigned":     "processing",
+  "label generated":  "processing",
+  "manifested":       "processing",
+  "pickup scheduled": "processing",
+  "pickup generated": "processing",
+  "pickup queued":    "processing",
+  "out for pickup":   "processing",
+  "ready to ship":    "processing",
+  "picked up":        "shipped",
+  "shipped":          "shipped",
+  "in transit":       "shipped",
+  "out for delivery": "shipped",
+  "delivered":        "delivered",
+  "cancelled":        "cancelled",
+  "canceled":         "cancelled",
+  "rto initiated":    "returned",
+  "rto in transit":   "returned",
+  "rto delivered":    "returned",
+};
+const FORWARD_STATUSES = ["pending", "processing", "shipped", "delivered"];
+
+/**
+ * Build the update that brings `order` in line with a Shiprocket `orders/show`
+ * payload, or null when nothing changed. Shared by the list auto-sync and the
+ * per-order Sync button so the two can't drift apart again.
+ *
+ * Field names are the ones a live `orders/show` response actually carries: there is
+ * no top-level `awb_code`, `courier_name` or `etd`. The AWB is `awb_data.awb` /
+ * `shipments.awb`, the courier `shipments.courier` / `last_mile_courier_name`, the
+ * EDD `etd_date`. Reading the wrong names meant the Sync button never picked up an
+ * AWB and neither sync ever filled in the courier or delivery estimate.
+ *
+ * Only forward movement from a forward status is applied. Comparing positions in
+ * FORWARD_STATUSES without that guard gave cancelled/return_requested orders an index
+ * of -1, so any Shiprocket status counted as "forward" — an order with an approved
+ * return was flipped back to "delivered" because its outbound shipment still shows
+ * DELIVERED.
+ *
+ * A courier-side cancellation or RTO is NOT applied silently. Moving the order to
+ * cancelled/returned here would skip the refund and stock restore the admin status
+ * flow performs (see applyAdminStatusChange); the order is flagged for manual review
+ * instead, and ops cancel it from the panel, which does both.
+ */
+const buildShiprocketSyncUpdate = (order, srOrder, { changedBy = null, notePrefix = "Synced from Shiprocket" } = {}) => {
+  if (!srOrder) return null;
+  const set = {};
+  let historyEntry = null;
+
+  const awb = srOrder.awb_data?.awb || srOrder.shipments?.awb;
+  if (!order.awb && awb) set.awb = awb;
+
+  const courier = srOrder.shipments?.courier || srOrder.last_mile_courier_name;
+  if (courier && courier !== order.estimatedCourierName) set.estimatedCourierName = courier;
+
+  const etdRaw = srOrder.etd_date || srOrder.etd;
+  if (etdRaw) {
+    const edd = new Date(etdRaw);
+    const current = order.estimatedDeliveryDate ? new Date(order.estimatedDeliveryDate).getTime() : null;
+    if (!isNaN(edd.getTime()) && edd.getTime() !== current) set.estimatedDeliveryDate = edd;
+  }
+
+  const mapped = SHIPROCKET_STATUS_MAP[(srOrder.status || "").toLowerCase()];
+  const currentIdx = FORWARD_STATUSES.indexOf(order.orderStatus);
+
+  if (mapped && currentIdx !== -1 && FORWARD_STATUSES.indexOf(mapped) > currentIdx) {
+    set.orderStatus = mapped;
+    // Same stamps the Shiprocket webhook writes — deliveredAt drives the return window.
+    if ((mapped === "shipped" || mapped === "delivered") && !order.shippedAt) set.shippedAt = new Date();
+    if (mapped === "delivered") {
+      if (!order.deliveredAt) set.deliveredAt = new Date();
+      if (order.paymentMethod === "cod" && order.paymentStatus !== "paid") set.paymentStatus = "paid";
+    }
+    historyEntry = {
+      fromStatus: order.orderStatus,
+      toStatus: mapped,
+      status: mapped,
+      changedBy,
+      // Must be a statusHistory.source enum value. Updates skip validators, so an invalid
+      // one (this used to write "shiprocket_auto_sync") persists and then makes every
+      // later order.save() — admin status changes, returns — fail validation.
+      source: "shiprocket",
+      note: `${notePrefix}: "${srOrder.status}"`,
+      changedAt: new Date(),
+    };
+  } else if ((mapped === "cancelled" || mapped === "returned") && !["cancelled", "returned"].includes(order.orderStatus)) {
+    const reason = `Shiprocket reports this order as "${srOrder.status}". Cancel or return it from the admin panel so the refund and stock restore run.`;
+    const existing = order.reviewReason || "";
+    if (!order.needsManualReview || !existing.includes(reason)) {
+      set.needsManualReview = true;
+      set.reviewReason = order.needsManualReview && existing ? `${existing} | ${reason}` : reason;
+    }
+  }
+
+  if (Object.keys(set).length === 0 && !historyEntry) return null;
+  const update = {};
+  if (Object.keys(set).length > 0) update.$set = set;
+  if (historyEntry) update.$push = { statusHistory: historyEntry };
+  return update;
+};
+
 const autoSyncOrdersWithShiprocket = async (orders) => {
   if (!process.env.SHIPROCKET_EMAIL) return;
 
@@ -526,59 +686,10 @@ const autoSyncOrdersWithShiprocket = async (orders) => {
         if (!detailRes.ok) return;
 
         const detailData = await detailRes.json();
-        const srOrder = detailData?.data;
-        if (!srOrder) return;
-
-        const updates = {};
-        const fetchedAwb = srOrder.awb_data?.awb || srOrder.shipments?.awb;
-        if (!order.awb && fetchedAwb) updates.awb = fetchedAwb;
-        if (srOrder.courier_name) updates.estimatedCourierName = srOrder.courier_name;
-        if (srOrder.etd) {
-          const edd = new Date(srOrder.etd);
-          if (!isNaN(edd.getTime())) updates.estimatedDeliveryDate = edd;
-        }
-
-        const rawStatus = (srOrder.status || "").toLowerCase();
-        const statusMap = {
-          "new":              "pending",
-          "ready to ship":    "processing",
-          "in transit":       "shipped",
-          "shipped":          "shipped",
-          "out for delivery": "shipped",
-          "delivered":        "delivered",
-          "cancelled":        "cancelled",
-          "rto initiated":    "returned",
-          "rto delivered":    "returned",
-        };
-        const mappedStatus = statusMap[rawStatus];
-        const statusPriority = ["pending", "processing", "shipped", "delivered"];
-        
-        if (
-          mappedStatus &&
-          (statusPriority.indexOf(mappedStatus) > statusPriority.indexOf(order.orderStatus) ||
-           mappedStatus === "cancelled" || mappedStatus === "returned")
-        ) {
-          updates.orderStatus = mappedStatus;
-          updates.$push = {
-            statusHistory: {
-              status: mappedStatus,
-              changedBy: null,
-              source: "shiprocket_auto_sync",
-              note: `Auto-synced from Shiprocket: "${srOrder.status}"`,
-              changedAt: new Date(),
-            },
-          };
-        }
-
-        const { $push, ...setFields } = updates;
-        if (Object.keys(setFields).length > 0 || $push) {
-          const updateOp = {};
-          if (Object.keys(setFields).length > 0) updateOp.$set = setFields;
-          if ($push) updateOp.$push = $push;
-          await Order.findByIdAndUpdate(order._id, updateOp);
-          
-          Object.assign(order, setFields);
-        }
+        const update = buildShiprocketSyncUpdate(order, detailData?.data, {
+          notePrefix: "Auto-synced from Shiprocket",
+        });
+        if (update) await Order.findByIdAndUpdate(order._id, update);
       } catch (err) {
         console.error(`Auto-sync failed for order ${order._id}:`, err.message);
       }
@@ -607,26 +718,39 @@ export const getAllOrdersAdmin = async (req, res) => {
     };
 
     if (search) {
-      const safeSearch = escapeStringRegexp(search);
-      query.$or = [
-        { _id: mongoose.isValidObjectId(search) ? search : undefined },
+      const term = String(search).trim();
+      const safeSearch = escapeStringRegexp(term);
+      // Built conditionally: an `{ _id: undefined }` entry (the old non-ObjectId case)
+      // is cast to `{}`, which matches every order — searching by name, email or phone
+      // returned the entire list.
+      const or = [
         { "shippingDetails.email": { $regex: safeSearch, $options: "i" } },
         { "shippingDetails.phone": { $regex: safeSearch, $options: "i" } },
         { "shippingDetails.name": { $regex: safeSearch, $options: "i" } }
-      ].filter(Boolean);
+      ];
+      if (mongoose.isObjectIdOrHexString(term)) or.push({ _id: term });
+      // The admin UI shows orders as "#" + the last 8 hex chars of the id, so that's
+      // what people paste into search. Match it as an id suffix.
+      const shortId = term.replace(/^#/, "");
+      if (/^[0-9a-f]{6,23}$/i.test(shortId)) {
+        or.push({ $expr: { $regexMatch: { input: { $toString: "$_id" }, regex: `${shortId}$`, options: "i" } } });
+      }
+      query.$or = or;
     }
     if (orderStatus) query.orderStatus = orderStatus;
     if (paymentStatus) query.paymentStatus = paymentStatus;
-    
+
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) {
-        if (isNaN(new Date(startDate).getTime())) return res.status(400).json({ success: false, message: "Invalid startDate" });
-        query.createdAt.$gte = new Date(startDate);
+        const start = parseRangeStart(startDate);
+        if (isNaN(start.getTime())) return res.status(400).json({ success: false, message: "Invalid startDate" });
+        query.createdAt.$gte = start;
       }
       if (endDate) {
-        if (isNaN(new Date(endDate).getTime())) return res.status(400).json({ success: false, message: "Invalid endDate" });
-        query.createdAt.$lte = new Date(endDate);
+        const end = parseRangeEnd(endDate);
+        if (isNaN(end.getTime())) return res.status(400).json({ success: false, message: "Invalid endDate" });
+        query.createdAt.$lte = end;
       }
     }
 
@@ -665,8 +789,9 @@ export const getOrderByIdAdmin = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("user", "name email phone role")
-      .populate("items.product", "name pid price images");
-    
+      .populate("items.product", "name pid price images")
+      .populate("statusHistory.changedBy", "name"); // timeline shows "by <admin>"
+
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
     res.json({ success: true, data: order });
@@ -690,121 +815,198 @@ const ORDER_TRANSITIONS = {
   returned:          []
 };
 
+const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
+
+/**
+ * Apply an admin-initiated status change to a hydrated order, including every side
+ * effect the target status needs. Mutates `order` but does not save it.
+ *
+ * The single-order and bulk endpoints both go through here. They used to diverge:
+ * only the single-order endpoint refunded, restocked and cancelled on Shiprocket, and
+ * the admin UI only ever calls the bulk one — so every admin cancellation of a paid
+ * order went out with no refund and no stock restore.
+ *
+ * Returns { ok: false, reason } for a disallowed transition, otherwise
+ * { ok: true, warnings } where warnings are side effects that failed and need a human
+ * (a refund that didn't go through, a Shiprocket shipment that's still live).
+ */
+export const applyAdminStatusChange = async (order, newStatus, req, { note } = {}) => {
+  const currentStatus = order.orderStatus;
+  const allowed = ORDER_TRANSITIONS[currentStatus] || [];
+  if (!allowed.includes(newStatus)) {
+    return {
+      ok: false,
+      reason: `Cannot transition order from "${currentStatus}" to "${newStatus}". Allowed: [${allowed.join(", ") || "none"}]`
+    };
+  }
+
+  const warnings = [];
+  const shortId = order._id.toString().slice(-8).toUpperCase();
+
+  order.statusHistory.push({
+    fromStatus: currentStatus,
+    toStatus: newStatus,
+    status: newStatus,
+    changedBy: req.user._id,
+    source: "admin",
+    note: note || `Status updated to ${newStatus} by admin`
+  });
+  order.orderStatus = newStatus;
+
+  // Same stamps the Shiprocket webhook sets. Without deliveredAt the return window
+  // fell back to updatedAt, which moves on every later edit (so it never closed), and
+  // a COD order marked delivered here stayed "payment pending" forever.
+  if ((newStatus === "shipped" || newStatus === "delivered") && !order.shippedAt) order.shippedAt = new Date();
+  if (newStatus === "delivered") {
+    if (!order.deliveredAt) order.deliveredAt = new Date();
+    if (order.paymentMethod === "cod" && order.paymentStatus === "pending") order.paymentStatus = "paid";
+  }
+
+  // ── Cancelled: pull the shipment from Shiprocket ──
+  if (newStatus === "cancelled" && (order.awb || order.shiprocketOrderId) && process.env.SHIPROCKET_EMAIL) {
+    try {
+      const token = await getShiprocketToken();
+      const srRes = order.awb
+        ? await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ awbs: [order.awb] })
+          })
+        : await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ids: [order.shiprocketOrderId] })
+          });
+      if (!srRes.ok) throw new Error(`Shiprocket responded ${srRes.status}`);
+    } catch (err) {
+      console.error("Admin cancel: Failed to cancel on Shiprocket:", err.message);
+      warnings.push(`#${shortId}: Shiprocket cancellation failed (${err.message}) — cancel the shipment in Shiprocket manually.`);
+    }
+  }
+
+  if (newStatus === "cancelled" || newStatus === "returned") {
+    // ── Refund the captured payment ──
+    const alreadyRefunding = ["pending", "processed"].includes(order.refundStatus);
+    if (order.paymentStatus === "paid" && order.razorpayPaymentId && !alreadyRefunding) {
+      try {
+        const Razorpay = (await import("razorpay")).default;
+        const razorpayInstance = new Razorpay({
+          key_id: process.env.RAZORPAY_KEY_ID,
+          key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+        // Full refund of whatever is still captured — no explicit amount, which would
+        // fail outright if it exceeded the captured amount (rounding, or a prior
+        // partial refund).
+        const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+          speed: "normal",
+          notes: { reason: `Order ${newStatus} by admin` },
+        });
+        order.refundId = refund.id;
+        order.refundStatus = "pending";
+        order.refundAmount = refund?.amount != null
+          ? fromRazorpayMinorUnits(refund.amount, (refund.currency || order.currency || "INR").toUpperCase())
+          : order.totalAmount;
+        order.paymentStatus = "refunded";
+      } catch (refundErr) {
+        const msg = refundErr?.error?.description || refundErr.message || "unknown error";
+        console.error("Admin cancel: Razorpay refund failed:", msg);
+        order.refundStatus = "failed";
+        order.refundAmount = order.totalAmount;
+        // Persisted, so the failure stays visible ("Needs review") after the toast is gone.
+        order.needsManualReview = true;
+        order.reviewReason = `Refund failed on ${newStatus === "returned" ? "return" : "cancellation"} (${msg}) — refund the customer manually in Razorpay.`;
+        warnings.push(`#${shortId}: Razorpay refund failed (${msg}) — refund the customer manually.`);
+      }
+    } else if (order.paymentStatus === "paid" && !order.razorpayPaymentId && order.paymentMethod !== "cod") {
+      warnings.push(`#${shortId}: marked paid but has no Razorpay payment to refund — refund the customer manually.`);
+    }
+
+    // ── Restore stock ──
+    // Every order-creation path (storefront COD, Razorpay checkout, admin draft)
+    // deducts stock up front, so stock is owed back whenever it hasn't been restored
+    // yet — paid or not. The old "only if paid or COD" rule leaked the stock of every
+    // unpaid order an admin cancelled. Claimed atomically: the draft-cleanup cron and
+    // the payment webhooks restore stock too, and must not double-count with this.
+    if (order.items?.length && !order.isStockRestored) {
+      const claimed = await Order.findOneAndUpdate(
+        { _id: order._id, isStockRestored: { $ne: true } },
+        { $set: { isStockRestored: true } }
+      );
+      if (claimed) {
+        try {
+          await Product.bulkWrite(order.items.map(item => ({
+            updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
+          })));
+        } catch (stockErr) {
+          console.error("Admin cancel: Failed to restore stock:", stockErr.message);
+          warnings.push(`#${shortId}: stock restore failed — adjust inventory manually.`);
+        }
+      }
+      order.isStockRestored = true;
+    }
+
+    // ── Release the welcome offer ──
+    // The customer cancel flow, the abandon cron and the returns flow all hand the
+    // offer back when the order it was spent on doesn't go through; an admin
+    // cancellation kept it consumed.
+    if (order.isWelcomeOfferApplied) {
+      const userHasPaidOrder = await Order.exists({
+        user: order.user,
+        orderStatus: { $nin: ["abandoned", "cancelled", "returned"] },
+        _id: { $ne: order._id },
+        $or: [{ paymentMethod: "cod" }, { paymentStatus: { $in: ["paid", "refunded"] } }]
+      });
+      if (!userHasPaidOrder) {
+        await UserProfile.updateOne({ _id: order.user }, { $set: { welcomeOfferUsed: false } });
+      }
+    }
+
+    // A cancelled order never went through — hand its coupon slot back.
+    if (newStatus === "cancelled") {
+      await releaseCouponUsage(order._id).catch(err => console.error("Coupon release failed:", err.message));
+    }
+  }
+
+  await logAction(req, "order_status_update", "order", order._id.toString(), {
+    before: { status: currentStatus },
+    after: { status: newStatus },
+    meta: { source: "admin", note }
+  });
+
+  return { ok: true, warnings };
+};
+
 /**
  * PATCH /api/v1/admin/orders/:id/status
  */
 export const updateOrderStatusAdmin = async (req, res) => {
   try {
-    const { orderStatus, paymentStatus, note, source = "admin" } = req.body;
-    const order = await Order.findById(req.params.id);
+    const { orderStatus, paymentStatus, note } = req.body;
+    if (paymentStatus && !PAYMENT_STATUSES.includes(paymentStatus)) {
+      return res.status(400).json({ success: false, message: `Invalid paymentStatus "${paymentStatus}"` });
+    }
 
+    const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
-    if (orderStatus) {
-      const currentStatus = order.orderStatus;
-      const allowed = ORDER_TRANSITIONS[currentStatus] || [];
-      if (!allowed.includes(orderStatus)) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot transition order from "${currentStatus}" to "${orderStatus}". Allowed: [${allowed.join(", ") || "none"}]`
-        });
-      }
-
-      order.statusHistory.push({
-        status: orderStatus,
-        changedBy: req.user._id,
-        source,
-        note: note || `Status updated to ${orderStatus} by admin`
-      });
-      order.orderStatus = orderStatus;
-
-      await logAction(req, "order_status_update", "order", order._id.toString(), {
-        before: { status: currentStatus },
-        after: { status: orderStatus },
-        meta: { source, note }
-      });
-
-      // ── IF CANCELLED: trigger side effects (refund, shiprocket, stock) ──
-      if (orderStatus === "cancelled") {
-        // 1. Shiprocket Cancel
-        if (order.awb || order.shiprocketOrderId) {
-          try {
-            if (process.env.SHIPROCKET_EMAIL) {
-              const { getShiprocketToken } = await import("../tracker/shiprocketservice.js");
-              const token = await getShiprocketToken();
-              if (order.awb) {
-                await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel/awbs", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ awbs: [order.awb] })
-                });
-              } else if (order.shiprocketOrderId) {
-                await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                  body: JSON.stringify({ ids: [order.shiprocketOrderId] })
-                });
-              }
-            }
-          } catch (err) {
-            console.error("Admin cancel: Failed to cancel on Shiprocket:", err.message);
-          }
-        }
-      }
-
-      // ── IF CANCELLED OR RETURNED: trigger refund and restore stock ──
-      if (orderStatus === "cancelled" || orderStatus === "returned") {
-        // 2. Razorpay Refund
-        if ((order.paymentStatus === "paid" || paymentStatus === "paid") && order.razorpayPaymentId) {
-          try {
-            const Razorpay = (await import("razorpay")).default;
-            const razorpayInstance = new Razorpay({
-              key_id: process.env.RAZORPAY_KEY_ID,
-              key_secret: process.env.RAZORPAY_KEY_SECRET,
-            });
-            const refund = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
-              amount: Math.round(order.totalAmount * 100),
-              speed: "normal",
-              notes: { reason: "Order cancelled by admin" },
-            });
-            order.refundId = refund.id;
-            order.refundStatus = "pending";
-            order.refundAmount = order.totalAmount;
-            order.paymentStatus = "refunded";
-          } catch (refundErr) {
-            console.error("Admin cancel: Razorpay refund failed:", refundErr.message);
-            order.refundStatus = "failed";
-            order.refundAmount = order.totalAmount;
-          }
-        }
-
-        // 3. Restore Stock (if paid or COD)
-        const shouldRestoreStock = order.paymentMethod === "cod" || order.paymentStatus === "paid" || order.paymentStatus === "refunded" || paymentStatus === "paid";
-        if (shouldRestoreStock && order.items && order.items.length > 0 && !order.isStockRestored) {
-          try {
-            const Product = (await import("../products/models.js")).default;
-            const bulkOps = order.items.map(item => ({
-              updateOne: { filter: { _id: item.product }, update: { $inc: { stock: item.quantity } } },
-            }));
-            await Product.bulkWrite(bulkOps);
-            order.isStockRestored = true;
-          } catch (stockErr) {
-            console.error("Admin cancel: Failed to restore stock:", stockErr.message);
-          }
-        }
-      }
-    }
-    
+    // Applied first so "mark paid + cancel" in one request refunds, as before.
     if (paymentStatus && order.paymentStatus !== "refunded") {
       order.paymentStatus = paymentStatus;
     }
 
+    let warnings = [];
+    if (orderStatus) {
+      const result = await applyAdminStatusChange(order, orderStatus, req, { note });
+      if (!result.ok) return res.status(400).json({ success: false, message: result.reason });
+      warnings = result.warnings;
+    }
+
     await order.save();
-    
+
     // Invalidate users cache since orders affect user stats/flags
     await redis.incr("admin:users:version");
 
-    res.json({ success: true, data: order });
+    res.json({ success: true, data: order, warnings });
   } catch (err) {
     console.error("Admin UpdateOrderStatus Error:", err);
     res.status(400).json({ success: false, message: err.message });
@@ -850,47 +1052,52 @@ export const getAllUsersAdmin = async (req, res) => {
           // Project only the 3 fields consumed by $addFields — prevents full order docs
           // from crossing the Atlas→Render wire just to be discarded post-join.
           pipeline: [
-            { $project: { orderStatus: 1, paymentStatus: 1, totalAmount: 1 } }
+            { $project: { orderStatus: 1, paymentStatus: 1, paymentMethod: 1, totalAmount: 1, currency: 1 } }
           ],
           as: "userOrders"
         }
       },
       {
+        // Tickets reference their owner as `userId`. Joining on `user` matched nothing,
+        // so hasOpenQuery was always false and open-ticket customers never surfaced.
         $lookup: {
           from: "tickets",
-          localField: "_id",
-          foreignField: "user",
           let: { userId: "$_id" },
           pipeline: [
-            { $match: { $expr: { $and: [ { $eq: ["$user", "$$userId"] }, { $eq: ["$status", "open"] } ] } } },
+            { $match: { $expr: { $and: [ { $eq: ["$userId", "$$userId"] }, { $eq: ["$status", "open"] } ] } } },
             { $limit: 1 }
           ],
           as: "openTickets"
         }
       },
       {
+        // A real order: not dead (cancelled/returned/abandoned) and actually paid for,
+        // or COD. "pending" alone also matches unpaid online checkouts.
         $addFields: {
-          totalOrders: {
-            $size: {
-              $filter: {
-                input: "$userOrders",
-                as: "o",
-                cond: { $in: ["$$o.orderStatus", ["pending", "processing", "shipped", "delivered"]] }
+          realOrders: {
+            $filter: {
+              input: "$userOrders",
+              as: "o",
+              cond: {
+                $and: [
+                  { $in: ["$$o.orderStatus", ["pending", "processing", "shipped", "delivered"]] },
+                  { $or: [{ $eq: ["$$o.paymentStatus", "paid"] }, { $eq: ["$$o.paymentMethod", "cod"] }] }
+                ]
               }
             }
-          },
+          }
+        }
+      },
+      {
+        $addFields: {
+          totalOrders: { $size: "$realOrders" },
+          // The list renders this as ₹ — only INR orders can be summed into it.
           totalRevenue: {
             $sum: {
               $map: {
-                input: {
-                  $filter: {
-                    input: "$userOrders",
-                    as: "o",
-                    cond: { $in: ["$$o.orderStatus", ["pending", "processing", "shipped", "delivered"]] }
-                  }
-                },
+                input: "$realOrders",
                 as: "o",
-                in: "$$o.totalAmount"
+                in: { $cond: [{ $eq: [{ $ifNull: ["$$o.currency", "INR"] }, "INR"] }, "$$o.totalAmount", 0] }
               }
             }
           },
@@ -900,7 +1107,7 @@ export const getAllUsersAdmin = async (req, res) => {
           hasOpenQuery: { $gt: [{ $size: "$openTickets" }, 0] }
         }
       },
-      { $project: { userOrders: 0, openTickets: 0 } },
+      { $project: { userOrders: 0, realOrders: 0, openTickets: 0 } },
       {
         $sort: {
           hasOpenQuery: -1,
@@ -942,13 +1149,38 @@ export const toggleUserBlock = async (req, res) => {
     const { isBlocked } = req.body;
     const targetId = req.params.id;
 
+    if (typeof isBlocked !== "boolean") {
+      return res.status(400).json({ success: false, message: "isBlocked must be true or false" });
+    }
+
     // Safety: Prevent self-blocking
     if (targetId === req.user._id.toString()) {
       return res.status(400).json({ success: false, message: "You cannot block yourself" });
     }
 
-    const user = await UserProfile.findByIdAndUpdate(targetId, { isBlocked }, { new: true });
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    const target = await UserProfile.findById(targetId).select("role isBlocked");
+    if (!target) return res.status(404).json({ success: false, message: "User not found" });
+
+    // Blocked users are rejected by `protect`, so blocking is a lockout. Any admin could
+    // previously lock out the Primary Admin or another admin through this route — the
+    // same hierarchy updateUserRole enforces has to apply here.
+    if (target.role === "primary_admin") {
+      return res.status(403).json({ success: false, message: "The Primary Admin cannot be blocked." });
+    }
+    if (target.role === "admin" && req.user.role !== "primary_admin") {
+      return res.status(403).json({ success: false, message: "Only the Primary Admin can block another admin." });
+    }
+
+    const previous = target.isBlocked;
+    const user = await UserProfile.findByIdAndUpdate(targetId, { $set: { isBlocked } }, { new: true });
+    clearAuthCache(); // a block must take effect on the user's very next request
+
+    await logAction(req, isBlocked ? "USER_BLOCKED" : "USER_UNBLOCKED", "user", targetId, {
+      before: { isBlocked: previous },
+      after: { isBlocked },
+    });
+    // The users list is cached per version — without this it showed the old state for 3 minutes.
+    await redis.incr("admin:users:version");
 
     res.json({ success: true, data: user });
   } catch (err) {
@@ -999,6 +1231,7 @@ export const updateUserRole = async (req, res) => {
 
     const previousRole = targetUser.role;
     targetUser.role = role;
+    clearAuthCache(); // role changes take effect immediately
     await targetUser.save();
 
     await logAction(
@@ -1012,6 +1245,8 @@ export const updateUserRole = async (req, res) => {
         meta: { source: "admin" }
       }
     );
+    // The users list is cached per version — without this it showed the old role for 3 minutes.
+    await redis.incr("admin:users:version");
 
     res.json({ success: true, data: targetUser });
   } catch (err) {
@@ -1050,10 +1285,16 @@ export const getLogsAdmin = async (req, res) => {
     }
 
     if (search) {
-      const safeSearch = escapeStringRegexp(search);
+      // The search box promises "events, IDs, or users" — it only matched the two id
+      // fields, so typing an event name or a person's name always returned nothing.
+      const re = new RegExp(escapeStringRegexp(String(search).trim()), "i");
+      const matchingUsers = await UserProfile.find({ $or: [{ name: re }, { email: re }] })
+        .select("_id").limit(100).lean();
       query.$or = [
-        { correlation_id: new RegExp(safeSearch, "i") },
-        { session_id: new RegExp(safeSearch, "i") }
+        { correlation_id: re },
+        { session_id: re },
+        { event_type: re },
+        ...(matchingUsers.length ? [{ user_id: { $in: matchingUsers.map(u => u._id) } }] : [])
       ];
     }
 
@@ -1113,7 +1354,8 @@ export const exportLogsCSV = async (req, res) => {
       const level = sanitizeCsv(l.severity);
       const type = sanitizeCsv(l.event_type);
       const userName = l.user_id?.name || l.user_id?.email || "System";
-      const user = sanitizeCsv(userName);
+      // Quoted: a name containing a comma shifted every later column.
+      const user = `"${sanitizeCsv(userName).replace(/"/g, '""')}"`;
       const corrId = sanitizeCsv(l.correlation_id || "None");
       const rawMsg = l.metadata?.reason || l.metadata?.error || l.metadata?.action || "";
       const msg = `"${sanitizeCsv(rawMsg).replace(/"/g, '""')}"`;
@@ -1136,25 +1378,28 @@ export const exportLogsCSV = async (req, res) => {
  */
 export const exportOrdersCSV = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, orderStatus, paymentStatus } = req.query;
     // Exclude abandoned orders just like the main view
     const exportQuery = {
       orderStatus: { $ne: "abandoned" },
       $nor: [abandonedCheckoutFilter()]   // keep the CSV consistent with the on-screen list
     };
+    // The same status filters the list applies, so "Export" saves what's on screen.
+    if (orderStatus) exportQuery.orderStatus = orderStatus;
+    if (paymentStatus) exportQuery.paymentStatus = paymentStatus;
 
     if (startDate || endDate) {
       exportQuery.createdAt = {};
-      if (startDate) exportQuery.createdAt.$gte = new Date(startDate);
-      if (endDate) exportQuery.createdAt.$lte = new Date(endDate);
+      if (startDate) exportQuery.createdAt.$gte = parseRangeStart(startDate);
+      if (endDate) exportQuery.createdAt.$lte = parseRangeEnd(endDate);
     }
 
     // Hard cap at 5000 rows — prevents loading the full orders collection into memory
-    // on every export click. Select only the 10 fields written to the CSV.
+    // on every export click. Select only the fields written to the CSV.
     const orders = await Order.find(exportQuery)
       .sort({ createdAt: -1 })
       .limit(5000)
-      .select('_id createdAt shippingDetails totalAmount paymentMethod paymentStatus orderStatus awb')
+      .select('_id createdAt shippingDetails totalAmount currency paymentMethod paymentStatus orderStatus awb')
       .lean();
 
     const sanitizeCsv = (val) => {
@@ -1163,18 +1408,21 @@ export const exportOrdersCSV = async (req, res) => {
       return val;
     };
 
-    let csv = "Order ID,Date,Customer Name,Email,Phone,Total,Payment Method,Payment Status,Order Status,AWB\n";
+    // Currency column: totals are in the order's own currency, and without it a $40
+    // order read as ₹40 in the spreadsheet.
+    let csv = "Order ID,Date,Customer Name,Email,Phone,Total,Currency,Payment Method,Payment Status,Order Status,AWB\n";
     orders.forEach(o => {
       const date = new Date(o.createdAt).toISOString().split("T")[0];
       const name = `"${sanitizeCsv(o.shippingDetails?.name || "").replace(/"/g, '""')}"`;
       const email = `"${sanitizeCsv(o.shippingDetails?.email || "").replace(/"/g, '""')}"`;
       const phone = sanitizeCsv(o.shippingDetails?.phone || "");
       const total = o.totalAmount;
+      const currency = sanitizeCsv(o.currency || "INR");
       const paymentMethod = sanitizeCsv(o.paymentMethod || "N/A");
       const paymentStatus = sanitizeCsv(o.paymentStatus || "N/A");
       const orderStatus = sanitizeCsv(o.orderStatus || "N/A");
       const awb = sanitizeCsv(o.awb || "N/A");
-      csv += `${o._id},${date},${name},${email},${phone},${total},${paymentMethod},${paymentStatus},${orderStatus},${awb}\n`;
+      csv += `${o._id},${date},${name},${email},${phone},${total},${currency},${paymentMethod},${paymentStatus},${orderStatus},${awb}\n`;
     });
 
     res.setHeader("Content-Type", "text/csv");
@@ -1191,7 +1439,7 @@ export const exportOrdersCSV = async (req, res) => {
  */
 export const bulkUpdateOrderStatus = async (req, res) => {
   try {
-    const { ids, orderStatus, note, source = "admin" } = req.body;
+    const { ids, orderStatus, note } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ success: false, message: "ids must be a non-empty array" });
     }
@@ -1201,48 +1449,42 @@ export const bulkUpdateOrderStatus = async (req, res) => {
 
     const updated = [];
     const failed = [];
+    const warnings = [];
 
     const orders = await Order.find({ _id: { $in: ids } });
     if (orders.length === 0) return res.status(404).json({ success: false, message: "No orders found" });
 
-    // Get allowed transitions from the map
-    const ORDER_TRANSITIONS_MAP = {
-      pending:          ["processing", "cancelled"],
-      processing:       ["shipped", "cancelled"],
-      shipped:          ["delivered", "return_requested"],
-      delivered:        ["return_requested"],
-      cancelled:        [],
-      return_requested: ["returned", "shipped"],
-      returned:         []
-    };
-
+    // Same routine as the single-order endpoint, so a bulk cancel refunds, restocks
+    // and cancels on Shiprocket exactly like a single one. Each order is isolated: one
+    // that fails no longer aborts the loop half-way with the rest silently unprocessed.
     for (const order of orders) {
-      const allowed = ORDER_TRANSITIONS_MAP[order.orderStatus] || [];
-      if (!allowed.includes(orderStatus)) {
-        failed.push({ id: order._id, reason: `Cannot transition from "${order.orderStatus}" to "${orderStatus}"` });
-        continue;
+      try {
+        const result = await applyAdminStatusChange(order, orderStatus, req, {
+          note: note || `Bulk status update to ${orderStatus}`
+        });
+        if (!result.ok) {
+          failed.push({ id: order._id, reason: result.reason });
+          continue;
+        }
+        await order.save();
+        updated.push(order._id);
+        warnings.push(...result.warnings);
+      } catch (err) {
+        console.error(`Admin BulkOrderStatus: order ${order._id} failed:`, err.message);
+        failed.push({ id: order._id, reason: err.message });
       }
-      order.statusHistory.push({
-        status: orderStatus,
-        changedBy: req.user._id,
-        source,
-        note: note || `Bulk status update to ${orderStatus}`
-      });
-      order.orderStatus = orderStatus;
-      await order.save();
-      updated.push(order._id);
     }
 
     if (updated.length > 0) {
       await logAction(req, "bulk_order_status_update", "order", "multiple", {
         after: { status: orderStatus },
-        meta: { count: updated.length, source }
+        meta: { count: updated.length, source: "admin" }
       });
       // Invalidate users cache since orders affect user stats/flags
       await redis.incr("admin:users:version");
     }
 
-    res.json({ success: true, updated: updated.length, failed });
+    res.json({ success: true, updated: updated.length, failed, warnings });
   } catch (err) {
     console.error("Admin BulkOrderStatus Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -1436,9 +1678,9 @@ export const bulkStockImport = async (req, res) => {
       }
       seenPids.add(row.pid);
 
-      // Validate stock
-      const stock = parseInt(row.stock);
-      if (isNaN(stock) || stock < 0) {
+      // Validate stock — whole numbers only. parseInt accepted "12abc" as 12 and "1.5" as 1.
+      const stock = /^\s*\d+\s*$/.test(String(row.stock ?? "")) ? Number(row.stock) : NaN;
+      if (!Number.isSafeInteger(stock) || stock < 0) {
         results.failed++;
         results.errors.push({ row: rowNum, pid: row.pid, reason: `Invalid stock value: "${row.stock}"` });
         continue;
@@ -1523,7 +1765,7 @@ export const uploadImage = async (req, res) => {
     const uploadResult = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
         { 
-          folder: "bodilicious_products",
+          folder: MEDIA_FOLDER,
           public_id: filename // Optional: force the exact public_id you want
         },
         (error, result) => {
@@ -1557,7 +1799,7 @@ export const uploadImage = async (req, res) => {
  */
 export const adminPushShiprocket = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id).populate("items.product");
+    const order = await Order.findById(req.params.id).populate("items.product", ORDER_ITEM_PRODUCT_FIELDS);
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
     if (order.shiprocketOrderId) {
@@ -1572,6 +1814,16 @@ export const adminPushShiprocket = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: `Cannot push order in "${order.orderStatus}" status to Shiprocket`,
+      });
+    }
+
+    // An unpaid online order is a checkout in progress (or an admin draft whose link
+    // hasn't been paid). Nothing downstream checks payment, so pushing one shipped goods
+    // that were never paid for.
+    if (order.paymentMethod !== "cod" && order.paymentStatus !== "paid") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot ship an unpaid order (payment status: ${order.paymentStatus}).`,
       });
     }
 
@@ -1645,77 +1897,33 @@ export const adminSyncShiprocket = async (req, res) => {
 
     const detailData = await detailRes.json();
     const srOrder = detailData?.data;
+    const update = buildShiprocketSyncUpdate(order, srOrder, { changedBy: req.user._id });
 
-    const updates = {};
-
-    // Sync AWB if we don't have it yet
-    if (!order.awb && srOrder?.awb_code) updates.awb = srOrder.awb_code;
-
-    // Sync courier name
-    if (srOrder?.courier_name) updates.estimatedCourierName = srOrder.courier_name;
-
-    // Sync estimated delivery date
-    if (srOrder?.etd) {
-      const edd = new Date(srOrder.etd);
-      if (!isNaN(edd.getTime())) updates.estimatedDeliveryDate = edd;
-    }
-
-    // Map Shiprocket order status → internal status
-    const rawStatus = (srOrder?.status || "").toLowerCase();
-    const statusMap = {
-      "new":              "pending",
-      "ready to ship":    "processing",
-      "in transit":       "shipped",
-      "shipped":          "shipped",
-      "out for delivery": "shipped",
-      "delivered":        "delivered",
-      "cancelled":        "cancelled",
-      "rto initiated":    "returned",
-      "rto delivered":    "returned",
-    };
-    const mappedStatus = statusMap[rawStatus];
-    const statusPriority = ["pending", "processing", "shipped", "delivered"];
-    if (
-      mappedStatus &&
-      (statusPriority.indexOf(mappedStatus) > statusPriority.indexOf(order.orderStatus) ||
-       mappedStatus === "cancelled" || mappedStatus === "returned")
-    ) {
-      updates.orderStatus = mappedStatus;
-      updates.$push = {
-        statusHistory: {
-          status: mappedStatus,
-          changedBy: req.user._id,
-          source: "shiprocket",
-          note: `Synced from Shiprocket: "${srOrder?.status}"`,
-          changedAt: new Date(),
-        },
-      };
-    }
-
-    const { $push, ...setFields } = updates;
-    if (Object.keys(setFields).length === 0 && !$push) {
+    if (!update) {
       const populated = await Order.findById(order._id)
         .populate("user", "name email")
         .populate("items.product", "name pid price images");
       return res.json({ success: true, message: "Already up to date", data: populated });
     }
 
-    // Separate $push from the rest to avoid conflict
-    const updateOp = {};
-    if (Object.keys(setFields).length > 0) updateOp.$set = setFields;
-    if ($push) updateOp.$push = $push;
-
-    await Order.findByIdAndUpdate(order._id, updateOp);
+    await Order.findByIdAndUpdate(order._id, update);
 
     const populated = await Order.findById(order._id)
       .populate("user", "name email")
       .populate("items.product", "name pid price images");
 
     await logAction(req, "ADMIN_SYNC_SHIPROCKET", "order", order._id.toString(), {
-      synced: setFields,
+      synced: update.$set || {},
     });
 
-    return res.json({ success: true, data: populated });
+    const flagged = Boolean(update.$set?.needsManualReview);
+    return res.json({
+      success: true,
+      message: flagged
+        ? `Shiprocket shows this order as "${srOrder?.status}" — flagged for review. Cancel it here to refund and restock.`
+        : undefined,
+      data: populated,
+    });
   } catch (err) {
     console.error("Admin SyncShiprocket Error:", err);
     return res.status(500).json({ success: false, message: err.message });
@@ -1757,23 +1965,43 @@ export const getAbandonedCheckouts = async (req, res) => {
  * Create a draft order manually (B2B, phone orders). Locks inventory.
  */
 export const createDraftOrder = async (req, res) => {
+  let { userId, items, shippingDetails, manualDiscount = 0, notes, paymentMethod = "razorpay", paymentStatus = "pending" } = req.body;
+
+  // ── Validate before opening a transaction (early returns used to leak it) ──
+  if (!Array.isArray(items) || items.length === 0 || !shippingDetails?.address) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+  if (!userId && (!shippingDetails.name || !shippingDetails.email)) {
+    return res.status(400).json({ success: false, message: "Name and Email are required for Guest Orders" });
+  }
+  // The draft form sent "cash_on_delivery", which isn't an Order.paymentMethod value,
+  // so every COD draft failed schema validation.
+  if (paymentMethod === "cash_on_delivery") paymentMethod = "cod";
+  if (!["cod", "razorpay"].includes(paymentMethod)) {
+    return res.status(400).json({ success: false, message: `Unsupported payment method "${paymentMethod}"` });
+  }
+  // "Mark as Already Paid" was ignored (status was hardcoded to pending): the order was
+  // saved as an unpaid Razorpay checkout, swept to "abandoned" by the cleanup cron with
+  // its stock released, and vanished from the orders list.
+  if (!["pending", "paid"].includes(paymentStatus)) {
+    return res.status(400).json({ success: false, message: `Invalid payment status "${paymentStatus}"` });
+  }
+  // A negative quantity matched `stock >= qty` and then INCREASED stock while
+  // subtracting from the total; fractions and zero aren't orderable either.
+  if (items.some(item => !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1)) {
+    return res.status(400).json({ success: false, message: "Every item needs a whole-number quantity of at least 1" });
+  }
+  manualDiscount = Number(manualDiscount);
+  if (!Number.isFinite(manualDiscount) || manualDiscount < 0) {
+    return res.status(400).json({ success: false, message: "Discount must be zero or a positive amount" });
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    let { userId, items, shippingDetails, manualDiscount = 0, notes, paymentMethod = "razorpay" } = req.body;
-    const paymentStatus = "pending";
-
-    if (!items || items.length === 0 || !shippingDetails?.address) {
-      return res.status(400).json({ success: false, message: "Missing required fields" });
-    }
-
     // 🚀 Support Guest Orders
     if (!userId) {
-      if (!shippingDetails.name || !shippingDetails.email) {
-        return res.status(400).json({ success: false, message: "Name and Email are required for Guest Orders" });
-      }
-      
       // Check if this email already exists
       let existingUser = await UserProfile.findOne({ email: shippingDetails.email }).session(session);
       
@@ -1805,6 +2033,7 @@ export const createDraftOrder = async (req, res) => {
 
     // Calculate prices and lock inventory
     for (const item of items) {
+      const qty = Number(item.quantity); // validated above as an integer >= 1
       let productMatch = null;
       if (mongoose.Types.ObjectId.isValid(item.productId)) {
         productMatch = { _id: item.productId };
@@ -1813,8 +2042,8 @@ export const createDraftOrder = async (req, res) => {
       }
 
       const product = await Product.findOneAndUpdate(
-        { ...productMatch, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
+        { ...productMatch, stock: { $gte: qty } },
+        { $inc: { stock: -qty } },
         { new: true, session }
       );
 
@@ -1825,25 +2054,42 @@ export const createDraftOrder = async (req, res) => {
         throw new Error(`Insufficient stock for ${exists.name}`);
       }
 
-      totalAmount += product.price * item.quantity;
-      
+      totalAmount += product.price * qty;
+
       orderItems.push({
         product: product._id,
-        quantity: item.quantity,
+        quantity: qty,
         priceAtPurchase: product.price
       });
     }
 
-    const settings = await StoreSettings.findOne().session(session) || { shippingThreshold: 999, shippingCost: 99 };
-    const shippingCost = totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost;
+    const settings = await StoreSettings.findOne().session(session) || {
+      shippingThreshold: 999, shippingCost: 99,
+      internationalShippingThreshold: 10000, internationalShippingCost: 2000,
+    };
+    // International addresses were charged the domestic rate (₹99 for a parcel that
+    // costs ~₹2000 to send abroad). Static international rate here — the live
+    // Shiprocket quote is a network call that doesn't belong inside the transaction;
+    // the admin can adjust with the manual discount.
+    const isIndia = ["india", "in", "bharat", "ind"].includes(String(shippingDetails.country || "India").toLowerCase().trim());
+    const shippingCost = isIndia
+      ? (totalAmount >= settings.shippingThreshold ? 0 : settings.shippingCost)
+      : (totalAmount >= settings.internationalShippingThreshold ? 0 : settings.internationalShippingCost);
     const originalAmount = totalAmount + shippingCost;
-    const finalAmount = Math.max(0, originalAmount - manualDiscount);
+    if (manualDiscount > originalAmount) {
+      throw new Error(`Discount (₹${manualDiscount}) can't exceed the order total (₹${originalAmount})`);
+    }
+    const finalAmount = originalAmount - manualDiscount;
 
     const [newOrder] = await Order.create([{
       user: userId,
       items: orderItems,
       totalAmount: finalAmount,
       originalAmount,
+      // Was never stored, so the order showed shipping as "Free" while charging it.
+      shippingCost,
+      // GST contained in the total (domestic only), as on storefront orders.
+      taxAmount: calculateInclusiveTax(finalAmount, isIndia ? (settings.taxRatePercent || 0) : 0),
       discountAmount: manualDiscount,
       paymentMethod,
       paymentStatus,
@@ -1891,11 +2137,9 @@ export const getImages = async (req, res) => {
       api_secret: process.env.CLOUDINARY_API_SECRET 
     });
 
-    const tenantFolder = "bodilicious_products";
-
     const result = await cloudinary.api.resources({
       type: 'upload',
-      prefix: `${tenantFolder}/`,
+      prefix: `${MEDIA_FOLDER}/`,
       max_results: Math.min(Number(maxResults) || 30, 500),
       next_cursor: nextCursor,
       direction: 'desc'
@@ -1930,13 +2174,11 @@ export const deleteImages = async (req, res) => {
       return res.status(400).json({ success: false, message: "No publicIds provided" });
     }
 
-    const tenantFolder = process.env.CLOUDINARY_FOLDER || "bodilicious";
-
     const invalidIds = publicIds.filter(id => {
       try {
         const decoded = decodeURIComponent(id);
         const normalized = path.normalize(decoded).replace(/\\/g, '/');
-        return normalized.includes('..') || !normalized.startsWith(`${tenantFolder}/`);
+        return normalized.includes('..') || !normalized.startsWith(`${MEDIA_FOLDER}/`);
       } catch (e) {
         return true;
       }
@@ -1970,11 +2212,15 @@ export const getImageUsage = async (req, res) => {
     const { publicId } = req.query;
     if (!publicId) return res.status(400).json({ success: false, message: "publicId is required" });
 
-    const searchString = escapeStringRegexp(publicId);
-    
+    // Escaped for the Mongo regex only. The homepage check below is a plain substring
+    // match, and the escaped form ("-" → "\x2d") never occurs in a real URL — images
+    // used on the homepage reported as unused and could be deleted.
+    const searchRegex = escapeStringRegexp(publicId);
+    const searchString = publicId;
+
     // Warning: This does a full collection scan with a regex on every request
     const products = await Product.find({
-      images: { $regex: searchString }
+      images: { $regex: searchRegex }
     }).select("pid name images isActive").lean();
 
     const usage = [];

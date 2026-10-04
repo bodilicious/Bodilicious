@@ -58,7 +58,9 @@ export default function AccountPage() {
     }
   };
 
-  if (authStatus === 'loading') {
+  // Signed in but the profile isn't populated yet: keep showing the skeleton. Falling
+  // through flashed the "Sign In / Register" prompt at people who were signed in.
+  if (authStatus === 'loading' || (authStatus === 'authenticated' && !user)) {
     return (
       <div className="min-h-screen bg-[#F8F4EF] flex flex-col">
         <div className="flex-1 max-w-5xl mx-auto w-full px-6 pt-28 pb-16">

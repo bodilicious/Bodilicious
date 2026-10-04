@@ -50,6 +50,7 @@
         "google-auth-library": "9.15.1"
     },
     "devDependencies": {
-        "firebase": "^12.17.0"
+        "firebase": "^12.17.0",
+        "mongodb-memory-server": "^10.4.3"
     }
 }

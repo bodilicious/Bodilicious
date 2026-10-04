@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { Ticket } from "./models.js";
 import Order from "../tracker/models.js";
 import Razorpay from "razorpay";
+import { fromRazorpayMinorUnits } from "../utils/currencies.js";
 
 dotenv.config();
 
@@ -82,7 +83,9 @@ export const processLookup = async (job) => {
           });
           const rp = await razorpayInstance.payments.fetch(order.razorpayPaymentId);
           let note = `Payment Status: ${rp.status.toUpperCase()}`;
-          note += `\nAmount: ₹${rp.amount / 100}`;
+          // Razorpay amounts are in the payment's own currency (minor units).
+          const rpCurrency = (rp.currency || "INR").toUpperCase();
+          note += `\nAmount: ${rpCurrency === "INR" ? "₹" : rpCurrency + " "}${fromRazorpayMinorUnits(rp.amount, rpCurrency)}`;
           if (rp.method) note += `\nMethod: ${rp.method.toUpperCase()}`;
           await appendSystemNote(ticket, note, true);
         } catch (rpErr) {

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { initRazorpayOrder, verifyPayment, razorpayWebhook, getOrderQuote } from "./controller.js";
 import { runPaymentReconciliation } from "./reconciliation.js";
 import { protect, tryProtect, adminOnly } from "../middleware/auth.js";
@@ -46,6 +47,10 @@ router.post("/admin/reconcile", protect, adminOnly, async (req, res) => {
 // getSingleOrder returns while paymentStatus is still "pending" or "paid"+invoiceGenerated=false.
 router.get("/order-status/:orderId", protect, async (req, res) => {
     try {
+        // A malformed id threw a CastError → 500 to a polling client; it's simply not found.
+        if (!mongoose.isObjectIdOrHexString(req.params.orderId)) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
         const order = await Order.findOne({
             _id: req.params.orderId,
             user: req.user._id

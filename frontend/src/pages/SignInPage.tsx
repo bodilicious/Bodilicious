@@ -150,6 +150,19 @@ export default function SignInPage() {
       if (fbErr.code === "auth/network-request-failed") {
         cleanError = "Network error.";
       }
+      // These all fell through to "check your credentials", which is wrong for each.
+      if (fbErr.code === "auth/too-many-requests") {
+        cleanError = "Too many attempts. Please wait a few minutes, or reset your password.";
+      }
+      if (fbErr.code === "auth/invalid-email") {
+        cleanError = "Please enter a valid email address.";
+      }
+      if (fbErr.code === "auth/weak-password") {
+        cleanError = "Please choose a stronger password (at least 6 characters).";
+      }
+      if (fbErr.code === "auth/user-disabled") {
+        cleanError = "This account has been disabled. Please contact support.";
+      }
 
       setError(cleanError);
     } finally {

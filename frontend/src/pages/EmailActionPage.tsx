@@ -24,16 +24,20 @@ export default function EmailActionPage() {
   const [oobCode, setOobCode] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Problems the user can fix (e.g. a weak password) stay on the form. Previously
+  // every error replaced the form with a dead-end "Verification Failed" screen
+  // showing Firebase's raw message, so a too-short password meant a fresh link.
+  const [formError, setFormError] = useState<string | null>(null);
   const actionProcessed = useRef(false);
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!newPassword || newPassword.length < 6) {
-      setStatus("error");
-      setMessage("Password must be at least 6 characters long.");
+      setFormError("Password must be at least 6 characters long.");
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
       const auth = getAuth();
@@ -43,8 +47,19 @@ export default function EmailActionPage() {
       setMessage("Your password has been reset successfully. You can now sign in.");
     } catch (err: any) {
       console.error("Password reset failed:", err);
-      setStatus("error");
-      setMessage(err.message || "Failed to reset password. The link might be expired.");
+      const code = err?.code as string | undefined;
+      if (code === "auth/weak-password") {
+        setFormError("That password is too weak. Please choose a stronger one.");
+      } else if (code === "auth/network-request-failed") {
+        setFormError("Network error. Please check your connection and try again.");
+      } else {
+        setStatus("error");
+        setMessage(
+          code === "auth/expired-action-code" || code === "auth/invalid-action-code"
+            ? "This reset link has expired or has already been used. Please request a new one from the sign-in page."
+            : "We couldn't reset your password. Please request a new reset link and try again."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -82,6 +97,13 @@ export default function EmailActionPage() {
         switch (urlMode) {
           case "verifyEmail":
             await applyActionCode(auth, urlOobCode);
+            // If this browser is signed in, its ID token still says "unverified" —
+            // refresh it so the app (and the API) see the verified state without a
+            // sign-out/sign-in.
+            if (auth.currentUser) {
+              await auth.currentUser.reload().catch(() => {});
+              await auth.currentUser.getIdToken(true).catch(() => {});
+            }
             setStatus("success");
             setMessage("Your email has been verified successfully.");
 
@@ -131,6 +153,11 @@ export default function EmailActionPage() {
             <p className="text-sm font-sans text-grey-beige leading-relaxed text-center mb-6">
               Please enter your new password below.
             </p>
+            {formError && (
+              <div className="mb-4 px-4 py-3 bg-indian-red/5 border border-indian-red/20 text-indian-red text-xs font-sans tracking-wide">
+                {formError}
+              </div>
+            )}
             <div className="mb-6">
               <label className="block text-[10px] uppercase tracking-widest text-grey-beige mb-2">
                 New Password
@@ -185,7 +212,7 @@ export default function EmailActionPage() {
           <>
             <XCircle className="w-12 h-12 text-dark-red mx-auto mb-6" />
             <h1 className="text-3xl font-serif text-dark-red mb-4">
-              Verification Failed
+              {mode === "resetPassword" ? "Link Expired" : "Verification Failed"}
             </h1>
             <p className="text-sm font-sans text-grey-beige leading-relaxed mb-8">
               {message}

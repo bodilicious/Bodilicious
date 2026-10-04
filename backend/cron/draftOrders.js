@@ -1,7 +1,27 @@
 import cron from "node-cron";
+import Razorpay from "razorpay";
 import Order from "../tracker/models.js";
 import Product from "../products/models.js";
 import UserProfile from "../profile/models.js";
+
+/**
+ * True when Razorpay holds a successful payment for this order. The sweep must not
+ * abandon such an order: if both the verify call and the webhook were missed (server
+ * down), it would relabel a PAID order "abandoned" and release its stock, and the
+ * reconciliation cron skips abandoned orders — a charged customer with no order.
+ * Throws when Razorpay can't be reached; the caller then leaves the order alone.
+ */
+const hasRazorpayPayment = async (razorpay, order) => {
+    if (order.razorpayOrderId) {
+        const payments = await razorpay.orders.fetchPayments(order.razorpayOrderId);
+        if ((payments.items || []).some(p => p.status === "captured" || p.status === "authorized")) return true;
+    }
+    if (order.paymentLinkId) {
+        const link = await razorpay.paymentLink.fetch(order.paymentLinkId);
+        if (link?.status === "paid") return true;
+    }
+    return false;
+};
 
 export const initDraftOrderCleanupCron = () => {
     // Run every 30 minutes — synced with 30-min quote lock expiry. No point running faster.
@@ -16,6 +36,10 @@ export const initDraftOrderCleanupCron = () => {
             // isStockRestored guard prevents double-restore if the webhook already ran
             // (webhook sets isStockRestored: true immediately after restoring).
             const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+            const now = new Date();
+            // Admin drafts are sent to the customer as a 24h Razorpay payment link
+            // (payment/controller.js → generatePaymentLink), so 30 minutes is far too short.
+            const draftHoldStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
             const abandonedOrders = await Order.find({
                 paymentMethod: "razorpay",
@@ -23,10 +47,33 @@ export const initDraftOrderCleanupCron = () => {
                 isStockRestored: { $ne: true },
                 orderStatus: { $ne: "abandoned" },
                 createdAt: { $lt: thirtyMinutesAgo },
-                $or: [
-                    { lastClaimFailedAt: null },
-                    { lastClaimFailedAt: { $exists: false } },
-                    { lastClaimFailedAt: { $lt: fifteenMinutesAgo } }
+                // Payment captured but order processing failed — the money is gone and the
+                // order looks exactly like an abandoned checkout. Sweeping it hid it from the
+                // admin orders list and released its stock.
+                needsManualReview: { $ne: true },
+                $and: [
+                    {
+                        $or: [
+                            { lastClaimFailedAt: null },
+                            { lastClaimFailedAt: { $exists: false } },
+                            { lastClaimFailedAt: { $lt: fifteenMinutesAgo } }
+                        ]
+                    },
+                    // A live payment link can still be paid; releasing its stock first sets up
+                    // a paid order with nothing left to ship.
+                    {
+                        $or: [
+                            { paymentLinkExpiresAt: null },
+                            { paymentLinkExpiresAt: { $exists: false } },
+                            { paymentLinkExpiresAt: { $lt: now } }
+                        ]
+                    },
+                    {
+                        $or: [
+                            { source: { $ne: "admin_draft" } },
+                            { createdAt: { $lt: draftHoldStart } }
+                        ]
+                    }
                 ]
             });
 
@@ -52,13 +99,28 @@ export const initDraftOrderCleanupCron = () => {
             // marked abandoned — anything that flipped to "paid" in the gap is
             // automatically skipped, with zero risk of clobbering it.
             const claimedOrders = [];
+            const razorpay = process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET
+                ? new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET })
+                : null;
 
             for (const order of abandonedOrders) {
+                if (razorpay && (order.razorpayOrderId || order.paymentLinkId)) {
+                    try {
+                        if (await hasRazorpayPayment(razorpay, order)) {
+                            console.warn(`[Cron] Order ${order._id} has a successful Razorpay payment — not abandoning it; reconciliation will complete it.`);
+                            continue;
+                        }
+                    } catch (err) {
+                        console.error(`[Cron] Couldn't check Razorpay for order ${order._id}; leaving it for the next run:`, err.message);
+                        continue;
+                    }
+                }
                 const claimed = await Order.findOneAndUpdate(
                     {
                         _id: order._id,
                         paymentStatus: { $in: ["pending", "failed"] },
-                        isStockRestored: { $ne: true }
+                        isStockRestored: { $ne: true },
+                        needsManualReview: { $ne: true }
                     },
                     { $set: { orderStatus: "abandoned", isStockRestored: true } },
                     { new: true }

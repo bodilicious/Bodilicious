@@ -12,10 +12,13 @@ const STATUS_STEPS = [
 ];
 
 const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
-  admin:           { label: 'Admin',    color: 'bg-slate-100 text-slate-700' },
-  system:          { label: 'System',   color: 'bg-slate-100 text-slate-600' },
-  shiprocket:      { label: 'Shiprocket', color: 'bg-orange-100 text-orange-700' },
-  payment_gateway: { label: 'Payment',  color: 'bg-green-100 text-green-700' },
+  admin:              { label: 'Admin',      color: 'bg-slate-100 text-slate-700' },
+  system:             { label: 'System',     color: 'bg-slate-100 text-slate-600' },
+  shiprocket:         { label: 'Shiprocket', color: 'bg-orange-100 text-orange-700' },
+  payment_gateway:    { label: 'Payment',    color: 'bg-green-100 text-green-700' },
+  'razorpay-webhook': { label: 'Razorpay',   color: 'bg-green-100 text-green-700' },
+  reconciliation:     { label: 'Reconciliation', color: 'bg-blue-100 text-blue-700' },
+  user:               { label: 'Customer',   color: 'bg-purple-100 text-purple-700' },
 };
 
 interface TimelineEntry {
@@ -50,6 +53,8 @@ interface Order {
   refundId?: string | null;
   refundStatus?: string | null;
   refundAmount?: number | null;
+  needsManualReview?: boolean;
+  reviewReason?: string | null;
 }
 
 interface Props {
@@ -93,6 +98,16 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
         </div>
 
         <div className="overflow-y-auto flex-1">
+          {order.needsManualReview && (
+            <div className="px-6 py-3 bg-red-50 border-b border-red-200 flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-red-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-red-800">Needs manual review</p>
+                {order.reviewReason && <p className="text-xs text-red-700 mt-0.5 leading-relaxed">{order.reviewReason}</p>}
+              </div>
+            </div>
+          )}
+
           {/* Order Summary Grid */}
           <div className={`px-6 py-5 border-b border-slate-200 grid ${order.billingDetails ? 'grid-cols-4' : 'grid-cols-3'} gap-6 text-sm bg-slate-50/50`}>
             <div>
@@ -168,8 +183,9 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
                               </div>
                             )}
                             <div>
-                              {isPopulated && product.slug ? (
-                                <a href={`/shop/product/${product.slug}`} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-900 text-sm hover:text-blue-600 transition-colors">
+                              {/* Storefront route is /product/:pid — the old /shop/product/:slug link 404'd. */}
+                              {isPopulated && product.pid ? (
+                                <a href={`/product/${product.pid}`} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-900 text-sm hover:text-blue-600 transition-colors">
                                   {pName}
                                 </a>
                               ) : (
@@ -206,7 +222,8 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
           </div>
 
           {/* Payment & Refund Block */}
-          {(order.paymentStatus === 'refunded' || order.refundId) && (
+          {/* refundStatus too: a refund Razorpay rejected has no refundId, and hiding it hid the failure. */}
+          {(order.paymentStatus === 'refunded' || order.refundId || order.refundStatus) && (
             <div className="px-6 py-5 border-b border-slate-200 bg-emerald-50/50">
               <div className="flex items-center gap-2 mb-4">
                 <RotateCcw size={14} className="text-emerald-600" />
@@ -215,7 +232,11 @@ export default function OrderTimelineModal({ order, onClose }: Props) {
               <div className="grid grid-cols-3 gap-x-6 gap-y-4 text-sm">
                 <div>
                   <p className="text-[11px] text-emerald-600/70 uppercase tracking-wider font-semibold mb-1">Status</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 capitalize">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border capitalize ${
+                    order.refundStatus === 'failed'
+                      ? 'bg-red-100 text-red-700 border-red-200'
+                      : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                  }`}>
                     {order.refundStatus || '—'}
                   </span>
                 </div>

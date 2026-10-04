@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { X, Printer } from 'lucide-react';
+import { formatCurrency } from '../utils/currencies';
 
 interface ShippingAddress {
   name: string;
@@ -8,6 +9,7 @@ interface ShippingAddress {
   city: string;
   state: string;
   pincode: string;
+  country?: string;
   email?: string;
 }
 
@@ -16,6 +18,7 @@ interface LabelProps {
     _id: string;
     shippingDetails: ShippingAddress;
     totalAmount: number;
+    currency?: string;
     paymentMethod: string;
     items?: any[];
   } | null;
@@ -68,12 +71,13 @@ export default function ShippingLabel({ order, onClose }: LabelProps) {
             <div className="header flex items-center justify-between border-b-2 border-gray-800 pb-3 mb-3">
               <div>
                 <div className="brand text-xl font-bold tracking-widest" style={{ letterSpacing: '3px' }}>BODILICIOUS</div>
-                <div className="text-[10px] text-gray-500">bodilicious.com</div>
+                <div className="text-[10px] text-gray-500">bodilicious.in</div>
               </div>
               {isCOD && (
                 <div className="text-right">
                   <div className="bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded">COD</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">₹{order.totalAmount.toFixed(0)}</div>
+                  {/* Exact amount to collect — toFixed(0) rounded ₹448.50 to ₹449. */}
+                  <div className="text-[10px] text-gray-500 mt-0.5">{formatCurrency(order.totalAmount, order.currency)}</div>
                 </div>
               )}
             </div>
@@ -85,6 +89,7 @@ export default function ShippingLabel({ order, onClose }: LabelProps) {
               <div className="address text-xs leading-relaxed text-gray-700 mt-1">
                 {sd.address}<br />
                 {sd.city}, {sd.state} – {sd.pincode}<br />
+                {sd.country && sd.country !== 'India' && <>{sd.country}<br /></>}
                 📞 {sd.phone}
                 {sd.email && <><br />✉️ {sd.email}</>}
               </div>

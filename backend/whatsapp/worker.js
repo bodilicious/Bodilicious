@@ -53,10 +53,14 @@ const processJob = async (job) => {
         await sendOrderPlaced(phone, {
           name: user.name || order.shippingDetails?.name,
           order_id: `#${order._id.toString().slice(-8).toUpperCase()}`,
-          amount: order.totalAmount !== undefined ? `₹${order.totalAmount}` : "N/A",
-          edd: order.estimatedDeliveryDate 
-            ? new Date(order.estimatedDeliveryDate).toLocaleDateString() 
-            : `${order.estimatedDeliveryDays || 3}-5 business days`,
+          // totalAmount is in the order's currency — "₹49.99" for a $49.99 order was wrong.
+          amount: order.totalAmount !== undefined
+            ? ((order.currency || "INR").toUpperCase() === "INR" ? `₹${order.totalAmount}` : `${order.currency.toUpperCase()} ${order.totalAmount}`)
+            : "N/A",
+          edd: order.estimatedDeliveryDate
+            ? new Date(order.estimatedDeliveryDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })
+            // "7-5 business days" when the estimate was 7 days
+            : (order.estimatedDeliveryDays ? `${order.estimatedDeliveryDays} business days` : "3-5 business days"),
         });
         break;
       }

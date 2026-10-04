@@ -18,6 +18,7 @@ import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import Select from '../components/Select';
 import { useLocation } from 'react-router-dom';
+import { formatCurrency } from '../utils/currencies';
 
 interface Message {
   _id: string;
@@ -252,6 +253,7 @@ const TicketManagement: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
+    if (sending) return;
     if ((!draft.trim() && attachments.length === 0) || !selectedTicket) return;
     if (attachments.some((a) => a.uploading)) {
       toast.error('Please wait for attachments to finish uploading.');
@@ -303,6 +305,8 @@ const TicketManagement: React.FC = () => {
   };
 
   const handleStatusChange = async (ticketId: string, status: 'resolved' | 'cancelled') => {
+    // Cancelling emails the customer immediately and sits right next to Resolve.
+    if (status === 'cancelled' && !window.confirm('Cancel this ticket? The customer will be emailed that it was cancelled.')) return;
     setResolvingId(ticketId);
     try {
       const headers = await getAuthHeaders();
@@ -560,7 +564,7 @@ const TicketManagement: React.FC = () => {
                   <div className="flex items-center gap-4 text-right">
                     <div>
                       <p className="text-xs text-grey-beige font-medium">Total</p>
-                      <p className="text-sm font-bold text-dark-red">₹{selectedTicketOrder.totalAmount}</p>
+                      <p className="text-sm font-bold text-dark-red">{formatCurrency(selectedTicketOrder.totalAmount ?? 0, selectedTicketOrder.currency)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-grey-beige font-medium">Status</p>
@@ -688,7 +692,9 @@ const TicketManagement: React.FC = () => {
                     }}
                     placeholder="Type a reply… (Enter to send)"
                     className="flex-1 resize-none px-4 py-2.5 bg-silk-light/60 rounded-xl text-sm text-dark-red focus:outline-none focus:ring-2 ring-dark-red/20 placeholder:text-grey-beige/50"
-                    disabled={sending}
+                    // Not disabled while sending: disabling drops focus, so after every
+                    // Enter the next message couldn't be typed until the box was clicked
+                    // again. handleSendMessage ignores sends while one is in flight.
                   />
                   <button
                     onClick={handleSendMessage}

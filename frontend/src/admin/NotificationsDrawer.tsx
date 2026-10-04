@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Bell, X, CheckCheck, Info, AlertTriangle, AlertOctagon, Sparkles, Circle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -33,17 +33,23 @@ interface NotificationsDrawerProps {
   /** Unread count derived by the parent (AdminLayout) from its own notifications fetch.
    *  Eliminates a separate /unread-count poll on every mount — saves 1 API call/hour. */
   initialUnreadCount?: number;
+  /** Called after notifications are marked read, so the parent can drop them from its
+   *  "Attention Required" banner — which otherwise kept showing them for up to an hour. */
+  onRead?: (ids: string[] | 'all') => void;
 }
 
-const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ initialUnreadCount = 0 }) => {
+const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ initialUnreadCount = 0, onRead }) => {
   const { getAuthHeaders } = useApp();
   const API = import.meta.env.VITE_API_URL || '';
 
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  // Seed from the prop so the bell badge is correct before the drawer is ever opened.
+  // Seeded from the prop so the bell badge is correct before the drawer is ever opened.
   // No separate polling needed — AdminLayout handles the periodic refresh.
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  // useState only reads its argument on the first render, and AdminLayout's fetch hasn't
+  // returned by then — so the badge sat at 0 until the drawer was opened. Follow the prop.
+  useEffect(() => { setUnreadCount(initialUnreadCount); }, [initialUnreadCount]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -71,18 +77,22 @@ const NotificationsDrawer: React.FC<NotificationsDrawerProps> = ({ initialUnread
   const markOneRead = async (id: string) => {
     try {
       const headers = await getAuthHeaders();
-      await fetch(`${API}/api/v1/admin/notifications/${id}/read`, { method: 'PATCH', headers });
+      const res = await fetch(`${API}/api/v1/admin/notifications/${id}/read`, { method: 'PATCH', headers });
+      if (!res.ok) throw new Error();
       setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
       setUnreadCount(c => Math.max(0, c - 1));
+      onRead?.([id]);
     } catch { toast.error('Failed to mark as read'); }
   };
 
   const markAllRead = async () => {
     try {
       const headers = await getAuthHeaders();
-      await fetch(`${API}/api/v1/admin/notifications/read-all`, { method: 'PATCH', headers });
+      const res = await fetch(`${API}/api/v1/admin/notifications/read-all`, { method: 'PATCH', headers });
+      if (!res.ok) throw new Error();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
+      onRead?.('all');
       toast.success('All notifications marked as read');
     } catch { toast.error('Failed to mark all as read'); }
   };

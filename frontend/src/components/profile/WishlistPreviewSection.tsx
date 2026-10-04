@@ -5,6 +5,7 @@ import { Product } from '../../types';
 import { useApp } from '../../context/AppContext';
 import toast from 'react-hot-toast';
 import { useCurrency } from '../../hooks/useCurrency';
+import { productImage } from '../../utils/productImage';
 
 interface Props {
     wishlist: Product[];
@@ -87,7 +88,7 @@ export default function WishlistPreviewSection({ wishlist, navigateTo }: Props) 
                                 >
                                     <img
                                         loading="lazy"
-                                        src={product.images[0]}
+                                        src={productImage(product.images[0], 'card')}
                                         alt={product.name}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                                     />

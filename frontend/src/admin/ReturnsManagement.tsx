@@ -3,6 +3,7 @@ import { RotateCcw, CheckCircle, XCircle, Package, ChevronDown, ChevronUp, Trend
 import toast from 'react-hot-toast';
 import { useApp } from '../context/AppContext';
 import Select from '../components/Select';
+import { formatCurrency } from '../utils/currencies';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -42,6 +43,8 @@ interface ReturnOrder {
   returnRefundMethod: string;
   physicalReceived: boolean;
   totalAmount: number;
+  currency?: string;
+  paymentMethod?: string;
   items: Array<{ product: { name: string; pid: string; images: string[] }; quantity: number; priceAtPurchase: number }>;
 }
 
@@ -66,6 +69,9 @@ const ReturnsManagement: React.FC = () => {
   const [approveModal, setApproveModal] = useState<{ open: boolean; orderId: string; refundMethod: string }>({ open: false, orderId: '', refundMethod: 'original_payment' });
   const [rejectModal, setRejectModal] = useState<{ open: boolean; orderId: string; reason: string }>({ open: false, orderId: '', reason: '' });
   const [confirmReceiveId, setConfirmReceiveId] = useState<string | null>(null);
+  // One action in flight at a time — a double-click on "Confirm" used to fire the
+  // request twice (two refund attempts for one return).
+  const [actionBusy, setActionBusy] = useState(false);
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -94,6 +100,8 @@ const ReturnsManagement: React.FC = () => {
   };
 
   const handleApprove = async () => {
+    if (actionBusy) return;
+    setActionBusy(true);
     try {
       const headers = await getAuthHeaders();
       const r = await fetch(`${API}/api/v1/admin/returns/${approveModal.orderId}/approve`, {
@@ -105,11 +113,16 @@ const ReturnsManagement: React.FC = () => {
       if (d.success) { toast.success('Return approved — confirmation email sent'); fetchQueue(); }
       else toast.error(d.message);
     } catch { toast.error('Approve failed'); }
-    finally { setApproveModal({ open: false, orderId: '', refundMethod: 'original_payment' }); }
+    finally {
+      setActionBusy(false);
+      setApproveModal({ open: false, orderId: '', refundMethod: 'original_payment' });
+    }
   };
 
   const handleReject = async () => {
     if (!rejectModal.reason.trim()) { toast.error('Rejection reason is required'); return; }
+    if (actionBusy) return;
+    setActionBusy(true);
     try {
       const headers = await getAuthHeaders();
       const r = await fetch(`${API}/api/v1/admin/returns/${rejectModal.orderId}/reject`, {
@@ -121,18 +134,33 @@ const ReturnsManagement: React.FC = () => {
       if (d.success) { toast.success('Return rejected — customer notified by email'); fetchQueue(); }
       else toast.error(d.message);
     } catch { toast.error('Reject failed'); }
-    finally { setRejectModal({ open: false, orderId: '', reason: '' }); }
+    finally {
+      setActionBusy(false);
+      setRejectModal({ open: false, orderId: '', reason: '' });
+    }
   };
 
   const handleMarkReceived = async (id: string) => {
+    if (actionBusy) return;
+    setActionBusy(true);
     try {
       const headers = await getAuthHeaders();
       const r = await fetch(`${API}/api/v1/admin/returns/${id}/received`, { method: 'PATCH', headers });
       const d = await r.json();
-      if (d.success) { toast.success('Marked as received' + (d.restockLog?.length ? ' — stock updated' : '')); fetchQueue(); }
+      if (d.success) {
+        toast.success('Marked as received' + (d.restockLog?.length ? ' — stock updated' : ''));
+        // Receiving a return also settles the refund; say what happened to the money.
+        if (d.refund?.status === 'success') toast.success('Refund issued to the original payment method');
+        else if (d.refund?.status === 'failed') toast.error(`Refund failed: ${d.refund.error || 'unknown error'} — refund manually`, { duration: 15000 });
+        else if (d.refund?.status === 'manual_required') toast.error('No online payment to refund (COD) — refund the customer manually', { duration: 15000 });
+        fetchQueue();
+      }
       else toast.error(d.message);
     } catch { toast.error('Failed to mark as received'); }
-    finally { setConfirmReceiveId(null); }
+    finally {
+      setActionBusy(false);
+      setConfirmReceiveId(null);
+    }
   };
 
   return (
@@ -215,7 +243,7 @@ const ReturnsManagement: React.FC = () => {
                     <div className="text-sm"><span className="font-medium text-gray-700">Items: </span>
                       <span className="text-gray-600">{order.items?.map(i => `${i.product?.name || 'Item'} ×${i.quantity}`).join(', ')}</span>
                     </div>
-                    <div className="text-sm"><span className="font-medium text-gray-700">Order Total: </span><span>₹{order.totalAmount?.toLocaleString('en-IN')}</span></div>
+                    <div className="text-sm"><span className="font-medium text-gray-700">Order Total: </span><span>{formatCurrency(order.totalAmount ?? 0, order.currency)}</span></div>
 
                     <div className="flex flex-wrap gap-3 pt-2">
                       {order.returnStatus === 'requested' && (
@@ -347,8 +375,8 @@ const ReturnsManagement: React.FC = () => {
             <div className="flex gap-3">
               <button onClick={() => setApproveModal({ open: false, orderId: '', refundMethod: 'original_payment' })}
                 className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all">Cancel</button>
-              <button onClick={handleApprove} className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-all">
-                Confirm Approval
+              <button onClick={handleApprove} disabled={actionBusy} className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-all">
+                {actionBusy ? 'Approving…' : 'Confirm Approval'}
               </button>
             </div>
           </div>
@@ -378,7 +406,7 @@ const ReturnsManagement: React.FC = () => {
             <div className="flex gap-3">
               <button onClick={() => setRejectModal({ open: false, orderId: '', reason: '' })}
                 className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all">Cancel</button>
-              <button onClick={handleReject} disabled={!rejectModal.reason.trim()}
+              <button onClick={handleReject} disabled={!rejectModal.reason.trim() || actionBusy}
                 className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                 Confirm Rejection
               </button>
@@ -393,10 +421,15 @@ const ReturnsManagement: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
             <Package size={36} className="mx-auto mb-3 text-blue-600" />
             <h3 className="text-lg font-bold text-gray-800 mb-2">Mark Item as Received?</h3>
-            <p className="text-sm text-gray-500 mb-5">This will mark the return as completed and may trigger an automatic restock.</p>
+            <p className="text-sm text-gray-500 mb-5">
+              This marks the return as completed and may trigger an automatic restock.
+              {orders.find(o => o._id === confirmReceiveId)?.returnRefundMethod === 'original_payment' && (
+                <> <span className="font-semibold text-gray-700">It also issues the refund to the customer's original payment method.</span></>
+              )}
+            </p>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmReceiveId(null)} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all">Cancel</button>
-              <button onClick={() => handleMarkReceived(confirmReceiveId)} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all">Confirm</button>
+              <button onClick={() => setConfirmReceiveId(null)} disabled={actionBusy} className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-all">Cancel</button>
+              <button onClick={() => handleMarkReceived(confirmReceiveId)} disabled={actionBusy} className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-all">{actionBusy ? 'Processing…' : 'Confirm'}</button>
             </div>
           </div>
         </div>

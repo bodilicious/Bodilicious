@@ -242,6 +242,8 @@ const BlogForm: React.FC = () => {
   // ── Cover image upload ──────────────────────────────────────────────────────
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset so choosing the same file again (e.g. after a failed upload) fires onChange.
+    e.target.value = '';
     if (!file) return;
 
     // Client-side validation

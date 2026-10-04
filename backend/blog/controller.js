@@ -359,6 +359,9 @@ export const deleteCategory = async (req, res) => {
   try {
     const cat = await BlogCategory.findByIdAndDelete(req.params.id);
     if (!cat) return res.status(404).json({ success: false, message: "Category not found" });
+    // Posts kept the deleted id in `categories` forever (a dangling ref that the public
+    // category filter and the editor's checkboxes kept tripping over).
+    await Blog.updateMany({ categories: cat._id }, { $pull: { categories: cat._id } });
     res.json({ success: true, message: "Category deleted" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -431,6 +434,13 @@ export const getPublicBlogBySlug = async (req, res) => {
     // night cream that don't link to each other waste the authority each has.
     // Best-effort: a failure here must never break the article page.
     const data = blog.toObject({ virtuals: true });
+    // Send a count and this reader's own state instead of every liker's profile id.
+    // The page compared that list to the Firebase uid (a different id), so a post
+    // you'd liked always showed as not liked and the next click removed your like.
+    const likes = blog.likes || [];
+    data.likesCount = likes.length;
+    data.hasLiked = !!req.user?._id && likes.some(l => l?.toString() === req.user._id.toString());
+    delete data.likes;
     try {
       const { default: Product } = await import("../products/models.js");
 
@@ -559,7 +569,8 @@ export const addComment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Comment is too long (max 2000 characters)" });
     }
 
-    const blog = await Blog.findById(id);
+    // Published posts only — drafts were commentable by anyone who knew the id.
+    const blog = await Blog.exists({ _id: id, status: "published" });
     if (!blog) return res.status(404).json({ success: false, message: "Blog not found" });
 
     // req.user is set by the `protect` middleware — never trust author from req.body
@@ -590,25 +601,22 @@ export const toggleLike = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid blog ID" });
     }
 
-    const blog = await Blog.findById(id);
-    if (!blog) {
+    // Atomic $addToSet/$pull. The read-modify-save version lost likes when two
+    // readers clicked together, and blog.save() re-validated the whole post.
+    const hasLiked = !!(await Blog.exists({ _id: id, status: "published", likes: userId }));
+    const updated = await Blog.findOneAndUpdate(
+      { _id: id, status: "published" },
+      hasLiked ? { $pull: { likes: userId } } : { $addToSet: { likes: userId } },
+      { new: true, projection: { likes: 1 } }
+    );
+    if (!updated) {
       return res.status(404).json({ success: false, message: "Blog not found" });
     }
-
-    const hasLiked = blog.likes && blog.likes.includes(userId);
-    if (hasLiked) {
-      blog.likes = blog.likes.filter(id => id.toString() !== userId.toString());
-    } else {
-      if (!blog.likes) blog.likes = [];
-      blog.likes.push(userId);
-    }
-
-    await blog.save();
 
     res.json({
       success: true,
       hasLiked: !hasLiked,
-      likesCount: blog.likes.length
+      likesCount: updated.likes?.length || 0
     });
   } catch (err) {
     console.error("toggleLike error:", err);

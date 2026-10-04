@@ -61,8 +61,10 @@ origin via the `source` field.
 
 ### 4. Money is not rupees
 
-Order amounts (`totalAmount`, `originalAmount`, `shippingCost`, `discountAmount`,
-`refundAmount`, `priceAtPurchase`) are denominated in `order.currency`, not INR. A
+Order totals (`totalAmount`, `originalAmount`, `shippingCost`, `discountAmount`,
+`refundAmount`) are denominated in `order.currency`, not INR — but line-item
+`priceAtPurchase` is always INR (`product.price`, never converted); multiply by
+`order.exchangeRate` to show it in the order's currency. A
 hardcoded `₹` or an `en-IN` format string is a bug on every foreign order. Razorpay
 amounts on the wire are **minor units** — use the helpers in `backend/utils/currencies.js`
 rather than `* 100` / `/ 100`, which mis-scale JPY (0 decimals) and KWD (3 decimals).

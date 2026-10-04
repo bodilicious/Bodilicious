@@ -2,9 +2,10 @@ import { Router } from "express";
 import multer from "multer";
 import { fileTypeFromBuffer } from "file-type";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { protect, adminOnly } from "../middleware/auth.js";
+import { protect, adminOnly, tryProtect } from "../middleware/auth.js";
 import { adminLimiter } from "../middleware/admin.js";
 import * as blogCtrl from "./controller.js";
+import { cacheResponse } from "../utils/responseCache.js";
 
 const router = Router();
 
@@ -77,10 +78,13 @@ categoryRouter.delete("/:id", blogCtrl.deleteCategory);
 
 // ── Public routes — no auth ─────────────────────────────────────────────────
 const publicRouter = Router();
-publicRouter.get("/",       blogCtrl.getPublicBlogs);
-publicRouter.get("/categories", blogCtrl.getCategories);
-publicRouter.get("/:slug",  blogCtrl.getPublicBlogBySlug);
-publicRouter.get("/:slug/related", blogCtrl.getRelatedBlogs);
+publicRouter.get("/",       cacheResponse(5 * 60_000), blogCtrl.getPublicBlogs);
+publicRouter.get("/categories", cacheResponse(10 * 60_000), blogCtrl.getCategories);
+// tryProtect: lets the response say whether *this* reader has liked the post.
+// Signed-in readers send a token (their response says whether they liked the post),
+// so cacheResponse skips them automatically; anonymous reads are served from memory.
+publicRouter.get("/:slug",  cacheResponse(5 * 60_000), tryProtect, blogCtrl.getPublicBlogBySlug);
+publicRouter.get("/:slug/related", cacheResponse(5 * 60_000), blogCtrl.getRelatedBlogs);
 publicRouter.get("/:id/comments", blogCtrl.getComments);
 publicRouter.post("/:id/comments", protect, commentLimiter, blogCtrl.addComment);
 publicRouter.post("/:id/like", protect, blogCtrl.toggleLike);

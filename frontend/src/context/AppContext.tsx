@@ -30,7 +30,7 @@ import {
   AuthStatus,
   Address
 } from '../types';
-import { usePostHog } from 'posthog-js/react';
+import { track } from '../utils/analytics';
 import { getCurrencyForCountry } from '../utils/currencies';
 
 /* ================================
@@ -85,6 +85,43 @@ interface AppContextType {
       ctaLabel: string;
       ctaLink: string;
       image: string;
+      showDelaySeconds: number;
+      exitIntentTrigger: boolean;
+      // theme
+      headerBg: string;
+      headerBgAnimated: boolean;
+      orb1Color: string;
+      orb2Color: string;
+      orb3Color: string;
+      badgeBg: string;
+      badgeTextColor: string;
+      titleColor: string;
+      descriptionColor: string;
+      ctaGradient: string;
+      ctaTextColor: string;
+      ctaGlow: boolean;
+      contentBg: string;
+      // emojis
+      floatingEmojisEnabled: boolean;
+      floatingEmojis: string[];
+      emojiTrailPhysics: boolean;
+      // urgency
+      urgencyEnabled: boolean;
+      urgencyText: string;
+      countdownEnabled: boolean;
+      countdownTargetDate: string;
+      countdownExpiredText: string;
+      // motion
+      entranceStyle: 'spring' | 'zoomFade' | 'slideUp' | 'flip3D';
+      parallaxOnMouse: boolean;
+      staggerContent: boolean;
+      effectsIntensity: 'low' | 'medium' | 'high';
+      // interactions
+      ctaShimmer: boolean;
+      ctaParticleBurst: boolean;
+      closeButtonSpin: boolean;
+      backdropBlurAnimated: boolean;
+      imageRevealStyle: 'none' | 'clipWipe' | 'fadeScale';
     };
     maintenanceMode: boolean;
     maintenanceMessage: string;
@@ -106,6 +143,9 @@ interface AppContextType {
     internationalShippingThreshold: number;
     codEnabled: boolean;
     codInternationalEnabled: boolean;
+    codExtraCharge: number;
+    minOrderValueForCOD: number;
+    returnWindowDays: number;
     // supportedCountries and exchangeRates intentionally removed — no longer
     // included in the public settings response to save bandwidth.
   };
@@ -169,6 +209,18 @@ export const AppContext = createContext<AppContextType | null>(null);
 
 const API_BASE = `${import.meta.env.VITE_API_URL}/api/v1`;
 const USER_BASE = `${API_BASE}/user`;
+
+// Stored UTM attribution. A corrupted/foreign value made JSON.parse throw, which
+// aborted checkout entirely — attribution is optional, so ignore anything bad.
+const parseStoredUtm = (raw: string | null) => {
+  if (!raw) return undefined;
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : undefined;
+  } catch {
+    return undefined;
+  }
+};
 const CART_STORAGE_KEY = 'bodilicious_guest_cart';
 
 const ENFORCEMENT_DATE = new Date("2026-05-31T00:00:00Z").getTime();
@@ -189,6 +241,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Refs used as fetch-once guards so fetchFilters/fetchSettings have stable [] deps
   // and don't create new references (which would re-trigger their useEffect every render).
   const filtersFetchedRef = useRef(false);
+  const productsReqRef = useRef(0);
   const settingsFetchedRef = useRef(false);
 
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -205,7 +258,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
   const [authLoading, setAuthLoading] = useState(true);
-  const posthog = usePostHog();
 
   const [storeSettings, setStoreSettings] = useState({
     storeName: 'Bodilicious',
@@ -221,6 +273,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ctaLabel: 'Explore Collection',
       ctaLink: '/shop',
       image: '',
+      showDelaySeconds: 2.5,
+      exitIntentTrigger: false,
+      headerBg: '',
+      headerBgAnimated: true,
+      orb1Color: '#F97316',
+      orb2Color: '#EC4899',
+      orb3Color: '#FBBF24',
+      badgeBg: 'rgba(255,255,255,0.15)',
+      badgeTextColor: '#FDE68A',
+      titleColor: '#ffffff',
+      descriptionColor: 'rgba(255,255,255,0.75)',
+      ctaGradient: '135deg, #FBBF24, #F97316',
+      ctaTextColor: '#2C1208',
+      ctaGlow: false,
+      contentBg: '#ffffff',
+      floatingEmojisEnabled: false,
+      floatingEmojis: [] as string[],
+      emojiTrailPhysics: true,
+      urgencyEnabled: false,
+      urgencyText: '⏰ Limited time offer',
+      countdownEnabled: false,
+      countdownTargetDate: '',
+      countdownExpiredText: 'Offer ended',
+      entranceStyle: 'spring' as const,
+      parallaxOnMouse: false,
+      staggerContent: true,
+      effectsIntensity: 'medium' as const,
+      ctaShimmer: true,
+      ctaParticleBurst: true,
+      closeButtonSpin: true,
+      backdropBlurAnimated: true,
+      imageRevealStyle: 'fadeScale' as const,
     },
     maintenanceMode: false,
     maintenanceMessage: 'We are currently down for maintenance. Please check back later.',
@@ -240,6 +324,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     internationalShippingThreshold: 10000,
     codEnabled: true,
     codInternationalEnabled: false,
+    codExtraCharge: 0,
+    minOrderValueForCOD: 0,
+    returnWindowDays: 7,
     // supportedCountries and exchangeRates removed from public API response to save bandwidth.
   });
 
@@ -377,6 +464,9 @@ const fetchUserProfileAndSync = useCallback(async () => {
       if (!prev) return null;
       return {
         ...prev,
+        // Edited name/photo live on the profile; Firebase's values are the fallback.
+        displayName: data?.name || prev.displayName,
+        photoURL: data?.avatar || prev.photoURL,
         phone: data?.phone,
         gender: data?.gender,
         dateOfBirth: data?.dateOfBirth,
@@ -661,17 +751,28 @@ const triggerPasswordReset = async (email: string) => {
     });
 
     if (!res.ok) {
-      throw new Error('Failed to update profile');
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.message || 'Failed to update profile');
     }
 
     const { data } = await res.json();
-    setUser(prev => (prev ? { ...prev, ...data } : null));
+    // The profile stores name/avatar; the app's user object calls them displayName/photoURL.
+    const { name, avatar, ...rest } = data || {};
+    setUser(prev => (prev ? {
+      ...prev,
+      ...rest,
+      ...(name ? { displayName: name } : {}),
+      ...(avatar ? { photoURL: avatar } : {}),
+    } : null));
   };
 
   /* =============================
      Products
   ============================== */
   const fetchProducts = useCallback(async (query: string = '') => {
+    // Only the newest request may update state: with quick filter clicks an older,
+    // slower response could land last and show results for the previous filters.
+    const reqId = ++productsReqRef.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -695,13 +796,15 @@ const triggerPasswordReset = async (email: string) => {
 
       const res = await fetch(url);
       const json = await res.json();
+      if (reqId !== productsReqRef.current) return;
       setProducts(json?.data ?? []);
       setTotalProducts(json?.total ?? 0);
     } catch (err) {
+      if (reqId !== productsReqRef.current) return;
       console.error(err);
       setError('Failed to load products');
     } finally {
-      setIsLoading(false);
+      if (reqId === productsReqRef.current) setIsLoading(false);
     }
   }, []);
 
@@ -892,12 +995,30 @@ const triggerPasswordReset = async (email: string) => {
   const addToCart = (product: Product, quantity: number = 1, skipRedirect: boolean = false, variant: string | null = null) => {
     if (!product) return;
 
+    // Never let the bag hold more than is in stock — the excess was only rejected at
+    // the payment step ("Insufficient stock"), after the customer had filled in
+    // the whole checkout.
+    const maxQty = typeof product.stock === 'number' && product.stock >= 0 ? product.stock : Infinity;
+    const inBag = cartItems.find(i => i.product?.pid === product.pid && (i.variant || null) === (variant || null));
+    const room = maxQty - Number(inBag?.quantity ?? 0);
+    if (room <= 0) {
+      import('react-hot-toast').then(({ toast }) => toast.error(
+        maxQty === 0 ? `${product.name} is out of stock.` : `Only ${maxQty} of ${product.name} available — they're all in your bag.`,
+        { id: `stock-${product.pid}` }
+      ));
+      return;
+    }
+    if (Number(quantity) > room) {
+      import('react-hot-toast').then(({ toast }) => toast(`Only ${maxQty} of ${product.name} available — added ${room}.`, { id: `stock-${product.pid}` }));
+      quantity = room;
+    }
+
     setCartItems(prev => {
       let isMutated = false;
       const newItems = prev.map(i => {
         if (i.product && i.product.pid === product.pid && (i.variant || null) === (variant || null)) {
           isMutated = true;
-          return { ...i, quantity: Number(i.quantity ?? 0) + Number(quantity) };
+          return { ...i, quantity: Math.min(Number(i.quantity ?? 0) + Number(quantity), maxQty) };
         }
         return i;
       });
@@ -912,15 +1033,13 @@ const triggerPasswordReset = async (email: string) => {
       return newItems;
     });
 
-    // 🚀 PostHog Client-Side Tracking
-    if (posthog) {
-      posthog.capture('Added to Cart', {
-        productId: product.pid,
-        name: product.name,
-        price: product.price,
-        quantity: quantity
-      });
-    }
+    // 🚀 PostHog Client-Side Tracking (queued until the lazily-loaded SDK is ready)
+    track('Added to Cart', {
+      productId: product.pid,
+      name: product.name,
+      price: product.price,
+      quantity: quantity
+    });
 
     // 🎯 Google Analytics/Ads Tracking
     if (typeof window !== 'undefined' && (window as any).gtag) {
@@ -979,11 +1098,12 @@ const triggerPasswordReset = async (email: string) => {
 
   const updateQuantity = (pid: string, qty: number, variant: string | null = null) => {
     setCartItems(prev => {
-      const nextCart = prev.map(i =>
-        (i.product && i.product.pid === pid && (i.variant || null) === (variant || null)) 
-          ? { ...i, quantity: Number(qty) } 
-          : i
-      );
+      const nextCart = prev.map(i => {
+        if (!(i.product && i.product.pid === pid && (i.variant || null) === (variant || null))) return i;
+        const stock = typeof i.product.stock === 'number' && i.product.stock >= 0 ? i.product.stock : Infinity;
+        // Clamp to 1..stock (never below 1 here — removal is removeFromCart's job).
+        return { ...i, quantity: Math.max(1, Math.min(Math.floor(Number(qty)) || 1, stock)) };
+      });
       setTimeout(() => syncCartToBackend(nextCart), 0);
       return nextCart;
     });
@@ -1000,8 +1120,11 @@ const triggerPasswordReset = async (email: string) => {
     if (authStatus !== 'authenticated') throw new Error('Please sign in to checkout');
     if (cartItems.length === 0) throw new Error('Your cart is empty');
 
+    // State is required for Indian addresses only (matches the server); many
+    // countries have none, and the shipping form allows leaving it blank for them.
+    const needsState = ['india', 'in', 'bharat', 'ind'].includes((shippingDetails?.country || 'India').toLowerCase().trim());
     if (!shippingDetails?.name || !shippingDetails?.phone || !shippingDetails?.address ||
-      !shippingDetails?.city || !shippingDetails?.state || !shippingDetails?.pincode) {
+      !shippingDetails?.city || (needsState && !shippingDetails?.state) || !shippingDetails?.pincode) {
       throw new Error('Please fill all required shipping details.');
     }
 
@@ -1017,7 +1140,7 @@ const triggerPasswordReset = async (email: string) => {
     if (items.length === 0) throw new Error('Cart items are missing product IDs. Refresh and add again.');
 
     const utmStorage = localStorage.getItem('bodilicious_utm');
-    const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
+    const marketing = parseStoredUtm(utmStorage);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -1054,7 +1177,7 @@ const triggerPasswordReset = async (email: string) => {
         items: order.items.map((i: any) => ({
           item_id: i.product?.pid || i.product,
           item_name: i.product?.name || 'Product',
-          price: i.price,
+          price: i.priceAtPurchase ?? i.price, // order items carry priceAtPurchase
           quantity: i.quantity
         }))
       });
@@ -1114,7 +1237,7 @@ const triggerPasswordReset = async (email: string) => {
     const headers = await getAuthHeaders();
     // Include UTM marketing attribution — same as COD checkout does
     const utmStorage = localStorage.getItem('bodilicious_utm');
-    const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
+    const marketing = parseStoredUtm(utmStorage);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -1155,7 +1278,7 @@ const triggerPasswordReset = async (email: string) => {
   ): Promise<Order> => {
     const headers = await getAuthHeaders();
     const utmStorage = localStorage.getItem('bodilicious_utm');
-    const marketing = utmStorage ? JSON.parse(utmStorage) : undefined;
+    const marketing = parseStoredUtm(utmStorage);
 
     const controller = new AbortController();
     // 35s timeout to allow for backend retries (which take ~5-15s) and UI timeout to trigger first
@@ -1216,7 +1339,7 @@ const triggerPasswordReset = async (email: string) => {
         items: order.items.map((i: any) => ({
           item_id: i.product?.pid || i.product,
           item_name: i.product?.name || 'Product',
-          price: i.price,
+          price: i.priceAtPurchase ?? i.price, // order items carry priceAtPurchase
           quantity: i.quantity
         }))
       });
@@ -1277,16 +1400,27 @@ const triggerPasswordReset = async (email: string) => {
      Orders
   ============================== */
   const cancelOrder = async (orderId: string) => {
-    if (authStatus !== 'authenticated') return;
+    // Returning silently here made the page toast "Order cancelled" for a no-op.
+    if (authStatus !== 'authenticated') throw new Error('Please sign in again to cancel this order.');
     const headers = await getAuthHeaders();
     const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, {
       method: 'PATCH',
       headers,
     });
-    if (!res.ok) throw new Error('Failed to cancel order');
+    const body = await res.json().catch(() => ({}));
+    // Surface the server's reason ("cannot be cancelled" once it has shipped, etc.).
+    if (!res.ok) throw new Error(body?.message || 'Failed to cancel order');
 
+    const patch = body?.data || {};
     setOrders(prev =>
-      prev.map(o => o._id === orderId ? { ...o, orderStatus: 'cancelled' } : o)
+      prev.map(o => o._id === orderId
+        ? {
+            ...o,
+            orderStatus: 'cancelled',
+            ...(patch.paymentStatus ? { paymentStatus: patch.paymentStatus } : {}),
+            ...(patch.refundStatus !== undefined ? { refundStatus: patch.refundStatus } : {}),
+          }
+        : o)
     );
     };
 
@@ -1418,11 +1552,22 @@ const triggerPasswordReset = async (email: string) => {
       // If we still don't have productId, skip backend sync (but keep local wishlist)
       if (!productId) return;
 
-      await fetch(exists ? `${USER_BASE}/wishlist/${productId}` : `${USER_BASE}/wishlist`, {
-        method: exists ? 'DELETE' : 'POST',
-        headers,
-        body: exists ? undefined : JSON.stringify({ productId }),
-      });
+      // Roll the optimistic change back if the server didn't take it — the heart
+      // otherwise showed a state that vanished on the next reload.
+      const revert = () =>
+        setWishlist(prev => (exists ? (prev.some(p => p.pid === product.pid) ? prev : [...prev, product]) : prev.filter(p => p.pid !== product.pid)));
+      try {
+        const res = await fetch(exists ? `${USER_BASE}/wishlist/${productId}` : `${USER_BASE}/wishlist`, {
+          method: exists ? 'DELETE' : 'POST',
+          headers,
+          body: exists ? undefined : JSON.stringify({ productId }),
+        });
+        if (!res.ok) throw new Error(`Wishlist update failed (${res.status})`);
+      } catch (err) {
+        console.error(err);
+        revert();
+        import('react-hot-toast').then(({ toast }) => toast.error("Couldn't update your wishlist. Please try again."));
+      }
     }
   };
 

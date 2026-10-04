@@ -184,7 +184,7 @@ const UserManagement: React.FC = () => {
         body: JSON.stringify({ role: newRole })
       });
       if (res.ok) {
-        toast.success(`User promoted to ${newRole}`);
+        toast.success(newRole === 'admin' ? 'User promoted to admin' : 'Admin demoted to user');
         fetchUsers();
       } else {
         const error = await res.json();

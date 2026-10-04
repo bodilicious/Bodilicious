@@ -22,7 +22,8 @@ import {
   Image,
   ChevronDown,
   Store,
-  FileText
+  FileText,
+  Star
 } from 'lucide-react';
 
 
@@ -118,13 +119,9 @@ const AdminLayout: React.FC = () => {
   };
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth > 1024) {
-        setIsSidebarOpen(true);
-      } else {
-        setIsSidebarOpen(false);
-      }
-    };
+    // Collapse on any resize. On desktop the sidebar expands on hover only; forcing it
+    // open here pinned the expanded overlay over the page after every window resize.
+    const handleResize = () => setIsSidebarOpen(false);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -166,6 +163,7 @@ const AdminLayout: React.FC = () => {
       title: 'Catalog',
       items: [
         { name: 'Products', path: '/admin/products', icon: Package },
+        { name: 'Reviews', path: '/admin/reviews', icon: Star },
         { name: 'Media Library', path: '/admin/media', icon: Image },
       ]
     },
@@ -355,7 +353,10 @@ const AdminLayout: React.FC = () => {
               <Store size={18} />
               <span className="hidden sm:inline">Back to Store</span>
             </Link>
-            <NotificationsDrawer initialUnreadCount={unreadNotifCount} />
+            <NotificationsDrawer
+              initialUnreadCount={unreadNotifCount}
+              onRead={(ids) => setCriticalAlerts(prev => ids === 'all' ? [] : prev.filter(n => !ids.includes(n._id)))}
+            />
             <div className="flex flex-col items-end">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden">
                 {user?.photoURL ? (

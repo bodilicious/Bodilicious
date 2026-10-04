@@ -84,7 +84,14 @@ export default function TicketsPage() {
 
   useEffect(() => {
     if (authStatus === 'loading') return;
-    if (authStatus === 'unauthenticated' || !userUid) { navigate('/signin'); return; }
+    if (authStatus === 'unauthenticated') {
+      navigate('/signin', { state: { returnTo: '/account/tickets' } });
+      return;
+    }
+    // Signed in but the profile hasn't populated `user` yet — wait for it. Redirecting
+    // here sent signed-in users to /signin, which bounced them on to /account, so the
+    // tickets page was unreachable on a fresh load.
+    if (!userUid) return;
     fetchTickets();
   }, [authStatus, userUid, fetchTickets]); // eslint-disable-line react-hooks/exhaustive-deps
 

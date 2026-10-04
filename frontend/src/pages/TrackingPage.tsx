@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Order, TimelineEvent } from '../types';
 import { formatCurrency } from '../utils/currencies';
 import { useSEO } from '../hooks/useSEO';
+import { productImage } from '../utils/productImage';
 
 
 export default function TrackingPage() {
@@ -107,7 +108,8 @@ export default function TrackingPage() {
                 }
 
                 setTrackingData({
-                    status: order.orderStatus.charAt(0).toUpperCase() + order.orderStatus.slice(1),
+                    // "return_requested" rendered as "Return_requested"
+                    status: (order.orderStatus.charAt(0).toUpperCase() + order.orderStatus.slice(1)).replace(/_/g, ' '),
                     expectedDelivery: 'Soon',
                     timeline: [
                         { status: 'Order Confirmed', location: 'System', date: new Date(order.createdAt).toLocaleDateString(), completed: true },
@@ -171,7 +173,7 @@ export default function TrackingPage() {
             await cancelOrder(selectedOrder._id);
             // Update local order state to show it's cancelled immediately
             setSelectedOrder(prev => prev ? { ...prev, orderStatus: 'cancelled' } : null);
-            setTrackingData(prev => prev ? { ...prev, status: 'Cancelled' } : null);
+            setTrackingData(prev => prev ? { ...prev, status: 'Cancelled', expectedDelivery: 'N/A' } : null);
             toast.success('Order cancelled successfully');
             setIsCancelModalOpen(false);
         } catch (err: any) {
@@ -205,7 +207,7 @@ export default function TrackingPage() {
 
                     {timeline.map((event, idx) => (
                         <div key={idx} className="relative flex flex-col items-center z-10">
-                            <div className={`w-5 h-5 rounded-full border-4 ${event.completed ? activeColor + ' border-' + activeColor : 'bg-gray-200 border-gray-200'} transition-colors duration-500`}></div>
+                            <div className={`w-5 h-5 rounded-full border-4 ${event.completed ? `${activeColor} ${isErrorState ? 'border-red-500' : 'border-[#e77600]'}` : 'bg-gray-200 border-gray-200'} transition-colors duration-500`}></div>
                             <div className="absolute top-8 w-24 text-center">
                                 <p className={`text-xs font-semibold ${event.completed ? 'text-gray-900' : 'text-gray-400'}`}>{event.status}</p>
                             </div>
@@ -260,7 +262,7 @@ export default function TrackingPage() {
                                     {order.items[0]?.product?.images?.[0] && (
                                         <img 
                                           loading="lazy"
-                                          src={order.items[0].product.images[0]} 
+                                          src={productImage(order.items[0].product.images[0], 'thumb')}  
                                           alt="" 
                                           className="w-full h-full object-contain p-1 mix-blend-multiply" 
                                         />
@@ -308,7 +310,7 @@ export default function TrackingPage() {
                                     >
                                         <FileText size={16} /> View Details
                                     </button>
-                                    {selectedOrder.orderStatus !== 'cancelled' && selectedOrder.orderStatus !== 'delivered' && selectedOrder.orderStatus !== 'shipped' && (
+                                    {['pending', 'processing'].includes(selectedOrder.orderStatus) && (
                                         <button
                                             onClick={handleCancelOrder}
                                             disabled={isCancelling}
@@ -325,7 +327,7 @@ export default function TrackingPage() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 bg-gray-50 border border-gray-100 p-4 rounded-md">
                                 <div>
                                     <div className="flex items-center gap-1 text-gray-500 text-xs mb-1">
-                                        <FileText size={12} /> Transaction ID
+                                        <FileText size={12} /> Order ID
                                     </div>
                                     <p className="font-mono text-xs font-semibold text-gray-900 break-all">{selectedOrder._id}</p>
                                 </div>
@@ -369,7 +371,7 @@ export default function TrackingPage() {
                                             <div key={idx} className="w-14 h-14 rounded-full border-2 border-white overflow-hidden bg-gray-100 shrink-0 relative z-[1]">
                                                 <img 
                                                   loading="lazy"
-                                                  src={item.product.images[0]} 
+                                                  src={productImage(item.product.images[0], 'thumb')}  
                                                   alt="" 
                                                   className="w-full h-full object-contain p-1 mix-blend-multiply" 
                                                 />

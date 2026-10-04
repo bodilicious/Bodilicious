@@ -7,7 +7,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import StarRating from './StarRating';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { hoverLift, hoverLiftSubtle } from '../utils/motionTokens';
-import { cloudinaryUrl } from '../utils/cloudinary';
+import { productImage, productSrcSet } from '../utils/productImage';
 
 interface ProductCardProps {
   product: Product;
@@ -90,7 +90,9 @@ export default memo(function ProductCard({
         <m.img
           whileHover={subtleLift}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          src={cloudinaryUrl(product.images[0], { w: 600 })}
+          src={productImage(product.images[0], 'card')}
+          srcSet={productSrcSet(product.images[0])}
+          sizes="(min-width: 768px) 30vw, 50vw"
           alt={product.name}
           width={600}
           height={900}

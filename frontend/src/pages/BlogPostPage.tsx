@@ -7,6 +7,7 @@ import { buildBlogTitle, buildBlogDescription, buildBlogKeywords, buildBlogOgAlt
 import { useApp } from '../context/useApp';
 import { ArrowLeft, Calendar, Loader2, AlertCircle, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { productImage } from '../utils/productImage';
 
 interface BlogPost {
   _id: string;
@@ -24,6 +25,8 @@ interface BlogPost {
   readingTime?: number;
   publishedAt: string;
   likes?: string[];
+  likesCount?: number;
+  hasLiked?: boolean;
   /** Injected by the API on the detail endpoint — internal linking, not stored. */
   relatedProducts?: { pid: string; name: string; price: number; images?: string[] }[];
 }
@@ -145,15 +148,17 @@ const BlogPostPage: React.FC = () => {
       setNotFound(false);
       setError('');
       try {
-        const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${slug}`);
+        // Signed in → the response includes whether this reader has liked the post.
+        const authHeaders = await getAuthHeaders(false).catch(() => ({}));
+        const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${slug}`, { headers: authHeaders });
         if (res.status === 404) { setNotFound(true); return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
         
         if (cancelled) return;
         setPost(data.data);
-        setLikesCount(data.data.likes?.length || 0);
-        setHasLiked(user ? data.data.likes?.includes(user.uid) : false);
+        setLikesCount(data.data.likesCount ?? data.data.likes?.length ?? 0);
+        setHasLiked(!!data.data.hasLiked);
 
         const [relatedRes, commentsRes] = await Promise.allSettled([
           fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs/${slug}/related`),
@@ -176,7 +181,8 @@ const BlogPostPage: React.FC = () => {
     };
     load();
     return () => { cancelled = true; };
-  }, [slug, user]);
+    // uid, not the user object: profile refreshes replace `user` and refetched the post.
+  }, [slug, user?.uid, getAuthHeaders]);
 
   const handleLike = async () => {
     if (!isAuthenticated) {
@@ -356,7 +362,7 @@ const BlogPostPage: React.FC = () => {
                   >
                     {product.images?.[0] && (
                       <img
-                        src={product.images[0]}
+                        src={productImage(product.images[0], 'thumb')}
                         alt={product.name}
                         loading="lazy"
                         className="w-16 h-16 object-cover rounded-xl border border-silk/60"

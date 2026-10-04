@@ -36,7 +36,7 @@ export default function MediaLibrary({ mode = 'manage', onSelect, onClose }: Med
     try {
       const headers = await getAuthHeaders();
       let url = `${API_URL}/api/v1/admin/images?maxResults=30`;
-      if (cursor) url += `&nextCursor=${cursor}`;
+      if (cursor) url += `&nextCursor=${encodeURIComponent(cursor)}`;
 
       const res = await fetch(url, { headers });
       const data = await res.json();
@@ -83,25 +83,30 @@ export default function MediaLibrary({ mode = 'manage', onSelect, onClose }: Med
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
     
-    // Usage check for the first selected item to warn users (basic implementation)
-    if (selectedIds.size === 1) {
-      try {
-        const id = Array.from(selectedIds)[0];
-        const headers = await getAuthHeaders();
-        const res = await fetch(`${API_URL}/api/v1/admin/images/usage?publicId=${encodeURIComponent(id)}`, { headers });
-        const data = await res.json();
-        if (data.success && data.usage.length > 0) {
-          const proceed = window.confirm(`This image is currently used in ${data.usage.length} place(s) (e.g. ${data.usage[0].name}). Are you sure you want to delete it permanently?`);
-          if (!proceed) return;
-        } else if (!window.confirm('Are you sure you want to delete this image permanently?')) {
-          return;
-        }
-      } catch (e) {
-        if (!window.confirm('Are you sure you want to delete this image permanently?')) return;
-      }
-    } else {
-      if (!window.confirm(`Are you sure you want to permanently delete ${selectedIds.size} images?`)) return;
+    // Usage check for EVERY selected image. It used to run only when exactly one was
+    // selected, so a multi-select delete removed in-use product/homepage images with
+    // no warning at all.
+    const ids = Array.from(selectedIds);
+    let inUse: { usage: { name: string }[] }[] = [];
+    let unchecked = 0;
+    try {
+      const headers = await getAuthHeaders();
+      const results = await Promise.all(ids.map(id =>
+        fetch(`${API_URL}/api/v1/admin/images/usage?publicId=${encodeURIComponent(id)}`, { headers })
+          .then(r => r.json())
+          .catch(() => null)
+      ));
+      unchecked = results.filter(d => !d?.success).length;
+      inUse = results.filter(d => d?.success && d.usage.length > 0);
+    } catch {
+      unchecked = ids.length;
     }
+    const what = ids.length === 1 ? 'this image' : `these ${ids.length} images`;
+    const warnings = [
+      inUse.length > 0 && `${inUse.length === ids.length && ids.length === 1 ? 'It is' : `${inUse.length} of them ${inUse.length === 1 ? 'is' : 'are'}`} currently in use (e.g. ${inUse[0].usage[0].name}).`,
+      unchecked > 0 && `Usage couldn't be checked for ${unchecked}.`,
+    ].filter(Boolean).join(' ');
+    if (!window.confirm(`Permanently delete ${what}?${warnings ? `\n\n${warnings}` : ''}`)) return;
 
     setIsDeleting(true);
     try {
