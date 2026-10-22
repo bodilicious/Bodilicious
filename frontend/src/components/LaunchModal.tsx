@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { m, AnimatePresence, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { X, Sparkles, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 /* ─── Shared defaults ────────────────────────────────────────────────────────
@@ -27,42 +27,6 @@ const MODAL_DEFAULTS = {
   entranceStyle: 'spring',
   imageRevealStyle: 'fadeScale',
 } as const;
-
-/* ─── Show-once memory ───────────────────────────────────────────────────────
-   Each visitor sees a given offer once, then again after REMIND_AFTER_DAYS.
-   Changing the badge, title, description or CTA link counts as a new offer
-   and shows again straight away.                                             */
-const SEEN_STORAGE_KEY = 'bod_launch_modal_seen';
-const REMIND_AFTER_DAYS = 3;
-
-function campaignKey(modal: Record<string, any>): string {
-  const src = [modal.badge, modal.title, modal.description, modal.ctaLink]
-    .map(v => (v ?? '').toString())
-    .join('|');
-  let h = 5381;
-  for (let i = 0; i < src.length; i++) h = ((h << 5) + h + src.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(36);
-}
-
-function wasRecentlySeen(key: string): boolean {
-  try {
-    const raw = window.localStorage.getItem(SEEN_STORAGE_KEY);
-    if (!raw) return false;
-    const data = JSON.parse(raw);
-    if (data?.key !== key) return false;
-    return Date.now() - Number(data.at) < REMIND_AFTER_DAYS * 86_400_000;
-  } catch {
-    return false; // private mode / blocked storage: just show the popup
-  }
-}
-
-function markSeen(key: string) {
-  try {
-    window.localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify({ key, at: Date.now() }));
-  } catch {
-    /* storage unavailable: nothing to remember */
-  }
-}
 
 /* ─── Small helpers ──────────────────────────────────────────────────────── */
 /** Relative "assets/..." paths break on nested routes; make them root-relative. */
@@ -222,6 +186,9 @@ function ParticleBurst({ particles, emojis }: { particles: Particle[]; emojis: s
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export default function LaunchModal() {
   const { storeSettings } = useApp();
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
+
   // Guard: settings may not have a launchModal block yet.
   const modal: Record<string, any> = storeSettings?.launchModal ?? {};
 
@@ -239,7 +206,6 @@ export default function LaunchModal() {
   const shownRef      = useRef(false);
   const closeTimerRef = useRef<number | undefined>(undefined);
 
-  const key    = campaignKey(modal);
   const imgSrc = resolveImageSrc(modal.image);
 
   /* Mouse parallax motion values — must be declared unconditionally */
@@ -255,19 +221,28 @@ export default function LaunchModal() {
     modal.countdownEnabled && modal.countdownTargetDate ? modal.countdownTargetDate : undefined,
   );
 
+  /* Clean up any legacy show-once localStorage key */
+  useEffect(() => {
+    try {
+      window.localStorage.removeItem('bod_launch_modal_seen');
+    } catch {}
+  }, []);
+
   /* Reset the image fallback when the image changes */
   useEffect(() => { setImgFailed(false); }, [imgSrc]);
 
-  /* Show delay + exit-intent — each only ever opens the popup once */
+  /* Show delay + exit-intent — triggers every time the visitor hits the home page */
   useEffect(() => {
-    if (!modal.isActive) return;
+    if (!modal.isActive || !isHomePage) {
+      setIsOpen(false);
+      return;
+    }
+
     shownRef.current = false;
-    if (wasRecentlySeen(key)) return;
 
     const open = () => {
       if (shownRef.current) return;
       shownRef.current = true;
-      markSeen(key);
       setIsOpen(true);
     };
 
@@ -289,7 +264,7 @@ export default function LaunchModal() {
       window.clearTimeout(timer);
       if (onLeave) document.removeEventListener('mouseout', onLeave);
     };
-  }, [modal.isActive, modal.showDelaySeconds, modal.exitIntentTrigger, key]);
+  }, [modal.isActive, modal.showDelaySeconds, modal.exitIntentTrigger, isHomePage, location.key]);
 
   /* While open: Escape closes, page scroll is locked, focus moves into the dialog */
   useEffect(() => {

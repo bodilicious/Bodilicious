@@ -732,7 +732,7 @@ function ModalBannerAdmin({ s, update, readOnly = false }: { s: any; update: (pa
         </span>
       </div>
       <p className="text-xs text-slate-500 pb-1">
-        Each visitor sees the popup once per offer, then again after a few days. Changing the badge, title, description or CTA link counts as a new offer and shows it again. Changes are saved with the rest of your settings.
+        Shown to visitors on the home page after the configured delay. Changes are saved with the rest of your settings.
       </p>
 
       {/* ── Section 1: Content & General ── */}
