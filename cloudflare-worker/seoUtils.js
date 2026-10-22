@@ -15,15 +15,27 @@ import {
   buildBlogKeywords,
   buildBlogOgAlt,
   buildBlogHeadline,
+  buildBlogIndexMeta,
+  BLOG_INDEX_PAGE_SIZE,
   STATIC_PAGE_SEO,
   stripHtml,
 } from '../frontend/src/utils/seo.ts';
 
 // Re-exported so worker.js can route on it without reaching into the frontend.
-export { STATIC_PAGE_SEO, stripHtml };
+export { STATIC_PAGE_SEO, stripHtml, BLOG_INDEX_PAGE_SIZE };
 
 // Includes major search engines, social media unfurlers, AI crawlers, and generic HTTP clients (used by AI assistants in sandboxes)
-export const BOT_UA_PATTERNS = /googlebot|google-extended|bingbot|msnbot|microsoftpreview|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|perplexity-user|amazonbot|meta-externalagent|ccbot|bytespider|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
+//
+// Any crawler NOT matched here gets the human response, which for /product/*
+// and /blogs/* is the SPA shell carrying the baked homepage's title and
+// canonical ("/"). Google's non-Googlebot crawlers each have their own token —
+// Storebot-Google (Merchant Center landing-page checks), AdsBot-Google (Ads
+// landing pages), Google-InspectionTool (Search Console live URL test,
+// Rich Results Test) — and none of them contain "googlebot". The same goes for
+// site-audit crawlers: Ahrefs Site Audit identifies as "AhrefsSiteAudit", not
+// "AhrefsBot", and Semrush's as "SiteAuditBot", so audits reported every
+// product and article in the sitemap as a non-canonical duplicate of "/".
+export const BOT_UA_PATTERNS = /googlebot|storebot-google|adsbot-google|google-inspectiontool|googleother|mediapartners-google|ahrefssiteaudit|siteauditbot|screaming frog|sitebulb|adidxbot|yeti\/|seznambot|petalbot|qwantbot|qwantify|mojeekbot|duckassistbot|google-extended|bingbot|msnbot|microsoftpreview|slurp|duckduckbot|baiduspider|yandexbot|facebot|facebookexternalhit|whatsapp|discordbot|telegrambot|slackbot|redditbot|twitterbot|linkedinbot|applebot|applebot-extended|semrushbot|ahrefsbot|pinterest|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-web|anthropic-ai|cohere-ai|perplexitybot|perplexity-user|amazonbot|meta-externalagent|ccbot|bytespider|omgili|youbot|python-requests|python-urllib|python\/|curl\/|wget\/|libwww-perl|got\/|axios\/|node-fetch|postmanruntime|insomnia\//i;
 
 export function isBot(request) {
   const userAgent = request.headers.get("user-agent") || "";
@@ -383,7 +395,7 @@ export function renderProductHtml(product, frontendUrl) {
       <header>
         <h1>${escapeHtml(h1)}</h1>
         <div>${sanitizeBlogHtml(product.description || '')}</div>
-        <p>Price: ₹${escapeHtml(String(product.price))}</p>
+        <p>Price: ₹${escapeHtml(String(product.price))}${product.original_price && product.original_price > product.price ? ` <del>₹${escapeHtml(String(product.original_price))}</del> (Limited Offer)` : ''}</p>
         ${product.rating && product.ratingCount
           ? `<p>Rated ${escapeHtml(String(product.rating.toFixed ? product.rating.toFixed(1) : product.rating))} out of 5 (${escapeHtml(String(product.ratingCount))} reviews)</p>`
           : ''}
@@ -685,6 +697,86 @@ export function rewriteBlogIndex(response, posts, frontendUrl) {
       element(el) { el.append(`<ul>${postLinks}</ul>`, { html: true }); },
     })
     .transform(withMeta);
+}
+
+/**
+ * Bot render for /blogs?page=N (N ≥ 2). Every client gets the prerendered
+ * /blogs page for any query string, and that file is page 1. A crawler that
+ * doesn't run JS therefore got the same 12 posts at every page URL and never
+ * found a link to the rest. This lists the same posts BlogListPage shows for
+ * page N, with the same title and canonical (buildBlogIndexMeta).
+ */
+export function renderBlogIndexPageHtml(posts, page, pages, frontendUrl) {
+  const { title, description, canonical } = buildBlogIndexMeta(page);
+  const url = `${frontendUrl}${canonical}`;
+  const pageUrl = (n) => `${frontendUrl}${buildBlogIndexMeta(n).canonical}`;
+  const prevUrl = page > 1 ? pageUrl(page - 1) : null;
+  const nextUrl = page < pages ? pageUrl(page + 1) : null;
+  const postUrl = (p) => `${frontendUrl}/blogs/${encodeURIComponent(p.slug)}`;
+  const intro = STATIC_PAGE_SEO['/blogs'].body.map(b => b.text).filter(Boolean)[0] || '';
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: title,
+    numberOfItems: posts.length,
+    itemListElement: posts.map((p, i) => ({
+      '@type': 'ListItem',
+      position: (page - 1) * BLOG_INDEX_PAGE_SIZE + i + 1,
+      url: postUrl(p),
+      name: buildBlogHeadline(p),
+    })),
+  };
+
+  const postsHtml = posts.map(p => {
+    const date = p.publishedAt ? String(p.publishedAt).slice(0, 10) : '';
+    return `<article><h2><a href="${postUrl(p)}">${escapeHtml(buildBlogHeadline(p))}</a></h2>${
+      p.excerpt ? `<p>${escapeHtml(String(p.excerpt))}</p>` : ''}${
+      date ? `<p><time datetime="${escapeHtml(date)}">${escapeHtml(date)}</time></p>` : ''}</article>`;
+  }).join('\n      ');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${url}">
+  <link rel="alternate" hreflang="en-IN" href="${url}">
+  <link rel="alternate" hreflang="x-default" href="${url}">
+  ${prevUrl ? `<link rel="prev" href="${prevUrl}">` : ''}
+  ${nextUrl ? `<link rel="next" href="${nextUrl}">` : ''}
+  <link rel="llms.txt" href="${frontendUrl}/llms.txt" title="LLM-readable site summary">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${url}">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:image" content="${frontendUrl}/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${frontendUrl}/og-image.png">
+  <script type="application/ld+json">${safeJsonLd(itemList)}</script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>${escapeHtml(STATIC_PAGE_SEO['/blogs'].h1)}</h1>
+      <p>${escapeHtml(intro)}</p>
+    </header>
+    <section aria-label="Articles">
+      ${postsHtml}
+    </section>
+    <nav aria-label="Pagination">
+      ${prevUrl ? `<a href="${prevUrl}" rel="prev">Previous page</a>` : ''}
+      <span>Page ${page} of ${pages}</span>
+      ${nextUrl ? `<a href="${nextUrl}" rel="next">Next page</a>` : ''}
+    </nav>
+  </main>
+  ${renderTrustFooter(frontendUrl)}
+</body>
+</html>`;
 }
 
 // ─── Shop / Category Page Bot Renderer ──────────────────────────────────────

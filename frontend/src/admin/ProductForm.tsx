@@ -213,7 +213,7 @@ const defaultFormData = {
   usage: { time: '', frequency: '', routine_step: '' },
   // Blank, not 0: clicking into a box showing "0" and typing 499 displayed "0499".
   // handleSubmit turns any blank number into 0; validate() still requires a price.
-  price: '' as number | string, price_inr: '' as number | string, stock: '' as number | string, lowStockThreshold: 5,
+  price: '' as number | string, original_price: '' as number | string, price_inr: '' as number | string, stock: '' as number | string, lowStockThreshold: 5,
   product_weight_ml: '' as number | string, product_weight_g: '' as number | string,
   availability: 'In Stock',
   is_active_based: false, isActive: true,
@@ -280,6 +280,7 @@ const ProductForm: React.FC = () => {
             seo_h1: data.data.seo_h1 ?? '',
             seo_image_alt: data.data.seo_image_alt ?? '',
             variants: Array.isArray(data.data.variants) ? data.data.variants : [],
+            original_price: (data.data.original_price && data.data.original_price > 0) ? data.data.original_price : '',
             usage: { ...prev.usage, ...data.data.usage }
           }));
           // Populate the rich text editor with existing description
@@ -374,6 +375,14 @@ const ProductForm: React.FC = () => {
     if (!formData.category) errs.push('Category is required');
     // A ₹0 product can't be paid for — Razorpay rejects a zero amount at checkout.
     if (!(Number(formData.price) > 0)) errs.push('Price must be greater than 0');
+    if (formData.original_price !== '' && formData.original_price !== undefined && formData.original_price !== null) {
+      const orig = Number(formData.original_price);
+      if (isNaN(orig) || orig <= 0) {
+        errs.push('Original price must be a positive number');
+      } else if (orig <= Number(formData.price)) {
+        errs.push('Original price (crossed-out) must be greater than the selling price');
+      }
+    }
     return errs;
   };
 
@@ -399,6 +408,13 @@ const ProductForm: React.FC = () => {
       } else if (payload[f] === '') {
         payload[f] = 0;
       }
+    }
+
+    // Optional original_price / MRP: if blank or 0, send null to clear it (or keep it unset) rather than saving 0
+    if (payload.original_price !== undefined && payload.original_price !== '' && Number(payload.original_price) > 0) {
+      payload.original_price = Number(payload.original_price);
+    } else {
+      payload.original_price = null;
     }
 
     // Drop half-filled FAQ rows before sending. The Mongoose subdocument marks
@@ -863,8 +879,24 @@ const ProductForm: React.FC = () => {
         <section className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">7. Pricing & Stock</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <InputField form={form} label="Price" field="price" type="number" min="0" required />
+            <InputField form={form} label="Selling Price" field="price" type="number" min="0" required />
+            <InputField form={form} label="Original / Crossed-out Price (MRP)" field="original_price" type="number" min="0" />
             <InputField form={form} label="Price (INR)" field="price_inr" type="number" min="0" />
+            {form.data.original_price && Number(form.data.original_price) > Number(form.data.price) && (() => {
+              const diff = Number(form.data.original_price) - Number(form.data.price);
+              const pct = Math.round((diff / Number(form.data.original_price)) * 100);
+              return (
+                <div className="col-span-full bg-emerald-50 border border-emerald-200/80 text-emerald-850 text-xs px-3.5 py-2.5 rounded-xl flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-emerald-900">Offer preview:</span>
+                  <span className="line-through text-gray-500 tabular-nums">₹{form.data.original_price}</span>
+                  <span className="font-bold text-dark-red tabular-nums">₹{form.data.price}</span>
+                  <span className="bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md font-bold text-[11px]">
+                    {pct >= 1 ? `SAVE ${pct}%` : `SAVE ₹${diff}`}
+                  </span>
+                  <span className="text-emerald-800">· Shows crossed-out price &amp; "Limited Offer" badge on product page</span>
+                </div>
+              );
+            })()}
             <div>
               <InputField form={form} label="Stock" field="stock" type="number" min="0" />
 

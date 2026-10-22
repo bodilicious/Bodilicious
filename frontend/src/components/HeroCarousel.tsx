@@ -364,7 +364,8 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
                 className="text-white/90 font-sans font-semibold text-[10px] sm:text-xs md:text-sm tracking-[0.3em] uppercase mb-4 md:mb-6 block"
               />
 
-              <h1 className="font-serif text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-[5.5rem] leading-[1.1] mb-4 md:mb-6 flex flex-col">
+              {/* h2, not h1: HomePage already renders the page's single <h1>. */}
+              <h2 className="font-serif text-white text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-[5.5rem] leading-[1.1] mb-4 md:mb-6 flex flex-col">
                 <EditableBlock
                   isEditing={!!isEditing}
                   value={slide.title || 'New Title'}
@@ -378,7 +379,7 @@ export default function HeroCarousel({ slides: propSlides, isEditing, onSlidesCh
                   tagName="em"
                   className="not-italic text-[#e87070] md:text-[#f08080]"
                 />
-              </h1>
+              </h2>
 
               <EditableBlock
                 isEditing={!!isEditing}

@@ -232,7 +232,7 @@ function formatProductReply(items) {
           : "";
     }
 
-    reply += `• ${p.name} – ₹${p.price_inr}
+    reply += `• ${p.name} – ₹${p.price_inr || p.price}${p.original_price && p.original_price > (p.price_inr || p.price) ? ` (was ₹${p.original_price})` : ''}
 ${p.description}
 ${suitableText}\n\n`;
   });
@@ -370,8 +370,8 @@ export const handleChat = async (req, res) => {
         // Prepare context for the AI - USE FUZZY SEARCH to find candidates
         const candidates = fuse.search(message).map(r => r.item).slice(0, 12);
         const productContext = candidates.length > 0 
-          ? candidates.map(p => `- ${p.name} (ID: ${p.pid}): ₹${p.price_inr}. Suitable: ${p.skin_type_suitable?.join(",") || "All"}. Description: ${(p.description || "").substring(0, 100)}...`).join("\n")
-          : liveProducts.slice(0, 8).map(p => `- ${p.name} (ID: ${p.pid}): ₹${p.price_inr}. Suitable: ${p.skin_type_suitable?.join(",") || "All"}.`).join("\n");
+          ? candidates.map(p => `- ${p.name} (ID: ${p.pid}): ₹${p.price_inr || p.price}${p.original_price && p.original_price > (p.price_inr || p.price) ? ` (was ₹${p.original_price})` : ''}. Suitable: ${p.skin_type_suitable?.join(",") || "All"}. Description: ${(p.description || "").substring(0, 100)}...`).join("\n")
+          : liveProducts.slice(0, 8).map(p => `- ${p.name} (ID: ${p.pid}): ₹${p.price_inr || p.price}${p.original_price && p.original_price > (p.price_inr || p.price) ? ` (was ₹${p.original_price})` : ''}. Suitable: ${p.skin_type_suitable?.join(",") || "All"}.`).join("\n");
 
         let userContextStr = "";
         if (profileContext) {

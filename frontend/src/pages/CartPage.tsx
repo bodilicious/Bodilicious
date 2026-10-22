@@ -262,7 +262,12 @@ export default function CartPage() {
                     </span>
                   </div>
 
-                  <p className="font-sans text-grey-beige text-xs mt-1 mb-4">
+                  <p className="font-sans text-grey-beige text-xs mt-1 mb-4 tabular-nums">
+                    {Boolean(item.product.original_price && item.product.original_price > item.product.price) && (
+                      <span className="line-through text-stone-500 mr-1">
+                        {formatPrice(item.product.original_price)}
+                      </span>
+                    )}
                     {formatPrice(item.product.price)} each
                   </p>
 

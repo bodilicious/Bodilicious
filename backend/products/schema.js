@@ -7,7 +7,7 @@ import { z } from "zod";
   - No isActive
   - No extra fields allowed
 */
-export const createProductSchema = z
+const baseProductSchema = z
   .object({
     pid: z.string().min(1, "Product ID is required"),
     name: z.string().min(1, "Name is required"),
@@ -44,6 +44,7 @@ export const createProductSchema = z
     }).optional(),
 
     price: z.number().min(0, "Price must be non-negative"),
+    original_price: z.number().min(0, "Original price must be non-negative").optional().nullable(),
     price_inr: z.number().min(0).optional(),
     stock: z.number().int("Stock must be an integer").min(0, "Stock cannot be negative"),
 
@@ -98,8 +99,32 @@ export const createProductSchema = z
   - Partial updates
   - Still no forbidden fields
 */
+export const createProductSchema = baseProductSchema.refine(
+  (data) => {
+    if (data.original_price != null && data.original_price > 0 && data.price != null) {
+      return data.original_price > data.price;
+    }
+    return true;
+  },
+  {
+    message: "Original price (MRP) must be greater than the selling price",
+    path: ["original_price"],
+  }
+);
+
 export const updateProductSchema =
-  createProductSchema.partial().strict();
+  baseProductSchema.partial().strict().refine(
+    (data) => {
+      if (data.original_price != null && data.original_price > 0 && data.price != null) {
+        return data.original_price > data.price;
+      }
+      return true;
+    },
+    {
+      message: "Original price (MRP) must be greater than the selling price",
+      path: ["original_price"],
+    }
+  );
 
 /*
   REVIEW CREATION

@@ -151,10 +151,12 @@
     <!-- Fallback content for crawlers that do not execute JavaScript.
          Prerender.js bakes full HTML into dist/ for bots, but this noscript
          block ensures even non-JS crawlers (e.g. Bing, older Googlebot passes)
-         see meaningful text and links instead of a completely empty page. -->
+         see meaningful text and links instead of a completely empty page.
+         No <h1> in here: prerender.js bakes this block into EVERY page, so an
+         <h1> gave each page a second one alongside the page's own heading. -->
     <noscript>
       <header>
-        <h1>Bodilicious — Premium Skincare &amp; Haircare</h1>
+        <p>Bodilicious — Premium Skincare &amp; Haircare</p>
         <nav>
           <a href="/shop">Shop All Products</a>
           <a href="/shop?category=skin">Skincare</a>

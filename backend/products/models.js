@@ -105,6 +105,23 @@ const productSchema = new mongoose.Schema(
     usage: { type: usageSchema, default: () => ({}) },
 
     price: { type: Number, required: true, min: 0 },
+    original_price: {
+      type: Number,
+      min: 0,
+      default: null,
+      validate: {
+        validator: function (val) {
+          if (val == null || val === 0) return true;
+          const update = typeof this.getUpdate === "function" ? this.getUpdate() : null;
+          const price = update
+            ? (update.$set?.price ?? update.price)
+            : this.price;
+          if (price != null && val <= price) return false;
+          return true;
+        },
+        message: "Original price (MRP) must be greater than the selling price",
+      },
+    },
     price_inr: { type: Number, min: 0 },
     stock: { type: Number, default: 0, min: 0 },
     expectedLifespanDays: { type: Number, default: 45 },

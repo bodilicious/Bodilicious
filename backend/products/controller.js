@@ -172,13 +172,13 @@ export const getAllProducts = async (req, res) => {
     // Use space-separated strings for projection to guarantee Mongoose strictly excludes other fields.
     // Using $slice in the projection object causes MongoDB to return the entire document (including heavy descriptions and reviews).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive variants createdAt'
+      ? 'pid name price original_price images rating ratingCount stock category brand isActive variants createdAt'
       // sub_category / product_type / google_product_category / seo_title /
       // seo_description are here for the Merchant Center feed, which reads
       // this endpoint (worker.js handleProductFeed) and has no other source
       // for them. A few short strings per item — negligible next to
       // description + reviews.
-      : 'pid name price images rating ratingCount stock category sub_category product_type google_product_category brand isActive description ingredients reviews seo_title seo_description variants';
+      : 'pid name price original_price images rating ratingCount stock category sub_category product_type google_product_category brand isActive description ingredients reviews seo_title seo_description variants';
 
     let productQuery = Product.find(query).select(projection).sort(sortObj).skip(skip).limit(numLimit);
 
@@ -318,8 +318,8 @@ export const getProductByPid = async (req, res) => {
     // Slim mode: only return card-level fields — used by pages that don't render
     // reviews, description, or ingredients (e.g. homepage best-seller section).
     const projection = isSlim
-      ? 'pid name price images rating ratingCount stock category brand isActive variants'
-      : 'pid name brand images description category sub_category product_type google_product_category item_form ingredients benefits concerns_targeted usage price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords seo_title seo_description seo_h1 seo_h2 seo_image_alt faqs variants';
+      ? 'pid name price original_price images rating ratingCount stock category brand isActive variants'
+      : 'pid name brand images description category sub_category product_type google_product_category item_form ingredients benefits concerns_targeted usage price original_price stock product_weight_ml product_weight_g skin_type_suitable skin_type_not_suitable hair_type_suitable how_to_use tips warnings texture rating ratingCount isActive reviews seo_keywords seo_title seo_description seo_h1 seo_h2 seo_image_alt faqs variants';
 
     let productQuery = Product.findOne({
       pid: req.params.pid,
@@ -408,7 +408,7 @@ export const updateProductByPid = async (req, res) => {
   try {
     // Explicit allowlist — prevents mass-assignment of sensitive fields like isActive, rating, ratingCount
     const {
-      name, price, description, images, stock,
+      name, price, original_price, description, images, stock,
       category, sub_category, product_type, google_product_category, concerns_targeted,
       brand, ingredients, benefits, how_to_use, faqs,
       product_weight_g, product_weight_ml,
@@ -416,12 +416,32 @@ export const updateProductByPid = async (req, res) => {
 
     const allowedUpdate = Object.fromEntries(
       Object.entries({
-        name, price, description, images, stock,
+        name, price, original_price, description, images, stock,
         category, sub_category, product_type, google_product_category, concerns_targeted,
         brand, ingredients, benefits, how_to_use, faqs,
         product_weight_g, product_weight_ml,
       }).filter(([, v]) => v !== undefined)
     );
+
+    const existing = await Product.findOne({ pid: req.params.pid, isActive: true }).select("price original_price").lean();
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    const effectivePrice = allowedUpdate.price !== undefined ? allowedUpdate.price : existing.price;
+    const effectiveOriginalPrice = allowedUpdate.original_price !== undefined ? allowedUpdate.original_price : existing.original_price;
+
+    if (effectiveOriginalPrice != null && effectiveOriginalPrice > 0) {
+      if (effectivePrice != null && effectiveOriginalPrice <= effectivePrice) {
+        return res.status(400).json({
+          success: false,
+          message: "Original price (MRP) must be greater than the selling price",
+        });
+      }
+    }
 
     const product = await Product.findOneAndUpdate(
       { pid: req.params.pid, isActive: true },

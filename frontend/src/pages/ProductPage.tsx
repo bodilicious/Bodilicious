@@ -910,10 +910,29 @@ export default function ProductPage() {
               </span>
             </div>
 
-            <p className="text-2xl sm:text-[30px] font-sans text-dark-red mb-5 sm:mb-6">
-              {formatPrice(product.price)}
-              {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
-            </p>
+            {/* Price display with optional strikethrough original price & Limited Offer badge */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-5 sm:mb-6">
+              <span className="text-2xl sm:text-[32px] font-sans font-bold text-dark-red tabular-nums leading-none">
+                {formatPrice(product.price)}
+                {userCurrency === 'USD' && <span className="text-sm ml-1 opacity-60">*</span>}
+              </span>
+
+              {Boolean(product.original_price && product.original_price > product.price) && (() => {
+                const savings = product.original_price! - product.price;
+                const savingsPercent = Math.round((savings / product.original_price!) * 100);
+                return (
+                  <>
+                    <span className="text-lg sm:text-xl font-sans text-stone-500 line-through tabular-nums leading-none">
+                      {formatPrice(product.original_price!)}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 bg-indian-red/10 border border-indian-red/20 text-indian-red text-xs font-sans font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indian-red motion-safe:animate-pulse" />
+                      Limited Offer · {savingsPercent >= 1 ? `Save ${savingsPercent}%` : `Save ${formatPrice(savings)}`}
+                    </span>
+                  </>
+                );
+              })()}
+            </div>
 
             <div
               className="prose prose-sm max-w-2xl mb-7 sm:mb-8
@@ -1679,7 +1698,14 @@ export default function ProductPage() {
               />
               <div className="min-w-0 flex-1">
                 <p className="font-sans text-xs font-semibold text-dark-red truncate">{product.name}</p>
-                <p className="font-sans text-sm text-dark-red">{formatPrice(product.price)}</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="font-sans text-sm font-bold text-dark-red tabular-nums">{formatPrice(product.price)}</p>
+                  {Boolean(product.original_price && product.original_price > product.price) && (
+                    <p className="font-sans text-xs text-stone-500 line-through tabular-nums">
+                      {formatPrice(product.original_price!)}
+                    </p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={handleAddToCart}

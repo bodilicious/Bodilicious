@@ -60,6 +60,7 @@ export interface Product {
   ratingCount: number;
   reviews: Review[];
   price: number;
+  original_price?: number;
   price_inr?: number;
   stock: number;
   isActive: boolean;

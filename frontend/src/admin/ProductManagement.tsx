@@ -351,7 +351,14 @@ const ProductManagement: React.FC = () => {
                     {product.category}
                   </span>
                 </td>
-                <td className="px-4 py-4 font-bold text-dark-red">₹{product.price}</td>
+                <td className="px-4 py-4 font-bold text-dark-red tabular-nums">
+                  ₹{product.price}
+                  {product.original_price && product.original_price > product.price ? (
+                    <span className="ml-1.5 text-xs text-gray-400 line-through font-normal tabular-nums">
+                      ₹{product.original_price}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-4">
                   {editingStockId === product._id ? (
                     <div className="flex items-center gap-2">

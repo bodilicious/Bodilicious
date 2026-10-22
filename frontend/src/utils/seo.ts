@@ -551,6 +551,28 @@ export function buildBlogOgAlt(post?: SeoBlogLike | null): string | undefined {
 }
 
 /**
+ * Posts per page on /blogs. The bot renderer for /blogs?page=N requests the
+ * same page size as BlogListPage.tsx, so page N lists the same posts for both.
+ */
+export const BLOG_INDEX_PAGE_SIZE = 12;
+
+/**
+ * Blog index metadata. Page 1 is plain /blogs; every later page gets its own
+ * title and a self-referencing canonical. Google advises against pointing a
+ * paginated series at page 1, since that hides the posts linked only from
+ * later pages. Shared by BlogListPage.tsx and the bot renderer.
+ */
+export function buildBlogIndexMeta(page = 1): { title: string; description: string; canonical: string } {
+  const base = STATIC_PAGE_SEO['/blogs'];
+  if (!(page > 1)) return { title: base.title, description: base.description, canonical: '/blogs' };
+  return {
+    title: `Blog — Page ${page} | ${BRAND}`,
+    description: `${base.description} Page ${page}.`,
+    canonical: `/blogs?page=${page}`,
+  };
+}
+
+/**
  * Meta description. Uses the editorial override when set, otherwise falls back
  * to the product description trimmed to what Google will actually display.
  *

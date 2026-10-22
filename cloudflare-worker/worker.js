@@ -4,6 +4,8 @@ import {
   renderShopHtml,
   renderHomeHtml,
   renderBlogHtml,
+  renderBlogIndexPageHtml,
+  BLOG_INDEX_PAGE_SIZE,
   rewriteBlogIndex,
   rewriteStaticMeta,
   rewriteHeadMeta,
@@ -48,8 +50,10 @@ const CSP_DIRECTIVES = [
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https://res.cloudinary.com https://*.razorpay.com https://*.gstatic.com https://images.pexels.com",
   "connect-src 'self' https://bodilicious-cxow.onrender.com https://bodilicious-front.onrender.com https://us.i.posthog.com https://*.posthog.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com https://analytics.ahrefs.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com",
-  "frame-src https://checkout.razorpay.com https://api.razorpay.com https://www.instagram.com https://accounts.google.com https://*.firebaseapp.com",
-  "frame-ancestors 'none'",
+  // 'self' in both: the admin live homepage builder (VisualHomepageEditor) frames
+  // /internal/homepage-preview from the same origin.
+  "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://www.instagram.com https://accounts.google.com https://*.firebaseapp.com",
+  "frame-ancestors 'self'",
   "form-action 'self'",
   // Only these two named policies are allowed to wrap strings as Trusted
   // Types — see frontend/src/utils/trustedTypes.ts for where they're created
@@ -118,9 +122,11 @@ function withSecurityHeaders(response, pathname) {
   // page and the popup — same-origin would silently break that flow.
   headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   // Belt-and-braces with frame-ancestors above, and — unlike the CSP directive
-  // above — enforced immediately: nothing on this site legitimately needs to
-  // be iframed, so this is zero-risk to turn on now.
-  headers.set('X-Frame-Options', 'DENY');
+  // above — enforced immediately. SAMEORIGIN, not DENY: the admin live homepage
+  // builder frames /internal/homepage-preview from this same origin, and DENY
+  // made the browser refuse it ("www.bodilicious.in refused to connect").
+  // Other sites still can't frame any page here. Matches the origin's render.yaml.
+  headers.set('X-Frame-Options', 'SAMEORIGIN');
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   if (response.status === 200 || response.status === 206) {
@@ -163,10 +169,22 @@ async function route(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
+    // HTTP → HTTPS on the SAME host, before anything else (sitemap included).
+    // Plain-HTTP requests used to be proxied to the origin over HTTP, and
+    // Render's own HTTPS redirect — which points at bodilicious-front.onrender.com
+    // — was passed straight back, so http://bodilicious.in/ sent visitors and
+    // crawlers to the Render hostname. /sitemap.xml was also answered over HTTP,
+    // so Ahrefs saw two sitemaps listing every page ("Page in multiple sitemaps").
+    if (url.protocol === 'http:') {
+      url.protocol = 'https:';
+      return Response.redirect(url.toString(), 301);
+    }
+
     // Helper to bypass Cloudflare Orange-to-Orange conflict by fetching the raw Render URL.
     // `originPath` fetches a different file than the one requested (see fetchPrerendered).
     const fetchFromOrigin = (originPath) => {
       const originUrl = new URL(request.url);
+      originUrl.protocol = 'https:';
       originUrl.hostname = 'bodilicious-front.onrender.com';
       if (originPath) {
         originUrl.pathname = originPath;
@@ -192,7 +210,8 @@ async function route(request, env, ctx) {
     };
 
     // fetchFromOriginNoCache: used exclusively as a graceful-degradation fallback
-    // inside bot-render handlers (handleBlog, handleProduct, handleShop, handleHome).
+    // inside bot-render handlers (handleShop, handleHome directly; handleBlog and
+    // handleProduct only when there is no prerendered copy — see fetchBotFallback).
     // When the API is unavailable (cold start timeout, non-200, JSON parse error),
     // the handler falls back to serving the Render origin's SPA shell. That shell
     // contains the hardcoded homepage canonical — if Cloudflare cached it at
@@ -259,6 +278,14 @@ async function route(request, env, ctx) {
 
     const frontendUrl = env.FRONTEND_URL || 'https://bodilicious.in';
 
+    // 1a. Later pages of the blog index, for bots. 1b below would serve the
+    // prerendered /blogs, which is page 1, for any query string. Humans still
+    // go through 1b, and BlogListPage loads page N once JS runs.
+    if (pathname === '/blogs' && isBot(request)) {
+      const blogPage = getBlogIndexPage(url);
+      if (blogPage > 1) return handleBlogIndexPage(blogPage, env, fetchFromOrigin, frontendUrl);
+    }
+
     // 1b. Static content pages — for EVERY client, not just bots. The build
     // prerenders each of these to dist/<path>/index.html, but the origin
     // answers /<path> with its SPA fallback, dist/index.html — which the
@@ -279,6 +306,16 @@ async function route(request, env, ctx) {
       return fetchFromOrigin();
     }
 
+    // Degraded path for the product/blog bot renderers (API cold start, timeout,
+    // non-200). The SPA shell they used to fall back to is the baked HOMEPAGE,
+    // canonical "/" included — so a slow backend told Googlebot that product
+    // and article URLs were duplicates of the homepage. The build-time
+    // prerender of this exact URL is a slightly stale but correctly
+    // canonicalised copy; the shell is only the last resort (e.g. a product
+    // published since the last deploy, which has no prerendered file).
+    const fetchBotFallback = async () =>
+      (await fetchPrerendered(pathname, fetchFromOrigin, frontendUrl)) || fetchFromOriginNoCache();
+
     // 3. Handle Product pages
     if (pathname.startsWith('/product/')) {
       // BUG FIX 2: pathname.split('/')[2] can return an empty string for trailing
@@ -287,7 +324,7 @@ async function route(request, env, ctx) {
       const rawPid = pathname.split('/')[2];
       const pid = rawPid ? decodeURIComponent(rawPid).trim() : null;
       if (pid) {
-        return handleProduct(pid, request, env, ctx, fetchFromOriginNoCache);
+        return handleProduct(pid, request, env, ctx, fetchBotFallback);
       }
     }
 
@@ -301,7 +338,7 @@ async function route(request, env, ctx) {
       const rawSlug = pathname.split('/')[2];
       const slug = rawSlug ? decodeURIComponent(rawSlug).trim() : null;
       if (slug) {
-        return handleBlog(slug, request, env, ctx, fetchFromOriginNoCache);
+        return handleBlog(slug, request, env, ctx, fetchBotFallback);
       }
     }
 
@@ -381,6 +418,14 @@ async function fetchPrerendered(pathname, fetchFromOrigin, frontendUrl) {
   const headers = new Headers(res.headers);
   headers.delete('content-length');
   return new Response(html, { status: res.status, statusText: res.statusText, headers });
+}
+
+/** N for a bare /blogs?page=N, else 0. Filtered or searched listings are left to the SPA. */
+function getBlogIndexPage(url) {
+  const keys = [...url.searchParams.keys()];
+  if (keys.length !== 1 || keys[0] !== 'page') return 0;
+  const raw = url.searchParams.get('page');
+  return /^\d+$/.test(raw) ? Number(raw) : 0;
 }
 
 function getShopFacets(url) {
@@ -517,7 +562,7 @@ async function handleShop({ category, type, concern }, request, env, ctx, fetchF
   }
 }
 
-async function handleProduct(pid, request, env, ctx, fetchFromOriginNoCache) {
+async function handleProduct(pid, request, env, ctx, fetchFallback) {
   try {
     const now = Date.now();
     // NOTE: Cloudflare Workers in-memory cache (Map) is per-isolate.
@@ -550,8 +595,8 @@ async function handleProduct(pid, request, env, ctx, fetchFromOriginNoCache) {
     
     if (!res.ok) {
       // Fall through to origin on API error (graceful degradation)
-      // no-store: don't let the CDN cache this degraded SPA shell response
-      return fetchFromOriginNoCache();
+      // fetchFallback: the prerendered copy of this URL, else the no-store SPA shell
+      return fetchFallback();
     }
 
     const data = await res.json();
@@ -581,8 +626,8 @@ async function handleProduct(pid, request, env, ctx, fetchFromOriginNoCache) {
     } else {
       console.error(`[SEO Worker] Error fetching product ${pid}:`, error.message);
     }
-    // no-store: don't let the CDN cache the degraded SPA shell response
-    return fetchFromOriginNoCache();
+    // fetchFallback: the prerendered copy of this URL, else the no-store SPA shell
+    return fetchFallback();
   }
 }
 
@@ -591,7 +636,7 @@ async function handleProduct(pid, request, env, ctx, fetchFromOriginNoCache) {
  * 404 for unknown slugs, and graceful fall-through to origin on any API error
  * so a backend hiccup degrades to the SPA rather than serving a broken page.
  */
-async function handleBlog(slug, request, env, ctx, fetchFromOriginNoCache) {
+async function handleBlog(slug, request, env, ctx, fetchFallback) {
   try {
     const now = Date.now();
     const cacheKey = `blog:${slug}`;
@@ -617,7 +662,7 @@ async function handleBlog(slug, request, env, ctx, fetchFromOriginNoCache) {
     );
 
     if (res.status === 404) return notFound();
-    if (!res.ok) return fetchFromOriginNoCache();
+    if (!res.ok) return fetchFallback();
 
     const data = await res.json();
     const post = data.data || data.blog;
@@ -641,8 +686,8 @@ async function handleBlog(slug, request, env, ctx, fetchFromOriginNoCache) {
     } else {
       console.error(`[SEO Worker] Error fetching blog ${slug}:`, error.message);
     }
-    // no-store: don't let the CDN cache the degraded SPA shell response
-    return fetchFromOriginNoCache();
+    // fetchFallback: the prerendered copy of this URL, else the no-store SPA shell
+    return fetchFallback();
   }
 }
 
@@ -676,6 +721,53 @@ async function handleBlogIndex(request, env, fetchFromOrigin) {
     console.error('[SEO Worker] Blog index rewrite failed:', error.message);
     return fetchFromOrigin();
   }
+}
+
+/**
+ * Bot renderer for /blogs?page=N (N ≥ 2). An out-of-range page is a 404. If the
+ * API is down it serves the prerendered /blogs, which is page 1 with a /blogs
+ * canonical: a valid page, just not page N.
+ */
+async function handleBlogIndexPage(page, env, fetchFromOrigin, frontendUrl) {
+  const now = Date.now();
+  const cacheKey = `blogs:page:${page}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return new Response(cached.html, {
+      headers: {
+        'Content-Type': 'text/html;charset=UTF-8',
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
+        'X-Cache': 'HIT',
+      }
+    });
+  }
+
+  try {
+    const apiUrl = env.API_BASE_URL || 'https://bodilicious-cxow.onrender.com';
+    const res = await fetchWithTimeout(`${apiUrl}/api/v1/blogs?page=${page}&limit=${BLOG_INDEX_PAGE_SIZE}`);
+    if (res.ok) {
+      const data = await res.json();
+      const posts = (data.data || data.blogs || []).filter(p => p && p.slug);
+      const pages = Number(data.pages || data.totalPages) || 1;
+      if (!posts.length || page > pages) {
+        return new Response(
+          '<!doctype html><html lang="en"><head><title>Page Not Found — Bodilicious</title><meta name="robots" content="noindex, nofollow"></head><body>Not Found</body></html>',
+          { status: 404, headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
+        );
+      }
+      const html = renderBlogIndexPageHtml(posts, page, pages, frontendUrl);
+      cache.set(cacheKey, { html, expiresAt: now + TTL_MS });
+      return new Response(html, {
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+          'Cache-Control': 'public, max-age=300, s-maxage=300',
+        }
+      });
+    }
+  } catch (error) {
+    console.error(`[SEO Worker] Blog index page ${page} failed:`, error.name);
+  }
+  return (await fetchPrerendered('/blogs', fetchFromOrigin, frontendUrl)) || fetchFromOrigin();
 }
 
 async function handleSitemap(env) {
@@ -793,7 +885,10 @@ async function handleSitemap(env) {
     <priority>0.75</priority>
   </url>`);
         });
-        blogTotalPages = blogData.totalPages || 1;
+        // The public blogs API reports `pages`, not `totalPages`, and caps
+        // limit at 50, so reading only totalPages cut the sitemap off after
+        // the first 50 posts.
+        blogTotalPages = blogData.pages || blogData.totalPages || 1;
         blogPage++;
       } while (blogPage <= blogTotalPages && blogPage <= MAX_PAGES);
     } catch (blogError) {
@@ -959,7 +1054,9 @@ async function handleProductFeed(env) {
     <link>${frontendUrl}/product/${escapeXml(p.pid)}</link>
     <g:image_link>${escapeXml(toAbsolute(primaryImage))}</g:image_link>${extraImageTags}
     <g:availability>${availability}</g:availability>
-    <g:price>${Number(p.price).toFixed(2)} INR</g:price>
+    ${p.original_price && p.original_price > p.price
+      ? `<g:price>${Number(p.original_price).toFixed(2)} INR</g:price>\n    <g:sale_price>${Number(p.price).toFixed(2)} INR</g:sale_price>`
+      : `<g:price>${Number(p.price).toFixed(2)} INR</g:price>`}
     <g:brand>${escapeXml(p.brand || 'Bodilicious')}</g:brand>
     <g:condition>new</g:condition>
     <g:identifier_exists>no</g:identifier_exists>

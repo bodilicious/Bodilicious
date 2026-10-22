@@ -104,7 +104,12 @@ export default function WishlistPreviewSection({ wishlist, navigateTo }: Props) 
                                 <div className="p-3">
                                     <h4 className="font-sans text-[11px] text-dark font-medium truncate mb-0.5">{product.name}</h4>
                                     <div className="flex items-center justify-between">
-                                        <p className="font-sans text-xs text-ruby-red font-semibold">{formatPrice(product.price)}</p>
+                                        <div className="flex items-baseline gap-1.5">
+                                            <p className="font-sans text-xs text-ruby-red font-semibold tabular-nums">{formatPrice(product.price)}</p>
+                                            {product.original_price && product.original_price > product.price ? (
+                                                <span className="font-sans text-[10px] text-stone-500 line-through tabular-nums">{formatPrice(product.original_price)}</span>
+                                            ) : null}
+                                        </div>
                                         {product.stock > 0 && product.stock < 5 && (
                                             <span className="text-[9px] text-amber-600 font-bold uppercase tracking-tighter flex items-center gap-0.5">
                                                 <AlertCircle size={8} /> Low Stock

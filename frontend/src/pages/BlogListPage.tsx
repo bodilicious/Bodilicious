@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSEO } from '../hooks/useSEO';
+import { buildBlogIndexMeta, BLOG_INDEX_PAGE_SIZE } from '../utils/seo';
 import { ChevronLeft, ChevronRight, BookOpen, AlertCircle, Search } from 'lucide-react';
 
 interface BlogPost {
@@ -27,15 +28,13 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 interface Category { _id: string; name: string; slug: string; }
 
 const BlogListPage: React.FC = () => {
-  useSEO({
-    title: 'Blog | Bodilicious',
-    description: 'Skincare tips, ingredient guides, and beauty rituals from the Bodilicious team.',
-    canonical: '/blogs',
-  });
-
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryFilter = searchParams.get('category') || '';
   const pageParam = parseInt(searchParams.get('page') || '1');
+
+  // /blogs?page=N is a page of its own (self canonical). Filtered and searched
+  // listings aren't, so they keep the plain /blogs metadata.
+  useSEO(buildBlogIndexMeta(categoryFilter || searchParams.get('search') ? 1 : pageParam));
   
   const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
   const debouncedSearch = useDebouncedValue(searchInput, 400);
@@ -68,7 +67,7 @@ const BlogListPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ page: String(pageParam), limit: '12' });
+      const params = new URLSearchParams({ page: String(pageParam), limit: String(BLOG_INDEX_PAGE_SIZE) });
       if (categoryFilter) params.set('category', categoryFilter);
       if (currentSearch) params.set('search', currentSearch);
       const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/blogs?${params}`);
@@ -94,10 +93,12 @@ const BlogListPage: React.FC = () => {
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
-  const setPage = (p: number) => {
+  const pageHref = (p: number) => {
     const next = new URLSearchParams(searchParams);
-    next.set('page', String(p));
-    setSearchParams(next);
+    if (p > 1) next.set('page', String(p));
+    else next.delete('page');
+    const qs = next.toString();
+    return qs ? `/blogs?${qs}` : '/blogs';
   };
 
   const setCategory = (id: string) => {
@@ -240,24 +241,39 @@ const BlogListPage: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* Pagination: real links, not buttons. Crawlers only follow <a href>,
+            so with onClick buttons no post past page 1 had an internal link. */}
         {pages > 1 && (
           <div className="flex items-center justify-center gap-4 mt-10">
-            <button
-              disabled={pageParam === 1}
-              onClick={() => setPage(pageParam - 1)}
-              className="p-2 border border-gray-200 rounded-lg bg-white disabled:opacity-40 hover:bg-gray-50 transition-colors"
-            >
-              <ChevronLeft size={18} />
-            </button>
+            {pageParam > 1 ? (
+              <Link
+                to={pageHref(pageParam - 1)}
+                rel="prev"
+                aria-label="Previous page"
+                className="inline-flex p-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors"
+              >
+                <ChevronLeft size={18} />
+              </Link>
+            ) : (
+              <span aria-hidden="true" className="inline-flex p-2 border border-gray-200 rounded-lg bg-white opacity-40">
+                <ChevronLeft size={18} />
+              </span>
+            )}
             <span className="text-sm text-gray-600">Page {pageParam} of {pages}</span>
-            <button
-              disabled={pageParam === pages}
-              onClick={() => setPage(pageParam + 1)}
-              className="p-2 border border-gray-200 rounded-lg bg-white disabled:opacity-40 hover:bg-gray-50 transition-colors"
-            >
-              <ChevronRight size={18} />
-            </button>
+            {pageParam < pages ? (
+              <Link
+                to={pageHref(pageParam + 1)}
+                rel="next"
+                aria-label="Next page"
+                className="inline-flex p-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 transition-colors"
+              >
+                <ChevronRight size={18} />
+              </Link>
+            ) : (
+              <span aria-hidden="true" className="inline-flex p-2 border border-gray-200 rounded-lg bg-white opacity-40">
+                <ChevronRight size={18} />
+              </span>
+            )}
           </div>
         )}
       </div>

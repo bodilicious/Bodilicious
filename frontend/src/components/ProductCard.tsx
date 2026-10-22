@@ -60,6 +60,13 @@ export default memo(function ProductCard({
 
   const navigate = useNavigate();
 
+  const hasDiscount = Boolean(product.original_price && product.original_price > product.price);
+  const savings = hasDiscount ? product.original_price! - product.price : 0;
+  const rawDiscountPercent = hasDiscount && product.original_price
+    ? Math.round((savings / product.original_price) * 100)
+    : (salePercent ?? 0);
+  const discountPercent = rawDiscountPercent >= 1 ? rawDiscountPercent : null;
+
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -104,27 +111,31 @@ export default memo(function ProductCard({
         {/* Hover tint */}
         <div className="absolute inset-0 bg-dark-red/0 group-hover:bg-dark-red/10 transition-colors duration-500" />
 
-        {/* ── Top-left badge (only one shown, priority: stock > explicit) ── */}
-        {product.stock === 0 ? (
-          <div className="absolute top-3 left-3 bg-dark-red/90 backdrop-blur-sm text-silk text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm">
-            Sold out
-          </div>
-        ) : product.stock <= 5 ? (
-          <div className="absolute top-3 left-3 bg-indian-red/90 backdrop-blur-sm text-white text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm">
-            Only {product.stock} left
-          </div>
-        ) : badge ? (
-          <div className={`absolute top-3 left-3 backdrop-blur-sm text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm ${BADGE_CONFIG[badge].className}`}>
-            {BADGE_CONFIG[badge].label}
-          </div>
-        ) : null}
+        {/* ── Top-left badges: status / low-stock & sale ribbon stacked vertically ── */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1 items-start z-10 pointer-events-none">
+          {product.stock <= 0 ? (
+            <div className="bg-dark-red/90 backdrop-blur-sm text-silk text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm">
+              Sold out
+            </div>
+          ) : product.stock <= 5 ? (
+            <div className="bg-indian-red/90 backdrop-blur-sm text-white text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm">
+              Only {product.stock} left
+            </div>
+          ) : (badge && BADGE_CONFIG[badge]) ? (
+            badge === 'sale' && (hasDiscount || salePercent) ? null : (
+              <div className={`backdrop-blur-sm text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm ${BADGE_CONFIG[badge].className}`}>
+                {BADGE_CONFIG[badge].label}
+              </div>
+            )
+          ) : null}
 
-        {/* ── Sale ribbon ── */}
-        {salePercent && product.stock > 0 && (
-          <div className="absolute top-3 right-12 bg-indian-red/90 backdrop-blur-sm text-white text-[9px] font-sans tracking-widest uppercase px-2 py-1 rounded-sm shadow-sm">
-            -{salePercent}%
-          </div>
-        )}
+          {/* Sale ribbon: shown under status badge at top-left whenever stock > 0 */}
+          {product.stock > 0 && (hasDiscount || salePercent) && (
+            <div className="bg-indian-red/90 backdrop-blur-sm text-white text-[9px] font-sans tracking-widest uppercase px-2.5 py-1 rounded-sm shadow-sm">
+              {discountPercent ? `-${discountPercent}%` : 'Sale'}
+            </div>
+          )}
+        </div>
 
         {/* ── Wishlist button ── */}
         <button
@@ -198,12 +209,16 @@ export default memo(function ProductCard({
         <div className="flex items-center justify-between pt-0.5">
           <StarRating rating={product.rating} count={product.ratingCount} size={12} />
           <div className="flex items-baseline gap-1.5">
-            {salePercent && (
-              <span className="text-[11px] font-sans text-grey-beige line-through">
+            {hasDiscount ? (
+              <span className="text-[11px] font-sans text-grey-beige line-through tabular-nums">
+                {formatPrice(product.original_price!)}
+              </span>
+            ) : (salePercent && salePercent > 0 && salePercent < 100) ? (
+              <span className="text-[11px] font-sans text-grey-beige line-through tabular-nums">
                 {formatPrice(Math.round(product.price / (1 - salePercent / 100)))}
               </span>
-            )}
-            <span className="font-sans font-semibold text-dark-red text-sm">
+            ) : null}
+            <span className="font-sans font-semibold text-dark-red text-sm tabular-nums">
               {formatPrice(product.price)}
               {userCurrency === 'USD' && <span className="text-[10px] ml-0.5 opacity-60">*</span>}
             </span>

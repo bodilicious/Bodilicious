@@ -408,7 +408,7 @@ export const getProductAdmin = async (req, res) => {
  * create-only extra: storefront URLs and the product feed are keyed on it.
  */
 const PRODUCT_EDITABLE_FIELDS = [
-  "name", "price", "price_inr", "description", "images", "stock", "lowStockThreshold",
+  "name", "price", "original_price", "price_inr", "description", "images", "stock", "lowStockThreshold",
   "category", "sub_category", "product_type", "item_form", "texture", "google_product_category",
   "brand", "ingredients", "benefits", "concerns_targeted", "how_to_use", "tips", "warnings",
   "usage", "skin_type_suitable", "skin_type_not_suitable", "hair_type_suitable",
@@ -431,6 +431,15 @@ export const createProductAdmin = async (req, res) => {
     // "pid is required" no matter what the form sent.
     const allowedFields = pickProductFields(req.body, ["pid"]);
 
+    if (allowedFields.original_price != null && allowedFields.original_price > 0) {
+      if (allowedFields.price != null && allowedFields.original_price <= allowedFields.price) {
+        return res.status(400).json({
+          success: false,
+          message: "Original price (MRP) must be greater than the selling price",
+        });
+      }
+    }
+
     const product = new Product(allowedFields);
     await product.save();
     res.status(201).json({ success: true, data: product });
@@ -452,9 +461,21 @@ export const updateProductAdmin = async (req, res) => {
     // Allowlist editable fields — never let the client overwrite sensitive computed/control fields
     const allowedFields = pickProductFields(req.body);
 
-    // Needed to record stock changes below; also the 404 check.
-    const before = await Product.findById(req.params.id).select("stock").lean();
+    // Needed to record stock changes below; also the 404 check and price validation.
+    const before = await Product.findById(req.params.id).select("stock price original_price").lean();
     if (!before) return res.status(404).json({ success: false, message: "Product not found" });
+
+    const effectivePrice = allowedFields.price !== undefined ? allowedFields.price : before.price;
+    const effectiveOriginalPrice = allowedFields.original_price !== undefined ? allowedFields.original_price : before.original_price;
+
+    if (effectiveOriginalPrice != null && effectiveOriginalPrice > 0) {
+      if (effectivePrice != null && effectiveOriginalPrice <= effectivePrice) {
+        return res.status(400).json({
+          success: false,
+          message: "Original price (MRP) must be greater than the selling price",
+        });
+      }
+    }
 
     // CRITICAL: always use $set — passing a plain object to findByIdAndUpdate
     // without $set causes Mongoose to do a full document REPLACEMENT, wiping
