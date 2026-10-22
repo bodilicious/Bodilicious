@@ -1,8 +1,80 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { m, AnimatePresence, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { X, Sparkles, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+
+/* ─── Shared defaults ────────────────────────────────────────────────────────
+   Keep in sync with MODAL_DEFAULTS in StoreSettings.tsx, so the admin preview
+   and the live popup always fall back to the same values.                    */
+const MODAL_DEFAULTS = {
+  headerBg: '135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #8B4513 75%, #4A1E0A 100%',
+  orb1Color: '#F97316',
+  orb2Color: '#EC4899',
+  orb3Color: '#FBBF24',
+  // Badge, title and description sit on the (white) content panel, so the
+  // defaults must be dark. The old white defaults were invisible.
+  badgeBg: 'rgba(124,53,39,0.10)',
+  badgeTextColor: '#7C3527',
+  titleColor: '#3B1E0A',
+  descriptionColor: '#6B4A3A',
+  contentBg: '#ffffff',
+  ctaGradient: '135deg, #FBBF24, #F97316',
+  ctaTextColor: '#2C1208',
+  showDelaySeconds: 2.5,
+  effectsIntensity: 'medium',
+  entranceStyle: 'spring',
+  imageRevealStyle: 'fadeScale',
+} as const;
+
+/* ─── Show-once memory ───────────────────────────────────────────────────────
+   Each visitor sees a given offer once, then again after REMIND_AFTER_DAYS.
+   Changing the badge, title, description or CTA link counts as a new offer
+   and shows again straight away.                                             */
+const SEEN_STORAGE_KEY = 'bod_launch_modal_seen';
+const REMIND_AFTER_DAYS = 3;
+
+function campaignKey(modal: Record<string, any>): string {
+  const src = [modal.badge, modal.title, modal.description, modal.ctaLink]
+    .map(v => (v ?? '').toString())
+    .join('|');
+  let h = 5381;
+  for (let i = 0; i < src.length; i++) h = ((h << 5) + h + src.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+function wasRecentlySeen(key: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(SEEN_STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (data?.key !== key) return false;
+    return Date.now() - Number(data.at) < REMIND_AFTER_DAYS * 86_400_000;
+  } catch {
+    return false; // private mode / blocked storage: just show the popup
+  }
+}
+
+function markSeen(key: string) {
+  try {
+    window.localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify({ key, at: Date.now() }));
+  } catch {
+    /* storage unavailable: nothing to remember */
+  }
+}
+
+/* ─── Small helpers ──────────────────────────────────────────────────────── */
+/** Relative "assets/..." paths break on nested routes; make them root-relative. */
+function resolveImageSrc(src?: string) {
+  if (!src) return '';
+  return src.startsWith('assets/') ? `/${src}` : src;
+}
+
+/** <Link> only handles in-app routes; full URLs need a plain <a>. */
+function isExternalLink(href: string) {
+  return /^(https?:)?\/\//i.test(href) || /^(mailto|tel):/i.test(href);
+}
 
 /* ─── Reduced-motion hook ────────────────────────────────────────────────── */
 function usePrefersReducedMotion() {
@@ -119,6 +191,8 @@ function ShimmerSweep() {
 
 /* ─── CTA particle burst ─────────────────────────────────────────────────── */
 type Particle = { id: number; x: number; y: number; angle: number };
+const BURST_MS = 450;
+
 function ParticleBurst({ particles, emojis }: { particles: Particle[]; emojis: string[] }) {
   const glyphs = emojis.length ? emojis : ['✦', '✧', '·', '✦', '✧'];
   return (
@@ -135,8 +209,8 @@ function ParticleBurst({ particles, emojis }: { particles: Particle[]; emojis: s
             rotate: p.angle * 45,
           }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.55, ease: 'easeOut' }}
-          style={{ position: 'absolute', fontSize: 13, pointerEvents: 'none', zIndex: 50 }}
+          transition={{ duration: BURST_MS / 1000, ease: 'easeOut' }}
+          style={{ position: 'absolute', left: 0, top: 0, fontSize: 13, pointerEvents: 'none', zIndex: 50 }}
         >
           {glyphs[p.id % glyphs.length]}
         </m.span>
@@ -148,15 +222,25 @@ function ParticleBurst({ particles, emojis }: { particles: Particle[]; emojis: s
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export default function LaunchModal() {
   const { storeSettings } = useApp();
-  const modal = storeSettings.launchModal;
-  const reduced  = usePrefersReducedMotion();
-  const intensity = modal.effectsIntensity ?? 'medium';
-  const isMed  = intensity === 'medium' || intensity === 'high';
-  const isHigh = intensity === 'high';
+  // Guard: settings may not have a launchModal block yet.
+  const modal: Record<string, any> = storeSettings?.launchModal ?? {};
 
-  const [isOpen, setIsOpen]     = useState(false);
+  const reduced   = usePrefersReducedMotion();
+  const intensity = modal.effectsIntensity ?? MODAL_DEFAULTS.effectsIntensity;
+  const isMed     = intensity === 'medium' || intensity === 'high';
+  const isHigh    = intensity === 'high';
+  const effectsOn = !reduced && intensity !== 'low';
+
+  const [isOpen, setIsOpen]       = useState(false);
   const [particles, setParticles] = useState<Particle[]>([]);
-  const modalRef = useRef<HTMLDivElement>(null);
+  const [imgFailed, setImgFailed] = useState(false);
+  const modalRef      = useRef<HTMLDivElement>(null);
+  const closeBtnRef   = useRef<HTMLButtonElement>(null);
+  const shownRef      = useRef(false);
+  const closeTimerRef = useRef<number | undefined>(undefined);
+
+  const key    = campaignKey(modal);
+  const imgSrc = resolveImageSrc(modal.image);
 
   /* Mouse parallax motion values — must be declared unconditionally */
   const mouseX = useMotionValue(0);
@@ -171,38 +255,95 @@ export default function LaunchModal() {
     modal.countdownEnabled && modal.countdownTargetDate ? modal.countdownTargetDate : undefined,
   );
 
-  /* Show delay + exit-intent */
+  /* Reset the image fallback when the image changes */
+  useEffect(() => { setImgFailed(false); }, [imgSrc]);
+
+  /* Show delay + exit-intent — each only ever opens the popup once */
   useEffect(() => {
     if (!modal.isActive) return;
-    const delay = (modal.showDelaySeconds ?? 2.5) * 1000;
-    const timer = setTimeout(() => setIsOpen(true), delay);
+    shownRef.current = false;
+    if (wasRecentlySeen(key)) return;
 
-    let exitFn: ((e: MouseEvent) => void) | null = null;
-    if (modal.exitIntentTrigger && !reduced) {
-      exitFn = (e: MouseEvent) => { if (e.clientY <= 20) setIsOpen(true); };
-      document.addEventListener('mousemove', exitFn);
-    }
-    return () => {
-      clearTimeout(timer);
-      if (exitFn) document.removeEventListener('mousemove', exitFn);
+    const open = () => {
+      if (shownRef.current) return;
+      shownRef.current = true;
+      markSeen(key);
+      setIsOpen(true);
     };
-  }, [modal.isActive, modal.showDelaySeconds, modal.exitIntentTrigger, reduced]);
 
-  const handleClose = useCallback(() => setIsOpen(false), []);
+    // A cleared delay field arrives as '' — fall back instead of showing instantly.
+    const rawDelay = modal.showDelaySeconds;
+    const delaySec = typeof rawDelay === 'number' && rawDelay >= 0 ? rawDelay : MODAL_DEFAULTS.showDelaySeconds;
+    const timer = window.setTimeout(open, delaySec * 1000);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!modal.parallaxOnMouse || reduced || intensity === 'low') return;
+    // Exit intent: the pointer leaves the page through the top edge (tabs / close button).
+    let onLeave: ((e: MouseEvent) => void) | null = null;
+    if (modal.exitIntentTrigger) {
+      onLeave = (e: MouseEvent) => {
+        if (!e.relatedTarget && e.clientY <= 0) open();
+      };
+      document.addEventListener('mouseout', onLeave);
+    }
+
+    return () => {
+      window.clearTimeout(timer);
+      if (onLeave) document.removeEventListener('mouseout', onLeave);
+    };
+  }, [modal.isActive, modal.showDelaySeconds, modal.exitIntentTrigger, key]);
+
+  /* While open: Escape closes, page scroll is locked, focus moves into the dialog */
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false); };
+    document.addEventListener('keydown', onKey);
+    const focusTimer = window.setTimeout(() => closeBtnRef.current?.focus(), 50);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKey);
+      window.clearTimeout(focusTimer);
+      prevFocus?.focus?.();
+    };
+  }, [isOpen]);
+
+  /* Clear any pending delayed close on unmount */
+  useEffect(() => () => window.clearTimeout(closeTimerRef.current), []);
+
+  const handleClose = useCallback(() => {
+    window.clearTimeout(closeTimerRef.current);
+    setParticles([]);
+    setIsOpen(false);
+  }, []);
+
+  const parallaxOn = !!modal.parallaxOnMouse && isMed && effectsOn;
+
+  const handleMouseMove = useCallback((e: ReactMouseEvent) => {
+    if (!parallaxOn) return;
     const rect = modalRef.current?.getBoundingClientRect();
     if (!rect) return;
     mouseX.set(e.clientX - rect.left - rect.width  / 2);
     mouseY.set(e.clientY - rect.top  - rect.height / 2);
-  }, [modal.parallaxOnMouse, reduced, intensity, mouseX, mouseY]);
+  }, [parallaxOn, mouseX, mouseY]);
 
-  const handleCTAClick = useCallback((e: React.MouseEvent) => {
-    if (!modal.ctaParticleBurst || reduced || intensity === 'low') return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const handleMouseLeave = useCallback(() => {
+    mouseX.set(0);
+    mouseY.set(0);
+  }, [mouseX, mouseY]);
+
+  /* CTA: with the burst on, wait for the particles before closing — closing
+     immediately unmounted the modal before they could render. */
+  const handleCTAClick = useCallback((e: ReactMouseEvent<HTMLElement>) => {
+    const burst = !!modal.ctaParticleBurst && effectsOn;
     const mRect = modalRef.current?.getBoundingClientRect();
-    if (!mRect) return;
+    if (!burst || !mRect) {
+      handleClose();
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
     const cx = rect.left + rect.width / 2  - mRect.left;
     const cy = rect.top  + rect.height / 2 - mRect.top;
     setParticles(
@@ -212,45 +353,66 @@ export default function LaunchModal() {
         angle: (i / 12) * Math.PI * 2,
       })),
     );
-    setTimeout(() => setParticles([]), 700);
-  }, [modal.ctaParticleBurst, reduced, intensity]);
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(handleClose, BURST_MS);
+  }, [modal.ctaParticleBurst, effectsOn, handleClose]);
 
   if (!modal.isActive) return null;
 
   /* ── Derived styles ── */
-  const headerGrad = modal.headerBg
-    ? `linear-gradient(${modal.headerBg})`
-    : 'linear-gradient(135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #8B4513 75%, #4A1E0A 100%)';
-  const orb1     = modal.orb1Color     || '#F97316';
-  const orb2     = modal.orb2Color     || '#EC4899';
-  const orb3     = modal.orb3Color     || '#FBBF24';
-  const badgeBg  = modal.badgeBg       || 'rgba(255,255,255,0.15)';
-  const badgeTxt = modal.badgeTextColor || '#FDE68A';
-  const titleClr = modal.titleColor    || '#ffffff';
-  const descClr  = modal.descriptionColor || 'rgba(255,255,255,0.75)';
-  const contentBg = modal.contentBg   || '#ffffff';
-  const ctaGrad  = modal.ctaGradient
-    ? `linear-gradient(${modal.ctaGradient})`
-    : 'linear-gradient(135deg, #FBBF24, #F97316)';
-  const ctaTxt   = modal.ctaTextColor  || '#2C1208';
-  const emojis   = (modal.floatingEmojisEnabled && modal.floatingEmojis?.length)
+  const headerGrad = `linear-gradient(${modal.headerBg || MODAL_DEFAULTS.headerBg})`;
+  const orb1      = modal.orb1Color        || MODAL_DEFAULTS.orb1Color;
+  const orb2      = modal.orb2Color        || MODAL_DEFAULTS.orb2Color;
+  const orb3      = modal.orb3Color        || MODAL_DEFAULTS.orb3Color;
+  const badgeBg   = modal.badgeBg          || MODAL_DEFAULTS.badgeBg;
+  const badgeTxt  = modal.badgeTextColor   || MODAL_DEFAULTS.badgeTextColor;
+  const titleClr  = modal.titleColor       || MODAL_DEFAULTS.titleColor;
+  const descClr   = modal.descriptionColor || MODAL_DEFAULTS.descriptionColor;
+  const contentBg = modal.contentBg        || MODAL_DEFAULTS.contentBg;
+  const ctaGrad   = `linear-gradient(${modal.ctaGradient || MODAL_DEFAULTS.ctaGradient})`;
+  const ctaTxt    = modal.ctaTextColor     || MODAL_DEFAULTS.ctaTextColor;
+  const emojis: string[] = (modal.floatingEmojisEnabled && modal.floatingEmojis?.length)
     ? modal.floatingEmojis.filter(Boolean)
     : [];
 
   const emojiPositions = [
-    { top: '10%', left: '8%'  },
-    { top: '15%', right: '10%' },
-    { bottom: '22%', left: '6%' },
-    { bottom: '12%', right: '7%' },
-    { top: '50%', left: '46%', transform: 'translate(-50%,-50%)' },
+    { top: '10%',    left: '8%'   },
+    { top: '15%',    right: '10%' },
+    { bottom: '22%', left: '6%'   },
+    { bottom: '12%', right: '7%'  },
+    { top: '46%',    left: '44%'  },
   ];
 
-  const modalVariants   = getVariants(modal.entranceStyle ?? 'spring', reduced);
-  const doStagger       = modal.staggerContent !== false && !reduced;
-  const contentParent   = doStagger ? staggerParent : {};
-  const contentChild    = doStagger ? staggerChild  : {};
+  const modalVariants = getVariants(modal.entranceStyle ?? MODAL_DEFAULTS.entranceStyle, reduced);
+  const doStagger     = modal.staggerContent !== false && !reduced;
+  const contentParent = doStagger ? staggerParent : {};
+  const contentChild  = doStagger ? staggerChild  : {};
 
-  const showUrgency = modal.urgencyEnabled || modal.countdownEnabled;
+  const hasCountdown = !!(modal.countdownEnabled && modal.countdownTargetDate);
+  const showUrgency  = modal.urgencyEnabled || modal.countdownEnabled;
+
+  /* Image reveal (default matches the admin's "Fade + Scale (default)") */
+  const reveal = reduced ? 'none' : (modal.imageRevealStyle ?? MODAL_DEFAULTS.imageRevealStyle);
+  const revealFrom =
+    reveal === 'clipWipe'  ? { clipPath: 'inset(0 100% 0 0)', opacity: 0 } :
+    reveal === 'fadeScale' ? { scale: 0.82, opacity: 0 } :
+    {};
+  const revealTo =
+    reveal === 'clipWipe'  ? { clipPath: 'inset(0 0% 0 0)', opacity: 1 } :
+    reveal === 'fadeScale' ? { scale: 1, opacity: 1 } :
+    {};
+
+  /* CTA */
+  const ctaHref    = (modal.ctaLink || '/shop').trim();
+  const ctaIsExt   = isExternalLink(ctaHref);
+  const ctaClasses = 'relative inline-flex w-full items-center justify-center gap-2 text-sm font-semibold px-6 py-3.5 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 group cursor-pointer overflow-hidden';
+  const ctaInner = (
+    <>
+      {modal.ctaShimmer && isMed && !reduced && <ShimmerSweep />}
+      <span className="relative z-10">{modal.ctaLabel || 'Explore Collection'}</span>
+      <ArrowRight size={16} className="relative z-10 transition-transform group-hover:translate-x-1" />
+    </>
+  );
 
   return (
     <AnimatePresence>
@@ -266,18 +428,23 @@ export default function LaunchModal() {
             exit={{ opacity: 0 }}
             transition={{ duration: modal.backdropBlurAnimated ? 0.38 : 0.18 }}
             onClick={handleClose}
-            className="absolute inset-0 bg-neutral-900/50 backdrop-blur-[6px]"
+            className={`absolute inset-0 bg-neutral-900/50 ${intensity === 'low' ? '' : 'backdrop-blur-[6px]'}`}
           />
 
           {/* Modal card */}
           <m.div
             ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="launch-modal-title"
+            aria-describedby={modal.description ? 'launch-modal-desc' : undefined}
             variants={modalVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
             onMouseMove={handleMouseMove}
-            className="relative w-full max-w-md overflow-visible rounded-3xl shadow-2xl z-10"
+            onMouseLeave={handleMouseLeave}
+            className="relative w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-3xl shadow-2xl z-10"
             style={{ background: contentBg, transformStyle: 'preserve-3d' }}
           >
             {/* Particle layer (positioned relative to the card) */}
@@ -287,6 +454,8 @@ export default function LaunchModal() {
 
             {/* Close button */}
             <m.button
+              ref={closeBtnRef}
+              type="button"
               onClick={handleClose}
               whileHover={modal.closeButtonSpin && !reduced ? { rotate: 90 } : {}}
               transition={{ type: 'spring', stiffness: 320, damping: 20 }}
@@ -355,13 +524,14 @@ export default function LaunchModal() {
                 const dur = modal.emojiTrailPhysics ? 4 + ((i * 1.3) % 3) : 5;
                 const del = modal.emojiTrailPhysics ? (i * 0.65) % 2 : i * 0.4;
                 const rot = modal.emojiTrailPhysics
-                  ? [-8 + i * 3, 8 - i * 2, -5 + i, -8 + i * 3] as number[]
-                  : [-10, 10, -10] as number[];
+                  ? [-8 + i * 3, 8 - i * 2, -5 + i, -8 + i * 3]
+                  : [-10, 10, -10];
                 return (
                   <m.span
                     key={i}
+                    aria-hidden
                     className="absolute text-2xl pointer-events-none select-none z-10"
-                    style={pos as any}
+                    style={pos}
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: [0, 0.9, 0.9, 0], scale: [0.5, 1, 1, 0.7], rotate: rot, y: [0, -10, 6, 0] }}
                     transition={{ duration: dur, delay: del, repeat: Infinity, ease: 'easeInOut' }}
@@ -371,52 +541,48 @@ export default function LaunchModal() {
                 );
               })}
 
-              {/* Image / graphic */}
+              {/* Image / graphic.
+                  Outer layer = mouse parallax, inner layer = entrance animation.
+                  Putting both on one element made them fight over `y`. */}
               <m.div
                 className="relative z-10 text-center w-full px-6"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.22, duration: 0.5 }}
-                style={modal.parallaxOnMouse && isMed && !reduced ? { x: imgX, y: imgY } as any : {}}
+                style={parallaxOn ? { x: imgX, y: imgY } : undefined}
               >
-                {modal.image ? (
-                  <m.img
-                    src={modal.image}
-                    alt={modal.title}
-                    className="h-36 w-auto object-contain mx-auto drop-shadow-2xl"
-                    animate={!reduced ? { y: [0, -8, 0] } : {}}
-                    transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                    initial={
-                      modal.imageRevealStyle === 'clipWipe'
-                        ? { clipPath: 'inset(0 100% 0 0)', opacity: 0 }
-                        : modal.imageRevealStyle === 'fadeScale'
-                        ? { scale: 0.82, opacity: 0 }
-                        : { opacity: 1 }
-                    }
-                    whileInView={
-                      modal.imageRevealStyle === 'clipWipe'
-                        ? { clipPath: 'inset(0 0% 0 0)', opacity: 1, transition: { duration: 0.7, delay: 0.3 } }
-                        : modal.imageRevealStyle === 'fadeScale'
-                        ? { scale: 1, opacity: 1, transition: { duration: 0.5, delay: 0.28 } }
-                        : {}
-                    }
-                  />
-                ) : (
-                  <div className="relative inline-block">
-                    <m.div
-                      animate={!reduced ? { y: [0, -8, 0] } : {}}
-                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                      className="w-14 h-20 mx-auto bg-gradient-to-b from-white/20 to-white/10 rounded-xl shadow-lg border border-white/30 flex items-center justify-center"
-                    >
-                      <Sparkles className="text-white opacity-70" size={22} />
-                    </m.div>
-                    <m.div
-                      animate={!reduced ? { scale: [1, 0.8, 1], opacity: [0.4, 0.2, 0.4] } : {}}
-                      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                      className="w-10 h-1.5 bg-white/20 rounded-full mx-auto mt-3 blur-[2px]"
+                <m.div
+                  initial={reduced ? { opacity: 0 } : { y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.22, duration: 0.5 }}
+                >
+                  {imgSrc && !imgFailed ? (
+                    <m.img
+                      src={imgSrc}
+                      alt={modal.title || 'Offer'}
+                      onError={() => setImgFailed(true)}
+                      className="h-36 w-auto object-contain mx-auto drop-shadow-2xl"
+                      initial={revealFrom}
+                      animate={{ ...revealTo, ...(!reduced ? { y: [0, -8, 0] } : {}) }}
+                      transition={{
+                        default: { duration: reveal === 'clipWipe' ? 0.7 : 0.5, delay: 0.28 },
+                        y: { duration: 4, repeat: Infinity, ease: 'easeInOut' },
+                      }}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="relative inline-block">
+                      <m.div
+                        animate={!reduced ? { y: [0, -8, 0] } : {}}
+                        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                        className="w-14 h-20 mx-auto bg-gradient-to-b from-white/20 to-white/10 rounded-xl shadow-lg border border-white/30 flex items-center justify-center"
+                      >
+                        <Sparkles className="text-white opacity-70" size={22} />
+                      </m.div>
+                      <m.div
+                        animate={!reduced ? { scale: [1, 0.8, 1], opacity: [0.4, 0.2, 0.4] } : {}}
+                        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                        className="w-10 h-1.5 bg-white/20 rounded-full mx-auto mt-3 blur-[2px]"
+                      />
+                    </div>
+                  )}
+                </m.div>
               </m.div>
             </div>
 
@@ -430,9 +596,9 @@ export default function LaunchModal() {
                   color: '#92400E',
                 }}
               >
-                {modal.countdownEnabled && modal.countdownTargetDate ? (
+                {hasCountdown ? (
                   timeLeft ? (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1" aria-label="Time left on this offer">
                       ⏰&nbsp;
                       <CountdownDigit value={timeLeft.hours} />
                       <span className="opacity-60 mx-0.5">:</span>
@@ -470,6 +636,7 @@ export default function LaunchModal() {
 
               {/* Title */}
               <m.h3
+                id="launch-modal-title"
                 variants={contentChild}
                 className="text-2xl font-serif leading-tight mb-2.5"
                 style={{ color: titleClr }}
@@ -478,16 +645,19 @@ export default function LaunchModal() {
               </m.h3>
 
               {/* Description */}
-              <m.p
-                variants={contentChild}
-                className="text-sm font-sans font-light leading-relaxed mb-7"
-                style={{ color: descClr }}
-              >
-                {modal.description}
-              </m.p>
+              {modal.description && (
+                <m.p
+                  id="launch-modal-desc"
+                  variants={contentChild}
+                  className="text-sm font-sans font-light leading-relaxed mb-7"
+                  style={{ color: descClr }}
+                >
+                  {modal.description}
+                </m.p>
+              )}
 
               {/* CTA */}
-              <m.div variants={contentChild} className="relative">
+              <m.div variants={contentChild} className={`relative ${modal.description ? '' : 'mt-4'}`}>
                 {/* Glow ring */}
                 {modal.ctaGlow && !reduced && (
                   <m.span
@@ -497,16 +667,26 @@ export default function LaunchModal() {
                     transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 )}
-                <Link
-                  to={modal.ctaLink || '/shop'}
-                  onClick={(e) => { handleCTAClick(e); handleClose(); }}
-                  className="relative inline-flex w-full items-center justify-center gap-2 text-sm font-semibold px-6 py-3.5 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 group cursor-pointer overflow-hidden"
-                  style={{ background: ctaGrad, color: ctaTxt }}
-                >
-                  {modal.ctaShimmer && isMed && !reduced && <ShimmerSweep />}
-                  <span className="relative z-10">{modal.ctaLabel || 'Explore Collection'}</span>
-                  <ArrowRight size={16} className="relative z-10 transition-transform group-hover:translate-x-1" />
-                </Link>
+                {ctaIsExt ? (
+                  <a
+                    href={ctaHref}
+                    {...(/^https?:|^\/\//i.test(ctaHref) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                    onClick={handleCTAClick}
+                    className={ctaClasses}
+                    style={{ background: ctaGrad, color: ctaTxt }}
+                  >
+                    {ctaInner}
+                  </a>
+                ) : (
+                  <Link
+                    to={ctaHref}
+                    onClick={handleCTAClick}
+                    className={ctaClasses}
+                    style={{ background: ctaGrad, color: ctaTxt }}
+                  >
+                    {ctaInner}
+                  </Link>
+                )}
               </m.div>
             </m.div>
           </m.div>

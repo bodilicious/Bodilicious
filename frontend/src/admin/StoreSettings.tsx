@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import toast from 'react-hot-toast';
 import {
   Save, Loader2, Store, Truck, Bell, CreditCard,
   RotateCcw, Star, Shield, AlertTriangle, Settings2, CheckCircle2,
-  Sparkles, ArrowRight, X, ChevronDown,
+  Sparkles, ArrowRight, X, ChevronDown, Upload, Trash2, Library, Link as LinkIcon,
 } from 'lucide-react';
+
+const MediaLibrary = lazy(() => import('../components/MediaLibrary'));
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -33,6 +36,9 @@ function Toggle({ checked, onChange, label, description }: { checked: boolean; o
       </div>
       <button
         type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange(!checked)}
         className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-red/30 focus-visible:ring-offset-2 ${checked ? 'bg-dark-red' : 'bg-slate-200'}`}
       >
@@ -90,11 +96,11 @@ function SettingsHeader({ isDirty, isSaving, isPrimaryAdmin, onSave }: any) {
       </div>
       <div className="flex items-center gap-3">
         {!isPrimaryAdmin && (
-          <span className="hidden sm:flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+          <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
             <AlertTriangle size={12} /> View-only
           </span>
         )}
-        
+
         {isPrimaryAdmin && (
           <div className="text-xs font-medium mr-2 hidden sm:block">
             {isSaving ? (
@@ -149,6 +155,26 @@ function SettingsSidebar({ tabs, activeSection, onSelect }: any) {
    ModalBannerAdmin — full WYSIWYG control panel for the LaunchModal popup
 ───────────────────────────────────────────────────────────────────────────── */
 
+/* Keep in sync with MODAL_DEFAULTS in LaunchModal.tsx, so the preview, the
+   admin controls and the live popup all fall back to the same values. */
+const MODAL_DEFAULTS = {
+  headerBg: '135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #8B4513 75%, #4A1E0A 100%',
+  orb1Color: '#F97316',
+  orb2Color: '#EC4899',
+  orb3Color: '#FBBF24',
+  badgeBg: 'rgba(124,53,39,0.10)',
+  badgeTextColor: '#7C3527',
+  titleColor: '#3B1E0A',
+  descriptionColor: '#6B4A3A',
+  contentBg: '#ffffff',
+  ctaGradient: '135deg, #FBBF24, #F97316',
+  ctaTextColor: '#2C1208',
+  showDelaySeconds: 2.5,
+  effectsIntensity: 'medium',
+  entranceStyle: 'spring',
+  imageRevealStyle: 'fadeScale',
+} as const;
+
 const HEADER_PRESETS = [
   { label: 'Warm Dark',  value: '135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #8B4513 75%, #4A1E0A 100%', swatch: '#5C2D1E' },
   { label: 'Rose',       value: '135deg, #881337 0%, #9F1239 40%, #BE123C 100%',                              swatch: '#9F1239' },
@@ -164,6 +190,24 @@ const CTA_PRESETS = [
   { label: 'Purple',       value: '135deg, #7C3AED, #6D28D9', swatch: '#7C3AED' },
 ];
 
+/** Relative "assets/..." paths break on nested routes; make them root-relative. */
+function resolveImageSrc(src?: string) {
+  if (!src) return '';
+  return src.startsWith('assets/') ? `/${src}` : src;
+}
+
+/** Static HH:MM:SS for the preview; null when the target is invalid or past. */
+function previewCountdown(target?: string): string | null {
+  if (!target) return null;
+  const diff = new Date(target).getTime() - Date.now();
+  if (isNaN(diff) || diff <= 0) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const h = Math.floor(diff / 3_600_000);
+  const mi = Math.floor((diff % 3_600_000) / 60_000);
+  const s = Math.floor((diff % 60_000) / 1_000);
+  return `${pad(h)}:${pad(mi)}:${pad(s)}`;
+}
+
 /* Accordion row */
 function Accordion({ title, icon, children, defaultOpen = false }: {
   title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean;
@@ -174,6 +218,7 @@ function Accordion({ title, icon, children, defaultOpen = false }: {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
         className="w-full flex items-center justify-between px-5 py-3.5 bg-white hover:bg-slate-50/80 transition-colors text-left"
       >
         <div className="flex items-center gap-2.5">
@@ -194,27 +239,42 @@ function Accordion({ title, icon, children, defaultOpen = false }: {
   );
 }
 
-/* Colour field: colour picker + hex text input side by side */
-function ColorField({ label, value, onChange, description }: {
-  label: string; value: string; onChange: (v: string) => void; description?: string;
+/* Colour field: compact (label on top) so it fits in a grid.
+   The swatch shows the real value, including rgba(), instead of a black box,
+   and an empty field shows the default the popup will actually use. */
+const HEX6 = /^#[0-9A-Fa-f]{6}$/;
+function ColorField({ label, value, onChange, description, fallback = '#000000' }: {
+  label: string; value: string; onChange: (v: string) => void; description?: string; fallback?: string;
 }) {
+  const effective = value || fallback;
+  const pickerValue = HEX6.test(value ?? '') ? value : HEX6.test(fallback) ? fallback : '#000000';
   return (
-    <Field label={label} description={description}>
+    <div className="py-3">
+      <label className="text-xs font-medium text-slate-700 block mb-1">{label}</label>
+      {description && <p className="text-[11px] text-slate-400 mb-1">{description}</p>}
       <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={/^#[0-9A-Fa-f]{6}$/.test(value ?? '') ? value : '#000000'}
-          onChange={e => onChange(e.target.value)}
-          className="w-9 h-9 p-0.5 rounded-lg border border-slate-300 cursor-pointer flex-shrink-0 bg-white"
-          title="Pick a colour"
-        />
+        <div className="relative w-9 h-9 flex-shrink-0">
+          <span
+            className="block w-9 h-9 rounded-lg border border-slate-300"
+            // Solid colour layered over a checkerboard, so translucent rgba() values are visible.
+            style={{ background: `linear-gradient(${effective}, ${effective}), repeating-conic-gradient(#e2e8f0 0% 25%, #fff 0% 50%) 50% / 10px 10px` }}
+          />
+          <input
+            type="color"
+            value={pickerValue}
+            onChange={e => onChange(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            title="Pick a colour"
+            aria-label={`${label} picker`}
+          />
+        </div>
         <Input
           value={value ?? ''}
           onChange={onChange}
-          placeholder="#000000 or rgba(…)"
+          placeholder={fallback}
         />
       </div>
-    </Field>
+    </div>
   );
 }
 
@@ -266,25 +326,29 @@ function GradientField({ label, value, onChange, presets, description }: {
   );
 }
 
-/* Live Preview — renders the modal visually with all custom styles applied */
+/* Live Preview — renders the modal visually with all custom styles applied.
+   Uses the same defaults and the same urgency/countdown logic as LaunchModal. */
 function ModalPreview({ m: modal }: { m: any }) {
-  const headerGrad = modal.headerBg
-    ? `linear-gradient(${modal.headerBg})`
-    : 'linear-gradient(135deg, #3B1E0A 0%, #5C2D1E 25%, #7C3527 50%, #4A1E0A 100%)';
-  const orb1    = modal.orb1Color    || '#F97316';
-  const orb2    = modal.orb2Color    || '#EC4899';
-  const badgeBg  = modal.badgeBg     || 'rgba(255,255,255,0.15)';
-  const badgeTxt = modal.badgeTextColor || '#FDE68A';
-  const titleClr = modal.titleColor  || '#ffffff';
-  const descClr  = modal.descriptionColor || 'rgba(255,255,255,0.75)';
-  const contentBg = modal.contentBg  || '#ffffff';
-  const ctaGrad  = modal.ctaGradient
-    ? `linear-gradient(${modal.ctaGradient})`
-    : 'linear-gradient(135deg, #FBBF24, #F97316)';
-  const ctaTxt   = modal.ctaTextColor || '#2C1208';
-  const emojis   = (modal.floatingEmojisEnabled && modal.floatingEmojis?.length)
+  const headerGrad = `linear-gradient(${modal.headerBg || MODAL_DEFAULTS.headerBg})`;
+  const orb1      = modal.orb1Color        || MODAL_DEFAULTS.orb1Color;
+  const orb2      = modal.orb2Color        || MODAL_DEFAULTS.orb2Color;
+  const badgeBg   = modal.badgeBg          || MODAL_DEFAULTS.badgeBg;
+  const badgeTxt  = modal.badgeTextColor   || MODAL_DEFAULTS.badgeTextColor;
+  const titleClr  = modal.titleColor       || MODAL_DEFAULTS.titleColor;
+  const descClr   = modal.descriptionColor || MODAL_DEFAULTS.descriptionColor;
+  const contentBg = modal.contentBg        || MODAL_DEFAULTS.contentBg;
+  const ctaGrad   = `linear-gradient(${modal.ctaGradient || MODAL_DEFAULTS.ctaGradient})`;
+  const ctaTxt    = modal.ctaTextColor     || MODAL_DEFAULTS.ctaTextColor;
+  const emojis: string[] = (modal.floatingEmojisEnabled && modal.floatingEmojis?.length)
     ? modal.floatingEmojis.filter(Boolean)
     : [];
+  const imgSrc = resolveImageSrc(modal.image);
+
+  const hasCountdown = !!(modal.countdownEnabled && modal.countdownTargetDate);
+  const cd = hasCountdown ? previewCountdown(modal.countdownTargetDate) : null;
+  const stripText = hasCountdown
+    ? (cd ? `⏰ ${cd}` : (modal.countdownExpiredText || 'Offer ended'))
+    : (modal.urgencyText || '⏰ Limited time offer');
 
   return (
     <div className="relative w-full max-w-xs mx-auto rounded-3xl shadow-2xl overflow-hidden border border-white/20" style={{ background: contentBg }}>
@@ -303,9 +367,9 @@ function ModalPreview({ m: modal }: { m: any }) {
           >{e}</span>
         ))}
         <div className="relative z-10 text-center px-4">
-          {modal.image ? (
+          {imgSrc ? (
             <img
-              src={modal.image}
+              src={imgSrc}
               alt="preview"
               className="h-24 w-auto object-contain mx-auto drop-shadow-xl"
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
@@ -320,10 +384,10 @@ function ModalPreview({ m: modal }: { m: any }) {
       {/* Urgency strip */}
       {(modal.urgencyEnabled || modal.countdownEnabled) && (
         <div className="px-4 py-2 text-[10px] font-semibold text-center" style={{ background: 'rgba(251,191,36,0.15)', color: '#92400E' }}>
-          {modal.urgencyEnabled ? modal.urgencyText || '⏰ Limited time offer' : '⏰ 24:00:00'}
+          {stripText}
         </div>
       )}
-      {/* Content */}
+      {/* Content — no line clamp, so the preview shows the full text like the live popup */}
       <div className="px-5 py-4 text-center" style={{ background: contentBg }}>
         <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-bold tracking-widest uppercase mb-2.5" style={{ background: badgeBg, color: badgeTxt }}>
           <Sparkles size={8} />
@@ -332,10 +396,12 @@ function ModalPreview({ m: modal }: { m: any }) {
         <h3 className="text-base font-serif leading-tight mb-1.5" style={{ color: titleClr }}>
           {modal.title || 'New Collection'}
         </h3>
-        <p className="text-[10px] leading-relaxed mb-4 line-clamp-2" style={{ color: descClr }}>
-          {modal.description || 'Discover our latest additions, crafted with rare botanical extracts.'}
-        </p>
-        <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold px-4 py-2 rounded-xl shadow-sm" style={{ background: ctaGrad, color: ctaTxt }}>
+        {modal.description && (
+          <p className="text-[10px] leading-relaxed mb-4" style={{ color: descClr }}>
+            {modal.description}
+          </p>
+        )}
+        <div className={`flex items-center justify-center gap-1.5 text-[10px] font-semibold px-4 py-2 rounded-xl shadow-sm ${modal.description ? '' : 'mt-3'}`} style={{ background: ctaGrad, color: ctaTxt }}>
           {modal.ctaLabel || 'Explore Collection'}
           <ArrowRight size={11} />
         </div>
@@ -374,8 +440,269 @@ function findBlankNumbers(original: any, current: any, prefix = ''): string[] {
   });
 }
 
+/* Modal Image Field with File Upload, Media Library, and Direct URL options */
+function ModalImageField({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+  disabled?: boolean;
+}) {
+  const { getAuthHeaders } = useApp();
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [inputMode, setInputMode] = useState<'upload' | 'url'>('upload');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const locked = isUploading || disabled;
+
+  const handleFileUpload = async (file: File) => {
+    if (!file || disabled) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Invalid file type. Only JPG, PNG, and WEBP are allowed.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be under 5MB.');
+      return;
+    }
+
+    const uploadToast = toast.loading('Uploading modal image...');
+    setIsUploading(true);
+    try {
+      const headers = await getAuthHeaders(false);
+      const fd = new FormData();
+      fd.append('image', file);
+
+      const res = await fetch(`${API_URL}/api/v1/admin/upload`, {
+        method: 'POST',
+        headers,
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        onChange(data.path);
+        toast.success('Modal image uploaded successfully!', { id: uploadToast });
+      } else {
+        toast.error(data.message || 'Failed to upload image', { id: uploadToast });
+      }
+    } catch (err: any) {
+      console.error('Modal image upload error:', err);
+      toast.error(err.message || 'Error uploading image', { id: uploadToast });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) handleFileUpload(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (locked) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFileUpload(file);
+  };
+
+  const displayUrl = resolveImageSrc(value);
+
+  return (
+    <Field
+      label="Popup Image"
+      description="Upload an image, pick from your Media Library, or paste an image URL. Leave blank to display the animated sparkle graphic."
+    >
+      <div className="space-y-3">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={onFileChange}
+          disabled={locked}
+        />
+
+        {/* Existing Image Preview Card */}
+        {value ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+            <div className="relative w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 shadow-xs flex items-center justify-center">
+              <img
+                src={displayUrl}
+                alt="Modal graphic"
+                className="w-full h-full object-contain p-1"
+                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 truncate" title={value}>
+                <span className="truncate">{value.split('/').pop() || 'Current Image'}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 truncate mt-0.5" title={value}>
+                {value}
+              </p>
+              {!disabled && (
+                <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={locked}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUploading ? <Loader2 size={13} className="animate-spin text-dark-red" /> : <Upload size={13} />}
+                    {isUploading ? 'Uploading...' : 'Replace'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLibraryOpen(true)}
+                    disabled={locked}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                  >
+                    <Library size={13} />
+                    Choose from Library
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChange('')}
+                    disabled={locked}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : disabled ? (
+          <p className="text-xs text-slate-400 italic">No image set (the sparkle graphic is shown).</p>
+        ) : (
+          /* Dropzone / Upload Action Box when no image is set */
+          <div
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+            onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-xl p-5 text-center transition-colors ${
+              isDragging ? 'border-dark-red bg-red-50/30' : 'border-slate-300 bg-slate-50/70 hover:bg-slate-50'
+            }`}
+          >
+            {isUploading ? (
+              <div className="flex flex-col items-center justify-center py-4">
+                <Loader2 size={24} className="animate-spin text-dark-red mb-2" />
+                <span className="text-xs font-medium text-slate-700">Uploading image to Cloudinary...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-red-50 text-dark-red flex items-center justify-center mb-2">
+                  <Upload size={18} />
+                </div>
+                <p className="text-xs font-medium text-slate-700 mb-1">
+                  Drag and drop an image, or{' '}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-dark-red underline hover:text-ruby-red font-semibold cursor-pointer"
+                  >
+                    browse files
+                  </button>
+                </p>
+                <p className="text-[11px] text-slate-400 mb-3">JPG, PNG, WEBP (up to 5 MB)</p>
+
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-dark-red rounded-lg hover:bg-ruby-red transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Upload size={13} />
+                    Upload Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLibraryOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <Library size={13} />
+                    Media Library
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Toggleable Direct URL entry */}
+        {!disabled && (
+          <div className="pt-0.5">
+            <button
+              type="button"
+              onClick={() => setInputMode(prev => prev === 'url' ? 'upload' : 'url')}
+              className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
+            >
+              <LinkIcon size={12} />
+              {inputMode === 'url' ? 'Hide URL input' : 'Or paste an image URL directly'}
+            </button>
+            {inputMode === 'url' && (
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={value ?? ''}
+                  onChange={(v: string) => onChange(v.trim())}
+                  placeholder="https://..."
+                />
+                {value && (
+                  <button
+                    type="button"
+                    onClick={() => onChange('')}
+                    className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-red-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors flex-shrink-0 cursor-pointer"
+                    title="Clear image"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Media Library Picker Modal */}
+        {isLibraryOpen && !disabled && createPortal(
+          <Suspense fallback={<div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 text-white text-xs">Loading media library...</div>}>
+            <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs" onClick={() => setIsLibraryOpen(false)}>
+              <div
+                className="relative w-full max-w-4xl h-[85vh] max-h-[700px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200"
+                onClick={e => e.stopPropagation()}
+              >
+                <MediaLibrary
+                  mode="picker"
+                  onSelect={(url) => {
+                    onChange(url);
+                    setIsLibraryOpen(false);
+                    toast.success('Image selected from library!');
+                  }}
+                  onClose={() => setIsLibraryOpen(false)}
+                />
+              </div>
+            </div>
+          </Suspense>,
+          document.body
+        )}
+      </div>
+    </Field>
+  );
+}
+
 /* The main admin panel component */
-function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value: any) => void }) {
+function ModalBannerAdmin({ s, update, readOnly = false }: { s: any; update: (path: string, value: any) => void; readOnly?: boolean }) {
   const m = s.launchModal ?? {};
   const lm = (k: string, v: any) => update(`launchModal.${k}`, v);
   const emojis: string[] = Array.isArray(m.floatingEmojis) ? [...m.floatingEmojis] : [];
@@ -390,6 +717,12 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
     lm('floatingEmojis', next);
   };
 
+  // Effective values: what the live popup actually uses when a field is unset.
+  const staggerOn       = m.staggerContent !== false;
+  const entranceStyle   = m.entranceStyle    ?? MODAL_DEFAULTS.entranceStyle;
+  const intensity       = m.effectsIntensity ?? MODAL_DEFAULTS.effectsIntensity;
+  const imageReveal     = m.imageRevealStyle ?? MODAL_DEFAULTS.imageRevealStyle;
+
   return (
     <div className="space-y-3 pt-1">
       <div className="flex items-center justify-between">
@@ -398,7 +731,9 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
           {m.isActive ? '● Active' : '○ Disabled'}
         </span>
       </div>
-      <p className="text-xs text-slate-500 pb-1">Configure every detail of the popup shown to first-time visitors. Changes are saved with the rest of your settings.</p>
+      <p className="text-xs text-slate-500 pb-1">
+        Each visitor sees the popup once per offer, then again after a few days. Changing the badge, title, description or CTA link counts as a new offer and shows it again. Changes are saved with the rest of your settings.
+      </p>
 
       {/* ── Section 1: Content & General ── */}
       <Accordion title="Content & General" icon="📝" defaultOpen>
@@ -420,26 +755,18 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
           />
         </Field>
         <Field label="CTA Button Label"><Input value={m.ctaLabel ?? ''} onChange={(v: string) => lm('ctaLabel', v)} placeholder="Explore Collection" /></Field>
-        <Field label="CTA Button Link"><Input value={m.ctaLink ?? ''} onChange={(v: string) => lm('ctaLink', v)} placeholder="/shop" /></Field>
-        <Field label="Image URL" description="Paste any image URL — leave blank to use the sparkle graphic">
-          <Input value={m.image ?? ''} onChange={(v: string) => lm('image', v)} placeholder="https://…" />
-          {m.image && (
-            <img
-              src={m.image}
-              alt="Preview"
-              className="mt-2 h-16 object-contain rounded-lg border border-slate-200 bg-slate-50"
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          )}
+        <Field label="CTA Button Link" description="A page on your site (e.g. /shop) or a full https:// URL, which opens in a new tab">
+          <Input value={m.ctaLink ?? ''} onChange={(v: string) => lm('ctaLink', v)} placeholder="/shop" />
         </Field>
+        <ModalImageField value={m.image ?? ''} onChange={v => lm('image', v)} disabled={readOnly} />
         <Field label="Popup Delay (seconds)" description="How long after page load before the popup appears">
-          <Input value={m.showDelaySeconds ?? 2.5} onChange={(v: number) => lm('showDelaySeconds', v)} type="number" />
+          <Input value={m.showDelaySeconds ?? MODAL_DEFAULTS.showDelaySeconds} onChange={(v: number) => lm('showDelaySeconds', v)} type="number" min={0} step={0.5} />
         </Field>
         <Toggle
           checked={!!m.exitIntentTrigger}
           onChange={v => lm('exitIntentTrigger', v)}
           label="Exit-Intent Trigger"
-          description="Also show the popup when the user moves their mouse toward the browser close button (desktop only)"
+          description="Also show the popup (once) if a desktop visitor moves to leave before the delay ends"
         />
       </Accordion>
 
@@ -453,18 +780,21 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
           description="CSS gradient string for the top image panel. e.g. 135deg, #3B1E0A 0%, #7C3527 100%"
         />
         <Toggle checked={!!m.headerBgAnimated} onChange={v => lm('headerBgAnimated', v)} label="Animate Header" description="Slowly pulses the gradient for a living background effect" />
-        <div className="grid grid-cols-3 gap-3 mt-1">
-          <ColorField label="Orb 1 Colour" value={m.orb1Color ?? '#F97316'} onChange={v => lm('orb1Color', v)} />
-          <ColorField label="Orb 2 Colour" value={m.orb2Color ?? '#EC4899'} onChange={v => lm('orb2Color', v)} />
-          <ColorField label="Orb 3 Colour" description="High intensity only" value={m.orb3Color ?? '#FBBF24'} onChange={v => lm('orb3Color', v)} />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 mt-1">
+          <ColorField label="Orb 1 Colour" value={m.orb1Color ?? ''} fallback={MODAL_DEFAULTS.orb1Color} onChange={v => lm('orb1Color', v)} />
+          <ColorField label="Orb 2 Colour" value={m.orb2Color ?? ''} fallback={MODAL_DEFAULTS.orb2Color} onChange={v => lm('orb2Color', v)} />
+          <ColorField label="Orb 3 Colour" description="High intensity only" value={m.orb3Color ?? ''} fallback={MODAL_DEFAULTS.orb3Color} onChange={v => lm('orb3Color', v)} />
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-1">
-          <ColorField label="Badge Background" value={m.badgeBg ?? ''} onChange={v => lm('badgeBg', v)} />
-          <ColorField label="Badge Text" value={m.badgeTextColor ?? ''} onChange={v => lm('badgeTextColor', v)} />
-          <ColorField label="Title Colour" value={m.titleColor ?? '#ffffff'} onChange={v => lm('titleColor', v)} />
-          <ColorField label="Description Colour" value={m.descriptionColor ?? ''} onChange={v => lm('descriptionColor', v)} />
-          <ColorField label="Content Panel BG" value={m.contentBg ?? '#ffffff'} onChange={v => lm('contentBg', v)} />
-          <ColorField label="CTA Text Colour" value={m.ctaTextColor ?? '#2C1208'} onChange={v => lm('ctaTextColor', v)} />
+        <p className="text-[11px] text-slate-500 pt-2">
+          The badge, title and description sit on the content panel (below the header), so pick colours that contrast with the Content Panel BG.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 mt-1">
+          <ColorField label="Badge Background" value={m.badgeBg ?? ''} fallback={MODAL_DEFAULTS.badgeBg} onChange={v => lm('badgeBg', v)} />
+          <ColorField label="Badge Text" value={m.badgeTextColor ?? ''} fallback={MODAL_DEFAULTS.badgeTextColor} onChange={v => lm('badgeTextColor', v)} />
+          <ColorField label="Title Colour" value={m.titleColor ?? ''} fallback={MODAL_DEFAULTS.titleColor} onChange={v => lm('titleColor', v)} />
+          <ColorField label="Description Colour" value={m.descriptionColor ?? ''} fallback={MODAL_DEFAULTS.descriptionColor} onChange={v => lm('descriptionColor', v)} />
+          <ColorField label="Content Panel BG" value={m.contentBg ?? ''} fallback={MODAL_DEFAULTS.contentBg} onChange={v => lm('contentBg', v)} />
+          <ColorField label="CTA Text Colour" value={m.ctaTextColor ?? ''} fallback={MODAL_DEFAULTS.ctaTextColor} onChange={v => lm('ctaTextColor', v)} />
         </div>
         <GradientField
           label="CTA Button Gradient"
@@ -493,7 +823,7 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
                   type="text"
                   value={e}
                   onChange={ev => setEmoji(i, ev.target.value)}
-                  // maxLength counts UTF-16 units: 4 cut multi-part emoji (👩‍🔬, skin
+                  // maxLength counts UTF-16 units: 4 cut multi-part emoji (👩🔬, skin
                   // tones) in half. 16 fits any single emoji.
                   maxLength={16}
                   placeholder={['🌸','🍃','✨','🌹','🎀'][i]}
@@ -507,12 +837,12 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
           <Toggle checked={!!m.emojiTrailPhysics} onChange={v => lm('emojiTrailPhysics', v)} label="Emoji Trail Physics" description="Each emoji gets unique speed and rotation so they never look identical" />
         )}
         <Toggle checked={!!m.ctaShimmer} onChange={v => lm('ctaShimmer', v)} label="CTA Shimmer Sweep" description="A light shine glides across the CTA button periodically" />
-        <Toggle checked={!!m.ctaParticleBurst} onChange={v => lm('ctaParticleBurst', v)} label="CTA Particle Burst" description="A burst of emoji particles fires from the button on click" />
+        <Toggle checked={!!m.ctaParticleBurst} onChange={v => lm('ctaParticleBurst', v)} label="CTA Particle Burst" description="A burst of emoji particles fires from the button on click (adds a short pause before the popup closes)" />
         <Toggle checked={!!m.closeButtonSpin} onChange={v => lm('closeButtonSpin', v)} label="Close Button Spin" description="The × icon rotates 90° on hover" />
         <Toggle checked={!!m.backdropBlurAnimated} onChange={v => lm('backdropBlurAnimated', v)} label="Animated Backdrop" description="Backdrop eases in smoothly instead of snapping" />
         <Field label="Image Reveal Style" description="How the image animates into view when the modal opens">
           <select
-            value={m.imageRevealStyle ?? 'fadeScale'}
+            value={imageReveal}
             onChange={e => lm('imageRevealStyle', e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-dark-red/20 focus:border-dark-red bg-white"
           >
@@ -532,8 +862,9 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
                 key={style}
                 type="button"
                 onClick={() => lm('entranceStyle', style)}
+                aria-pressed={entranceStyle === style}
                 className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all text-left ${
-                  m.entranceStyle === style
+                  entranceStyle === style
                     ? 'bg-red-50 border-dark-red text-dark-red'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
                 }`}
@@ -547,7 +878,7 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
           </div>
         </Field>
         <Toggle checked={!!m.parallaxOnMouse} onChange={v => lm('parallaxOnMouse', v)} label="Mouse Parallax Depth" description="Orbs and image shift with cursor position — 3D depth feel (desktop)" />
-        <Toggle checked={!!m.staggerContent} onChange={v => lm('staggerContent', v)} label="Stagger Content" description="Badge → title → description → CTA fade up in sequence" />
+        <Toggle checked={staggerOn} onChange={v => lm('staggerContent', v)} label="Stagger Content" description="Badge → title → description → CTA fade up in sequence" />
         <Field label="Effects Intensity" description="Reduces heavy effects on low-end devices">
           <div className="flex gap-2">
             {(['low','medium','high'] as const).map(level => (
@@ -555,8 +886,9 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
                 key={level}
                 type="button"
                 onClick={() => lm('effectsIntensity', level)}
+                aria-pressed={intensity === level}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold border capitalize transition-all ${
-                  m.effectsIntensity === level
+                  intensity === level
                     ? 'bg-red-50 border-dark-red text-dark-red'
                     : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
                 }`}
@@ -617,12 +949,12 @@ function ModalBannerAdmin({ s, update }: { s: any; update: (path: string, value:
 
 export default function StoreSettings() {
   const { getAuthHeaders, isPrimaryAdmin } = useApp();
-  
+
   const [originalState, setOriginalState] = useState<any>(null);
   const [formState, setFormState] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  
+
   const [activeSection, setActiveSection] = useState<Tab>('general');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -649,19 +981,20 @@ export default function StoreSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
-  // Setup ScrollSpy for Active Section
+  // ScrollSpy for the active sidebar item. Depends only on whether settings have
+  // loaded — depending on formState rebuilt the observer on every keystroke.
+  const hasSettings = formState !== null;
   useEffect(() => {
-    if (isLoading || !formState) return;
-    
+    if (isLoading || !hasSettings) return;
+
     const observer = new IntersectionObserver((entries) => {
-      // Find the first intersecting entry
       const visible = entries.find(e => e.isIntersecting);
       if (visible) {
         setActiveSection(visible.target.id as Tab);
       }
-    }, { 
+    }, {
       root: null,
-      rootMargin: '-100px 0px -60% 0px' 
+      rootMargin: '-100px 0px -60% 0px'
     });
 
     TABS.forEach(tab => {
@@ -670,9 +1003,20 @@ export default function StoreSettings() {
     });
 
     return () => observer.disconnect();
-  }, [isLoading, formState]);
+  }, [isLoading, hasSettings]);
 
   const isDirty = formState && originalState ? JSON.stringify(formState) !== JSON.stringify(originalState) : false;
+
+  // Warn before closing or reloading the tab with unsaved changes.
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
   const handleSave = async () => {
     if (!isPrimaryAdmin) {
@@ -682,6 +1026,13 @@ export default function StoreSettings() {
     const blanks = findBlankNumbers(originalState, formState);
     if (blanks.length > 0) {
       toast.error(`Fill in a number (0 is fine) for: ${blanks.join(', ')}`);
+      return;
+    }
+    // findBlankNumbers only catches fields that were numbers before. A popup delay
+    // that was never saved and then cleared would go through as '' (instant popup).
+    const delay = formState.launchModal?.showDelaySeconds;
+    if (delay !== undefined && (delay === '' || delay === null || Number.isNaN(Number(delay)) || Number(delay) < 0)) {
+      toast.error('Popup delay must be 0 or more seconds.');
       return;
     }
     const payload = {
@@ -718,7 +1069,9 @@ export default function StoreSettings() {
     }
   };
 
+  // View-only admins can browse settings but not change them.
   const update = (path: string, value: any) => {
+    if (!isPrimaryAdmin) return;
     setFormState((prev: any) => {
       const keys = path.split('.');
       const next = JSON.parse(JSON.stringify(prev));
@@ -754,11 +1107,11 @@ export default function StoreSettings() {
 
   return (
     <div className="flex flex-col -m-3 sm:-m-6 lg:-m-8">
-      <SettingsHeader 
-        isDirty={isDirty} 
-        isSaving={saveStatus === 'saving'} 
-        isPrimaryAdmin={isPrimaryAdmin} 
-        onSave={handleSave} 
+      <SettingsHeader
+        isDirty={isDirty}
+        isSaving={saveStatus === 'saving'}
+        isPrimaryAdmin={isPrimaryAdmin}
+        onSave={handleSave}
       />
 
       <div className="flex flex-col md:flex-row">
@@ -770,13 +1123,20 @@ export default function StoreSettings() {
         {/* Content Area */}
         <div ref={scrollContainerRef} className="flex-1 bg-slate-50/50 p-4 sm:p-8">
           <div className="max-w-4xl mx-auto space-y-8 pb-24">
-            
+
+            {!isPrimaryAdmin && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                You have view-only access. Only the primary admin can change these settings.
+              </div>
+            )}
+
             <SettingsCard id="general" title="General Information" description="Basic details about your business and store profile.">
               <Field label="Store Name"><Input value={s.storeName} onChange={(v: string) => update('storeName', v)} /></Field>
               <Field label="Support Email"><Input value={s.supportEmail} onChange={(v: string) => update('supportEmail', v)} type="email" /></Field>
               <Field label="Support Phone"><Input value={s.supportPhone} onChange={(v: string) => update('supportPhone', v)} /></Field>
               <Field label="Store Address" description="Physical address for invoices"><Input value={s.storeAddress} onChange={(v: string) => update('storeAddress', v)} /></Field>
-              
+
               <div className="pt-6 mt-6 border-t border-slate-100">
                 <h4 className="text-sm font-bold text-slate-800 mb-2">Tax & Invoicing</h4>
                 <Field label="Invoice Prefix"><Input value={s.invoicePrefix} onChange={(v: string) => update('invoicePrefix', v)} placeholder="BOD-" /></Field>
@@ -805,7 +1165,7 @@ export default function StoreSettings() {
               {/* ════════════════════════════════════════════════════════════
                   Launch Modal / Popup Banner — full WYSIWYG admin
               ════════════════════════════════════════════════════════════ */}
-              <ModalBannerAdmin s={s as any} update={update} />
+              <ModalBannerAdmin s={s as any} update={update} readOnly={!isPrimaryAdmin} />
             </SettingsCard>
 
             <SettingsCard id="shipping" title="Shipping & Delivery" description="Manage shipping thresholds, costs, and international settings.">

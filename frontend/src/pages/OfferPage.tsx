@@ -2,6 +2,7 @@
 import { useApp } from '../context/AppContext';
 import { Sparkles, ShoppingBag, Gift, CheckCircle, XCircle, Clock, ChevronRight, Instagram, Facebook, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import { useSEO } from '../hooks/useSEO';
 
@@ -9,9 +10,9 @@ export default function OfferPage() {
   const { user, authStatus, navigateTo } = useApp();
 
   useSEO({
-    title: 'Welcome Offer — 10% Off Your First Order | Bodilicious',
+    title: 'Limited-Time Skincare Offers | Bodilicious',
     description:
-      'New to Bodilicious? Enjoy 10% off your first order. Dermatologically tested, free shipping on qualifying orders.',
+      'Shop limited-time offers on Bodilicious Niacinamide Serum and Liquid Sunscreen.',
         keywords: 'bodilicious, skincare, haircare, natural beauty, products, buy online',
     canonical: '/offers',
     ogImage: 'https://bodilicious.in/og-image.png',
@@ -34,6 +35,25 @@ export default function OfferPage() {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as any } }
   };
+
+  const productOffers = [
+    {
+      name: 'Niacinamide Serum',
+      pid: 'BD-SER-NIA-SPF30',
+      originalPrice: 349,
+      offerPrice: 249,
+      image: '/products/niacinamide-serum-0.webp',
+      detail: 'A daily serum with 5% niacinamide.',
+    },
+    {
+      name: 'Liquid Sunscreen',
+      pid: 'BD-SUN-LIQ',
+      originalPrice: 249,
+      offerPrice: 149,
+      image: '/products/liq-sun-0.webp',
+      detail: 'Lightweight sun protection for everyday use.',
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-[#F8F4EF] flex flex-col selection:bg-ruby-red/10">
@@ -167,6 +187,35 @@ export default function OfferPage() {
             </div>
           )}
         </motion.div>
+      </section>
+
+      {/* Limited-time product offers */}
+      <section className="max-w-5xl mx-auto w-full px-4 sm:px-6 pt-12 sm:pt-16">
+        <div className="text-center mb-7 sm:mb-8">
+          <p className="font-sans text-[10px] uppercase tracking-[0.3em] text-ruby-red font-bold mb-3">Limited-Time Offers</p>
+          <h2 className="font-serif text-3xl sm:text-4xl text-dark">Skincare favourites, special prices</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+          {productOffers.map((offer) => (
+            <Link
+              key={offer.pid}
+              to={`/product/${offer.pid}`}
+              className="group min-w-0 bg-white rounded-2xl border border-silk p-4 sm:p-5 flex items-center gap-4 sm:gap-5 hover:shadow-luxury transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ruby-red"
+            >
+              <img src={offer.image} alt={offer.name} className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 object-contain rounded-xl bg-[#F8F4EF]" loading="lazy" />
+              <div className="min-w-0 flex-1">
+                <span className="inline-block text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-ruby-red mb-1">Limited-time price</span>
+                <h3 className="font-serif text-lg sm:text-xl text-dark group-hover:text-ruby-red transition-colors">{offer.name}</h3>
+                <p className="text-xs text-grey-beige mt-1">{offer.detail}</p>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-2 sm:mt-3">
+                  <span className="text-lg font-bold text-dark-red">₹{offer.offerPrice}</span>
+                  <span className="text-sm text-grey-beige line-through">₹{offer.originalPrice}</span>
+                  <span className="text-xs font-semibold text-emerald-700">Save ₹{offer.originalPrice - offer.offerPrice}</span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       </section>
 
       {/* How it works */}
