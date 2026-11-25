@@ -1,7 +1,7 @@
 import { AppContext, AppProvider } from './context/AppContext';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { LazyMotion, domAnimation, AnimatePresence } from 'framer-motion';
-import { lazy, Suspense, useEffect, useContext } from 'react';
+import { lazy, Suspense, useEffect, useContext, useRef } from 'react';
 import Navbar from './components/Navbar';
 import PageTransition from './components/PageTransition';
 import ScrollToTop from './components/ScrollToTop';
@@ -12,6 +12,7 @@ import AdminRoute from './components/AdminRoute';
 import SessionTracker from './components/SessionTracker';
 import LaunchModal from './components/LaunchModal';
 import OffersPopup from './components/OffersPopup';
+import { trackMetaPageView } from './utils/metaPixel';
 
 // Lazy load page components
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -78,6 +79,16 @@ const PageLoader = () => (
 function AppRoutes() {
   const location = useLocation();
   const { storeSettings } = useContext(AppContext)!;
+  const lastTrackedRouteRef = useRef(`${location.pathname}${location.search}`);
+
+  useEffect(() => {
+    const currentRoute = `${location.pathname}${location.search}`;
+    if (currentRoute === lastTrackedRouteRef.current) return;
+    lastTrackedRouteRef.current = currentRoute;
+    if (!location.pathname.startsWith('/admin')) {
+      trackMetaPageView();
+    }
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

@@ -36,25 +36,26 @@ const TTL_MS = 5 * 60 * 1000; // 5 minutes
 // immediately — watch the console on sign-in and a real checkout, fix any
 // gaps, then switch the header name to the enforcing `Content-Security-Policy`.
 //
-// script-src's hash covers the single static inline <script> in index.html
-// (the gtag bootstrap snippet). If that snippet's contents ever change, this
-// hash must be recomputed — see frontend/index.html for the source.
+// script-src's hashes cover the static inline <script> blocks in index.html
+// (the gtag and Meta Pixel bootstrap snippets). If either snippet's contents
+// ever change, its hash must be recomputed — see frontend/index.html for the source.
 const GTAG_INLINE_SCRIPT_HASH = "'sha256-0ZKCLuJt1ufyFVMehULEakKDT1sqnq7/wqcAONtkfw8='";
+const META_PIXEL_INLINE_SCRIPT_HASH = "'sha256-0rtv+6FE3GTunpodkd43lUD/+7b9TanzTY7h5dwFzRE='";
 
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
-  `script-src 'self' ${GTAG_INLINE_SCRIPT_HASH} https://www.googletagmanager.com https://analytics.ahrefs.com https://checkout.razorpay.com https://apis.google.com https://www.gstatic.com`,
+  `script-src 'self' ${GTAG_INLINE_SCRIPT_HASH} ${META_PIXEL_INLINE_SCRIPT_HASH} https://www.googletagmanager.com https://analytics.ahrefs.com https://connect.facebook.net https://checkout.razorpay.com https://apis.google.com https://www.gstatic.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob: https://res.cloudinary.com https://*.razorpay.com https://*.gstatic.com https://images.pexels.com",
-  "connect-src 'self' https://bodilicious-cxow.onrender.com https://bodilicious-front.onrender.com https://us.i.posthog.com https://*.posthog.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com https://analytics.ahrefs.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com",
+  "img-src 'self' data: blob: https://res.cloudinary.com https://*.razorpay.com https://*.gstatic.com https://images.pexels.com https://www.facebook.com",
+  "connect-src 'self' https://bodilicious-cxow.onrender.com https://bodilicious-front.onrender.com https://us.i.posthog.com https://*.posthog.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com https://analytics.ahrefs.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net",
   // 'self' in both: the admin live homepage builder (VisualHomepageEditor) frames
   // /internal/homepage-preview from the same origin.
   "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://www.instagram.com https://accounts.google.com https://*.firebaseapp.com",
   "frame-ancestors 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://www.facebook.com",
   // Only these two named policies are allowed to wrap strings as Trusted
   // Types — see frontend/src/utils/trustedTypes.ts for where they're created
   // and what they guard (sanitized blog HTML, the Razorpay script URL).

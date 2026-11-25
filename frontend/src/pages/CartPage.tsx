@@ -8,6 +8,7 @@ import { useSEO } from '../hooks/useSEO';
 import { getCountryNameFromIso } from '../utils/countries';
 import { formatCurrency } from '../utils/currencies';
 import { productImage } from '../utils/productImage';
+import { trackMetaInitiateCheckout } from '../utils/metaPixel';
 
 export default function CartPage() {
   useSEO({
@@ -409,6 +410,16 @@ export default function CartPage() {
               )}
               <button
                 onClick={() => {
+                  // 🎯 Meta Pixel Tracking - InitiateCheckout
+                  trackMetaInitiateCheckout({
+                    items: validCartItems.map((i: any) => ({
+                      id: String(i.product?.pid || ''),
+                      quantity: Number(i.quantity || 1),
+                    })),
+                    value: Number(quoteData.total || 0),
+                    currency: quoteData.currency || userCurrency || 'INR',
+                  });
+
                   // 🎯 Google Analytics/Ads Tracking - Begin Checkout
                   if (typeof window !== 'undefined' && (window as any).gtag) {
                     (window as any).gtag('event', 'begin_checkout', {

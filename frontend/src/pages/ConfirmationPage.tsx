@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import { formatCurrency } from '../utils/currencies';
 import { useSEO } from '../hooks/useSEO';
 import { productImage } from '../utils/productImage';
+import { trackMetaPurchase } from '../utils/metaPixel';
 
 const CONFIRMATION_STATE_KEY = 'bodilicious_confirmation_state';
 
@@ -147,6 +148,19 @@ export default function ConfirmationPage() {
         
         conversionTrackedRef.current = true;
         sessionStorage.setItem(trackedKey, '1');
+
+        // Fallback Meta Pixel Purchase (deduplicated per orderId via sessionStorage;
+        // catches async 202 webhook-created orders that bypassed verifyPayment)
+        trackMetaPurchase({
+            orderId: String(order._id),
+            items: (order.items || []).map((item: any) => ({
+                id: String(item.product?.pid || item.product || ''),
+                quantity: Number(item.quantity || 1),
+                item_price: typeof item.priceAtPurchase === 'number' ? item.priceAtPurchase : undefined,
+            })),
+            value: Number(order.totalAmount || 0),
+            currency: order.currency || 'INR',
+        });
 
         if (typeof window !== 'undefined' && (window as any).gtag) {
             const hasPeptide = order.items.some((item: any) => item.product?.pid === 'BD-MOIST-PEP');

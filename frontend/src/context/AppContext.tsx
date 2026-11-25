@@ -31,6 +31,7 @@ import {
   Address
 } from '../types';
 import { track } from '../utils/analytics';
+import { trackMetaAddToCart, trackMetaPurchase } from '../utils/metaPixel';
 import { getCurrencyForCountry } from '../utils/currencies';
 
 /* ================================
@@ -1035,6 +1036,16 @@ const triggerPasswordReset = async (email: string) => {
       quantity: quantity
     });
 
+    // 🎯 Meta Pixel Tracking - AddToCart
+    trackMetaAddToCart({
+      id: product.pid,
+      name: product.name,
+      category: product.category,
+      value: Number(product.price || 0) * Number(quantity),
+      quantity: Number(quantity),
+      currency: 'INR',
+    });
+
     // 🎯 Google Analytics/Ads Tracking
     if (typeof window !== 'undefined' && (window as any).gtag) {
       // GA4 Event
@@ -1161,6 +1172,18 @@ const triggerPasswordReset = async (email: string) => {
 
     const json = await response.json();
     const { order } = json.data;
+
+    // 🎯 Meta Pixel Tracking - Purchase (COD)
+    trackMetaPurchase({
+      orderId: String(order._id || order.orderId),
+      items: (order.items || []).map((i: any) => ({
+        id: String(i.product?.pid || i.product || ''),
+        quantity: Number(i.quantity || 1),
+        item_price: typeof (i.priceAtPurchase ?? i.price) === 'number' ? Number(i.priceAtPurchase ?? i.price) : undefined,
+      })),
+      value: Number(order.totalAmount || 0),
+      currency: order.currency || 'INR',
+    });
 
     // 🎯 Google Analytics/Ads Tracking - Purchase
     if (typeof window !== 'undefined' && (window as any).gtag) {
@@ -1323,6 +1346,18 @@ const triggerPasswordReset = async (email: string) => {
     }
 
     const { data: order } = await res.json();
+
+    // 🎯 Meta Pixel Tracking - Purchase (Razorpay)
+    trackMetaPurchase({
+      orderId: String(order._id || order.orderId),
+      items: (order.items || []).map((i: any) => ({
+        id: String(i.product?.pid || i.product || ''),
+        quantity: Number(i.quantity || 1),
+        item_price: typeof (i.priceAtPurchase ?? i.price) === 'number' ? Number(i.priceAtPurchase ?? i.price) : undefined,
+      })),
+      value: Number(order.totalAmount || 0),
+      currency: order.currency || 'INR',
+    });
 
     // 🎯 Google Analytics/Ads Tracking - Purchase
     if (typeof window !== 'undefined' && (window as any).gtag) {

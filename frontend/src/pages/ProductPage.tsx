@@ -62,6 +62,7 @@ import {
   usableFaqs,
 } from '../utils/seo';
 import { track } from '../utils/analytics';
+import { trackMetaViewContent } from '../utils/metaPixel';
 import { useCurrency } from '../hooks/useCurrency';
 import DOMPurify from 'dompurify';
 import { toTrustedHTML } from '../utils/trustedTypes';
@@ -435,12 +436,15 @@ export default function ProductPage() {
   // Reported to /admin/analytics/track (public, optional auth). The comment here used
   // to say the product fetch tracked views server-side — it couldn't (that request
   // carries no token and logged nothing), so admin product views/funnels stayed at 0.
-  const viewTracked = useRef(false);
+  const viewTrackedPid = useRef<string | null>(null);
   useEffect(() => {
-    if (!product?.pid || viewTracked.current) return;
+    if (!product?.pid || viewTrackedPid.current === product.pid) return;
     const sessionKey = `pv_${product.pid}`;
-    if (sessionStorage.getItem(sessionKey)) return;
-    viewTracked.current = true;
+    if (sessionStorage.getItem(sessionKey)) {
+      viewTrackedPid.current = product.pid;
+      return;
+    }
+    viewTrackedPid.current = product.pid;
     sessionStorage.setItem(sessionKey, '1');
 
     // First-party view event (feeds the admin product-velocity ETL + CRM)
@@ -462,6 +466,15 @@ export default function ProductPage() {
       name: product.name,
       category: product.category,
       price: product.price
+    });
+
+    // 🎯 Meta Pixel Tracking - ViewContent
+    trackMetaViewContent({
+      id: product.pid,
+      name: product.name,
+      category: product.category,
+      value: Number(product.price || 0),
+      currency: 'INR',
     });
 
     // 🎯 Google Analytics/Ads Client-Side Tracking (Dynamic Remarketing)

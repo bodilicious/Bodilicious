@@ -96,6 +96,18 @@ function writeHtml(urlPath, html) {
 
 // ── Process a single URL with Puppeteer ──────────────────────────────────────
 
+async function serializeCleanHtml(page) {
+  // Remove dynamically-injected third-party script tags (e.g. Meta Pixel's
+  // fbevents.js) before serializing so prerendered HTML keeps only the clean
+  // inline bootstrap and doesn't ship duplicate <script> tags.
+  await page.evaluate(() => {
+    document
+      .querySelectorAll('script[src*="connect.facebook.net/en_US/fbevents.js"]')
+      .forEach((el) => el.remove());
+  });
+  return page.content();
+}
+
 async function renderPage(browser, urlPath) {
   const fullUrl = `${BASE_URL}${urlPath}`;
   const page = await browser.newPage();
@@ -150,13 +162,13 @@ async function renderPage(browser, urlPath) {
       });
     }
 
-    const html = await page.content();
+    const html = await serializeCleanHtml(page);
     writeHtml(urlPath, html);
     return { path: urlPath, ok: true };
   } catch (err) {
     // Timeout or navigation error: try to save whatever we have
     try {
-      const html = await page.content();
+      const html = await serializeCleanHtml(page);
       if (html && html.includes('<div id="root">')) {
         writeHtml(urlPath, html);
         console.warn(`[prerender]   ⚠ Timeout on ${urlPath} — saved partial HTML (${err.message})`);
